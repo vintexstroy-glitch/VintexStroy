@@ -1,0 +1,205 @@
+/**
+ * ОГЛЕДАЛОТО — производно състояние.
+ *
+ * Не се съхранява. Изчислява се от Журнала при всяко поискване:
+ *   състояние = fold(събития, приложи)
+ *
+ * Правилото, за което се плати скъпо: „текущо състояние" е АГРЕГАТ на всички
+ * събития за същността, не последният ред (Архитектурен документ §2).
+ *
+ * Сторното се самопогасява: събитие, което е сторнирано, не се прилага —
+ * и самото сторно не се прилага. Нищо не се трие; просто не се брои.
+ */
+
+import type { Sabitie } from '../yadro/index.js';
+import type {
+  PayloadImotDobaven,
+  PayloadNaemDobaven,
+  PayloadNaemPrekraten,
+  PayloadPlashtanePrieto,
+  PayloadStorno,
+  PayloadVzemaneNachisleno,
+} from '../domein/sabitiya.js';
+
+export interface Imot {
+  readonly id: string;
+  readonly adres: string;
+  readonly edinitsa: string;
+  readonly ploshtad_kvsm: number;
+}
+
+export interface Naem {
+  readonly id: string;
+  readonly imotId: string;
+  readonly naemetel: string;
+  readonly naem_st: number;
+  readonly padezhDen: number;
+  readonly ot: string;
+  readonly do: string;
+  readonly depozit_st: number;
+  readonly prekraten: boolean;
+  readonly kraj?: string;
+}
+
+export type SastoyanieVzemane = 'отворено' | 'частично' | 'затворено' | 'надплатено';
+
+export interface Vzemane {
+  readonly id: string;
+  readonly naemId: string;
+  readonly period: string;
+  readonly osnovanie: string;
+  readonly nachisleno_st: number;
+  readonly pogaseno_st: number;
+  readonly ostatak_st: number;
+  readonly padezh: string;
+  readonly sastoyanie: SastoyanieVzemane;
+}
+
+export interface Plashtane {
+  readonly id: string;
+  readonly vzemaneId: string;
+  readonly suma_st: number;
+  readonly nachin: string;
+  readonly data: string;
+}
+
+export interface Ogledalo {
+  readonly imoti: ReadonlyMap<string, Imot>;
+  readonly naemi: ReadonlyMap<string, Naem>;
+  readonly vzemaniya: ReadonlyMap<string, Vzemane>;
+  readonly plashtaniya: ReadonlyMap<string, Plashtane>;
+  /** колко събития са влезли в състоянието */
+  readonly prilozheni: number;
+  /** seq-овете, които сторно е погасило (и самите сторна) */
+  readonly pogaseni: ReadonlySet<number>;
+}
+
+/**
+ * Изгражда Огледалото от подредена по seq редица събития.
+ * Две минавания: първо кои seq са погасени, после кои се прилагат.
+ */
+export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
+  const pogaseni = new Set<number>();
+  for (const s of sabitiya) {
+    if (s.type === 'Сторно') {
+      const p = s.payload as unknown as PayloadStorno;
+      pogaseni.add(p.pogasyavaSeq);
+      pogaseni.add(s.seq);
+    }
+  }
+
+  const imoti = new Map<string, Imot>();
+  const naemi = new Map<string, Naem>();
+  const vzemaniya = new Map<string, Vzemane>();
+  const plashtaniya = new Map<string, Plashtane>();
+  let prilozheni = 0;
+
+  for (const s of sabitiya) {
+    if (pogaseni.has(s.seq)) continue;
+    prilozheni += 1;
+
+    switch (s.type) {
+      case 'ИмотДобавен': {
+        const p = s.payload as unknown as PayloadImotDobaven;
+        imoti.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          adres: p.adres,
+          edinitsa: p.edinitsa,
+          ploshtad_kvsm: p.ploshtad_kvsm,
+        });
+        break;
+      }
+
+      case 'НаемДобавен': {
+        const p = s.payload as unknown as PayloadNaemDobaven;
+        naemi.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          imotId: p.imotId,
+          naemetel: p.naemetel,
+          naem_st: p.naem_st,
+          padezhDen: p.padezhDen,
+          ot: p.ot,
+          do: p.do,
+          depozit_st: p.depozit_st,
+          prekraten: false,
+        });
+        break;
+      }
+
+      case 'НаемПрекратен': {
+        const p = s.payload as unknown as PayloadNaemPrekraten;
+        const naem = naemi.get(p.naemId);
+        if (naem) naemi.set(naem.id, { ...naem, prekraten: true, kraj: p.kraj });
+        break;
+      }
+
+      case 'ВземанеНачислено': {
+        const p = s.payload as unknown as PayloadVzemaneNachisleno;
+        vzemaniya.set(
+          s.sashtnost.id,
+          presmetni({
+            id: s.sashtnost.id,
+            naemId: p.naemId,
+            period: p.period,
+            osnovanie: p.osnovanie,
+            nachisleno_st: p.suma_st,
+            pogaseno_st: 0,
+            padezh: p.padezh,
+          }),
+        );
+        break;
+      }
+
+      case 'ПлащанеПрието': {
+        const p = s.payload as unknown as PayloadPlashtanePrieto;
+        plashtaniya.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          vzemaneId: p.vzemaneId,
+          suma_st: p.suma_st,
+          nachin: p.nachin,
+          data: p.data,
+        });
+        const vzemane = vzemaniya.get(p.vzemaneId);
+        if (vzemane) {
+          vzemaniya.set(
+            vzemane.id,
+            presmetni({ ...vzemane, pogaseno_st: vzemane.pogaseno_st + p.suma_st }),
+          );
+        }
+        break;
+      }
+
+      default:
+        // Непознат тип не събаря Огледалото — брои се, но не мени нищо.
+        break;
+    }
+  }
+
+  return { imoti, naemi, vzemaniya, plashtaniya, prilozheni, pogaseni };
+}
+
+type BezPresmetnato = Omit<Vzemane, 'ostatak_st' | 'sastoyanie'>;
+
+function presmetni(v: BezPresmetnato): Vzemane {
+  const ostatak_st = v.nachisleno_st - v.pogaseno_st;
+  let sastoyanie: SastoyanieVzemane;
+  if (v.pogaseno_st === 0) sastoyanie = 'отворено';
+  else if (ostatak_st > 0) sastoyanie = 'частично';
+  else if (ostatak_st === 0) sastoyanie = 'затворено';
+  else sastoyanie = 'надплатено';
+  return { ...v, ostatak_st, sastoyanie };
+}
+
+/** Сборът, който трябва да затваря: начислено − погасено по всички вземания. */
+export function duljimo(o: Ogledalo): number {
+  let sbor = 0;
+  for (const v of o.vzemaniya.values()) sbor += v.ostatak_st;
+  return sbor;
+}
+
+/** Всичко събрано — сборът на непогасените плащания. */
+export function sabrano(o: Ogledalo): number {
+  let sbor = 0;
+  for (const p of o.plashtaniya.values()) sbor += p.suma_st;
+  return sbor;
+}
