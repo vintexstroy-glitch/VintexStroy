@@ -6,6 +6,7 @@
  */
 
 import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaData, otData } from '../src/yadro/data.js';
 import {
   duljimo,
   prosrocheni,
@@ -182,7 +183,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
   const opis = v ? opisiVzemane(o, v) : { koy: '—', kade: p.vzemaneId };
   return `
     <div class="red plashtane">
-      <span class="kletka"><b>${p.data}</b><span>seq ${p.seq}</span></span>
+      <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
       <span class="suma plateno">${kakvoPishe(p.suma_st as never)}</span>
@@ -295,10 +296,13 @@ export function zakachiPari(
     const buton = formaPl.querySelector<HTMLButtonElement>('button[type=submit]')!;
 
     let suma_st: number;
+    let data: string;
     try {
       suma_st = otLeva(String(danni.get('suma')));
+      data = otData(String(danni.get('data') ?? ''), 'Датата на плащането');
     } catch (err) {
-      greshka.textContent = err instanceof GreshkaPari ? err.message : String(err);
+      greshka.textContent =
+        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
       return;
     }
     if (suma_st <= 0) {
@@ -314,7 +318,7 @@ export function zakachiPari(
           vzemaneId: formaPl.dataset['vzemane']!,
           suma_st,
           nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
-          data: String(danni.get('data')),
+          data,
         },
         { opId: opIdPlashtane },
       );

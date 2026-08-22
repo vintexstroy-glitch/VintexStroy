@@ -10,6 +10,7 @@
  */
 
 import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
@@ -396,12 +397,15 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
 
     let naem_st: number;
     let depozit_st = 0;
+    let ot: string;
     try {
       naem_st = otLeva(String(danni.get('naem')));
       const surovDepozit = String(danni.get('depozit') ?? '').trim();
       if (surovDepozit !== '') depozit_st = otLeva(surovDepozit);
+      ot = otData(String(danni.get('ot') ?? ''), 'Датата „Договор от“');
     } catch (e) {
-      greshka.textContent = e instanceof GreshkaPari ? e.message : String(e);
+      greshka.textContent =
+        e instanceof GreshkaPari || e instanceof GreshkaData ? e.message : String(e);
       return;
     }
 
@@ -415,7 +419,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
             naemetel: String(danni.get('naemetel')).trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
-            ot: String(danni.get('ot')),
+            ot,
             do: star.do,
             depozit_st,
             sektor: String(danni.get('sektor')),
@@ -434,7 +438,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
             naemetel: String(danni.get('naemetel')).trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
-            ot: String(danni.get('ot')),
+            ot,
             do: '',
             depozit_st,
             sektor: String(danni.get('sektor')),
@@ -462,12 +466,20 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     const danni = new FormData(formaPrekrati);
     const buton = formaPrekrati.querySelector<HTMLButtonElement>('button[type=submit]')!;
 
+    let kraj: string;
+    try {
+      kraj = otData(String(danni.get('kraj') ?? ''), 'Датата на края');
+    } catch (e) {
+      greshka.textContent = e instanceof GreshkaData ? e.message : String(e);
+      return;
+    }
+
     buton.disabled = true;
     try {
       await k.deystviya.prekratiNaem(
         {
           naemId: formaPrekrati.dataset['naem']!,
-          kraj: String(danni.get('kraj')),
+          kraj,
           prichina: String(danni.get('prichina') ?? '').trim() || 'без посочена причина',
         },
         { opId: opIdDeystvie },

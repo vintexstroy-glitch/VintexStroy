@@ -3,6 +3,20 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!--
+    Приложението не прави НИТО ЕДНА мрежова заявка и няма нито един чужд скрипт.
+    Затова стената може да е глуха: всичко от собствения адрес, шрифтовете от
+    Google изрично, нищо друго. `ws://localhost` е само за `npm run dev`.
+  -->
+  <meta http-equiv="Content-Security-Policy" content="
+    default-src 'self';
+    style-src 'self' https://fonts.googleapis.com;
+    font-src https://fonts.gstatic.com;
+    img-src 'self' data:;
+    connect-src 'self' ws://localhost:* ws://127.0.0.1:*;
+    object-src 'none';
+    base-uri 'none';
+    form-action 'none'">
   <title>MasterBook · Имоти</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

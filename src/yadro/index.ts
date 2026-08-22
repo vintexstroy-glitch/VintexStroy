@@ -4,6 +4,7 @@
  */
 
 export * from './pari.js';
+export * from './data.js';
 export * from './sabitie.js';
 export * from './hash.js';
 export * from './dnevnik.js';
