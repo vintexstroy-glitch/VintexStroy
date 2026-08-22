@@ -318,3 +318,30 @@ button { font-family: inherit; cursor: pointer; }
   font-family: inherit; font-size: inherit; padding: 0; cursor: pointer;
   text-decoration: underline;
 }
+
+/* ── таблото · отметките и сравнението на плановете ─────────────────────── */
+.chislo.malak { font-size: 18px; letter-spacing: -0.01em; }
+
+.vazmozhnosti { display: flex; flex-direction: column; gap: 2px; }
+
+.vazm {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 11px 12px; border-radius: 5px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.vazm:hover { background: #FDFBF7; border-color: var(--liniya); }
+.vazm input { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--aktsent); }
+.vazm input:disabled { cursor: not-allowed; }
+.vazm-tyalo { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
+.vazm-tyalo b { font-weight: 500; font-size: 13.5px; }
+.vazm-tyalo span { font-size: 12px; color: var(--mastilo2); line-height: 1.5; }
+
+/* Каквото планът изобщо не дава, се вижда — но избеляло и незакачаемо.
+   Скриването му би оставило въпроса „а къде е", а точно него плащат нагоре. */
+.vazm.nyama { cursor: default; opacity: 0.45; }
+.vazm.nyama:hover { background: transparent; border-color: transparent; }
+
+.glava.planred, .red.planred {
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+}
+.red.planred.tuk { background: var(--toplo); }
