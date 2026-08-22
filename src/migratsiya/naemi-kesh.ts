@@ -29,7 +29,7 @@ export interface RedOtRegistara {
  * Каквото САМИЯТ лист обявява за себе си. Сверката е срещу това,
  * не срещу наше очакване — иначе проверяваме себе си със себе си.
  */
-export interface ObyavenoOtListа {
+export interface ObyavenoOtLista {
   readonly broiRedove: number;
   /** колона → обявен тотал в стотинки */
   readonly totali_st: Readonly<Record<string, number>>;
@@ -59,7 +59,7 @@ export class GreshkaMigratsiya extends Error {
  */
 export function sveriRegistara(
   redove: readonly RedOtRegistara[],
-  obyaveno: ObyavenoOtListа,
+  obyaveno: ObyavenoOtLista,
   kogato: string,
 ): Sverka[] {
   const sverki: Sverka[] = [
@@ -90,7 +90,7 @@ export function sveriRegistara(
 export interface NastroykiMigratsiya {
   readonly deystviya: Deystviya;
   readonly redove: readonly RedOtRegistara[];
-  readonly obyaveno: ObyavenoOtListа;
+  readonly obyaveno: ObyavenoOtLista;
   readonly kogato: string;
   /** ден от месеца за падеж — регистърът не го носи */
   readonly padezhDen: number;

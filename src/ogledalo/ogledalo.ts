@@ -20,6 +20,7 @@ import type {
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
+  PayloadRazhodZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -75,11 +76,31 @@ export interface Plashtane {
   readonly data: string;
 }
 
+/** Един разход — другата страна на ДДС-то. */
+export interface Razhod {
+  readonly id: string;
+  readonly seq: number;
+  readonly potok: string;
+  readonly dostavchik: string;
+  readonly opis: string;
+  /** обща цена с ДДС — не се разделя тук */
+  readonly suma_st: number;
+  readonly sektor: string;
+  readonly nachin: string;
+  readonly data: string;
+  readonly dokument: string;
+  /** ключ от източник; празно за ръчно въведен */
+  readonly klyuch: string;
+  /** кой файл и коя негова версия го донесе */
+  readonly izvor: string;
+}
+
 export interface Ogledalo {
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
   readonly vzemaniya: ReadonlyMap<string, Vzemane>;
   readonly plashtaniya: ReadonlyMap<string, Plashtane>;
+  readonly razhodi: ReadonlyMap<string, Razhod>;
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
   /** seq-овете, които сторно е погасило (и самите сторна) */
@@ -104,6 +125,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const naemi = new Map<string, Naem>();
   const vzemaniya = new Map<string, Vzemane>();
   const plashtaniya = new Map<string, Plashtane>();
+  const razhodi = new Map<string, Razhod>();
   let prilozheni = 0;
 
   for (const s of sabitiya) {
@@ -138,6 +160,25 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // Наем, записан преди резен 4, няма сектор — пада към жилищен.
           sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
           prekraten: false,
+        });
+        break;
+      }
+
+      case 'РазходЗаписан': {
+        const p = s.payload as unknown as PayloadRazhodZapisan;
+        razhodi.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          seq: s.seq,
+          potok: p.potok,
+          dostavchik: p.dostavchik,
+          opis: p.opis,
+          suma_st: p.suma_st,
+          sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+          nachin: p.nachin,
+          data: p.data,
+          dokument: p.dokument,
+          klyuch: p.klyuch ?? '',
+          izvor: p.izvor ?? '',
         });
         break;
       }
@@ -227,7 +268,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     }
   }
 
-  return { imoti, naemi, vzemaniya, plashtaniya, prilozheni, pogaseni };
+  return { imoti, naemi, vzemaniya, plashtaniya, razhodi, prilozheni, pogaseni };
 }
 
 type BezPresmetnato = Omit<Vzemane, 'ostatak_st' | 'sastoyanie'>;

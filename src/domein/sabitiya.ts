@@ -14,6 +14,7 @@ export const VID = {
   naem: 'naem',
   vzemane: 'vzemane',
   plashtane: 'plashtane',
+  razhod: 'razhod',
 } as const;
 
 export type Vid = (typeof VID)[keyof typeof VID];
@@ -24,6 +25,7 @@ export type TipSabitie =
   | 'НаемПрекратен'
   | 'ВземанеНачислено'
   | 'ПлащанеПрието'
+  | 'РазходЗаписан'
   | 'ИмотПоправен'
   | 'НаемПоправен'
   | 'Сторно';
@@ -102,6 +104,34 @@ export interface PayloadPlashtanePrieto {
   readonly suma_st: number;
   readonly nachin: 'банка' | 'в брой';
   readonly data: string;
+}
+
+/**
+ * РАЗХОД · другата страна на ДДС-то.
+ *
+ * `suma_st` е пак ОБЩА ЦЕНА С ДДС — правилото на собственика не се мени
+ * заради посоката. Секторът определя ставката, с която ДДС-то се ИЗВАЖДА;
+ * заплатите и кредитите падат в акумулатори със ставка нула.
+ */
+export interface PayloadRazhodZapisan {
+  /** ключ на поток: 'zaplati' | 'krediti' | 'fakturi' */
+  readonly potok: string;
+  readonly dostavchik: string;
+  readonly opis: string;
+  readonly suma_st: number;
+  /** ключ на акумулатор от `dds.ts` */
+  readonly sektor: string;
+  readonly nachin: 'банка' | 'в брой';
+  readonly data: string;
+  /** номер на фактура или документ; празно, ако няма */
+  readonly dokument: string;
+  /**
+   * СЛЕДАТА от източника. Празни за ръчно въведен разход.
+   * `klyuch` е стабилният ключ, по който препрочитането на същата таблица
+   * разпознава своя ред; `izvor` казва кой файл и коя негова версия го донесе.
+   */
+  readonly klyuch?: string;
+  readonly izvor?: string;
 }
 
 export interface PayloadStorno {

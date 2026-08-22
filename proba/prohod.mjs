@@ -10,7 +10,9 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { setTimeout as pochakay } from 'node:timers/promises';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const HROM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = Number(process.env['PROBA_PORT'] ?? 4178);
@@ -63,8 +65,7 @@ async function plochka(p, etiket) {
 }
 
 async function broySabitiya(p) {
-  const red = await tekstNa(p, '.veriga .redche:last-child');
-  return Number(red.match(/^(\d+)/)?.[1] ?? -1);
+  return Number(await p.$eval('[data-broi]', (e) => e.dataset.broi));
 }
 
 /**
@@ -102,6 +103,12 @@ async function main() {
   });
   // Сторното пита за причина през prompt().
   stranitsa.on('dialog', (d) => d.accept('сгрешена сума'));
+  // Модерният избирач на файлове отваря прозорец на самата система, който
+  // никой скрипт не може да кара. Проходът минава по стария път — същият,
+  // по който върви и браузър без него.
+  await stranitsa.addInitScript(() => {
+    delete globalThis.showOpenFilePicker;
+  });
 
   const p = stranitsa;
 
@@ -204,7 +211,7 @@ async function main() {
 
     proveri('приход', await plochka(p, 'Приход за'), '2000,00');
     proveri('ДДС за внасяне', await plochka(p, 'ДДС за внасяне'), '200,00');
-    proveri('влязло', await plochka(p, 'Влязло'), '1200,00');
+    proveri('разход · още няма', await plochka(p, 'Разход за'), '0,00');
     proveri('разлика по сверката', await plochka(p, 'Разлика по сверката'), '0,00');
 
     const smetki = Object.fromEntries((await redove(p, '.red.smetka')).map((r) => [r[0].split(' ')[0], r[3]]));
@@ -262,6 +269,34 @@ async function main() {
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
     proveri('изнесени 12 събития', izneseni.length, 12);
     proveri('всяко носи hash и prevHash', izneseni.every((x) => x.hash && x.prevHash !== undefined), true);
+
+    proveri('лентата помни износа', (await tekstNa(p, '.veriga')).includes('Изнесен днес'), true);
+
+    // ══ 10б · внасяне · връщането на изнесеното ══════════════════════════
+    razdel = '10б · внасяне';
+    await p.setInputFiles('#fayl', patyat);
+    await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
+    proveri('същият файл не добавя нищо', await broySabitiya(p), 12);
+
+    // подправен файл — отказва се изцяло
+    const podpraven = `${patyat}.podpraven.json`;
+    const redica = JSON.parse(await readFile(patyat, 'utf8'));
+    redica[3] = { ...redica[3], payload: { ...redica[3].payload, naem_st: 999_99 } };
+    await writeFile(podpraven, JSON.stringify(redica));
+
+    await p.setInputFiles('#fayl', podpraven);
+    await p.waitForFunction(() => document.body.innerText.includes('Внасянето е отказано'));
+    const otkaz = await tekstNa(p, '.vest');
+    proveri('казва къде се къса', otkaz.includes('се къса на seq 4'), true);
+    proveri('казва, че нищо не е внесено', otkaz.includes('Нищо не е внесено'), true);
+    proveri('Журналът не е пипнат', await broySabitiya(p), 12);
+
+    // файл, който изобщо не е Журнал
+    const bokluk = `${patyat}.boklu.json`;
+    await writeFile(bokluk, '{"каквото и да е": 1}');
+    await p.setInputFiles('#fayl', bokluk);
+    await p.waitForFunction(() => document.body.innerText.includes('не е редица от събития'));
+    proveri('и след боклук Журналът е цял', await broySabitiya(p), 12);
 
     // ══ 11 · тесен екран ═════════════════════════════════════════════════
     razdel = '11 · тесен екран';
@@ -334,6 +369,99 @@ async function main() {
     proveri('шестнайсет събития', await broySabitiya(p), 16);
     proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00');
 
+    // ══ 11в · разходите → входящият ДДС ══════════════════════════════════
+    razdel = '11в · разходите';
+    await naEkran(p, 'smetki', '#forma-period');
+    await p.fill('#smetki-period', '2026-02');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    proveri('ДДС преди разходите', await plochka(p, 'ДДС за внасяне'), '200,00');
+
+    await zapishiRazhod(p, {
+      potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Материали ООД',
+      opis: 'цимент', suma: '600,00', nachin: 'банка', data: '2026-02-14', dokument: '1042',
+    });
+    proveri('седемнайсет събития', await broySabitiya(p), 17);
+
+    await zapishiRazhod(p, {
+      potok: 'zaplati', sektor: 'pokupki-materiali', dostavchik: 'екип',
+      opis: 'заплати февруари', suma: '2000,00', nachin: 'в брой', data: '2026-02-28', dokument: '',
+    });
+    proveri('осемнайсет събития', await broySabitiya(p), 18);
+
+    const smetkiR = Object.fromEntries(
+      (await redove(p, '.red.smetka')).map((x) => [x[0].split(' ')[0], x[3]]),
+    );
+    proveri('ред Фактури', smetkiR['Фактури'], '600,00');
+    proveri('ред Заплати', smetkiR['Заплати'], '2000,00');
+    proveri('плочка Разход', await plochka(p, 'Разход за'), '2600,00');
+
+    const vhod = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
+    proveri('две страни „вход" — материали и заплати', vhod.length, 2);
+    const materiali = vhod.find((x) => x[1]?.startsWith('покупки · материали'));
+    proveri('входящ ДДС от фактурата', materiali?.[4], '100,00');
+    proveri('заплатите не носят ДДС', vhod.find((x) => x[1]?.startsWith('заплати'))?.[4], '0,00');
+    proveri('за внасяне пада наполовина', await plochka(p, 'ДДС за внасяне'), '100,00');
+
+    const sverkiR = await redove(p, '.red.sverka');
+    proveri('четирите сверки затварят', sverkiR.every((x) => x[4] === 'затваря'), true);
+    proveri('сверката на разхода', sverkiR[2]?.[1], '2600,00');
+
+    // сторно на фактурата — входящият ДДС си отива с нея
+    await sSabitie(p, () => p.click('.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
+    proveri('деветнайсет събития', await broySabitiya(p), 19);
+    proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00');
+    proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2000,00');
+
+    // ══ 11г · източниците · таблица от Драйва ════════════════════════════
+    razdel = '11г · източници';
+    const GLAVA = 'Доставчик;За какво;Сума;Дата;Документ';
+    const parviCSV = join(tmpdir(), 'razhodi-fevruari.csv');
+    await writeFile(
+      parviCSV,
+      [GLAVA, 'Бетон ЕООД;бетон;900,00;10.02.2026;5001', 'Кран ООД;кран;300,00;12.02.2026;5002'].join('\n'),
+    );
+
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    proveri('менюто се отваря с четирите източника', (await p.$$('[data-iztochnik]')).length, 4);
+
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', parviCSV);
+    await p.waitForSelector('#prilozhi');
+    proveri('казва, че е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Прочетено'), true);
+    proveri('показва отпечатъка на файла', (await tekstNa(p, '.karta.izbrana .dyalglava span')).includes('отпечатък'), true);
+    const razlikiPredi = await redove(p, '.red.razlika');
+    proveri('два нови реда', razlikiPredi.length, 2);
+    proveri('първият е нов', razlikiPredi[0]?.[0], 'нов');
+
+    await sSabitiya(p, 2, () => p.click('#prilozhi'));
+    proveri('двайсет и едно събития', await broySabitiya(p), 21);
+    proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3], '1200,00');
+
+    // поправен файл за същия месец: една сума сменена, един ред махнат
+    const vtoriCSV = join(tmpdir(), 'razhodi-fevruari-popraven.csv');
+    await writeFile(vtoriCSV, [GLAVA, 'Бетон ЕООД;бетон;950,00;10.02.2026;5001'].join('\n'));
+
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', vtoriCSV);
+    await p.waitForSelector('#prilozhi');
+    proveri('вече не е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Разликите'), true);
+
+    const vidove = (await redove(p, '.red.razlika')).map((x) => x[0]);
+    proveri('един поправен и един махнат', vidove.sort().join(','), 'махнат,поправен');
+    proveri('филтърът показва само промените', (await redove(p, '.red.razlika')).length, 2);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar=vsichko]'));
+    proveri('филтърът „всичко" пак дава два', (await redove(p, '.red.razlika')).length, 2);
+
+    await sSabitiya(p, 3, () => p.click('#prilozhi'));
+    proveri('двайсет и четири събития', await broySabitiya(p), 24);
+    proveri(
+      'Фактури казват това, което казва новият файл',
+      (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3],
+      '950,00',
+    );
+    proveri('веригата пак ще е цяла — сторно, не презапис', (await tekstNa(p, '.vest')).includes('сторнирани'), true);
+
     // ══ 12 · скъсана верига → спирателен кран ════════════════════════════
     razdel = '12 · скъсана верига';
     const podmenen = await p.evaluate(async () => {
@@ -366,7 +494,7 @@ async function main() {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 16);
+    proveri('Журналът не е пипан', await broySabitiya(p), 24);
 
     await naEkran(p, 'imoti', '#forma-imot');
     await p.fill('#imot-adres', 'След инцидента');
@@ -374,7 +502,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 16);
+    proveri('нищо ново не влезе', await broySabitiya(p), 24);
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -411,8 +539,7 @@ async function dobaviImot(p, adres, edinitsa, ploshtad) {
   const predi = await broySabitiya(p);
   await p.click('#forma-imot button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -426,8 +553,7 @@ async function dobaviNaem(p, { imot, koy, suma, sektor, padezh }) {
   const predi = await broySabitiya(p);
   await p.click('#forma-naem button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -444,13 +570,22 @@ async function deystvieSPrerisuvane(p, deystvie) {
   });
 }
 
+/** Действие, което ТРЯБВА да сложи точно N нови събития в Журнала. */
+async function sSabitiya(p, kolko, deystvie) {
+  const predi = await broySabitiya(p);
+  await deystvie();
+  await p.waitForFunction(
+    ([n, k]) => Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + k,
+    [predi, kolko],
+  );
+}
+
 /** Действие, което ТРЯБВА да сложи точно едно ново събитие в Журнала. */
 async function sSabitie(p, deystvie) {
   const predi = await broySabitiya(p);
   await deystvie();
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -468,9 +603,20 @@ async function plati(p, koy, suma, nachin, data) {
   const predi = await broySabitiya(p);
   await p.click('#forma-plashtane button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
+}
+
+async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin, data, dokument }) {
+  await p.selectOption('#razhod-potok', potok);
+  await p.selectOption('#razhod-sektor', sektor);
+  await p.fill('#razhod-dostavchik', dostavchik);
+  await p.fill('#razhod-opis', opis);
+  await p.fill('#razhod-suma', suma);
+  await p.selectOption('#razhod-nachin', nachin);
+  await p.fill('#razhod-data', data);
+  await p.fill('#razhod-dokument', dokument);
+  await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
 }
 
 async function smetni(p, opis, suma, stavka) {

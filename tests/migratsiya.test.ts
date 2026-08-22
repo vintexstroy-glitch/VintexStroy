@@ -17,7 +17,7 @@ import {
   GreshkaMigratsiya,
   migrirajNaemiKesh,
   sveriRegistara,
-  type ObyavenoOtListа,
+  type ObyavenoOtLista,
   type RedOtRegistara,
 } from '../src/migratsiya/naemi-kesh.js';
 
@@ -44,7 +44,7 @@ const REDOVE: RedOtRegistara[] = [
   { edinitsa: 'ПМ № 11', myasto: 'Място Б', kolona: 'колона 2', naem_st: stotinki(77_20) },
 ];
 
-const OBYAVENO: ObyavenoOtListа = {
+const OBYAVENO: ObyavenoOtLista = {
   broiRedove: 4,
   totali_st: { 'колона 1': 1128_00, 'колона 2': 594_20 },
 };

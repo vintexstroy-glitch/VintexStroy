@@ -24,8 +24,8 @@ describe('инвариант 8 · монотонен seq', () => {
       await vrata.dobavi(operatsiya({ opId: `op-${i}` }));
     }
 
-    const seqове = (await dnevnik.chetiVsichki('vintexstroy')).map((s) => s.seq);
-    expect(seqове).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
+    const redicata = (await dnevnik.chetiVsichki('vintexstroy')).map((s) => s.seq);
+    expect(redicata).toEqual(Array.from({ length: 100 }, (_, i) => i + 1));
   });
 
   it('200 едновременни записа дават 200 различни seq без дупка', async () => {
@@ -36,8 +36,8 @@ describe('инвариант 8 · монотонен seq', () => {
     );
 
     const vsichki = await dnevnik.chetiVsichki('vintexstroy');
-    const seqове = vsichki.map((s) => s.seq).sort((a, b) => a - b);
-    expect(seqове).toEqual(Array.from({ length: 200 }, (_, i) => i + 1));
+    const redicata = vsichki.map((s) => s.seq).sort((a, b) => a - b);
+    expect(redicata).toEqual(Array.from({ length: 200 }, (_, i) => i + 1));
     expect((await proveriVerigata(vsichki, SHA)).tsyala).toBe(true);
   });
 
