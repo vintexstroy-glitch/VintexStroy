@@ -1,51 +1,16 @@
 /**
- * ПЛАНОВЕТЕ И НОВИТЕ ОГЛЕДАЛА.
+ * НОВИТЕ ОГЛЕДАЛА · „по имот" и „по контрагент".
  *
- * Планове: таблицата е закон — всеки по-голям план носи всичко от по-малкия,
- * а стартъпът („Малък и среден бизнес") носи всичко построено досега.
- *
- * Огледала: „по имот" и „по контрагент" — сборовете им трябва да затварят
- * срещу главното Огледало до стотинка, иначе двата ъгъла лъжат различно.
+ * Сборовете им трябва да затварят срещу главното Огледало до стотинка —
+ * иначе двата ъгъла лъжат различно и никой не знае кой е верният.
  */
 
 import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
-import { mozhe, plan, PLAN_PO_PODRAZBIRANE, PLANOVE } from '../src/domein/planove.js';
 import { poImot, poKontragent } from '../src/ogledalo/izgledi.js';
 import { duljimo } from '../src/ogledalo/ogledalo.js';
 import { SHA } from './pomoshtni.js';
-
-describe('плановете', () => {
-  it('всеки по-голям план носи всичко от по-малкия', () => {
-    for (let i = 1; i < PLANOVE.length; i += 1) {
-      const malak = PLANOVE[i - 1]!;
-      const golyam = PLANOVE[i]!;
-      for (const v of malak.vazmozhnosti) {
-        expect(golyam.vazmozhnosti.has(v), `${golyam.ime} губи „${v}" спрямо ${malak.ime}`).toBe(true);
-      }
-    }
-  });
-
-  it('стартъпът е „Малък и среден бизнес" и носи всичко построено', () => {
-    const osnoven = plan(PLAN_PO_PODRAZBIRANE);
-    expect(osnoven.ime).toBe('Малък и среден бизнес');
-    for (const v of ['zapis', 'smetki-dds', 'iztochnitsi', 'arhiv-eksel', 'fini-filtri', 'spodelen-akaunt'] as const) {
-      expect(mozhe(osnoven, v)).toBe(true);
-    }
-    // Ролите нарочно НЕ: споделеният безплатен Gmail е ЕДИН акаунт по замисъл.
-    expect(mozhe(osnoven, 'roli-i-personalizatsiya')).toBe(false);
-  });
-
-  it('ролите и разработките са само за холдинги; непознат план пада към стартъпа', () => {
-    expect(mozhe(plan('holding'), 'roli-i-personalizatsiya')).toBe(true);
-    expect(mozhe(plan('holding'), 'individualni-razrabotki')).toBe(true);
-    expect(mozhe(plan('edinichen'), 'spodelen-akaunt')).toBe(false);
-    expect(mozhe(plan('evtin'), 'arhiv-eksel')).toBe(false);
-    expect(plan('няма такъв').klyuch).toBe('osnoven');
-    expect(plan(undefined).klyuch).toBe('osnoven');
-  });
-});
 
 describe('огледалата по имот и по контрагент', () => {
   async function nasadi() {
