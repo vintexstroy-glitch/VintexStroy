@@ -10,9 +10,9 @@
 
 import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
+import { MERKA } from '../src/yadro/sverka.js';
 import { AKUMULATORI, akumulator, ddsOtObshta, sektoriNaRazhod } from '../src/domein/dds.js';
 import {
-  MERKA,
   potok,
   potototsiNaRazhod,
   razhodiZaPerioda,

@@ -8,10 +8,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run",
+    "test": "vitest run --exclude proba/merki.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "proba": "vite build && node proba/prohod.mjs"
+    "proba": "vite build && node proba/prohod.mjs",
+    "merki": "vitest run proba/merki.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

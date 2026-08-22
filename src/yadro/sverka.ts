@@ -21,6 +21,12 @@ export interface Sverka {
   readonly belezhka?: string;
 }
 
+/**
+ * В какво се мери една сверка. Стои в `belezhka`, за да не се показват
+ * стотинки и бройки с един и същи вид — 120000 и 1 не са едно и също нещо.
+ */
+export const MERKA = { pari: 'стотинки', broy: 'брой' } as const;
+
 export function sverka(
   kakvo: string,
   vhod: number,

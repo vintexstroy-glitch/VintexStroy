@@ -37,7 +37,13 @@ export function otvoriDnevnik(ime = 'masterbook'): Promise<DnevnikVIndexedDB> {
       }
     };
 
-    zayavka.onsuccess = () => resolve(new DnevnikVIndexedDB(zayavka.result));
+    zayavka.onsuccess = () => {
+      const db = zayavka.result;
+      // Друг раздел иска нова версия на базата — тази връзка се пуска чисто,
+      // вместо да я държи заключена завинаги.
+      db.onversionchange = () => db.close();
+      resolve(new DnevnikVIndexedDB(db));
+    };
     zayavka.onerror = () => reject(zayavka.error);
   });
 }
@@ -51,6 +57,16 @@ export class DnevnikVIndexedDB implements Dnevnik {
 
   zatvori(): void {
     this.#db.close();
+  }
+
+  /** Затворена ли е връзката — Вратата пита, за да откаже с думи, не с гниене. */
+  get zatvorena(): boolean {
+    try {
+      this.#db.transaction(HRANILISHTE, 'readonly');
+      return false;
+    } catch {
+      return true;
+    }
   }
 
   async posledno(naematel: string): Promise<Sabitie | undefined> {
@@ -74,7 +90,12 @@ export class DnevnikVIndexedDB implements Dnevnik {
   }
 
   async dobavi(s: Sabitie): Promise<void> {
-    const transaktsiya = this.#db.transaction(HRANILISHTE, 'readwrite');
+    // durability: 'strict' — записът се брои за станал, когато е НА ДИСКА.
+    // По подразбиране браузърът може да отговори „да" преди изхвърлянето на
+    // буфера — и токът да отнесе последното звено, а котвата да го помни.
+    const transaktsiya = this.#db.transaction(HRANILISHTE, 'readwrite', {
+      durability: 'strict',
+    });
     const hranilishte = transaktsiya.objectStore(HRANILISHTE);
 
     // Проверката и записът са в ЕДНА транзакция — тя е единичният писач.

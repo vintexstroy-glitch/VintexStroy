@@ -9,8 +9,7 @@
  * едва тогава нещо влиза. При разминаване не влиза НИЩО.
  */
 
-import { DnevnikNaSverki, sverka, type Sverka } from '../yadro/sverka.js';
-import { MERKA } from './smetki.js';
+import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import type { Dnevnik, Sabitie, Vrata } from '../yadro/index.js';
 
 export class GreshkaVnos extends Error {

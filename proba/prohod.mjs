@@ -503,6 +503,46 @@ async function main() {
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
     proveri('нищо ново не влезе', await broySabitiya(p), 24);
+
+    // ══ 13 · хранилището и котвата ═══════════════════════════════════════
+    razdel = '13 · хранилище и котва';
+    const lentata = await tekstNa(p, '.veriga');
+    proveri('лентата казва какво е хранилището', /Хранилището|Постоянството/.test(lentata), true);
+
+    // „Изчезват" последните две събития — направо от IndexedDB, както би
+    // направил бъг, чистач на място или зла ръка. Веригата на остатъка е
+    // ЦЯЛА — само котвата може да усети липсата.
+    await p.evaluate(async () => {
+      const db = await new Promise((da, ne) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      await new Promise((da, ne) => {
+        const t = db.transaction('sabitiya', 'readwrite');
+        const hr = t.objectStore('sabitiya');
+        hr.delete(['vintexstroy', 23]);
+        hr.delete(['vintexstroy', 24]);
+        t.oncomplete = () => da(undefined);
+        t.onerror = () => ne(t.error);
+      });
+      db.close();
+    });
+
+    await p.reload();
+    await p.waitForSelector('.vest.zle');
+    const trevoga = await tekstNa(p, '.vest.zle');
+    proveri('котвата хваща скъсяването отзад', trevoga.includes('скъсяван отзад'), true);
+    proveri('казва колко липсват', trevoga.includes('Липсват 2'), true);
+    proveri('и че кранът е дръпнат', trevoga.includes('Вратата е спряна'), true);
+
+    await p.waitForSelector('#forma-imot');
+    await p.fill('#imot-adres', 'След котвата');
+    await p.fill('#imot-edinitsa', 'не влиза');
+    await p.click('#forma-imot button[type=submit]');
+    await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
+    proveri('записът е отказан с думи', (await tekstNa(p, '#greshka-imot')).includes('котвата'), true);
+    proveri('Журналът остава на 22', await broySabitiya(p), 22);
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

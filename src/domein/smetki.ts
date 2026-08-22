@@ -15,19 +15,13 @@
  * СВЕРКА, чиято разлика се записва, дори когато е нула.
  */
 
-import { DnevnikNaSverki, sverka, type Sverka } from '../yadro/sverka.js';
+import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import { akumulator, ddsOtObshta, type Akumulator } from './dds.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 
 export type Posoka = 'приход' | 'разход';
 export type StranaDDS = 'изход' | 'вход';
-
-/**
- * В какво се мери една сверка. Стои в `belezhka`, за да не се показват
- * стотинки и бройки с един и същи вид — 120000 и 1 не са едно и също нещо.
- */
-export const MERKA = { pari: 'стотинки', broy: 'брой' } as const;
 
 /**
  * ПОТОЦИТЕ — декларирана таблица, за да е смяната един ред, не търсене из кода.
