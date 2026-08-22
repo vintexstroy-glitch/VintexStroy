@@ -11,3 +11,4 @@ export * from './dnevnik.js';
 export * from './pravata.js';
 export * from './vrata.js';
 export * from './sverka.js';
+export * from './kotva.js';

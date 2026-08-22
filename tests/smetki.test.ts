@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
-import { MERKA, smetki } from '../src/domein/smetki.js';
+import { smetki } from '../src/domein/smetki.js';
+import { MERKA } from '../src/yadro/sverka.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import { SHA } from './pomoshtni.js';
 

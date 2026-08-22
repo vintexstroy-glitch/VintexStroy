@@ -13,6 +13,8 @@
  */
 
 import type { Dnevnik } from './dnevnik.js';
+import { GreshkaDnevnik } from './dnevnik.js';
+import type { DrajkaNaKotva } from './kotva.js';
 import { izchisliHash, proveriVerigata, type Sha256 } from './hash.js';
 import { eStotinki } from './pari.js';
 import type { Pravata } from './pravata.js';
@@ -62,12 +64,25 @@ export interface NastroykiVrata {
   readonly dnevnik: Dnevnik;
   readonly pravata: Pravata;
   readonly sha: Sha256;
+  /**
+   * Котвата: последното звено, записано извън Журнала. По избор —
+   * ядрото върви и без нея, но приложението я подава винаги.
+   */
+  readonly kotva?: DrajkaNaKotva;
+  /**
+   * Ключалка МЕЖДУ раздели (Web Locks в браузъра). Опашката в паметта пази
+   * реда само в един раздел; ключалката го пази между няколко. По избор —
+   * без нея сблъсъкът се оправя с повторение (виж #zapishi).
+   */
+  readonly klyuchalka?: <T>(naematel: string, rabota: () => Promise<T>) => Promise<T>;
 }
 
 export class Vrata {
   readonly #dnevnik: Dnevnik;
   readonly #pravata: Pravata;
   readonly #sha: Sha256;
+  readonly #kotva: DrajkaNaKotva | undefined;
+  readonly #klyuchalka: (<T>(naematel: string, rabota: () => Promise<T>) => Promise<T>) | undefined;
 
   /** Спирателен кран (П1.4): спира записа, без да събаря приложението. */
   #zatvorena = false;
@@ -80,6 +95,8 @@ export class Vrata {
     this.#dnevnik = n.dnevnik;
     this.#pravata = n.pravata;
     this.#sha = n.sha;
+    this.#kotva = n.kotva;
+    this.#klyuchalka = n.klyuchalka;
   }
 
   get zatvorena(): boolean {
@@ -182,10 +199,18 @@ export class Vrata {
         await this.#dnevnik.dobavi(s);
       }
 
+      // Върнатата история става новото помнено — котвата се премества на върха ѝ.
+      const posledno = sabitiya[sabitiya.length - 1]!;
+      this.#kotva?.zabij(naematel, {
+        seq: posledno.seq,
+        hash: posledno.hash,
+        kogato: posledno.ts,
+      });
+
       return {
         vneseni: sabitiya.length - sega.length,
         veche: sega.length,
-        posledenHash: sabitiya[sabitiya.length - 1]!.hash,
+        posledenHash: posledno.hash,
       };
     });
   }
@@ -198,16 +223,28 @@ export class Vrata {
       );
     }
 
-    proveriValidnost(op);
+    // Уникод-двойникът: „й" се пише по два начина (NFC/NFD), изглеждат
+    // еднакво, но са различни низове — различни хешове, различни ключове,
+    // несработила идемпотентност. Затова ВСИЧКО се привежда към NFC тук,
+    // преди валидност, хеш и запис.
+    const chista = normalizirayNFC(op) as Operatsiya;
+    proveriValidnost(chista);
 
-    if (!(await this.#pravata.mozheDaPishe(op.actor, op.naematel, op.sashtnost))) {
+    if (!(await this.#pravata.mozheDaPishe(chista.actor, chista.naematel, chista.sashtnost))) {
       throw new GreshkaVrata(
         'BEZ_PRAVO',
-        `${op.actor} няма право да пише при наемател ${op.naematel}`,
+        `${chista.actor} няма право да пише при наемател ${chista.naematel}`,
       );
     }
 
-    return this.#naOpashka(op.naematel, () => this.#zapishi(op));
+    return this.#naOpashka(chista.naematel, () =>
+      this.#podKlyuch(chista.naematel, () => this.#zapishi(chista)),
+    );
+  }
+
+  /** Ключалката между раздели, когато я има; иначе направо. */
+  async #podKlyuch<T>(naematel: string, rabota: () => Promise<T>): Promise<T> {
+    return this.#klyuchalka ? this.#klyuchalka(naematel, rabota) : rabota();
   }
 
   /** Сериализира записите за един наемател — пази seq и веригата. */
@@ -226,40 +263,82 @@ export class Vrata {
   }
 
   async #zapishi(op: Operatsiya): Promise<Rezultat> {
-    // 3 · дедупликация по opId
-    const veche = await this.#dnevnik.poOpId(op.naematel, op.opId);
-    if (veche) {
-      return { seq: veche.seq, hash: veche.hash, povtoreno: true };
-    }
-
-    // 4 · rev-предпазител
-    if (op.expectedRev !== undefined) {
-      const tekusht = await this.#dnevnik.tekushtRev(op.naematel, op.sashtnost);
-      if (tekusht !== op.expectedRev) {
-        throw new GreshkaReplay(tekusht, op.expectedRev);
+    // Друг раздел може да пише в същия Журнал. Опашката в паметта не го
+    // вижда; носителят обаче отказва сгрешен seq в своята транзакция.
+    // Тогава тук се препрочита и повтаря. Всеки отказ значи, че НЯКОЙ е
+    // записал — системата върви напред; повтаря само изгубилият.
+    let posledenOtkaz: unknown;
+    for (let opit = 0; opit < 10; opit += 1) {
+      // 3 · дедупликация по opId — проверява се на ВСЕКИ опит: междувременно
+      // другият раздел може да е записал точно тази операция.
+      const veche = await this.#dnevnik.poOpId(op.naematel, op.opId);
+      if (veche) {
+        return { seq: veche.seq, hash: veche.hash, povtoreno: true };
       }
+
+      // 4 · rev-предпазител
+      if (op.expectedRev !== undefined) {
+        const tekusht = await this.#dnevnik.tekushtRev(op.naematel, op.sashtnost);
+        if (tekusht !== op.expectedRev) {
+          throw new GreshkaReplay(tekusht, op.expectedRev);
+        }
+      }
+
+      // 5 · append
+      const posledno = await this.#dnevnik.posledno(op.naematel);
+      const zaHeshirane = {
+        seq: (posledno?.seq ?? 0) + 1,
+        opId: op.opId,
+        ts: op.ts,
+        naematel: op.naematel,
+        actor: op.actor,
+        type: op.type,
+        sashtnost: op.sashtnost,
+        payload: op.payload,
+        prevHash: posledno?.hash ?? '',
+      };
+      const hash = await izchisliHash(zaHeshirane, this.#sha);
+      const sabitie: Sabitie = { ...zaHeshirane, hash };
+
+      try {
+        await this.#dnevnik.dobavi(sabitie);
+      } catch (greshka) {
+        if (greshka instanceof GreshkaDnevnik) {
+          // Сблъсък със съседен писач. Кратък отстъп, растящ с опита —
+          // иначе двата раздела се застъпват в такт и губи все същият.
+          posledenOtkaz = greshka;
+          await new Promise((gotovo) => setTimeout(gotovo, opit));
+          continue;
+        }
+        throw greshka;
+      }
+
+      // Котвата: последното звено, забито ИЗВЪН Журнала — срещу скъсяване отзад.
+      this.#kotva?.zabij(op.naematel, { seq: sabitie.seq, hash, kogato: op.ts });
+
+      // 6 · върни
+      return { seq: sabitie.seq, hash, povtoreno: false };
     }
 
-    // 5 · append
-    const posledno = await this.#dnevnik.posledno(op.naematel);
-    const zaHeshirane = {
-      seq: (posledno?.seq ?? 0) + 1,
-      opId: op.opId,
-      ts: op.ts,
-      naematel: op.naematel,
-      actor: op.actor,
-      type: op.type,
-      sashtnost: op.sashtnost,
-      payload: op.payload,
-      prevHash: posledno?.hash ?? '',
-    };
-    const hash = await izchisliHash(zaHeshirane, this.#sha);
-    const sabitie: Sabitie = { ...zaHeshirane, hash };
-    await this.#dnevnik.dobavi(sabitie);
-
-    // 6 · върни
-    return { seq: sabitie.seq, hash, povtoreno: false };
+    throw posledenOtkaz;
   }
+}
+
+/**
+ * Привежда всеки низ в стойността — рекурсивно, и ключовете на обектите —
+ * към NFC. Едно „й" = един запис, независимо от клавиатурата, която го е писала.
+ */
+export function normalizirayNFC(v: unknown): unknown {
+  if (typeof v === 'string') return v.normalize('NFC');
+  if (Array.isArray(v)) return v.map(normalizirayNFC);
+  if (v !== null && typeof v === 'object') {
+    const izhod: Record<string, unknown> = {};
+    for (const [klyuch, stoynost] of Object.entries(v as Record<string, unknown>)) {
+      izhod[klyuch.normalize('NFC')] = normalizirayNFC(stoynost);
+    }
+    return izhod;
+  }
+  return v;
 }
 
 /** Полетата за пари завършват на `_st` и са ЦЕЛИ СТОТИНКИ. */
@@ -305,7 +384,8 @@ function proveriParite(v: Readonly<Record<string, unknown>>, pat: string): void 
 }
 
 function neprazen(v: unknown, ime: string): void {
-  if (typeof v !== 'string' || v.length === 0) {
+  // trim() — иначе opId от три интервала минава за име. Намерено от фъртуната.
+  if (typeof v !== 'string' || v.trim().length === 0) {
     throw new GreshkaVrata('NEVALIDNO', `${ime} е задължително и не може да е празно`);
   }
 }

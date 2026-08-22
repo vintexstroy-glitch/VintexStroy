@@ -14,5 +14,5 @@
     "verbatimModuleSyntax": true,
     "isolatedModules": true
   },
-  "include": ["src", "tests", "app", "vite.config.ts"]
+  "include": ["src", "tests", "app", "proba/merki.test.ts", "vite.config.ts"]
 }

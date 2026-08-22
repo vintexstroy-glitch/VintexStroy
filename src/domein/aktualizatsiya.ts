@@ -14,8 +14,7 @@
  * Второто показва РАЗЛИКИТЕ и чака „да".
  */
 
-import { DnevnikNaSverki, sverka, type Sverka } from '../yadro/sverka.js';
-import { MERKA } from './smetki.js';
+import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import { VID } from './sabitiya.js';
 import { sborNaSnimka, type RedOtSnimka, type Snimka } from '../iztochnik/snimka.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';

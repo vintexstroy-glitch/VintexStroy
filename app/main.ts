@@ -5,7 +5,19 @@
  * няма чакане. Вратата стои над него и не знае кой носител е отдолу.
  */
 
-import { Vrata, VsichkoRazresheno, proveriVerigata } from '../src/yadro/index.js';
+import {
+  KotvaVLocalStorage,
+  proveriKotvata,
+  proveriVerigata,
+  Vrata,
+  VsichkoRazresheno,
+} from '../src/yadro/index.js';
+import {
+  klyuchalkaMezhduRazdeli,
+  kolkoMyasto,
+  osiguriHranilishte,
+  type SastoyanieNaHranilishteto,
+} from '../src/nositel/hranilishte.js';
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
@@ -60,6 +72,11 @@ function zapishiBeleg(beleg: BelegZaIznos): void {
 const koren = document.getElementById('ekran')!;
 let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
 let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
+let hranilishte: SastoyanieNaHranilishteto = {
+  postoyanstvo: 'неизвестно',
+  zaeto: -1,
+  pozvoleno: -1,
+};
 let ekran: KoyEkran = 'imoti';
 
 const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }> = {
@@ -82,7 +99,36 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
 
 async function trugvay(): Promise<void> {
   const dnevnik = await otvoriDnevnik('masterbook');
-  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: sha256Web });
+  const kotva = new KotvaVLocalStorage();
+  // Един писач и МЕЖДУ разделите, не само в този.
+  const klyuchalka = klyuchalkaMezhduRazdeli();
+  const vrata = new Vrata({
+    dnevnik,
+    pravata: new VsichkoRazresheno(),
+    sha: sha256Web,
+    kotva,
+    ...(klyuchalka ? { klyuchalka } : {}),
+  });
+
+  // Постоянство: изтриваемото хранилище е дупката №1 за „нула загуба".
+  hranilishte = await osiguriHranilishte();
+
+  // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
+  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(NAEMATEL);
+  const proverka = proveriKotvata(
+    kotva.cheti(NAEMATEL),
+    sabitiyaVNachaloto[sabitiyaVNachaloto.length - 1]?.seq ?? 0,
+    (seq) => sabitiyaVNachaloto.find((s) => s.seq === seq)?.hash,
+  );
+  if (!proverka.nared) {
+    vrata.zatvori(`котвата не съвпада: ${proverka.prichina}`);
+    poslednaVest = {
+      vid: 'zle',
+      tekst:
+        `${proverka.prichina} Вратата е спряна — четенето работи, записът не. ` +
+        'Журналът не се пипа; вземи последния износ и го внеси.',
+    };
+  }
   const deystviya = new Deystviya({
     vrata,
     dnevnik,
@@ -181,6 +227,16 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
         </div>
         <div class="redche" data-broi="${v.broi}">${v.broi} ${v.broi === 1 ? 'събитие' : 'събития'} · местно, в този браузър</div>
         <div class="redche">${redZaIznos(v.broi)}</div>
+        <div class="redche">
+          <span class="tochka ${hranilishte.postoyanstvo === 'изтриваемо' ? 'zle' : ''}"></span>
+          ${
+            hranilishte.postoyanstvo === 'постоянно'
+              ? 'Хранилището е постоянно'
+              : hranilishte.postoyanstvo === 'изтриваемо'
+                ? 'Хранилището е ИЗТРИВАЕМО — изнасяй често'
+                : 'Постоянството е неизвестно'
+          }${hranilishte.zaeto >= 0 ? ` · ${kolkoMyasto(hranilishte.zaeto)}` : ''}
+        </div>
       </div>
     </aside>`;
 }
