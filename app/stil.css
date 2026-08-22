@@ -200,8 +200,8 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 860px;
 }
 .glava.naem, .red.naem {
-  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.6fr) minmax(0, 1.3fr) 120px 132px 232px;
-  min-width: 980px;
+  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.5fr) minmax(0, 1.2fr) 120px 136px 292px;
+  min-width: 1040px;
 }
 .butoni { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .glava.vzemane, .red.vzemane {
