@@ -14,6 +14,7 @@ import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 
 const NAEMATEL = 'vintexstroy';
 const ACTOR = 'vintexstroy@gmail.com';
@@ -115,6 +116,7 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
+            ${narisuvayButona()}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             <button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>
             <button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>
@@ -123,6 +125,7 @@ async function trugvay(): Promise<void> {
         </header>
         <div class="telo">
           ${vestHTML()}
+          ${narisuvayPlana()}
           ${
             ekran === 'imoti'
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
@@ -137,6 +140,7 @@ async function trugvay(): Promise<void> {
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
     else zakachiSmetki(koren, k, prerisuvay);
+    zakachiIztochnitsi(koren, k, prerisuvay);
     zakachiGlavnite(k, prerisuvay);
   }
 

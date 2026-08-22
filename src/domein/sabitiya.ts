@@ -125,6 +125,13 @@ export interface PayloadRazhodZapisan {
   readonly data: string;
   /** номер на фактура или документ; празно, ако няма */
   readonly dokument: string;
+  /**
+   * СЛЕДАТА от източника. Празни за ръчно въведен разход.
+   * `klyuch` е стабилният ключ, по който препрочитането на същата таблица
+   * разпознава своя ред; `izvor` казва кой файл и коя негова версия го донесе.
+   */
+  readonly klyuch?: string;
+  readonly izvor?: string;
 }
 
 export interface PayloadStorno {

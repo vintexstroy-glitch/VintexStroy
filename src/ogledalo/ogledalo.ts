@@ -89,6 +89,10 @@ export interface Razhod {
   readonly nachin: string;
   readonly data: string;
   readonly dokument: string;
+  /** ключ от източник; празно за ръчно въведен */
+  readonly klyuch: string;
+  /** кой файл и коя негова версия го донесе */
+  readonly izvor: string;
 }
 
 export interface Ogledalo {
@@ -173,6 +177,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           nachin: p.nachin,
           data: p.data,
           dokument: p.dokument,
+          klyuch: p.klyuch ?? '',
+          izvor: p.izvor ?? '',
         });
         break;
       }

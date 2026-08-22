@@ -11,6 +11,8 @@ import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { setTimeout as pochakay } from 'node:timers/promises';
 import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 
 const HROM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = Number(process.env['PROBA_PORT'] ?? 4178);
@@ -101,6 +103,12 @@ async function main() {
   });
   // Сторното пита за причина през prompt().
   stranitsa.on('dialog', (d) => d.accept('сгрешена сума'));
+  // Модерният избирач на файлове отваря прозорец на самата система, който
+  // никой скрипт не може да кара. Проходът минава по стария път — същият,
+  // по който върви и браузър без него.
+  await stranitsa.addInitScript(() => {
+    delete globalThis.showOpenFilePicker;
+  });
 
   const p = stranitsa;
 
@@ -404,6 +412,56 @@ async function main() {
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2000,00');
 
+    // ══ 11г · източниците · таблица от Драйва ════════════════════════════
+    razdel = '11г · източници';
+    const GLAVA = 'Доставчик;За какво;Сума;Дата;Документ';
+    const parviCSV = join(tmpdir(), 'razhodi-fevruari.csv');
+    await writeFile(
+      parviCSV,
+      [GLAVA, 'Бетон ЕООД;бетон;900,00;10.02.2026;5001', 'Кран ООД;кран;300,00;12.02.2026;5002'].join('\n'),
+    );
+
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    proveri('менюто се отваря с четирите източника', (await p.$$('[data-iztochnik]')).length, 4);
+
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', parviCSV);
+    await p.waitForSelector('#prilozhi');
+    proveri('казва, че е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Прочетено'), true);
+    proveri('показва отпечатъка на файла', (await tekstNa(p, '.karta.izbrana .dyalglava span')).includes('отпечатък'), true);
+    const razlikiPredi = await redove(p, '.red.razlika');
+    proveri('два нови реда', razlikiPredi.length, 2);
+    proveri('първият е нов', razlikiPredi[0]?.[0], 'нов');
+
+    await sSabitiya(p, 2, () => p.click('#prilozhi'));
+    proveri('двайсет и едно събития', await broySabitiya(p), 21);
+    proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3], '1200,00');
+
+    // поправен файл за същия месец: една сума сменена, един ред махнат
+    const vtoriCSV = join(tmpdir(), 'razhodi-fevruari-popraven.csv');
+    await writeFile(vtoriCSV, [GLAVA, 'Бетон ЕООД;бетон;950,00;10.02.2026;5001'].join('\n'));
+
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', vtoriCSV);
+    await p.waitForSelector('#prilozhi');
+    proveri('вече не е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Разликите'), true);
+
+    const vidove = (await redove(p, '.red.razlika')).map((x) => x[0]);
+    proveri('един поправен и един махнат', vidove.sort().join(','), 'махнат,поправен');
+    proveri('филтърът показва само промените', (await redove(p, '.red.razlika')).length, 2);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar=vsichko]'));
+    proveri('филтърът „всичко" пак дава два', (await redove(p, '.red.razlika')).length, 2);
+
+    await sSabitiya(p, 3, () => p.click('#prilozhi'));
+    proveri('двайсет и четири събития', await broySabitiya(p), 24);
+    proveri(
+      'Фактури казват това, което казва новият файл',
+      (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3],
+      '950,00',
+    );
+    proveri('веригата пак ще е цяла — сторно, не презапис', (await tekstNa(p, '.vest')).includes('сторнирани'), true);
+
     // ══ 12 · скъсана верига → спирателен кран ════════════════════════════
     razdel = '12 · скъсана верига';
     const podmenen = await p.evaluate(async () => {
@@ -436,7 +494,7 @@ async function main() {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 19);
+    proveri('Журналът не е пипан', await broySabitiya(p), 24);
 
     await naEkran(p, 'imoti', '#forma-imot');
     await p.fill('#imot-adres', 'След инцидента');
@@ -444,7 +502,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 19);
+    proveri('нищо ново не влезе', await broySabitiya(p), 24);
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -510,6 +568,16 @@ async function deystvieSPrerisuvane(p, deystvie) {
     const shapka = document.querySelector('.shapka');
     return Boolean(shapka) && !shapka.dataset['beleg'];
   });
+}
+
+/** Действие, което ТРЯБВА да сложи точно N нови събития в Журнала. */
+async function sSabitiya(p, kolko, deystvie) {
+  const predi = await broySabitiya(p);
+  await deystvie();
+  await p.waitForFunction(
+    ([n, k]) => Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + k,
+    [predi, kolko],
+  );
 }
 
 /** Действие, което ТРЯБВА да сложи точно едно ново събитие в Журнала. */
