@@ -10,7 +10,7 @@
 import { chromium } from 'playwright-core';
 import { spawn } from 'node:child_process';
 import { setTimeout as pochakay } from 'node:timers/promises';
-import { readFile } from 'node:fs/promises';
+import { readFile, writeFile } from 'node:fs/promises';
 
 const HROM = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const PORT = Number(process.env['PROBA_PORT'] ?? 4178);
@@ -63,8 +63,7 @@ async function plochka(p, etiket) {
 }
 
 async function broySabitiya(p) {
-  const red = await tekstNa(p, '.veriga .redche:last-child');
-  return Number(red.match(/^(\d+)/)?.[1] ?? -1);
+  return Number(await p.$eval('[data-broi]', (e) => e.dataset.broi));
 }
 
 /**
@@ -263,6 +262,34 @@ async function main() {
     proveri('изнесени 12 събития', izneseni.length, 12);
     proveri('всяко носи hash и prevHash', izneseni.every((x) => x.hash && x.prevHash !== undefined), true);
 
+    proveri('лентата помни износа', (await tekstNa(p, '.veriga')).includes('Изнесен днес'), true);
+
+    // ══ 10б · внасяне · връщането на изнесеното ══════════════════════════
+    razdel = '10б · внасяне';
+    await p.setInputFiles('#fayl', patyat);
+    await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
+    proveri('същият файл не добавя нищо', await broySabitiya(p), 12);
+
+    // подправен файл — отказва се изцяло
+    const podpraven = `${patyat}.podpraven.json`;
+    const redica = JSON.parse(await readFile(patyat, 'utf8'));
+    redica[3] = { ...redica[3], payload: { ...redica[3].payload, naem_st: 999_99 } };
+    await writeFile(podpraven, JSON.stringify(redica));
+
+    await p.setInputFiles('#fayl', podpraven);
+    await p.waitForFunction(() => document.body.innerText.includes('Внасянето е отказано'));
+    const otkaz = await tekstNa(p, '.vest');
+    proveri('казва къде се къса', otkaz.includes('се къса на seq 4'), true);
+    proveri('казва, че нищо не е внесено', otkaz.includes('Нищо не е внесено'), true);
+    proveri('Журналът не е пипнат', await broySabitiya(p), 12);
+
+    // файл, който изобщо не е Журнал
+    const bokluk = `${patyat}.boklu.json`;
+    await writeFile(bokluk, '{"каквото и да е": 1}');
+    await p.setInputFiles('#fayl', bokluk);
+    await p.waitForFunction(() => document.body.innerText.includes('не е редица от събития'));
+    proveri('и след боклук Журналът е цял', await broySabitiya(p), 12);
+
     // ══ 11 · тесен екран ═════════════════════════════════════════════════
     razdel = '11 · тесен екран';
     await p.setViewportSize({ width: 390, height: 844 });
@@ -454,8 +481,7 @@ async function dobaviImot(p, adres, edinitsa, ploshtad) {
   const predi = await broySabitiya(p);
   await p.click('#forma-imot button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -469,8 +495,7 @@ async function dobaviNaem(p, { imot, koy, suma, sektor, padezh }) {
   const predi = await broySabitiya(p);
   await p.click('#forma-naem button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -492,8 +517,7 @@ async function sSabitie(p, deystvie) {
   const predi = await broySabitiya(p);
   await deystvie();
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 
@@ -511,8 +535,7 @@ async function plati(p, koy, suma, nachin, data) {
   const predi = await broySabitiya(p);
   await p.click('#forma-plashtane button[type=submit]');
   await p.waitForFunction((n) => {
-    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
-    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+    return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
 }
 

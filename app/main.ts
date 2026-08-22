@@ -10,6 +10,7 @@ import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-in
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
+import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
@@ -24,6 +25,35 @@ export interface Konteks {
   readonly dnevnik: DnevnikVIndexedDB;
   readonly vrata: Vrata;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
+}
+
+/**
+ * Кога е бил последният износ. Живее в localStorage, не в Журнала — това е
+ * удобство на този браузър, не факт от историята. Може и да го няма.
+ */
+const KLYUCH_IZNOS = 'masterbook:posleden-iznos';
+
+interface BelegZaIznos {
+  readonly kogato: string;
+  readonly broi: number;
+  readonly hash: string;
+}
+
+function chetiBeleg(): BelegZaIznos | null {
+  try {
+    const surovo = localStorage.getItem(KLYUCH_IZNOS);
+    return surovo ? (JSON.parse(surovo) as BelegZaIznos) : null;
+  } catch {
+    return null;
+  }
+}
+
+function zapishiBeleg(beleg: BelegZaIznos): void {
+  try {
+    localStorage.setItem(KLYUCH_IZNOS, JSON.stringify(beleg));
+  } catch {
+    // Частен прозорец или забранени данни — износът пак стана, само не се помни.
+  }
 }
 
 const koren = document.getElementById('ekran')!;
@@ -87,6 +117,8 @@ async function trugvay(): Promise<void> {
           <div class="desno-gore">
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             <button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>
+            <button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>
+            <input type="file" id="fayl" accept="application/json,.json" hidden>
           </div>
         </header>
         <div class="telo">
@@ -143,9 +175,26 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
         <div class="redche">
           <span class="tochka ${v.proverena && !v.tsyala ? 'zle' : ''}"></span>${tekst}
         </div>
-        <div class="redche">${v.broi} ${v.broi === 1 ? 'събитие' : 'събития'} · местно, в този браузър</div>
+        <div class="redche" data-broi="${v.broi}">${v.broi} ${v.broi === 1 ? 'събитие' : 'събития'} · местно, в този браузър</div>
+        <div class="redche">${redZaIznos(v.broi)}</div>
       </div>
     </aside>`;
+}
+
+/** Един ред за износа — тихо напомняне, не аларма. */
+function redZaIznos(sega: number): string {
+  const beleg = chetiBeleg();
+  if (!beleg) {
+    return sega === 0
+      ? 'Още няма какво да се изнася'
+      : '<b>Журналът не е изнасян</b> · само в този браузър';
+  }
+  const dni = Math.max(0, Math.round((Date.now() - Date.parse(beleg.kogato)) / 86_400_000));
+  const novi = sega - beleg.broi;
+  const kolko = dni === 0 ? 'днес' : dni === 1 ? 'вчера' : `преди ${dni} дни`;
+  return novi > 0
+    ? `Изнесен ${kolko} · <b>${novi} ${novi === 1 ? 'ново събитие' : 'нови събития'}</b> оттогава`
+    : `Изнесен ${kolko} · нищо ново оттогава`;
 }
 
 function vestHTML(): string {
@@ -195,8 +244,68 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     vruzka.download = `zhurnal-${NAEMATEL}-${new Date().toISOString().slice(0, 10)}.json`;
     vruzka.click();
     URL.revokeObjectURL(adres);
-    k.vest('dobre', `Изнесени ${sabitiya.length} събития.`);
+
+    const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
+    zapishiBeleg({
+      kogato: new Date().toISOString(),
+      broi: sabitiya.length,
+      hash: posledenHash,
+    });
+    k.vest(
+      'dobre',
+      `Изнесени ${sabitiya.length} събития. Последен hash: ${posledenHash.slice(0, 12)}… ` +
+        'Запиши го някъде извън браузъра — той е котвата, с която после се доказва подмяна.',
+    );
     await prerisuvay();
+  });
+
+  // ── внасяне · връщането на изнесеното ────────────────────────────────────
+  const fayl = koren.querySelector<HTMLInputElement>('#fayl');
+  koren.querySelector<HTMLButtonElement>('#vnesi')?.addEventListener('click', () => fayl?.click());
+
+  fayl?.addEventListener('change', async () => {
+    const izbran = fayl.files?.[0];
+    if (!izbran) return;
+
+    const sega = (await k.dnevnik.chetiVsichki(NAEMATEL)).length;
+    const potvarzhdenie =
+      sega === 0
+        ? `Да внеса ли „${izbran.name}"?`
+        : `Тук вече има ${sega} събития.\n\nВнасянето ще ги ПРОДЪЛЖИ, ако файлът е от същия ` +
+          'Журнал, и ще откаже изцяло, ако е от друг. Нищо няма да се презапише. Да продължа ли?';
+    if (!confirm(potvarzhdenie)) {
+      fayl.value = '';
+      return;
+    }
+
+    try {
+      const rezultat = await vnesiZhurnal({
+        vrata: k.vrata,
+        dnevnik: k.dnevnik,
+        naematel: NAEMATEL,
+        actor: ACTOR,
+        tekst: await izbran.text(),
+        kogato: new Date().toISOString(),
+      });
+      k.vest(
+        'dobre',
+        rezultat.vneseni === 0
+          ? `Файлът вече е тук — всичките ${rezultat.vsichko} събития съвпадат. Нищо ново не влезе.`
+          : `Върнати ${rezultat.vneseni} ${rezultat.vneseni === 1 ? 'събитие' : 'събития'}` +
+            `${rezultat.veche ? `, ${rezultat.veche} вече бяха` : ''}. ` +
+            `Журналът е на ${rezultat.vsichko}. Веригата е проверена цяла, преди да влезе каквото и да е.`,
+      );
+    } catch (greshka) {
+      k.vest(
+        'zle',
+        greshka instanceof GreshkaVnos || greshka instanceof Error
+          ? `Внасянето е отказано. ${greshka.message}`
+          : String(greshka),
+      );
+    } finally {
+      fayl.value = '';
+      await prerisuvay();
+    }
   });
 }
 

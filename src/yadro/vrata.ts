@@ -13,12 +13,12 @@
  */
 
 import type { Dnevnik } from './dnevnik.js';
-import { izchisliHash, type Sha256 } from './hash.js';
+import { izchisliHash, proveriVerigata, type Sha256 } from './hash.js';
 import { eStotinki } from './pari.js';
 import type { Pravata } from './pravata.js';
 import type { Operatsiya, Sabitie } from './sabitie.js';
 
-export type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY';
+export type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY' | 'NESAVMESTIM';
 
 export class GreshkaVrata extends Error {
   readonly kod: KodGreshka;
@@ -48,6 +48,14 @@ export interface Rezultat {
   readonly hash: string;
   /** true, когато opId вече е бил приет — върнат е същият резултат, нов запис няма */
   readonly povtoreno: boolean;
+}
+
+export interface RezultatVazstanovyavane {
+  /** колко събития са влезли сега */
+  readonly vneseni: number;
+  /** колко вече са били тук — общото начало на двете редици */
+  readonly veche: number;
+  readonly posledenHash: string;
 }
 
 export interface NastroykiVrata {
@@ -91,6 +99,95 @@ export class Vrata {
   otvori(): void {
     this.#zatvorena = false;
     this.#prichinaZaZatvaryane = '';
+  }
+
+  /**
+   * ВЪЗСТАНОВЯВАНЕ от износ — втората врата в същата стена, не дупка до нея.
+   *
+   * Внасяните събития вече са минали веднъж през Вратата; хешовете им го
+   * доказват. Затова тук те НЕ се преподписват — влизат такива, каквито са.
+   * Но не влизат безусловно:
+   *
+   *   1. Кранът важи и тук: спряна Врата не възстановява.
+   *   2. Веригата се проверява ЦЯЛА, преди да е записано каквото и да е.
+   *   3. Журналът трябва да е празен ИЛИ внасяното да продължава точно него —
+   *      събитие по събитие, същите хешове. Две различни истории не се сливат.
+   *
+   * Ако нещо не съвпадне, не влиза НИЩО. Поуката от 24,2%: сверката е преди
+   * записа, не след него.
+   */
+  async vazstanovi(
+    naematel: string,
+    actor: string,
+    sabitiya: readonly Sabitie[],
+  ): Promise<RezultatVazstanovyavane> {
+    if (this.#zatvorena) {
+      throw new GreshkaVrata(
+        'SPRYAN',
+        `Вратата е спряна: ${this.#prichinaZaZatvaryane || 'без посочена причина'}`,
+      );
+    }
+    if (sabitiya.length === 0) {
+      throw new GreshkaVrata('NEVALIDNO', 'Няма нито едно събитие за възстановяване.');
+    }
+
+    for (const [i, s] of sabitiya.entries()) {
+      if (s.naematel !== naematel) {
+        throw new GreshkaVrata(
+          'NESAVMESTIM',
+          `Събитие ${s.seq} е на наемател „${s.naematel}", а се възстановява при „${naematel}".`,
+        );
+      }
+      if (s.seq !== i + 1) {
+        throw new GreshkaVrata(
+          'NESAVMESTIM',
+          `Редицата прескача: на място ${i + 1} стои seq ${s.seq}.`,
+        );
+      }
+    }
+
+    if (!(await this.#pravata.mozheDaPishe(actor, naematel, { vid: 'zhurnal', id: naematel }))) {
+      throw new GreshkaVrata('BEZ_PRAVO', `${actor} няма право да пише при наемател ${naematel}`);
+    }
+
+    const proverka = await proveriVerigata(sabitiya, this.#sha);
+    if (!proverka.tsyala) {
+      throw new GreshkaVrata(
+        'NESAVMESTIM',
+        `Веригата във файла се къса на seq ${proverka.parvoSchupeno} (${proverka.prichina}). ` +
+          'Нищо не е внесено.',
+      );
+    }
+
+    return this.#naOpashka(naematel, async () => {
+      const sega = await this.#dnevnik.chetiVsichki(naematel);
+      if (sega.length > sabitiya.length) {
+        throw new GreshkaVrata(
+          'NESAVMESTIM',
+          `Тук има ${sega.length} събития, а файлът носи ${sabitiya.length}. ` +
+            'Внасяното е по-старо от това, което вече стои — нищо не е внесено.',
+        );
+      }
+      for (const [i, star] of sega.entries()) {
+        if (star.hash !== sabitiya[i]!.hash) {
+          throw new GreshkaVrata(
+            'NESAVMESTIM',
+            `Двете истории се разделят на seq ${star.seq}. Различни журнали не се сливат — ` +
+              'изнеси този, преди да внасяш друг.',
+          );
+        }
+      }
+
+      for (const s of sabitiya.slice(sega.length)) {
+        await this.#dnevnik.dobavi(s);
+      }
+
+      return {
+        vneseni: sabitiya.length - sega.length,
+        veche: sega.length,
+        posledenHash: sabitiya[sabitiya.length - 1]!.hash,
+      };
+    });
   }
 
   async dobavi(op: Operatsiya): Promise<Rezultat> {

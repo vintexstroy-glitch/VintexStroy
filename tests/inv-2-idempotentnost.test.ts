@@ -21,7 +21,7 @@ function novaVrata() {
 describe('инвариант 2 · идемпотентност по opId', () => {
   it('повторен opId връща същия резултат и не добавя запис', async () => {
     const { dnevnik, vrata } = novaVrata();
-    const op = operatsiya({ opId: 'op-eднократна', payload: { suma_st: 250_00 } });
+    const op = operatsiya({ opId: 'op-еднократна', payload: { suma_st: 250_00 } });
 
     const parvo = await vrata.dobavi(op);
     const vtoro = await vrata.dobavi(op);
@@ -80,7 +80,7 @@ describe('инвариант 2 · идемпотентност по opId', () =>
 
     await vrata.dobavi(operatsiya({ opId: 'ok-1', sashtnost }));
     await expect(
-      vrata.dobavi(operatsiya({ opId: 'lош-2', sashtnost, expectedRev: 999 })),
+      vrata.dobavi(operatsiya({ opId: 'лош-2', sashtnost, expectedRev: 999 })),
     ).rejects.toBeInstanceOf(GreshkaReplay);
     await vrata.dobavi(operatsiya({ opId: 'ok-3', sashtnost }));
 
