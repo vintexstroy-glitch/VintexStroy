@@ -1,4 +1,8 @@
 import type { Operatsiya } from '../src/yadro/index.js';
+import { sha256Node } from '../src/nositel/hash-node.js';
+
+/** Носителят за тестовете. Ядрото нарочно няма стойност по подразбиране. */
+export const SHA = sha256Node;
 
 /** Детерминистичен генератор — без Math.random, за да са тестовете повторяеми. */
 export function seyalka(seme = 1): () => number {

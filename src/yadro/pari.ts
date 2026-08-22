@@ -63,3 +63,20 @@ export function kakvoPishe(s: Stotinki): string {
   const abs = Math.abs(s);
   return `${znak}${Math.floor(abs / 100)},${String(abs % 100).padStart(2, '0')}`;
 }
+
+/**
+ * Чете сума, написана от човек, и я превръща в ЦЕЛИ СТОТИНКИ.
+ * Приема „1150,50", „1150.50", „1 150,50", „1150". Отказва всичко друго —
+ * входът е мястото, където се спира дробното, не Вратата.
+ */
+export function otLeva(tekst: string): Stotinki {
+  const chisto = tekst.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
+  const nameren = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(chisto);
+  if (!nameren) {
+    throw new GreshkaPari(`Не е сума в левове: „${tekst}"`);
+  }
+  const [, znak, tsyala, drobna = ''] = nameren;
+  const stotni = Number(drobna.padEnd(2, '0'));
+  const sbor = Number(tsyala) * 100 + stotni;
+  return stotinki(znak === '-' ? -sbor : sbor);
+}

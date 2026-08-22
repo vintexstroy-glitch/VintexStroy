@@ -12,9 +12,12 @@
  */
 
 import type { Sabitie } from '../yadro/index.js';
+import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type {
   PayloadImotDobaven,
+  PayloadImotPopraven,
   PayloadNaemDobaven,
+  PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
   PayloadStorno,
@@ -23,6 +26,8 @@ import type {
 
 export interface Imot {
   readonly id: string;
+  /** seq на събитието, което го създаде — сторното сочи именно него */
+  readonly seq: number;
   readonly adres: string;
   readonly edinitsa: string;
   readonly ploshtad_kvsm: number;
@@ -30,6 +35,8 @@ export interface Imot {
 
 export interface Naem {
   readonly id: string;
+  /** seq на „НаемДобавен“ — не се мени от поправки */
+  readonly seq: number;
   readonly imotId: string;
   readonly naemetel: string;
   readonly naem_st: number;
@@ -37,6 +44,8 @@ export interface Naem {
   readonly ot: string;
   readonly do: string;
   readonly depozit_st: number;
+  /** ключ на акумулатор за ДДС — виж `src/domein/dds.ts` */
+  readonly sektor: string;
   readonly prekraten: boolean;
   readonly kraj?: string;
 }
@@ -45,6 +54,7 @@ export type SastoyanieVzemane = 'отворено' | 'частично' | 'за�
 
 export interface Vzemane {
   readonly id: string;
+  readonly seq: number;
   readonly naemId: string;
   readonly period: string;
   readonly osnovanie: string;
@@ -57,6 +67,8 @@ export interface Vzemane {
 
 export interface Plashtane {
   readonly id: string;
+  /** seq на събитието — сторното сочи именно него */
+  readonly seq: number;
   readonly vzemaneId: string;
   readonly suma_st: number;
   readonly nachin: string;
@@ -103,6 +115,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadImotDobaven;
         imoti.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           adres: p.adres,
           edinitsa: p.edinitsa,
           ploshtad_kvsm: p.ploshtad_kvsm,
@@ -114,6 +127,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadNaemDobaven;
         naemi.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           imotId: p.imotId,
           naemetel: p.naemetel,
           naem_st: p.naem_st,
@@ -121,8 +135,44 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           ot: p.ot,
           do: p.do,
           depozit_st: p.depozit_st,
+          // Наем, записан преди резен 4, няма сектор — пада към жилищен.
+          sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
           prekraten: false,
         });
+        break;
+      }
+
+      case 'ИмотПоправен': {
+        const p = s.payload as unknown as PayloadImotPopraven;
+        const imot = imoti.get(p.imotId);
+        // Поправка на несъществуващ имот не създава имот от нищото.
+        if (imot) {
+          imoti.set(imot.id, {
+            ...imot,
+            adres: p.adres,
+            edinitsa: p.edinitsa,
+            ploshtad_kvsm: p.ploshtad_kvsm,
+          });
+        }
+        break;
+      }
+
+      case 'НаемПоправен': {
+        const p = s.payload as unknown as PayloadNaemPopraven;
+        const naem = naemi.get(p.naemId);
+        if (naem) {
+          // Прекратеността НЕ се пипа оттук — тя си има свое събитие.
+          naemi.set(naem.id, {
+            ...naem,
+            naemetel: p.naemetel,
+            naem_st: p.naem_st,
+            padezhDen: p.padezhDen,
+            ot: p.ot,
+            do: p.do,
+            depozit_st: p.depozit_st,
+            sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+          });
+        }
         break;
       }
 
@@ -139,6 +189,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           s.sashtnost.id,
           presmetni({
             id: s.sashtnost.id,
+            seq: s.seq,
             naemId: p.naemId,
             period: p.period,
             osnovanie: p.osnovanie,
@@ -154,6 +205,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadPlashtanePrieto;
         plashtaniya.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           vzemaneId: p.vzemaneId,
           suma_st: p.suma_st,
           nachin: p.nachin,
@@ -202,4 +254,45 @@ export function sabrano(o: Ogledalo): number {
   let sbor = 0;
   for (const p of o.plashtaniya.values()) sbor += p.suma_st;
   return sbor;
+}
+
+/** Вземанията за един наем, подредени по период. */
+export function vzemaniyaZaNaem(o: Ogledalo, naemId: string): Vzemane[] {
+  return [...o.vzemaniya.values()]
+    .filter((v) => v.naemId === naemId)
+    .sort((a, b) => a.period.localeCompare(b.period));
+}
+
+export interface ProsrocheneVzemane extends Vzemane {
+  readonly dniZakasnenie: number;
+}
+
+/**
+ * Незатворените вземания с падеж преди `dnes`, най-закъснелите отгоре.
+ * Датите са ISO низове — сравняват се лексикографски, без часови пояси.
+ */
+export function prosrocheni(o: Ogledalo, dnes: string): ProsrocheneVzemane[] {
+  const den = dnes.slice(0, 10);
+  return [...o.vzemaniya.values()]
+    .filter((v) => v.ostatak_st > 0 && v.padezh < den)
+    .map((v) => ({ ...v, dniZakasnenie: dniMezhdu(v.padezh, den) }))
+    .sort((a, b) => b.dniZakasnenie - a.dniZakasnenie || a.id.localeCompare(b.id));
+}
+
+/** Остатъкът по наеми — карта naemId → дължимо в стотинки. */
+export function duljimoPoNaem(o: Ogledalo): Map<string, number> {
+  const karta = new Map<string, number>();
+  for (const v of o.vzemaniya.values()) {
+    if (v.ostatak_st === 0) continue;
+    karta.set(v.naemId, (karta.get(v.naemId) ?? 0) + v.ostatak_st);
+  }
+  return karta;
+}
+
+/** Цели дни между две ISO дати. */
+export function dniMezhdu(ot: string, doo: string): number {
+  const a = Date.parse(`${ot.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${doo.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.round((b - a) / 86_400_000);
 }

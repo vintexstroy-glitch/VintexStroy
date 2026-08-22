@@ -9,12 +9,14 @@
  * иначе идемпотентността е само дума.
  */
 
-import type { Dnevnik, Operatsiya, Rezultat, Vrata } from '../yadro/index.js';
+import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
+  PayloadImotPopraven,
+  PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
   PayloadStorno,
@@ -63,6 +65,15 @@ export class Deystviya {
     return this.#pusni('НаемПрекратен', VID.naem, danni.naemId, danni, z);
   }
 
+  /** Поправка на описанието — ново събитие върху същия имот, не сторно. */
+  async popraviImot(danni: PayloadImotPopraven, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ИмотПоправен', VID.imot, danni.imotId, danni, z);
+  }
+
+  async popraviNaem(danni: PayloadNaemPopraven, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('НаемПоправен', VID.naem, danni.naemId, danni, z);
+  }
+
   async nachisliVzemane(
     id: string,
     danni: PayloadVzemaneNachisleno,
@@ -83,13 +94,23 @@ export class Deystviya {
    * Поправка = НОВО събитие. Журналът не се пипа.
    * Сторното сочи seq-а, който погасява; и двете остават записани завинаги.
    */
-  async storniraj(id: string, danni: PayloadStorno, z: Zayavka): Promise<Rezultat> {
-    return this.#pusni('Сторно', VID.plashtane, id, danni, z);
+  async storniraj(
+    id: string,
+    danni: PayloadStorno,
+    z: Zayavka,
+    vid: Vid = VID.plashtane,
+  ): Promise<Rezultat> {
+    return this.#pusni('Сторно', vid, id, danni, z);
   }
 
   /** Огледалото: изчислява се от Журнала при всяко поискване, не се пази. */
   async ogledalo(): Promise<Ogledalo> {
     return fold(await this.#dnevnik.chetiVsichki(this.#naematel));
+  }
+
+  /** Суровите събития на този наемател — за проверки, износ и вратаря на сторното. */
+  async sabitiya(): Promise<readonly Sabitie[]> {
+    return this.#dnevnik.chetiVsichki(this.#naematel);
   }
 
   async #pusni(

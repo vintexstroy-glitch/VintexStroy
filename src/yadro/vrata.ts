@@ -13,7 +13,7 @@
  */
 
 import type { Dnevnik } from './dnevnik.js';
-import { izchisliHash, sha256Node, type Sha256 } from './hash.js';
+import { izchisliHash, type Sha256 } from './hash.js';
 import { eStotinki } from './pari.js';
 import type { Pravata } from './pravata.js';
 import type { Operatsiya, Sabitie } from './sabitie.js';
@@ -53,7 +53,7 @@ export interface Rezultat {
 export interface NastroykiVrata {
   readonly dnevnik: Dnevnik;
   readonly pravata: Pravata;
-  readonly sha?: Sha256;
+  readonly sha: Sha256;
 }
 
 export class Vrata {
@@ -71,7 +71,7 @@ export class Vrata {
   constructor(n: NastroykiVrata) {
     this.#dnevnik = n.dnevnik;
     this.#pravata = n.pravata;
-    this.#sha = n.sha ?? sha256Node;
+    this.#sha = n.sha;
   }
 
   get zatvorena(): boolean {

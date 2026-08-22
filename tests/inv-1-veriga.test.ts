@@ -11,11 +11,11 @@ import {
   VsichkoRazresheno,
   type Sabitie,
 } from '../src/yadro/index.js';
-import { operatsiya, seyalka } from './pomoshtni.js';
+import { operatsiya, seyalka, SHA } from './pomoshtni.js';
 
 function novaVrata() {
   const dnevnik = new DnevnikVPametta();
-  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno() }) };
+  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA }) };
 }
 
 describe('инвариант 1 · хеш-веригата', () => {
@@ -38,7 +38,7 @@ describe('инвариант 1 · хеш-веригата', () => {
     const vsichki = await dnevnik.chetiVsichki('vintexstroy');
     expect(vsichki).toHaveLength(1000);
 
-    const rezultat = await proveriVerigata(vsichki);
+    const rezultat = await proveriVerigata(vsichki, SHA);
     expect(rezultat.tsyala).toBe(true);
     expect(rezultat.proverni).toBe(1000);
   });
@@ -67,7 +67,7 @@ describe('инвариант 1 · хеш-веригата', () => {
       i === 4 ? { ...s, payload: { suma_st: 999_00 } } : s,
     );
 
-    const rezultat = await proveriVerigata(podmenen);
+    const rezultat = await proveriVerigata(podmenen, SHA);
     expect(rezultat.tsyala).toBe(false);
     expect(rezultat.parvoSchupeno).toBe(5);
     expect(rezultat.prichina).toBe('hash');
@@ -83,7 +83,7 @@ describe('инвариант 1 · хеш-веригата', () => {
     const vsichki = await dnevnik.chetiVsichki('vintexstroy');
     const bezTretoto = vsichki.filter((s) => s.seq !== 3);
 
-    const rezultat = await proveriVerigata(bezTretoto);
+    const rezultat = await proveriVerigata(bezTretoto, SHA);
     expect(rezultat.tsyala).toBe(false);
     expect(rezultat.prichina).toBe('seq');
   });
