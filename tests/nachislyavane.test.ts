@@ -62,6 +62,7 @@ async function nasadi(d: Deystviya, naemi: readonly OpisNaem[]) {
         ot: n.ot ?? '2024-01-01',
         do: n.do ?? '',
         depozit_st: 0,
+        sektor: 'naem-zhilishten',
       },
       { opId: `op-${n.id}` },
     );
@@ -71,7 +72,7 @@ async function nasadi(d: Deystviya, naemi: readonly OpisNaem[]) {
 describe('кой наем се начислява', () => {
   const naem = {
     id: 'N-1', imotId: 'I-1', naemetel: 'X', naem_st: 100_00, padezhDen: 5,
-    ot: '2024-03-01', do: '', depozit_st: 0, prekraten: false,
+    ot: '2024-03-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten', prekraten: false,
   };
 
   it('жив наем с отворен договор — да', () => {
@@ -99,7 +100,7 @@ describe('кой наем се начислява', () => {
 describe('падежът', () => {
   const naem = {
     id: 'N-1', imotId: 'I-1', naemetel: 'X', naem_st: 100_00, padezhDen: 16,
-    ot: '2024-01-01', do: '', depozit_st: 0, prekraten: false,
+    ot: '2024-01-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten', prekraten: false,
   };
 
   it('пада на посочения ден от периода', () => {

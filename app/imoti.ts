@@ -6,6 +6,7 @@
  */
 
 import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './main.js';
 
@@ -104,8 +105,19 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, k: Konteks): stri
             <input id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off">
           </div>
           <div class="pole">
-            <label for="naem-suma">Наем на месец, лв.</label>
+            <label for="naem-suma">Наем на месец, лв. — с ДДС</label>
             <input id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="naem-sektor">Сектор — определя ставката</label>
+            <select id="naem-sektor" name="sektor" required>
+              ${sektoriNaNaem()
+                .map(
+                  (a) =>
+                    `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`,
+                )
+                .join('')}
+            </select>
           </div>
           <div class="pole">
             <label for="naem-depozit">Депозит, лв. (по избор)</label>
@@ -123,7 +135,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, k: Konteks): stri
         <p class="greshka" id="greshka-naem"></p>
         <div class="deystviya">
           <button type="submit" class="glaven">Запиши наема</button>
-          <p class="drebno">1150,50 лв. става 115050 стотинки. Никакъв float — иначе стотинките се разминават в ДДС.</p>
+          <p class="drebno">1150,50 лв. става 115050 стотинки. Никакъв float — иначе стотинките се разминават в ДДС.<br>Сумата е <b>обща цена с ДДС</b>; ДДС-то се изважда на отделен ред в „Сметки", не се прибавя тук.</p>
         </div>
       </form>`
       }
@@ -250,6 +262,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           ot: String(danni.get('ot')),
           do: '',
           depozit_st,
+          sektor: String(danni.get('sektor')),
         },
         { opId: opIdNaem },
       );

@@ -12,6 +12,7 @@
  */
 
 import type { Sabitie } from '../yadro/index.js';
+import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -37,6 +38,8 @@ export interface Naem {
   readonly ot: string;
   readonly do: string;
   readonly depozit_st: number;
+  /** ключ на акумулатор за ДДС — виж `src/domein/dds.ts` */
+  readonly sektor: string;
   readonly prekraten: boolean;
   readonly kraj?: string;
 }
@@ -123,6 +126,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           ot: p.ot,
           do: p.do,
           depozit_st: p.depozit_st,
+          // Наем, записан преди резен 4, няма сектор — пада към жилищен.
+          sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
           prekraten: false,
         });
         break;

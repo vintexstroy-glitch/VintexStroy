@@ -12,11 +12,12 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
+import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 
 const NAEMATEL = 'vintexstroy';
 const ACTOR = 'vintexstroy@gmail.com';
 
-export type KoyEkran = 'imoti' | 'pari';
+export type KoyEkran = 'imoti' | 'pari' | 'smetki';
 
 export interface Konteks {
   readonly deystviya: Deystviya;
@@ -40,6 +41,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     ime: 'Пари',
     podnaslov: 'какво ти дължат, кой закъснява, какво е влязло',
     ikona: '<rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path>',
+  },
+  smetki: {
+    ime: 'Сметки',
+    podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
+    ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
   },
 };
 
@@ -88,14 +94,17 @@ async function trugvay(): Promise<void> {
           ${
             ekran === 'imoti'
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
-              : narisuvayPari(ogledalo, dnes)
+              : ekran === 'pari'
+                ? narisuvayPari(ogledalo, dnes)
+                : narisuvaySmetki(ogledalo, dnes)
           }
         </div>
       </main>`;
 
     poslednaVest = null;
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
-    else zakachiPari(koren, k, prerisuvay);
+    else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
+    else zakachiSmetki(koren, k, prerisuvay);
     zakachiGlavnite(k, prerisuvay);
   }
 

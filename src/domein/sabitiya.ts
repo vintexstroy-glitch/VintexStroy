@@ -42,6 +42,11 @@ export interface PayloadNaemDobaven {
   readonly ot: string;
   readonly do: string;
   readonly depozit_st: number;
+  /**
+   * Ключ на акумулатор от `dds.ts` — определя ставката, с която ДДС-то се
+   * ИЗВАЖДА от наема. Наемът си остава обща цена; тук се пази само откъде е.
+   */
+  readonly sektor: string;
 }
 
 export interface PayloadNaemPrekraten {

@@ -203,3 +203,28 @@ button { font-family: inherit; cursor: pointer; }
 }
 .znachka.trevoga { background: var(--toplo); color: var(--aktsent); }
 .poleta.tesni { grid-template-columns: minmax(0, 240px); }
+
+/* ── сметки, ДДС, сверка, калкулатор ────────────────────────────────── */
+.glava.smetka, .red.smetka {
+  grid-template-columns: minmax(0, 2.2fr) 110px 90px 140px;
+  min-width: 640px;
+}
+.glava.dds, .red.dds {
+  grid-template-columns: 84px minmax(0, 2fr) 90px 130px 130px;
+  min-width: 700px;
+}
+.glava.sverka, .red.sverka {
+  grid-template-columns: minmax(0, 2.4fr) 100px 100px 100px 128px;
+  min-width: 700px;
+}
+.glava.smyatane, .red.smyatane {
+  grid-template-columns: minmax(0, 2fr) 90px 120px 120px 120px;
+  min-width: 640px;
+}
+.red.sbor {
+  background: var(--panel);
+  border-top: 1px solid var(--liniya);
+  border-bottom: none;
+}
+.red.sbor .suma { font-weight: 600; }
+.plochka.trevoga { border-color: var(--aktsent); background: var(--toplo); }

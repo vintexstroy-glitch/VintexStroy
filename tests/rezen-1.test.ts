@@ -49,6 +49,7 @@ const NAEM = {
   ot: '2024-03-01',
   do: '2027-02-28',
   depozit_st: stotinki(1150_00),
+  sektor: 'naem-targovski',
 };
 
 const VZEMANE = {

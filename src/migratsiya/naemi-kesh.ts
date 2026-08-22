@@ -11,6 +11,7 @@
 import { GreshkaSverka, sverka, type Sverka } from '../yadro/sverka.js';
 import { DnevnikNaSverki } from '../yadro/sverka.js';
 import { eStotinki } from '../yadro/pari.js';
+import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { Deystviya } from '../domein/deystviya.js';
 
 /** Един ред от регистъра, вече прочетен и приведен към стотинки. */
@@ -149,6 +150,8 @@ export async function migrirajNaemiKesh(n: NastroykiMigratsiya): Promise<Rezulta
         ot: n.kogato.slice(0, 10),
         do: '',
         depozit_st: 0,
+        // Наемите от листа са жилищни; друго не се твърди без дума за него.
+        sektor: SEKTOR_PO_PODRAZBIRANE,
       },
       { opId: `migratsiya:naemi-kesh:naem:${naemId}` },
     );
