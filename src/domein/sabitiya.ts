@@ -24,6 +24,8 @@ export type TipSabitie =
   | 'НаемПрекратен'
   | 'ВземанеНачислено'
   | 'ПлащанеПрието'
+  | 'ИмотПоправен'
+  | 'НаемПоправен'
   | 'Сторно';
 
 export interface PayloadImotDobaven {
@@ -47,6 +49,37 @@ export interface PayloadNaemDobaven {
    * ИЗВАЖДА от наема. Наемът си остава обща цена; тук се пази само откъде е.
    */
   readonly sektor: string;
+}
+
+/**
+ * ПОПРАВКА НА ОПИСАНИЕТО — ново събитие, същият `id`.
+ *
+ * Сгрешен адрес не се сторнира: сторното на имота би оставило наемите му
+ * да висят на нищо. Затова поправката е отделно събитие, което носи новите
+ * стойности НАЦЯЛО и се налага върху старите при сглобяването на Огледалото.
+ */
+export interface PayloadImotPopraven {
+  readonly imotId: string;
+  readonly adres: string;
+  readonly edinitsa: string;
+  readonly ploshtad_kvsm: number;
+  readonly prichina: string;
+}
+
+/**
+ * Същото за наема. Смяната на `naem_st` важи за БЪДЕЩИТЕ начисления —
+ * вече начислените вземания са отделни събития и не се пипат оттук.
+ */
+export interface PayloadNaemPopraven {
+  readonly naemId: string;
+  readonly naemetel: string;
+  readonly naem_st: number;
+  readonly padezhDen: number;
+  readonly ot: string;
+  readonly do: string;
+  readonly depozit_st: number;
+  readonly sektor: string;
+  readonly prichina: string;
 }
 
 export interface PayloadNaemPrekraten {

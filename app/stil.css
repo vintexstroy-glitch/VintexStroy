@@ -183,10 +183,6 @@ button { font-family: inherit; cursor: pointer; }
 .navred.tuk .broyach { background: var(--hartiya); color: var(--mastilo); }
 
 /* ── редове за вземания и плащания ──────────────────────────────────── */
-.glava.vzemane, .red.vzemane {
-  grid-template-columns: minmax(0, 2fr) 92px minmax(0, 130px) 120px 142px;
-  min-width: 700px;
-}
 .glava.plashtane, .red.plashtane {
   grid-template-columns: 130px minmax(0, 2fr) minmax(0, 110px) 120px 100px;
   min-width: 700px;
@@ -197,6 +193,21 @@ button { font-family: inherit; cursor: pointer; }
 .vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 12.5px; }
 .karta.izbrana { border-color: var(--aktsent); background: var(--toplo); }
 .karta.izbrana .pole input, .karta.izbrana .pole select { background: #FFFFFF; }
+
+/* ── редове с действия ───────────────────────────────────────────────── */
+.glava.imot, .red.imot {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) 96px 120px 108px 168px;
+  min-width: 860px;
+}
+.glava.naem, .red.naem {
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.6fr) minmax(0, 1.3fr) 120px 132px 232px;
+  min-width: 980px;
+}
+.butoni { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.glava.vzemane, .red.vzemane {
+  grid-template-columns: minmax(0, 2fr) 92px minmax(0, 130px) 120px 216px;
+  min-width: 800px;
+}
 
 @media (max-width: 620px) {
   .glava.vzemane, .red.vzemane, .glava.plashtane, .red.plashtane { min-width: 620px; }

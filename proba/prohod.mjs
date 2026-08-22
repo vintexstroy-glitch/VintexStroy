@@ -135,7 +135,7 @@ async function main() {
     proveri('отдадени', await plochka(p, 'Отдадени'), '2 / 2');
     proveri('месечен наем', await plochka(p, 'Месечен наем'), '2000,00');
 
-    const imoti = await redove(p, '.red');
+    const imoti = await redove(p, '.red.imot');
     const malinova = imoti.find((r) => r[0]?.startsWith('Малинова'));
     proveri('имот с два наема · сбор', malinova?.[3], '800,00');
     proveri('имот с два наема · знак', malinova?.[4], '2 наема');
@@ -187,8 +187,7 @@ async function main() {
 
     const zaStorno = (await redove(p, '.red.plashtane')).find((r) => r[3] === '700,00');
     proveri('плащането от 700,00 се вижда', Boolean(zaStorno), true);
-    await p.click(`.red.plashtane:has-text("700,00") [data-storno]`);
-    await p.waitForFunction(() => document.body.innerText.includes('сторнирано'));
+    await sSabitie(p, () => p.click(`.red.plashtane:has-text("700,00") [data-storno]`));
     proveri('единайсет събития след сторно', await broySabitiya(p), 11);
     proveri('сторното върна остатъка', await ostatak(p, 'Стройпласт'), '600,00');
 
@@ -254,6 +253,7 @@ async function main() {
     await p.click('#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е'));
     proveri('веригата е цяла, 12 звена', await tekstNa(p, '.vest'), 'Веригата е цяла · 12 от 12 звена.');
+    await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 10 · износ ═══════════════════════════════════════════════════════
     razdel = '10 · износ';
@@ -272,6 +272,67 @@ async function main() {
       proveri(`${koy}: нищо не излиза встрани`, izliza, false);
     }
     await p.setViewportSize({ width: 1280, height: 900 });
+
+    // ══ 11б · поправка, прекратяване, вратарят на сторното ═══════════════
+    razdel = '11б · поправката';
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    // поправка на имот — наемът му НЕ се къса
+    await deystvieSPrerisuvane(p, () => p.click('.red.imot:has-text("Дианабад") [data-popravi-imot]'));
+    proveri('формата се напълни със стария адрес', await p.inputValue('#imot-adres'), 'Дианабад');
+    await p.fill('#imot-adres', 'Дианабад 4');
+    await p.fill('#imot-prichina', 'сбъркан номер');
+    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    proveri('тринайсет събития', await broySabitiya(p), 13);
+    const sledPopravka = (await redove(p, '.red.imot')).find((x) => x[0].startsWith('Дианабад'));
+    proveri('новият адрес се вижда', sledPopravka?.[0], 'Дианабад 4 ОФИС № 3');
+    proveri('наемът не се откачи', sledPopravka?.[1]?.startsWith('Стройпласт'), true);
+
+    // поправка на наем — новата сума важи за напред
+    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Стройпласт") [data-popravi-naem]'));
+    proveri('формата се напълни със старата сума', await p.inputValue('#naem-suma'), '1200,00');
+    await p.fill('#naem-suma', '1300,00');
+    await p.fill('#naem-prichina', 'вдигнат наем');
+    await sSabitie(p, () => p.click('#forma-naem button[type=submit]'));
+    proveri('четиринайсет събития', await broySabitiya(p), 14);
+    proveri(
+      'новата сума в списъка',
+      (await redove(p, '.red.naem')).find((x) => x[0].startsWith('Стройпласт'))?.[3],
+      '1300,00',
+    );
+
+    // прекратяване
+    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Домакинство") [data-prekrati]'));
+    await p.fill('#prekrati-kraj', '2026-02-28');
+    await p.fill('#prekrati-prichina', 'изнесоха се');
+    await sSabitie(p, () => p.click('#forma-prekrati button[type=submit]'));
+    proveri('петнайсет събития', await broySabitiya(p), 15);
+    proveri(
+      'наемът е прекратен',
+      (await redove(p, '.red.naem')).find((x) => x[0].startsWith('Домакинство'))?.[4],
+      'прекратен 2026-02-28',
+    );
+    proveri('месечният наем спадна', await plochka(p, 'Месечен наем'), '1600,00');
+
+    // вратарят отказва, докато нещо живо виси
+    await deystvieSPrerisuvane(p, () => p.click('.red.imot:has-text("Малинова") [data-storno-imot]'));
+    proveri('сторно на имот с наеми се отказва', (await tekstNa(p, '.vest')).includes('висят'), true);
+    proveri('нищо не влезе', await broySabitiya(p), 15);
+
+    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Стройпласт") [data-storno-naem]'));
+    proveri(
+      'сторно на наем с вземания се отказва',
+      (await tekstNa(p, '.vest')).includes('начислено вземане'),
+      true,
+    );
+    proveri('пак нищо не влезе', await broySabitiya(p), 15);
+
+    // сторно на начисление БЕЗ плащания — минава
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00');
+    await sSabitie(p, () => p.click('.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
+    proveri('шестнайсет събития', await broySabitiya(p), 16);
+    proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00');
 
     // ══ 12 · скъсана верига → спирателен кран ════════════════════════════
     razdel = '12 · скъсана верига';
@@ -305,7 +366,7 @@ async function main() {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 12);
+    proveri('Журналът не е пипан', await broySabitiya(p), 16);
 
     await naEkran(p, 'imoti', '#forma-imot');
     await p.fill('#imot-adres', 'След инцидента');
@@ -313,7 +374,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 12);
+    proveri('нищо ново не влезе', await broySabitiya(p), 16);
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -364,6 +425,29 @@ async function dobaviNaem(p, { imot, koy, suma, sektor, padezh }) {
   await p.fill('#naem-ot', '2026-01-01');
   const predi = await broySabitiya(p);
   await p.click('#forma-naem button[type=submit]');
+  await p.waitForFunction((n) => {
+    const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
+    return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
+  }, predi);
+}
+
+/** Действие, което прерисува екрана, но не добавя събитие (бутон, отказ). */
+async function deystvieSPrerisuvane(p, deystvie) {
+  await p.evaluate(() => {
+    const shapka = document.querySelector('.shapka');
+    if (shapka) shapka.dataset['beleg'] = 'staro';
+  });
+  await deystvie();
+  await p.waitForFunction(() => {
+    const shapka = document.querySelector('.shapka');
+    return Boolean(shapka) && !shapka.dataset['beleg'];
+  });
+}
+
+/** Действие, което ТРЯБВА да сложи точно едно ново събитие в Журнала. */
+async function sSabitie(p, deystvie) {
+  const predi = await broySabitiya(p);
+  await deystvie();
   await p.waitForFunction((n) => {
     const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
     return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;

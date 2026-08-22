@@ -18,7 +18,9 @@ import {
   nachisliZaPeriod,
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
+import { VID } from '../src/domein/sabitiya.js';
 import { ekraniraj } from './imoti.js';
+import { opitajStorno } from './storno.js';
 import type { Konteks } from './main.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
@@ -166,10 +168,11 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
         ${dni > 0 ? `<span class="zakasnenie">закъснял ${dni} ${dni === 1 ? 'ден' : 'дни'}</span>` : ''}
       </span>
       <span class="suma${dni > 0 ? ' duljimo' : ''}">${kakvoPishe(v.ostatak_st as never)}</span>
-      <span>
+      <span class="butoni">
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>
+        <button type="button" class="vtorichen malak" data-storno-vzemane="${v.seq}">Сторно</button>
       </span>
     </div>`;
 }
@@ -183,8 +186,8 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
       <span class="suma plateno">${kakvoPishe(p.suma_st as never)}</span>
-      <span>
-        <button type="button" class="vtorichen malak" data-storno="${p.seq}" data-storno-koe="${ekraniraj(p.id)}">Сторно</button>
+      <span class="butoni">
+        <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
       </span>
     </div>`;
 }
@@ -326,29 +329,19 @@ export function zakachiPari(
     }
   });
 
-  // ── сторно ───────────────────────────────────────────────────────────────
-  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-storno]')) {
-    b.addEventListener('click', async () => {
-      const seq = Number(b.dataset['storno']);
-      const prichina = prompt(
-        'Защо се сторнира това плащане?\nПричината остава в Журнала завинаги.',
-        '',
-      );
-      if (prichina === null) return;
-
-      b.disabled = true;
-      try {
-        await k.deystviya.storniraj(
-          `S:${crypto.randomUUID()}`,
-          { pogasyavaSeq: seq, prichina: prichina.trim() || 'без посочена причина' },
-          { opId: `storno:${crypto.randomUUID()}` },
-        );
-        k.vest('dobre', `Плащането на seq ${seq} е сторнирано. И двете стоят в Журнала.`);
+  // ── сторно · и на плащане, и на начисление, винаги през вратаря ─────────
+  for (const [znak, vid, kakvo] of [
+    ['data-storno', VID.plashtane, 'плащането'],
+    ['data-storno-vzemane', VID.vzemane, 'начислението'],
+  ] as const) {
+    for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
+      b.addEventListener('click', async () => {
+        b.disabled = true;
+        const izhod = await opitajStorno(k, Number(b.getAttribute(znak)), vid, kakvo);
+        if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
+        izbrano = null;
         await prerisuvay();
-      } catch (err) {
-        k.vest('zle', err instanceof Error ? err.message : String(err));
-        await prerisuvay();
-      }
-    });
+      });
+    }
   }
 }

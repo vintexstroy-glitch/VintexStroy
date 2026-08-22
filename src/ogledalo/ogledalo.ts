@@ -15,7 +15,9 @@ import type { Sabitie } from '../yadro/index.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type {
   PayloadImotDobaven,
+  PayloadImotPopraven,
   PayloadNaemDobaven,
+  PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
   PayloadStorno,
@@ -24,6 +26,8 @@ import type {
 
 export interface Imot {
   readonly id: string;
+  /** seq на събитието, което го създаде — сторното сочи именно него */
+  readonly seq: number;
   readonly adres: string;
   readonly edinitsa: string;
   readonly ploshtad_kvsm: number;
@@ -31,6 +35,8 @@ export interface Imot {
 
 export interface Naem {
   readonly id: string;
+  /** seq на „НаемДобавен“ — не се мени от поправки */
+  readonly seq: number;
   readonly imotId: string;
   readonly naemetel: string;
   readonly naem_st: number;
@@ -48,6 +54,7 @@ export type SastoyanieVzemane = 'отворено' | 'частично' | 'за�
 
 export interface Vzemane {
   readonly id: string;
+  readonly seq: number;
   readonly naemId: string;
   readonly period: string;
   readonly osnovanie: string;
@@ -108,6 +115,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadImotDobaven;
         imoti.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           adres: p.adres,
           edinitsa: p.edinitsa,
           ploshtad_kvsm: p.ploshtad_kvsm,
@@ -119,6 +127,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadNaemDobaven;
         naemi.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           imotId: p.imotId,
           naemetel: p.naemetel,
           naem_st: p.naem_st,
@@ -130,6 +139,40 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
           prekraten: false,
         });
+        break;
+      }
+
+      case 'ИмотПоправен': {
+        const p = s.payload as unknown as PayloadImotPopraven;
+        const imot = imoti.get(p.imotId);
+        // Поправка на несъществуващ имот не създава имот от нищото.
+        if (imot) {
+          imoti.set(imot.id, {
+            ...imot,
+            adres: p.adres,
+            edinitsa: p.edinitsa,
+            ploshtad_kvsm: p.ploshtad_kvsm,
+          });
+        }
+        break;
+      }
+
+      case 'НаемПоправен': {
+        const p = s.payload as unknown as PayloadNaemPopraven;
+        const naem = naemi.get(p.naemId);
+        if (naem) {
+          // Прекратеността НЕ се пипа оттук — тя си има свое събитие.
+          naemi.set(naem.id, {
+            ...naem,
+            naemetel: p.naemetel,
+            naem_st: p.naem_st,
+            padezhDen: p.padezhDen,
+            ot: p.ot,
+            do: p.do,
+            depozit_st: p.depozit_st,
+            sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+          });
+        }
         break;
       }
 
@@ -146,6 +189,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           s.sashtnost.id,
           presmetni({
             id: s.sashtnost.id,
+            seq: s.seq,
             naemId: p.naemId,
             period: p.period,
             osnovanie: p.osnovanie,
