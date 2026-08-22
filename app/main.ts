@@ -9,10 +9,14 @@ import { Vrata, VsichkoRazresheno, proveriVerigata } from '../src/yadro/index.js
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
+import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
+import { narisuvayPari, zakachiPari } from './pari.js';
 
 const NAEMATEL = 'vintexstroy';
 const ACTOR = 'vintexstroy@gmail.com';
+
+export type KoyEkran = 'imoti' | 'pari';
 
 export interface Konteks {
   readonly deystviya: Deystviya;
@@ -24,6 +28,20 @@ export interface Konteks {
 const koren = document.getElementById('ekran')!;
 let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
 let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
+let ekran: KoyEkran = 'imoti';
+
+const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }> = {
+  imoti: {
+    ime: 'Имоти',
+    podnaslov: 'записва вместо да помни · всичко минава през Вратата',
+    ikona: '<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9.5 21v-6.5h5V21"></path>',
+  },
+  pari: {
+    ime: 'Пари',
+    podnaslov: 'какво ти дължат, кой закъснява, какво е влязло',
+    ikona: '<rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path>',
+  },
+};
 
 async function trugvay(): Promise<void> {
   const dnevnik = await otvoriDnevnik('masterbook');
@@ -49,14 +67,16 @@ async function trugvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
+    const dnes = new Date().toISOString().slice(0, 10);
+    const opis = EKRANI[ekran];
 
     koren.innerHTML = `
-      ${strana()}
+      ${strana(ogledalo, dnes)}
       <main class="glavno">
         <header class="shapka">
           <div>
-            <h1>Имоти</h1>
-            <p>записва вместо да помни · всичко минава през Вратата</p>
+            <h1>${opis.ime}</h1>
+            <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
@@ -65,31 +85,51 @@ async function trugvay(): Promise<void> {
         </header>
         <div class="telo">
           ${vestHTML()}
-          ${narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)}
+          ${
+            ekran === 'imoti'
+              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
+              : narisuvayPari(ogledalo, dnes)
+          }
         </div>
       </main>`;
 
     poslednaVest = null;
-    zakachiFormite(koren, k, prerisuvay);
+    if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
+    else zakachiPari(koren, k, prerisuvay);
     zakachiGlavnite(k, prerisuvay);
   }
 
   await prerisuvay();
 }
 
-function strana(): string {
+function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
     ? 'Веригата не е проверявана в тази сесия'
     : v.tsyala
       ? 'Веригата е цяла'
       : 'Веригата е СКЪСАНА';
+  const zakasneli = prosrocheni(o, dnes).length;
+
+  const punktove = (Object.keys(EKRANI) as KoyEkran[])
+    .map((koy) => {
+      const e = EKRANI[koy];
+      const znachka = koy === 'pari' && zakasneli > 0
+        ? `<span class="broyach">${zakasneli}</span>`
+        : '';
+      return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
+        <svg viewBox="0 0 24 24">${e.ikona}</svg>${e.ime}${znachka}
+      </button>`;
+    })
+    .join('');
+
   return `
     <aside class="strana">
       <div class="marka">
         <b>VintexStroy</b>
         <span>MasterBook</span>
       </div>
+      <nav class="nav">${punktove}</nav>
       <div class="veriga">
         <div class="redche">
           <span class="tochka ${v.proverena && !v.tsyala ? 'zle' : ''}"></span>${tekst}
@@ -105,6 +145,13 @@ function vestHTML(): string {
 }
 
 function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-ekran]')) {
+    b.addEventListener('click', async () => {
+      ekran = b.dataset['ekran'] as KoyEkran;
+      await prerisuvay();
+    });
+  }
+
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
     const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
     const rezultat = await proveriVerigata(sabitiya, sha256Web);

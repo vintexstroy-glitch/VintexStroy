@@ -57,6 +57,8 @@ export interface Vzemane {
 
 export interface Plashtane {
   readonly id: string;
+  /** seq на събитието — сторното сочи именно него */
+  readonly seq: number;
   readonly vzemaneId: string;
   readonly suma_st: number;
   readonly nachin: string;
@@ -154,6 +156,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadPlashtanePrieto;
         plashtaniya.set(s.sashtnost.id, {
           id: s.sashtnost.id,
+          seq: s.seq,
           vzemaneId: p.vzemaneId,
           suma_st: p.suma_st,
           nachin: p.nachin,
@@ -202,4 +205,45 @@ export function sabrano(o: Ogledalo): number {
   let sbor = 0;
   for (const p of o.plashtaniya.values()) sbor += p.suma_st;
   return sbor;
+}
+
+/** Вземанията за един наем, подредени по период. */
+export function vzemaniyaZaNaem(o: Ogledalo, naemId: string): Vzemane[] {
+  return [...o.vzemaniya.values()]
+    .filter((v) => v.naemId === naemId)
+    .sort((a, b) => a.period.localeCompare(b.period));
+}
+
+export interface ProsrocheneVzemane extends Vzemane {
+  readonly dniZakasnenie: number;
+}
+
+/**
+ * Незатворените вземания с падеж преди `dnes`, най-закъснелите отгоре.
+ * Датите са ISO низове — сравняват се лексикографски, без часови пояси.
+ */
+export function prosrocheni(o: Ogledalo, dnes: string): ProsrocheneVzemane[] {
+  const den = dnes.slice(0, 10);
+  return [...o.vzemaniya.values()]
+    .filter((v) => v.ostatak_st > 0 && v.padezh < den)
+    .map((v) => ({ ...v, dniZakasnenie: dniMezhdu(v.padezh, den) }))
+    .sort((a, b) => b.dniZakasnenie - a.dniZakasnenie || a.id.localeCompare(b.id));
+}
+
+/** Остатъкът по наеми — карта naemId → дължимо в стотинки. */
+export function duljimoPoNaem(o: Ogledalo): Map<string, number> {
+  const karta = new Map<string, number>();
+  for (const v of o.vzemaniya.values()) {
+    if (v.ostatak_st === 0) continue;
+    karta.set(v.naemId, (karta.get(v.naemId) ?? 0) + v.ostatak_st);
+  }
+  return karta;
+}
+
+/** Цели дни между две ISO дати. */
+export function dniMezhdu(ot: string, doo: string): number {
+  const a = Date.parse(`${ot.slice(0, 10)}T00:00:00Z`);
+  const b = Date.parse(`${doo.slice(0, 10)}T00:00:00Z`);
+  if (Number.isNaN(a) || Number.isNaN(b)) return 0;
+  return Math.round((b - a) / 86_400_000);
 }

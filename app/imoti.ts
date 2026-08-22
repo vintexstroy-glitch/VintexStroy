@@ -147,14 +147,29 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, k: Konteks): stri
 }
 
 function red(imot: Imot, naemi: readonly Naem[]): string {
-  const zhiv = naemi.find((n) => !n.prekraten);
+  // Всички живи наеми, не само първият — нищо не изчезва тихо.
+  const zhivi = naemi.filter((n) => !n.prekraten);
+  const sbor = zhivi.reduce((s, n) => s + n.naem_st, 0);
+  const koy = zhivi.length === 0
+    ? '<span>—</span>'
+    : `<b>${ekraniraj(zhivi[0]!.naemetel)}</b><span>${
+        zhivi.length === 1
+          ? `падеж ${zhivi[0]!.padezhDen}-о число`
+          : `и още ${zhivi.length - 1} · ${zhivi.slice(1).map((n) => ekraniraj(n.naemetel)).join(', ')}`
+      }</span>`;
   return `
     <div class="red">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
-      <span class="kletka">${zhiv ? `<b>${ekraniraj(zhiv.naemetel)}</b><span>падеж ${zhiv.padezhDen}-о число</span>` : '<span>—</span>'}</span>
+      <span class="kletka">${koy}</span>
       <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${kakvoPishe(imot.ploshtad_kvsm / 100 as never)} м²` : '—'}</span></span>
-      <span class="suma">${zhiv ? kakvoPishe(zhiv.naem_st as never) : '—'}</span>
-      <span>${zhiv ? '<span class="znachka dobre">отдаден</span>' : '<span class="znachka tiha">свободен</span>'}</span>
+      <span class="suma">${zhivi.length ? kakvoPishe(sbor as never) : '—'}</span>
+      <span>${
+        zhivi.length > 1
+          ? `<span class="znachka trevoga">${zhivi.length} наема</span>`
+          : zhivi.length === 1
+            ? '<span class="znachka dobre">отдаден</span>'
+            : '<span class="znachka tiha">свободен</span>'
+      }</span>
     </div>`;
 }
 
