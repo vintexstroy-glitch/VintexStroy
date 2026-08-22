@@ -1,0 +1,24 @@
+# Node
+node_modules/
+dist/
+build/
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Големи двоични данни — не влизат в Git история
+*.db
+*.sqlite
+*.sqlite3
