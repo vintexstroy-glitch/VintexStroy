@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #B25E38; text-decoration: none; }
+    a:hover { color: #8E4526; }
+    .ekran {
+      --hartiya: #FBF8F3;
+      --panel: #F4EFE7;
+      --mastilo: #2A2521;
+      --mastilo2: #6E645B;
+      --liniya: #E3DACE;
+      --aktsent: #B25E38;
+      --zeleno: #2E7D5E;
+      --toplo: #F6E7DE;
+      --red: 14px;
+      width: 1440px; height: 900px; display: flex;
+      background: var(--hartiya); color: var(--mastilo);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;
+      overflow: hidden;
+    }
+    .strana { width: 232px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--liniya); display: flex; flex-direction: column; }
+    .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+    .marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav { display: flex; flex-direction: column; gap: 1px; padding: 4px 12px; }
+    .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; color: var(--mastilo); font-size: 13.5px; }
+    .nav a:hover { background: #EAE2D6; color: var(--mastilo); }
+    .nav a.tuk { background: var(--mastilo); color: var(--hartiya); }
+    .nav a.tuk svg { stroke: var(--hartiya); }
+    .nav svg { width: 17px; height: 17px; stroke: var(--mastilo2); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+    .navdyal { padding: 14px 22px 6px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #A2968A; }
+    .veriga { margin-top: auto; padding: 14px 20px 18px; border-top: 1px solid var(--liniya); display: flex; flex-direction: column; gap: 5px; }
+    .veriga .redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+    .tochka { width: 7px; height: 7px; border-radius: 50%; background: var(--zeleno); flex-shrink: 0; }
+    .glavno { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+    .shapka { display: flex; align-items: flex-end; justify-content: space-between; padding: 26px 32px 18px; border-bottom: 1px solid var(--liniya); }
+    .shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+    .shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+    .desno-gore { display: flex; align-items: center; gap: 10px; }
+    .glaven { display: flex; align-items: center; gap: 7px; background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px; padding: 9px 16px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .glaven svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .vtorichen { background: transparent; border: 1px solid var(--liniya); border-radius: 4px; padding: 9px 14px; font-family: inherit; font-size: 13px; color: var(--mastilo); cursor: pointer; }
+    .vtorichen:hover { background: var(--panel); }
+    .telo { flex-grow: 1; padding: 22px 32px 0; display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow: hidden; }
+    .dyalglava { display: flex; align-items: baseline; justify-content: space-between; }
+    .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
+    .dyalglava span { font-size: 12px; color: var(--mastilo2); }
+    .plochki { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .plochka { background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px; padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px; }
+    .plochka .etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .plochka .chislo { font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .plochka .pod { font-size: 12px; color: var(--mastilo2); }
+    .plochka.trevoga { border-color: #E0B49E; background: var(--toplo); }
+    .plochka.trevoga .chislo { color: var(--aktsent); }
+    .tablitsa { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: hidden; }
+    .tablitsa .glava, .tablitsa .red { display: grid; align-items: center; gap: 16px; padding: var(--red) 18px; }
+    .tablitsa .glava { background: var(--panel); border-bottom: 1px solid var(--liniya); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px; }
+    .tablitsa .red { border-bottom: 1px solid #EFE8DD; }
+    .tablitsa .red:last-child { border-bottom: none; }
+    .tablitsa .red:hover { background: #FDFBF7; }
+    .kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .kletka b { font-weight: 500; font-size: 13.5px; }
+    .kletka span { font-size: 12px; color: var(--mastilo2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chislo-red { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+    .chislo-red.duljimo { color: var(--aktsent); }
+    .chislo-red.plateno { color: var(--zeleno); }
+    .znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .znachka svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+    .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
+    .znachka.trevoga { background: var(--toplo); color: var(--aktsent); }
+    .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
+    .filtri { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chip { border: 1px solid var(--liniya); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; color: var(--mastilo2); background: transparent; font-family: inherit; cursor: pointer; }
+    .chip.izbran { background: var(--mastilo); border-color: var(--mastilo); color: var(--hartiya); }
+    .tarsene { flex-grow: 1; min-width: 160px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 12px; background: #FFFFFF; color: #A2968A; font-size: 13px; }
+    .tarsene svg { width: 15px; height: 15px; stroke: #A2968A; fill: none; stroke-width: 1.7; }
+
+    .skitsa {
+      width: 880px; height: 560px; box-sizing: border-box; padding: 26px 28px;
+      background: #FFFDF9; color: #2A2521;
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 13px;
+      display: flex; flex-direction: column; gap: 16px; overflow: hidden;
+    }
+    .sglava { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; border-bottom: 2px solid #2A2521; padding-bottom: 10px; }
+    .sglava h2 { font-family: Literata, Georgia, serif; font-size: 20px; font-weight: 600; margin: 0; }
+    .sglava p { margin: 0; font-size: 12.5px; color: #6E645B; max-width: 460px; text-align: right; }
+    .skutiya { border: 1.5px dashed #B8AB9C; border-radius: 4px; background: #FFFFFF; padding: 12px 14px; display: flex; flex-direction: column; gap: 8px; }
+    .skutiya.plutna { border-style: solid; border-color: #2A2521; }
+    .setiket { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #8A7E71; }
+    .sivo { background: #E8E1D6; border-radius: 3px; }
+    .stekst { height: 9px; }
+    .kompromis { margin: auto 0 0; font-size: 12px; color: #6E645B; border-top: 1px solid #E3DACE; padding-top: 10px; line-height: 1.5; }
+    .kompromis b { color: #2A2521; font-weight: 500; }
+  </style>
+</helmet>
+<div class="skitsa">
+  <div class="sglava">
+    <h2>Посока Б · Днешният списък</h2>
+    <p>Един екран, един въпрос: какво иска действие днес. Журналът е долу, под линия — виждаш го, когато го потърсиш.</p>
+  </div>
+  <div style="display: flex; flex-direction: column; gap: 12px; flex-grow: 1; min-height: 0">
+    <div style="display: grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap: 10px">
+      <div class="skutiya" style="gap: 6px"><span class="setiket">Днес</span><span class="sivo" style="height: 24px"></span></div>
+      <div class="skutiya" style="gap: 6px; border-color: #C98A68"><span class="setiket">Просрочено</span><span class="sivo" style="height: 24px; background: #E4CBBB"></span></div>
+      <div class="skutiya" style="gap: 6px"><span class="setiket">Събрано</span><span class="sivo" style="height: 24px"></span></div>
+      <div class="skutiya" style="gap: 6px"><span class="setiket">Заетост</span><span class="sivo" style="height: 24px"></span></div>
+    </div>
+    <div class="skutiya plutna" style="flex-grow: 1">
+      <span class="setiket">Иска действие · всеки ред има бутон</span>
+      <div style="display: flex; flex-direction: column; gap: 9px">
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sivo stekst" style="flex-grow: 1"></span><span class="sivo" style="width: 96px; height: 24px; border-radius: 4px; background: #D9C6B7"></span></span>
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sivo stekst" style="flex-grow: 1"></span><span class="sivo" style="width: 96px; height: 24px; border-radius: 4px"></span></span>
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sivo stekst" style="flex-grow: 1"></span><span class="sivo" style="width: 96px; height: 24px; border-radius: 4px"></span></span>
+        <span style="display: flex; align-items: center; gap: 10px"><span class="sivo stekst" style="flex-grow: 1"></span><span class="sivo" style="width: 96px; height: 24px; border-radius: 4px"></span></span>
+      </div>
+    </div>
+    <div class="skutiya" style="flex-direction: row; align-items: center; gap: 12px">
+      <span class="setiket" style="margin: 0">Журналът днес</span>
+      <span class="sivo stekst" style="flex-grow: 1"></span>
+    </div>
+  </div>
+  <p class="kompromis"><b>За:</b> отваряш и знаеш какво да правиш; най-краткият път от въпрос до действие. <b>Против:</b> истината е на едно кликване разстояние, а не пред очите.</p>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":880,"height":560}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>

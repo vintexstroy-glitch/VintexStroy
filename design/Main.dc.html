@@ -1,0 +1,273 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #B25E38; text-decoration: none; }
+    a:hover { color: #8E4526; }
+    .ekran {
+      --hartiya: #FBF8F3;
+      --panel: #F4EFE7;
+      --mastilo: #2A2521;
+      --mastilo2: #6E645B;
+      --liniya: #E3DACE;
+      --zeleno: #2E7D5E;
+      --toplo: #F6E7DE;
+      width: 1440px; height: 900px; display: flex;
+      background: var(--hartiya); color: var(--mastilo);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;
+      overflow: hidden;
+    }
+    .strana { width: 232px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--liniya); display: flex; flex-direction: column; }
+    .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+    .marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav { display: flex; flex-direction: column; gap: 1px; padding: 4px 12px; }
+    .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; color: var(--mastilo); font-size: 13.5px; }
+    .nav a:hover { background: #EAE2D6; color: var(--mastilo); }
+    .nav a.tuk { background: var(--mastilo); color: var(--hartiya); }
+    .nav a.tuk svg { stroke: var(--hartiya); }
+    .nav svg { width: 17px; height: 17px; stroke: var(--mastilo2); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+    .navdyal { padding: 14px 22px 6px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #A2968A; }
+    .veriga { margin-top: auto; padding: 14px 20px 18px; border-top: 1px solid var(--liniya); display: flex; flex-direction: column; gap: 5px; }
+    .veriga .redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+    .tochka { width: 7px; height: 7px; border-radius: 50%; background: var(--zeleno); flex-shrink: 0; }
+    .glavno { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+    .shapka { display: flex; align-items: flex-end; justify-content: space-between; padding: 26px 32px 18px; border-bottom: 1px solid var(--liniya); }
+    .shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+    .shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+    .desno-gore { display: flex; align-items: center; gap: 10px; }
+    .sega { display: flex; align-items: center; gap: 7px; background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px; padding: 9px 16px; font-family: inherit; font-size: 13px; font-weight: 600; letter-spacing: 0.04em; cursor: pointer; }
+    .sega svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .vtorichen { background: transparent; border: 1px solid var(--liniya); border-radius: 4px; padding: 9px 14px; font-family: inherit; font-size: 13px; color: var(--mastilo); cursor: pointer; }
+    .telo { flex-grow: 1; display: grid; grid-template-columns: minmax(0, 1fr) 356px; gap: 0; min-height: 0; }
+    .lyavo { padding: 22px 26px 0 32px; display: flex; flex-direction: column; gap: 20px; min-width: 0; overflow: hidden; }
+    .plochki { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .plochka { background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px; padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px; }
+    .plochka .etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .plochka .chislo { font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .plochka .pod { font-size: 12px; color: var(--mastilo2); }
+    .plochka.trevoga { border-color: #E0B49E; background: var(--toplo); }
+    .plochka.trevoga .chislo { color: var(--aktsent); }
+    .dyal { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+    .dyalglava { display: flex; align-items: baseline; justify-content: space-between; }
+    .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
+    .dyalglava span { font-size: 12px; color: var(--mastilo2); }
+    .spisak { display: flex; flex-direction: column; border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: hidden; }
+    .red { display: grid; grid-template-columns: 22px minmax(0, 1fr) 118px 108px; align-items: center; gap: 14px; padding: var(--red) 16px; border-bottom: 1px solid #EFE8DD; }
+    .red:last-child { border-bottom: none; }
+    .red:hover { background: #FDFBF7; }
+    .znak { width: 22px; height: 22px; border-radius: 50%; display: flex; align-items: center; justify-content: center; }
+    .znak svg { width: 13px; height: 13px; fill: none; stroke-width: 1.9; }
+    .znak.speshno { background: var(--toplo); }
+    .znak.speshno svg { stroke: var(--aktsent); }
+    .znak.tiho { background: var(--panel); }
+    .znak.tiho svg { stroke: var(--mastilo2); }
+    .red .kakvo { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .red .kakvo b { font-weight: 500; font-size: 13.5px; }
+    .red .kakvo span { font-size: 12px; color: var(--mastilo2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .suma { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+    .suma.duljimo { color: var(--aktsent); }
+    .deystvie { border: 1px solid var(--liniya); background: transparent; border-radius: 4px; padding: 6px 10px; font-family: inherit; font-size: 12.5px; color: var(--mastilo); cursor: pointer; white-space: nowrap; }
+    .deystvie:hover { background: var(--panel); }
+    .grafika { display: flex; align-items: flex-end; gap: 10px; height: 92px; padding: 0 2px; }
+    .stalb { flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+    .stalb .pryut { width: 100%; background: var(--aktsent); border-radius: 4px 4px 0 0; }
+    .stalb .pryut.blyad { background: #DFCFC2; }
+    .stalb .mesets { font-size: 11px; color: var(--mastilo2); }
+    .dnevnik { border-left: 1px solid var(--liniya); background: var(--panel); padding: 22px 26px 0; display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
+    .sabitie { display: flex; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--liniya); }
+    .sabitie:last-of-type { border-bottom: none; }
+    .sabitie .chas { font-family: 'IBM Plex Mono', monospace; font-size: 11.5px; color: var(--mastilo2); padding-top: 1px; flex-shrink: 0; }
+    .sabitie .opis { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .sabitie .opis b { font-weight: 500; font-size: 13px; }
+    .sabitie .opis span { font-size: 11.5px; color: var(--mastilo2); font-family: 'IBM Plex Mono', monospace; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .znachka { display: inline-flex; align-items: center; gap: 5px; align-self: flex-start; background: #E6F0EA; color: var(--zeleno); border-radius: 3px; padding: 4px 8px; font-size: 11.5px; font-weight: 500; }
+    .znachka svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+  </style>
+</helmet>
+<div class="ekran" style="--aktsent: {{aktsent}}; --red: {{redPad}}">
+
+  <aside class="strana">
+    <div class="marka">
+      <b>VintexStroy</b>
+      <span>MasterBook</span>
+    </div>
+    <div class="navdyal">Всеки ден</div>
+    <nav class="nav">
+      <a href="#" class="tuk"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>Табло</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9.5 21v-6.5h5V21"></path></svg>Имоти</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M4 9.5h16"></path><path d="M9 19V9.5"></path></svg>Наеми</a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path></svg>Плащания</a>
+      <div class="navdyal">Пари</div>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-3.5-2-3.5 2-3.5-2L5 21z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path></svg>Счетоводство</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m8 14 3.5-4 3 2.5L20 7"></path></svg>Разходи</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8 2.2 2.6 5 3.2 5 1.2 5 3.2-2.2 2.8-5 2.8-5-1-5-3"></path></svg>Кредити</a>
+      <div class="navdyal">Строеж</div>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="10" height="4" rx="1"></rect><rect x="7" y="11" width="12" height="4" rx="1"></rect><rect x="5" y="17" width="8" height="4" rx="1"></rect></svg>Проекти и Гант</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"></path><path d="M14 3v5h5"></path></svg>Документи</a>
+      <div class="navdyal">Истината</div>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.5"></circle><circle cx="7" cy="18" r="2.5"></circle><path d="M7 8.5v7"></path><path d="M9.5 6H20"></path><path d="M9.5 18H20"></path><path d="M13 12h7"></path></svg>Журналът</a>
+    </nav>
+    <div class="veriga">
+      <div class="redche"><span class="tochka"></span>Веригата е цяла</div>
+      <div class="redche">12 480 събития · проверена 09:12</div>
+    </div>
+  </aside>
+
+  <main class="glavno">
+    <header class="shapka">
+      <div>
+        <h1>Табло</h1>
+        <p>петък, 22 август 2026 · всичко е записано, нищо не се помни</p>
+      </div>
+      <div class="desno-gore">
+        <button type="button" class="vtorichen">Провери веригата</button>
+        <button type="button" class="sega">
+          <svg viewBox="0 0 24 24"><path d="M13 2 4.5 13.5H11L10 22l8.5-11.5H12z"></path></svg>
+          СЕГА
+        </button>
+      </div>
+    </header>
+
+    <div class="telo">
+      <section class="lyavo">
+        <div class="plochki">
+          <div class="plochka">
+            <span class="etiket">Дължимо днес</span>
+            <span class="chislo">4 280,00</span>
+            <span class="pod">3 вземания · лв.</span>
+          </div>
+          <div class="plochka trevoga">
+            <span class="etiket">Просрочено</span>
+            <span class="chislo">1 150,00</span>
+            <span class="pod">2 наемателя · до 6 дни</span>
+          </div>
+          <div class="plochka">
+            <span class="etiket">Събрано в август</span>
+            <span class="chislo">18 640,00</span>
+            <span class="pod">86% от начисленото</span>
+          </div>
+          <div class="plochka">
+            <span class="etiket">Заетост</span>
+            <span class="chislo">11 / 13</span>
+            <span class="pod">2 свободни единици</span>
+          </div>
+        </div>
+
+        <div class="dyal">
+          <div class="dyalglava">
+            <h2>Иска действие днес</h2>
+            <span>5 неща</span>
+          </div>
+          <div class="spisak">
+            <div class="red">
+              <span class="znak speshno"><svg viewBox="0 0 24 24"><path d="M12 8v5"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle><path d="M12 3 2.5 20h19z"></path></svg></span>
+              <span class="kakvo"><b>Наем · Лозенец, ап. 3</b><span>Стройпласт ЕООД · падеж 16.08 · просрочен 6 дни</span></span>
+              <span class="suma duljimo">1 150,00</span>
+              <button type="button" class="deystvie">Приеми плащане</button>
+            </div>
+            <div class="red">
+              <span class="znak speshno"><svg viewBox="0 0 24 24"><path d="M12 8v5"></path><circle cx="12" cy="17" r="0.6" fill="currentColor" stroke="none"></circle><path d="M12 3 2.5 20h19z"></path></svg></span>
+              <span class="kakvo"><b>ДДС декларация за юли</b><span>срок 14.08 · подава се по сектори, два акумулатора</span></span>
+              <span class="suma">2 106,40</span>
+              <button type="button" class="deystvie">Отвори</button>
+            </div>
+            <div class="red">
+              <span class="znak tiho"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"></circle><path d="M12 7.5V12l3 2"></path></svg></span>
+              <span class="kakvo"><b>Вноска по кредит · Оборище</b><span>падеж 25.08 · главница и лихва разделени</span></span>
+              <span class="suma">3 200,00</span>
+              <button type="button" class="deystvie">Насрочи</button>
+            </div>
+            <div class="red">
+              <span class="znak tiho"><svg viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"></path><path d="M14 3v5h5"></path></svg></span>
+              <span class="kakvo"><b>Договор изтича след 21 дни</b><span>Оборище, магазин · без клауза за автоматично подновяване</span></span>
+              <span class="suma">—</span>
+              <button type="button" class="deystvie">Виж договора</button>
+            </div>
+            <div class="red">
+              <span class="znak tiho"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="10" height="4" rx="1"></rect><rect x="7" y="11" width="12" height="4" rx="1"></rect><rect x="5" y="17" width="8" height="4" rx="1"></rect></svg></span>
+              <span class="kakvo"><b>Акт 16 · Лозенец</b><span>на критичния път · всяко забавяне бута края</span></span>
+              <span class="suma">—</span>
+              <button type="button" class="deystvie">Виж Ганта</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="dyal">
+          <div class="dyalglava">
+            <h2>Събрано по месеци</h2>
+            <span>лв., последните шест</span>
+          </div>
+          <div class="grafika">
+            <span class="stalb"><span class="pryut" style="height: 46px"></span><span class="mesets">мар</span></span>
+            <span class="stalb"><span class="pryut" style="height: 58px"></span><span class="mesets">апр</span></span>
+            <span class="stalb"><span class="pryut" style="height: 52px"></span><span class="mesets">май</span></span>
+            <span class="stalb"><span class="pryut" style="height: 68px"></span><span class="mesets">юни</span></span>
+            <span class="stalb"><span class="pryut" style="height: 71px"></span><span class="mesets">юли</span></span>
+            <span class="stalb"><span class="pryut blyad" style="height: 62px"></span><span class="mesets">авг</span></span>
+          </div>
+        </div>
+      </section>
+
+      <aside class="dnevnik">
+        <div class="dyalglava">
+          <h2>Журналът днес</h2>
+          <span>14 събития</span>
+        </div>
+        <span class="znachka">
+          <svg viewBox="0 0 24 24"><path d="m4 12.5 5 5L20 6.5"></path></svg>
+          Веригата е цяла до seq 12 480
+        </span>
+        <div>
+          <div class="sabitie">
+            <span class="chas">11:42</span>
+            <span class="opis"><b>ПлащанеПрието</b><span>naem N-114 · 1 250,00 · a7f3…c2</span></span>
+          </div>
+          <div class="sabitie">
+            <span class="chas">10:18</span>
+            <span class="opis"><b>Сторно</b><span>погасява seq 12 471 · грешен наемател</span></span>
+          </div>
+          <div class="sabitie">
+            <span class="chas">09:55</span>
+            <span class="opis"><b>РазходЗаписан</b><span>Лозенец · материали · 4 890,00</span></span>
+          </div>
+          <div class="sabitie">
+            <span class="chas">09:31</span>
+            <span class="opis"><b>ЗадачаПреместена</b><span>Акт 16 · +3 дни · критичен път</span></span>
+          </div>
+          <div class="sabitie">
+            <span class="chas">09:12</span>
+            <span class="opis"><b>ВеригаПроверена</b><span>12 480 / 12 480 · разлика 0</span></span>
+          </div>
+          <div class="sabitie">
+            <span class="chas">08:47</span>
+            <span class="opis"><b>НаемДобавен</b><span>Младост 4 · ателие · 640,00 / мес.</span></span>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </main>
+
+</div>
+</x-dc>
+<script data-dc-script data-props='{"aktsent":{"editor":"color","default":"#B25E38","options":["#B25E38","#2E7D5E","#3A5FB2","#7A4FA8"],"section":"Стил"},"plutnost":{"editor":"enum","default":"спокойно","options":["спокойно","плътно"],"section":"Стил"},"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() {
+    const plutnost = this.props.plutnost ?? 'спокойно';
+    return {
+      aktsent: this.props.aktsent ?? '#B25E38',
+      redPad: plutnost === 'плътно' ? '9px' : '14px',
+    };
+  }
+}
+</script>
+</body>
+</html>

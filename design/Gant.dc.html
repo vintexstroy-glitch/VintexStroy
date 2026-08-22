@@ -1,0 +1,257 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #B25E38; text-decoration: none; }
+    a:hover { color: #8E4526; }
+    .ekran {
+      --hartiya: #FBF8F3;
+      --panel: #F4EFE7;
+      --mastilo: #2A2521;
+      --mastilo2: #6E645B;
+      --liniya: #E3DACE;
+      --aktsent: #B25E38;
+      --zeleno: #2E7D5E;
+      --toplo: #F6E7DE;
+      --red: 14px;
+      width: 1440px; height: 900px; display: flex;
+      background: var(--hartiya); color: var(--mastilo);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;
+      overflow: hidden;
+    }
+    .strana { width: 232px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--liniya); display: flex; flex-direction: column; }
+    .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+    .marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav { display: flex; flex-direction: column; gap: 1px; padding: 4px 12px; }
+    .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; color: var(--mastilo); font-size: 13.5px; }
+    .nav a:hover { background: #EAE2D6; color: var(--mastilo); }
+    .nav a.tuk { background: var(--mastilo); color: var(--hartiya); }
+    .nav a.tuk svg { stroke: var(--hartiya); }
+    .nav svg { width: 17px; height: 17px; stroke: var(--mastilo2); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+    .navdyal { padding: 14px 22px 6px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #A2968A; }
+    .veriga { margin-top: auto; padding: 14px 20px 18px; border-top: 1px solid var(--liniya); display: flex; flex-direction: column; gap: 5px; }
+    .veriga .redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+    .tochka { width: 7px; height: 7px; border-radius: 50%; background: var(--zeleno); flex-shrink: 0; }
+    .glavno { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+    .shapka { display: flex; align-items: flex-end; justify-content: space-between; padding: 26px 32px 18px; border-bottom: 1px solid var(--liniya); }
+    .shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+    .shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+    .desno-gore { display: flex; align-items: center; gap: 10px; }
+    .glaven { display: flex; align-items: center; gap: 7px; background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px; padding: 9px 16px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .glaven svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .vtorichen { background: transparent; border: 1px solid var(--liniya); border-radius: 4px; padding: 9px 14px; font-family: inherit; font-size: 13px; color: var(--mastilo); cursor: pointer; }
+    .vtorichen:hover { background: var(--panel); }
+    .telo { flex-grow: 1; padding: 22px 32px 0; display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow: hidden; }
+    .dyalglava { display: flex; align-items: baseline; justify-content: space-between; }
+    .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
+    .dyalglava span { font-size: 12px; color: var(--mastilo2); }
+    .plochki { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .plochka { background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px; padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px; }
+    .plochka .etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .plochka .chislo { font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .plochka .pod { font-size: 12px; color: var(--mastilo2); }
+    .plochka.trevoga { border-color: #E0B49E; background: var(--toplo); }
+    .plochka.trevoga .chislo { color: var(--aktsent); }
+    .tablitsa { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: hidden; }
+    .tablitsa .glava, .tablitsa .red { display: grid; align-items: center; gap: 16px; padding: var(--red) 18px; }
+    .tablitsa .glava { background: var(--panel); border-bottom: 1px solid var(--liniya); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px; }
+    .tablitsa .red { border-bottom: 1px solid #EFE8DD; }
+    .tablitsa .red:last-child { border-bottom: none; }
+    .tablitsa .red:hover { background: #FDFBF7; }
+    .kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .kletka b { font-weight: 500; font-size: 13.5px; }
+    .kletka span { font-size: 12px; color: var(--mastilo2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chislo-red { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+    .chislo-red.duljimo { color: var(--aktsent); }
+    .chislo-red.plateno { color: var(--zeleno); }
+    .znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .znachka svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+    .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
+    .znachka.trevoga { background: var(--toplo); color: var(--aktsent); }
+    .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
+    .filtri { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chip { border: 1px solid var(--liniya); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; color: var(--mastilo2); background: transparent; font-family: inherit; cursor: pointer; }
+    .chip.izbran { background: var(--mastilo); border-color: var(--mastilo); color: var(--hartiya); }
+    .tarsene { flex-grow: 1; min-width: 160px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 12px; background: #FFFFFF; color: #A2968A; font-size: 13px; }
+    .tarsene svg { width: 15px; height: 15px; stroke: #A2968A; fill: none; stroke-width: 1.7; }
+
+    .legenda { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .klyuch { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+    .proba { width: 15px; height: 15px; border-radius: 3px; flex-shrink: 0; }
+    .proba.zavursheno { background: #CFE0D6; }
+    .proba.teche { background: var(--zeleno); }
+    .proba.kritichno { background: var(--aktsent); }
+    .proba.luft { background: repeating-linear-gradient(135deg, #E8DCCD, #E8DCCD 3px, #FBF8F3 3px, #FBF8F3 6px); border: 1px solid var(--liniya); }
+    .proba.predstoi { background: #DCD2C4; }
+    .gant { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: hidden; }
+    .gred { display: grid; grid-template-columns: minmax(0, 210px) 128px repeat(12, minmax(0, 1fr)); align-items: stretch; border-bottom: 1px solid #EFE8DD; }
+    .gred:last-child { border-bottom: none; }
+    .gred.glava { background: var(--panel); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .gred .zadacha { padding: 10px 16px; display: flex; align-items: center; }
+    .gred .zadacha b { font-weight: 500; font-size: 13.5px; }
+    .gred .mera { padding: 10px 12px; display: flex; align-items: center; font-size: 12.5px; color: var(--mastilo2); border-right: 1px solid var(--liniya); }
+    .gred .sedm { padding: 10px 0; text-align: center; font-variant-numeric: tabular-nums; }
+    .kl { margin: 4px 2px; border-radius: 3px; min-height: 24px; display: flex; align-items: center; justify-content: center; font-size: 10.5px; font-weight: 600; color: #FFF9F4; }
+    .kl.zavursheno { background: #CFE0D6; color: var(--zeleno); }
+    .kl.teche { background: var(--zeleno); }
+    .kl.kritichno { background: var(--aktsent); }
+    .kl.luft { background: repeating-linear-gradient(135deg, #E8DCCD, #E8DCCD 3px, #FFFFFF 3px, #FFFFFF 6px); }
+    .kl.predstoi { background: #DCD2C4; }
+    .dolu { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+    .karta { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; padding: 15px 17px; display: flex; flex-direction: column; gap: 11px; }
+    .tovar { display: flex; align-items: flex-end; gap: 9px; height: 72px; }
+    .tovar .stalb { flex-grow: 1; display: flex; flex-direction: column; align-items: center; gap: 5px; }
+    .tovar .pryut { width: 100%; background: #DFCFC2; border-radius: 3px 3px 0 0; }
+    .tovar .pryut.nad { background: var(--aktsent); }
+    .tovar .etiketche { font-size: 10.5px; color: var(--mastilo2); }
+    .pravila { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.5; color: var(--mastilo2); }
+    .pravila b { color: var(--mastilo); font-weight: 500; }
+    .drebno { margin: 0; font-size: 11.5px; color: var(--mastilo2); line-height: 1.55; }
+  </style>
+</helmet>
+<div class="ekran">
+  <aside class="strana">
+    <div class="marka">
+      <b>VintexStroy</b>
+      <span>MasterBook</span>
+    </div>
+    <nav class="nav">
+      <div class="navdyal">Всеки ден</div>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9"></rect><rect x="14" y="3" width="7" height="5"></rect><rect x="14" y="12" width="7" height="9"></rect><rect x="3" y="16" width="7" height="5"></rect></svg>Табло</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9.5 21v-6.5h5V21"></path></svg>Имоти</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4z"></path><path d="M4 9.5h16"></path><path d="M9 19V9.5"></path></svg>Наеми</a>
+      <a href="#"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path></svg>Плащания</a>
+      <div class="navdyal">Пари</div>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M5 3h14v18l-3.5-2-3.5 2-3.5-2L5 21z"></path><path d="M9 8h6"></path><path d="M9 12h6"></path></svg>Счетоводство</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M4 19V5"></path><path d="M4 19h16"></path><path d="m8 14 3.5-4 3 2.5L20 7"></path></svg>Разходи</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M12 3v18"></path><path d="M17 7.5c0-2-2.2-3-5-3s-5 .9-5 2.8 2.2 2.6 5 3.2 5 1.2 5 3.2-2.2 2.8-5 2.8-5-1-5-3"></path></svg>Кредити</a>
+      <div class="navdyal">Строеж</div>
+      <a href="#" class="tuk"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="10" height="4" rx="1"></rect><rect x="7" y="11" width="12" height="4" rx="1"></rect><rect x="5" y="17" width="8" height="4" rx="1"></rect></svg>Проекти и Гант</a>
+      <a href="#"><svg viewBox="0 0 24 24"><path d="M6 3h8l5 5v13H6z"></path><path d="M14 3v5h5"></path></svg>Документи</a>
+      <div class="navdyal">Истината</div>
+      <a href="#"><svg viewBox="0 0 24 24"><circle cx="7" cy="6" r="2.5"></circle><circle cx="7" cy="18" r="2.5"></circle><path d="M7 8.5v7"></path><path d="M9.5 6H20"></path><path d="M9.5 18H20"></path><path d="M13 12h7"></path></svg>Журналът</a>
+    </nav>
+    <div class="veriga">
+      <div class="redche"><span class="tochka"></span>Веригата е цяла</div>
+      <div class="redche">12 480 събития · проверена 09:12</div>
+    </div>
+  </aside>
+  <main class="glavno">
+    <header class="shapka">
+      <div>
+        <h1>Лозенец · нов корпус</h1>
+        <p>Гантът е таблица с оцветени клетки, не диаграма · критичният път е с етикет, не само с цвят</p>
+      </div>
+      <div class="desno-gore">
+        <button type="button" class="vtorichen">Ден</button>
+        <button type="button" class="vtorichen" style="background: var(--panel)">Седмица</button>
+        <button type="button" class="vtorichen">Месец</button>
+        <button type="button" class="glaven">
+          <svg viewBox="0 0 24 24"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+          Задача
+        </button>
+      </div>
+    </header>
+    <div class="telo">
+      <div class="legenda">
+        <span class="klyuch"><span class="proba zavursheno"></span>завършено</span>
+        <span class="klyuch"><span class="proba teche"></span>тече</span>
+        <span class="klyuch"><span class="proba kritichno"></span>критичен път · Slack 0</span>
+        <span class="klyuch"><span class="proba luft"></span>луфт</span>
+        <span class="klyuch"><span class="proba predstoi"></span>предстои</span>
+        <span style="margin-left: auto; font-size: 12px; color: var(--mastilo2)">седмици 32 → 43 · 2026</span>
+      </div>
+
+      <div class="gant">
+        <div class="gred glava">
+          <span class="zadacha">Задача</span>
+          <span class="mera">Ресурс</span>
+          <span class="sedm">32</span><span class="sedm">33</span><span class="sedm">34</span><span class="sedm">35</span>
+          <span class="sedm">36</span><span class="sedm">37</span><span class="sedm">38</span><span class="sedm">39</span>
+          <span class="sedm">40</span><span class="sedm">41</span><span class="sedm">42</span><span class="sedm">43</span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Груб строеж</b></span><span class="mera">бригада А</span>
+          <span class="kl zavursheno">✓</span><span class="kl zavursheno"></span><span class="kl zavursheno"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Покрив</b></span><span class="mera">подизпълнител</span>
+          <span class="kl"></span><span class="kl zavursheno">✓</span><span class="kl zavursheno"></span><span class="kl teche"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Инсталации</b></span><span class="mera">бригада Б</span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl kritichno">кр.</span>
+          <span class="kl kritichno"></span><span class="kl kritichno"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Мазилки</b></span><span class="mera">бригада А</span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl predstoi"></span><span class="kl predstoi"></span><span class="kl luft"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Дограма</b></span><span class="mera">доставчик</span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl predstoi"></span><span class="kl predstoi"></span>
+          <span class="kl luft"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Акт 16</b></span><span class="mera">общината</span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl kritichno">кр.</span><span class="kl kritichno"></span><span class="kl"></span><span class="kl"></span>
+        </div>
+        <div class="gred">
+          <span class="zadacha"><b>Предаване</b></span><span class="mera">—</span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl"></span><span class="kl"></span>
+          <span class="kl"></span><span class="kl"></span><span class="kl predstoi"></span><span class="kl predstoi"></span>
+        </div>
+      </div>
+
+      <div class="dolu">
+        <div class="karta">
+          <div class="dyalglava"><h2>Натоварване · бригада А</h2><span>над 100% е червено, не „почти"</span></div>
+          <div class="tovar">
+            <span class="stalb"><span class="pryut" style="height: 34px"></span><span class="etiketche">32</span></span>
+            <span class="stalb"><span class="pryut" style="height: 42px"></span><span class="etiketche">33</span></span>
+            <span class="stalb"><span class="pryut" style="height: 40px"></span><span class="etiketche">34</span></span>
+            <span class="stalb"><span class="pryut nad" style="height: 62px"></span><span class="etiketche">35</span></span>
+            <span class="stalb"><span class="pryut nad" style="height: 58px"></span><span class="etiketche">36</span></span>
+            <span class="stalb"><span class="pryut" style="height: 44px"></span><span class="etiketche">37</span></span>
+            <span class="stalb"><span class="pryut" style="height: 30px"></span><span class="etiketche">38</span></span>
+            <span class="stalb"><span class="pryut" style="height: 26px"></span><span class="etiketche">39</span></span>
+          </div>
+          <p class="drebno">Седмици 35–36: 130% и 118%. Мазилките могат да се изтеглят с една седмица — имат луфт.</p>
+        </div>
+        <div class="karta">
+          <div class="dyalglava"><h2>Критичен път</h2><span>Slack 0 · всяко забавяне бута края</span></div>
+          <ol class="pravila">
+            <li><b>Инсталации</b> · седм. 35–37 · бригада Б</li>
+            <li><b>Акт 16</b> · седм. 40–41 · общината · <span style="color: var(--aktsent)">+3 дни от вчера</span></li>
+            <li><b>Предаване</b> · седм. 42–43</li>
+          </ol>
+          <p class="drebno">Цикли се засичат преди изчислението — кръгова зависимост не се смята, а се показва.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</x-dc>
+
+</body>
+</html>
