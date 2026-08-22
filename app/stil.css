@@ -278,3 +278,43 @@ button { font-family: inherit; cursor: pointer; }
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 12.5px; }
 .karta.izbrana .tablitsa { background: #FFFFFF; }
+
+/* ── фините филтри в стил Уиндоус ────────────────────────────────────── */
+.glavicha { position: relative; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.glavicha.suma { justify-content: flex-end; text-align: right; }
+.strelka {
+  border: none; background: transparent; color: var(--mastilo2);
+  font-size: 10px; padding: 2px 4px; border-radius: 3px; line-height: 1;
+  cursor: pointer;
+}
+.strelka:hover { background: #EAE2D6; color: var(--mastilo); }
+.strelka.aktivna { color: var(--aktsent); font-weight: 700; }
+.filtar-menyu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  min-width: 220px; max-height: 320px; overflow-y: auto;
+  background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(42, 37, 33, 0.14);
+  padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  text-transform: none; letter-spacing: normal; font-size: 13px;
+  color: var(--mastilo); font-weight: 400; text-align: left; cursor: default;
+}
+.glavicha.suma .filtar-menyu { left: auto; right: 0; }
+.otmetka {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 4px; cursor: pointer; min-height: 34px;
+}
+.otmetka:hover { background: var(--panel); }
+.otmetka input { accent-color: var(--aktsent); width: 15px; height: 15px; flex-shrink: 0; }
+.otmetka span { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otmetka b { font-size: 11.5px; color: var(--mastilo2); font-weight: 500; font-variant-numeric: tabular-nums; }
+.izchisti-filtar {
+  border: none; background: transparent; color: var(--aktsent);
+  font-family: inherit; font-size: 12.5px; text-align: left;
+  padding: 8px; border-top: 1px solid var(--liniya); margin-top: 4px; cursor: pointer;
+}
+.filtar-skrito { margin-top: 6px; }
+.vrazka {
+  border: none; background: transparent; color: var(--aktsent);
+  font-family: inherit; font-size: inherit; padding: 0; cursor: pointer;
+  text-decoration: underline;
+}

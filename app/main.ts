@@ -7,6 +7,7 @@
 
 import {
   KotvaVLocalStorage,
+  type Pravata,
   proveriKotvata,
   proveriVerigata,
   Vrata,
@@ -27,6 +28,8 @@ import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
+import { arhivZaEksel } from './arhiv.js';
+import { zakachiFiltri } from './filtri.js';
 
 const NAEMATEL = 'vintexstroy';
 const ACTOR = 'vintexstroy@gmail.com';
@@ -37,6 +40,7 @@ export interface Konteks {
   readonly deystviya: Deystviya;
   readonly dnevnik: DnevnikVIndexedDB;
   readonly vrata: Vrata;
+  readonly pravata: Pravata;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
 }
 
@@ -102,9 +106,10 @@ async function trugvay(): Promise<void> {
   const kotva = new KotvaVLocalStorage();
   // Един писач и МЕЖДУ разделите, не само в този.
   const klyuchalka = klyuchalkaMezhduRazdeli();
+  const pravata = new VsichkoRazresheno();
   const vrata = new Vrata({
     dnevnik,
-    pravata: new VsichkoRazresheno(),
+    pravata,
     sha: sha256Web,
     kotva,
     ...(klyuchalka ? { klyuchalka } : {}),
@@ -141,6 +146,7 @@ async function trugvay(): Promise<void> {
     deystviya,
     dnevnik,
     vrata,
+    pravata,
     vest: (vid, tekst) => {
       poslednaVest = { vid, tekst };
     },
@@ -165,6 +171,7 @@ async function trugvay(): Promise<void> {
             ${narisuvayButona()}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             <button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>
+            <button type="button" class="vtorichen" id="arhiv">Архив за Ексел</button>
             <button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>
             <input type="file" id="fayl" accept="application/json,.json" hidden>
           </div>
@@ -187,6 +194,7 @@ async function trugvay(): Promise<void> {
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
     else zakachiSmetki(koren, k, prerisuvay);
     zakachiIztochnitsi(koren, k, prerisuvay);
+    zakachiFiltri(koren, prerisuvay);
     zakachiGlavnite(k, prerisuvay);
   }
 
@@ -294,6 +302,12 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   });
 
   koren.querySelector<HTMLButtonElement>('#iznesi')?.addEventListener('click', async () => {
+    // Свалянето е ПРАВО, не даденост — думата на собственика.
+    if (!(await k.pravata.mozheDaIznasya(ACTOR, NAEMATEL))) {
+      k.vest('zle', 'Нямаш право да сваляш Журнала. Свалянето се дава по списък.');
+      await prerisuvay();
+      return;
+    }
     const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
@@ -315,6 +329,33 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       'dobre',
       `Изнесени ${sabitiya.length} събития. Последен hash: ${posledenHash.slice(0, 12)}… ` +
         'Запиши го някъде извън браузъра — той е котвата, с която после се доказва подмяна.',
+    );
+    await prerisuvay();
+  });
+
+  // ── архив за Ексел · всеки лист с готови филтри ──────────────────────────
+  koren.querySelector<HTMLButtonElement>('#arhiv')?.addEventListener('click', async () => {
+    if (!(await k.pravata.mozheDaIznasya(ACTOR, NAEMATEL))) {
+      k.vest('zle', 'Нямаш право да сваляш архива. Свалянето се дава по списък.');
+      await prerisuvay();
+      return;
+    }
+    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const ogledalo = await k.deystviya.ogledalo();
+    const bajtove = arhivZaEksel(sabitiya, ogledalo, new Date().toISOString());
+    const fayl = new Blob([bajtove.slice().buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const adres = URL.createObjectURL(fayl);
+    const vruzka = document.createElement('a');
+    vruzka.href = adres;
+    vruzka.download = `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    vruzka.click();
+    URL.revokeObjectURL(adres);
+    k.vest(
+      'dobre',
+      `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +
+        'Точният архив с хешовете остава JSON-износът.',
     );
     await prerisuvay();
   });

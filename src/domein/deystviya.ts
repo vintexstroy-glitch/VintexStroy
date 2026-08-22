@@ -11,7 +11,9 @@
 
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
+import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
+import { GreshkaZamrazen } from './zamrazyavane.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -19,7 +21,9 @@ import type {
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
+  PayloadDDSPlateno,
   PayloadRazhodZapisan,
+  PayloadSpravkaPodadena,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from './sabitiya.js';
@@ -37,6 +41,11 @@ export interface Zayavka {
   readonly opId: string;
   /** rev-предпазител: seq на последното събитие за същността, което си видял */
   readonly expectedRev?: number;
+  /**
+   * Страничният вход на заключен период: сверената промяна от таблица.
+   * Само актуализацията го вдига — формите никога.
+   */
+  readonly svereno?: boolean;
 }
 
 export class Deystviya {
@@ -80,6 +89,7 @@ export class Deystviya {
     danni: PayloadVzemaneNachisleno,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriZamrazen(await this.ogledalo(), danni.period, z.svereno);
     return this.#pusni('ВземанеНачислено', VID.vzemane, id, danni, z);
   }
 
@@ -88,6 +98,7 @@ export class Deystviya {
     danni: PayloadPlashtanePrieto,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
   }
 
@@ -96,7 +107,28 @@ export class Deystviya {
     danni: PayloadRazhodZapisan,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
+  }
+
+  /**
+   * Подава ДДС-справка — и с това ЗАКЛЮЧВА периода.
+   * Второ подаване се отказва: поправка = сторно на старата + нова.
+   */
+  async podaySpravka(danni: PayloadSpravkaPodadena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (o.spravki.has(danni.period)) {
+      throw new GreshkaZamrazen(
+        danni.period,
+        ' За този период вече има справка — сторнирай я, преди да подадеш нова.',
+      );
+    }
+    return this.#pusni('СправкаПодадена', VID.spravka, `SP:${danni.period}`, danni, z);
+  }
+
+  /** Внесеното ДДС, от платежното. Нарочно НЕ иска отключен период. */
+  async platiDDS(id: string, danni: PayloadDDSPlateno, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ДДСПлатено', VID.spravka, id, danni, z);
   }
 
   /**
@@ -109,6 +141,14 @@ export class Deystviya {
     z: Zayavka,
     vid: Vid = VID.plashtane,
   ): Promise<Rezultat> {
+    // Сторно на събитие ОТ заключен период също е редакция на периода.
+    const zhertva = (await this.#dnevnik.chetiVsichki(this.#naematel)).find(
+      (s) => s.seq === danni.pogasyavaSeq,
+    );
+    if (zhertva) {
+      const period = periodNaSabitie(zhertva);
+      if (period !== '') proveriZamrazen(await this.ogledalo(), period, z.svereno);
+    }
     return this.#pusni('Сторно', vid, id, danni, z);
   }
 

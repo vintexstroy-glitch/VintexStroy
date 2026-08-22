@@ -15,6 +15,7 @@ export const VID = {
   vzemane: 'vzemane',
   plashtane: 'plashtane',
   razhod: 'razhod',
+  spravka: 'spravka',
 } as const;
 
 export type Vid = (typeof VID)[keyof typeof VID];
@@ -26,6 +27,8 @@ export type TipSabitie =
   | 'ВземанеНачислено'
   | 'ПлащанеПрието'
   | 'РазходЗаписан'
+  | 'СправкаПодадена'
+  | 'ДДСПлатено'
   | 'ИмотПоправен'
   | 'НаемПоправен'
   | 'Сторно';
@@ -132,6 +135,37 @@ export interface PayloadRazhodZapisan {
    */
   readonly klyuch?: string;
   readonly izvor?: string;
+}
+
+/**
+ * СПРАВКАТА ЗА ДДС · ключалката на периода.
+ *
+ * Думата на собственика: „няма да може да се редактира, ако има такава
+ * справка". Подадена справка ЗАКЛЮЧВА месеца: вземания, плащания и разходи
+ * с дата вътре не влизат през формите. Отключване = СТОРНО на справката —
+ * и то остава в Журнала като следа. Единствената поправка на заключен месец
+ * е „сверената промяна" от таблица (актуализацията), която сама си носи
+ * сторно + ново + бележка кой файл я е донесъл.
+ *
+ * `dds_deklarirano_st` е каквото РЕАЛНО е декларирано пред НАП — въвежда се
+ * на ръка и нарочно не се преизчислява: разликата с изчисленото в Сметки
+ * трябва да СВЕТИ, не да се замазва.
+ */
+export interface PayloadSpravkaPodadena {
+  /** период във вида '2026-08' */
+  readonly period: string;
+  readonly dds_deklarirano_st: number;
+  /** датата на подаване */
+  readonly data: string;
+  readonly belezhka: string;
+}
+
+/** Внесеното ДДС — на ръка, от платежното. Може на части. */
+export interface PayloadDDSPlateno {
+  readonly period: string;
+  readonly suma_st: number;
+  readonly data: string;
+  readonly nachin: 'банка' | 'в брой';
 }
 
 export interface PayloadStorno {

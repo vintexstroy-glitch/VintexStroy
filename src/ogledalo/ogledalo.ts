@@ -20,7 +20,9 @@ import type {
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
+  PayloadDDSPlateno,
   PayloadRazhodZapisan,
+  PayloadSpravkaPodadena,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -95,12 +97,35 @@ export interface Razhod {
   readonly izvor: string;
 }
 
+/** Подадената ДДС-справка — ключалката на периода. */
+export interface Spravka {
+  readonly period: string;
+  readonly seq: number;
+  /** каквото реално е декларирано — на ръка, не преизчислено */
+  readonly deklarirano_st: number;
+  readonly data: string;
+  readonly belezhka: string;
+}
+
+/** Едно внасяне на ДДС — от платежното, на ръка. */
+export interface PlashtaneDDS {
+  readonly id: string;
+  readonly seq: number;
+  readonly period: string;
+  readonly suma_st: number;
+  readonly data: string;
+  readonly nachin: string;
+}
+
 export interface Ogledalo {
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
   readonly vzemaniya: ReadonlyMap<string, Vzemane>;
   readonly plashtaniya: ReadonlyMap<string, Plashtane>;
   readonly razhodi: ReadonlyMap<string, Razhod>;
+  /** период → живата справка; има я = периодът е заключен */
+  readonly spravki: ReadonlyMap<string, Spravka>;
+  readonly platenoDDS: ReadonlyMap<string, PlashtaneDDS>;
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
   /** seq-овете, които сторно е погасило (и самите сторна) */
@@ -126,6 +151,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const vzemaniya = new Map<string, Vzemane>();
   const plashtaniya = new Map<string, Plashtane>();
   const razhodi = new Map<string, Razhod>();
+  const spravki = new Map<string, Spravka>();
+  const platenoDDS = new Map<string, PlashtaneDDS>();
   let prilozheni = 0;
 
   for (const s of sabitiya) {
@@ -179,6 +206,31 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           dokument: p.dokument,
           klyuch: p.klyuch ?? '',
           izvor: p.izvor ?? '',
+        });
+        break;
+      }
+
+      case 'СправкаПодадена': {
+        const p = s.payload as unknown as PayloadSpravkaPodadena;
+        spravki.set(p.period, {
+          period: p.period,
+          seq: s.seq,
+          deklarirano_st: p.dds_deklarirano_st,
+          data: p.data,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
+      case 'ДДСПлатено': {
+        const p = s.payload as unknown as PayloadDDSPlateno;
+        platenoDDS.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          seq: s.seq,
+          period: p.period,
+          suma_st: p.suma_st,
+          data: p.data,
+          nachin: p.nachin,
         });
         break;
       }
@@ -268,7 +320,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     }
   }
 
-  return { imoti, naemi, vzemaniya, plashtaniya, razhodi, prilozheni, pogaseni };
+  return { imoti, naemi, vzemaniya, plashtaniya, razhodi, spravki, platenoDDS, prilozheni, pogaseni };
 }
 
 type BezPresmetnato = Omit<Vzemane, 'ostatak_st' | 'sastoyanie'>;
@@ -328,6 +380,15 @@ export function duljimoPoNaem(o: Ogledalo): Map<string, number> {
     karta.set(v.naemId, (karta.get(v.naemId) ?? 0) + v.ostatak_st);
   }
   return karta;
+}
+
+/** Внесеното ДДС за един период — сбор на плащанията. */
+export function platenoDDSZaPerioda(o: Ogledalo, period: string): number {
+  let sbor = 0;
+  for (const p of o.platenoDDS.values()) {
+    if (p.period === period) sbor += p.suma_st;
+  }
+  return sbor;
 }
 
 /** Цели дни между две ISO дати. */
