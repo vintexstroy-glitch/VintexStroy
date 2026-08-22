@@ -41,6 +41,10 @@ export const AKUMULATORI: readonly Akumulator[] = Object.freeze([
   { klyuch: 'uslugi-stroitelni', darzhava: 'BG', sektor: 'строителни услуги', stavka: 20 },
   { klyuch: 'pokupki-materiali', darzhava: 'BG', sektor: 'покупки · материали', stavka: 20 },
   { klyuch: 'pokupki-uslugi', darzhava: 'BG', sektor: 'покупки · услуги', stavka: 20 },
+  // Заплатите и вноските по кредит не носят ДДС — стоят в свои акумулатори
+  // със ставка нула, вместо да се крият в чужд.
+  { klyuch: 'zaplati', darzhava: 'BG', sektor: 'заплати и осигуровки', stavka: 0 },
+  { klyuch: 'krediti', darzhava: 'BG', sektor: 'кредити · главница и лихва', stavka: 0 },
 ]);
 
 /** Старите събития нямат сектор — падат тук, вместо да пукат. */
@@ -56,6 +60,11 @@ export function akumulator(klyuch: string | undefined): Akumulator {
 /** Секторите, между които се избира във формите. */
 export function sektoriNaNaem(): readonly Akumulator[] {
   return AKUMULATORI.filter((a) => a.klyuch.startsWith('naem-'));
+}
+
+/** Секторите за разход — оттам идва ВХОДЯЩИЯТ ДДС. */
+export function sektoriNaRazhod(): readonly Akumulator[] {
+  return AKUMULATORI.filter((a) => !a.klyuch.startsWith('naem-'));
 }
 
 export interface RazbivkaDDS {

@@ -109,7 +109,7 @@ describe('редът ДДС', () => {
 
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
 
-    expect(s.sverki).toHaveLength(2);
+    expect(s.sverki).toHaveLength(4);
     expect(s.sverki.every((x) => x.razlika === 0)).toBe(true);
     expect(s.sverki.every((x) => x.nared)).toBe(true);
   });
@@ -119,9 +119,17 @@ describe('редът ДДС', () => {
     await nasadi(deystviya);
 
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
-    expect(s.sverki.map((x) => x.belezhka)).toEqual([MERKA.pari, MERKA.broy]);
+    expect(s.sverki.map((x) => x.belezhka)).toEqual([
+      MERKA.pari,
+      MERKA.broy,
+      MERKA.pari,
+      MERKA.broy,
+    ]);
     expect(s.sverki[0]!.vhod).toBe(1700_00);
     expect(s.sverki[1]!.vhod).toBe(2);
+    // Разходната страна е празна, но сверката ѝ пак се записва — нула също е отговор.
+    expect(s.sverki[2]!.vhod).toBe(0);
+    expect(s.sverki[3]!.vhod).toBe(0);
   });
 });
 
@@ -176,8 +184,9 @@ describe('потоците пари', () => {
       'banka',
       'zaplati',
       'krediti',
+      'fakturi',
     ]);
-    for (const k of ['zaplati', 'krediti']) {
+    for (const k of ['zaplati', 'krediti', 'fakturi']) {
       const r = s.redove.find((x) => x.klyuch === k)!;
       expect(r.posoka).toBe('разход');
       expect(r.suma_st).toBe(0);

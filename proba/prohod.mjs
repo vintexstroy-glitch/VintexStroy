@@ -204,7 +204,7 @@ async function main() {
 
     proveri('приход', await plochka(p, 'Приход за'), '2000,00');
     proveri('ДДС за внасяне', await plochka(p, 'ДДС за внасяне'), '200,00');
-    proveri('влязло', await plochka(p, 'Влязло'), '1200,00');
+    proveri('разход · още няма', await plochka(p, 'Разход за'), '0,00');
     proveri('разлика по сверката', await plochka(p, 'Разлика по сверката'), '0,00');
 
     const smetki = Object.fromEntries((await redove(p, '.red.smetka')).map((r) => [r[0].split(' ')[0], r[3]]));
@@ -334,6 +334,49 @@ async function main() {
     proveri('шестнайсет събития', await broySabitiya(p), 16);
     proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00');
 
+    // ══ 11в · разходите → входящият ДДС ══════════════════════════════════
+    razdel = '11в · разходите';
+    await naEkran(p, 'smetki', '#forma-period');
+    await p.fill('#smetki-period', '2026-02');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    proveri('ДДС преди разходите', await plochka(p, 'ДДС за внасяне'), '200,00');
+
+    await zapishiRazhod(p, {
+      potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Материали ООД',
+      opis: 'цимент', suma: '600,00', nachin: 'банка', data: '2026-02-14', dokument: '1042',
+    });
+    proveri('седемнайсет събития', await broySabitiya(p), 17);
+
+    await zapishiRazhod(p, {
+      potok: 'zaplati', sektor: 'pokupki-materiali', dostavchik: 'екип',
+      opis: 'заплати февруари', suma: '2000,00', nachin: 'в брой', data: '2026-02-28', dokument: '',
+    });
+    proveri('осемнайсет събития', await broySabitiya(p), 18);
+
+    const smetkiR = Object.fromEntries(
+      (await redove(p, '.red.smetka')).map((x) => [x[0].split(' ')[0], x[3]]),
+    );
+    proveri('ред Фактури', smetkiR['Фактури'], '600,00');
+    proveri('ред Заплати', smetkiR['Заплати'], '2000,00');
+    proveri('плочка Разход', await plochka(p, 'Разход за'), '2600,00');
+
+    const vhod = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
+    proveri('две страни „вход" — материали и заплати', vhod.length, 2);
+    const materiali = vhod.find((x) => x[1]?.startsWith('покупки · материали'));
+    proveri('входящ ДДС от фактурата', materiali?.[4], '100,00');
+    proveri('заплатите не носят ДДС', vhod.find((x) => x[1]?.startsWith('заплати'))?.[4], '0,00');
+    proveri('за внасяне пада наполовина', await plochka(p, 'ДДС за внасяне'), '100,00');
+
+    const sverkiR = await redove(p, '.red.sverka');
+    proveri('четирите сверки затварят', sverkiR.every((x) => x[4] === 'затваря'), true);
+    proveri('сверката на разхода', sverkiR[2]?.[1], '2600,00');
+
+    // сторно на фактурата — входящият ДДС си отива с нея
+    await sSabitie(p, () => p.click('.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
+    proveri('деветнайсет събития', await broySabitiya(p), 19);
+    proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00');
+    proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2000,00');
+
     // ══ 12 · скъсана верига → спирателен кран ════════════════════════════
     razdel = '12 · скъсана верига';
     const podmenen = await p.evaluate(async () => {
@@ -366,7 +409,7 @@ async function main() {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 16);
+    proveri('Журналът не е пипан', await broySabitiya(p), 19);
 
     await naEkran(p, 'imoti', '#forma-imot');
     await p.fill('#imot-adres', 'След инцидента');
@@ -374,7 +417,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 16);
+    proveri('нищо ново не влезе', await broySabitiya(p), 19);
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -471,6 +514,18 @@ async function plati(p, koy, suma, nachin, data) {
     const t = document.querySelector('.veriga .redche:last-child')?.textContent ?? '';
     return Number(t.match(/^\s*(\d+)/)?.[1] ?? -1) === n + 1;
   }, predi);
+}
+
+async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin, data, dokument }) {
+  await p.selectOption('#razhod-potok', potok);
+  await p.selectOption('#razhod-sektor', sektor);
+  await p.fill('#razhod-dostavchik', dostavchik);
+  await p.fill('#razhod-opis', opis);
+  await p.fill('#razhod-suma', suma);
+  await p.selectOption('#razhod-nachin', nachin);
+  await p.fill('#razhod-data', data);
+  await p.fill('#razhod-dokument', dokument);
+  await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
 }
 
 async function smetni(p, opis, suma, stavka) {

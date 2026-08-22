@@ -19,6 +19,7 @@ import type {
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
+  PayloadRazhodZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from './sabitiya.js';
@@ -88,6 +89,14 @@ export class Deystviya {
     z: Zayavka,
   ): Promise<Rezultat> {
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
+  }
+
+  async zapishiRazhod(
+    id: string,
+    danni: PayloadRazhodZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
   }
 
   /**

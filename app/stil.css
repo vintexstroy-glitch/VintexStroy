@@ -221,8 +221,12 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 640px;
 }
 .glava.dds, .red.dds {
-  grid-template-columns: 84px minmax(0, 2fr) 90px 130px 130px;
-  min-width: 700px;
+  grid-template-columns: 92px minmax(0, 2fr) 90px minmax(150px, 190px) 130px;
+  min-width: 760px;
+}
+.glava.razhod, .red.razhod {
+  grid-template-columns: minmax(0, 2.2fr) 110px minmax(0, 1.4fr) 130px 110px 108px;
+  min-width: 900px;
 }
 .glava.sverka, .red.sverka {
   grid-template-columns: minmax(0, 2.4fr) 100px 100px 100px 128px;
