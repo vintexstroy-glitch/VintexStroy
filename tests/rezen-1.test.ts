@@ -16,13 +16,14 @@ import {
 } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, fold, sabrano } from '../src/ogledalo/ogledalo.js';
+import { SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
 const KOGATO = '2026-08-22T09:00:00.000Z';
 
 function stend() {
   const dnevnik = new DnevnikVPametta();
-  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno() });
+  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
   let tik = 0;
   const deystviya = new Deystviya({
     vrata,
@@ -92,7 +93,7 @@ describe('резен 1 · от имот до платен наем', () => {
     expect(sabrano(ogledalo)).toBe(1150_00);
 
     // Веригата остава цяла през целия път.
-    expect((await proveriVerigata(await dnevnik.chetiVsichki(NAEMATEL))).tsyala).toBe(true);
+    expect((await proveriVerigata(await dnevnik.chetiVsichki(NAEMATEL), SHA)).tsyala).toBe(true);
   });
 
   it('частично плащане оставя точния остатък', async () => {
@@ -146,7 +147,7 @@ describe('резен 1 · от имот до платен наем', () => {
     expect(vsichki).toHaveLength(5);
     expect(vsichki.map((s) => s.type)).toContain('ПлащанеПрието');
     expect(vsichki.map((s) => s.type)).toContain('Сторно');
-    expect((await proveriVerigata(vsichki)).tsyala).toBe(true);
+    expect((await proveriVerigata(vsichki, SHA)).tsyala).toBe(true);
   });
 
   it('повторено плащане със същия opId не удвоява погасяването', async () => {

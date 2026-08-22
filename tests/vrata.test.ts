@@ -11,11 +11,11 @@ import {
   VsichkoRazresheno,
   type Pravata,
 } from '../src/yadro/index.js';
-import { operatsiya } from './pomoshtni.js';
+import { operatsiya, SHA } from './pomoshtni.js';
 
 function novaVrata(pravata: Pravata = new VsichkoRazresheno()) {
   const dnevnik = new DnevnikVPametta();
-  return { dnevnik, vrata: new Vrata({ dnevnik, pravata }) };
+  return { dnevnik, vrata: new Vrata({ dnevnik, pravata, sha: SHA }) };
 }
 
 describe('спирателен кран', () => {

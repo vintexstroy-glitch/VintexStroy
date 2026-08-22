@@ -8,6 +8,7 @@ import {
   izvadi,
   kakvoPishe,
   obarni,
+  otLeva,
   razpredeli,
   sabiri,
   stotinki,
@@ -70,5 +71,26 @@ describe('за четене от човек', () => {
     expect(kakvoPishe(stotinki(100_00))).toBe('100,00');
     expect(kakvoPishe(stotinki(5))).toBe('0,05');
     expect(kakvoPishe(stotinki(-1234_56))).toBe('-1234,56');
+  });
+});
+
+describe('четене на сума, написана от човек', () => {
+  it('приема запетая, точка и разредка', () => {
+    expect(otLeva('1150,50')).toBe(1150_50);
+    expect(otLeva('1150.50')).toBe(1150_50);
+    expect(otLeva('1 150,50')).toBe(1150_50);
+    expect(otLeva('1150')).toBe(1150_00);
+    expect(otLeva('0,05')).toBe(5);
+    expect(otLeva('-1150,50')).toBe(-1150_50);
+  });
+
+  it('допълва липсващата втора цифра', () => {
+    expect(otLeva('1150,5')).toBe(1150_50);
+  });
+
+  it('отказва всичко, което не е сума', () => {
+    for (const losho of ['', 'абв', '1150,505', '1150,', '1.2.3', '12,5лв', '1e3']) {
+      expect(() => otLeva(losho)).toThrow(GreshkaPari);
+    }
   });
 });

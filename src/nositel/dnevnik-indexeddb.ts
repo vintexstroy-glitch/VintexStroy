@@ -1,0 +1,148 @@
+/**
+ * ЖУРНАЛЪТ върху IndexedDB — носител „В · местно-първо" (ADR-001).
+ *
+ * Същият порт `Dnevnik`, същият договор. Разликата е само къде лежат байтовете:
+ * тук — в браузъра на собственика, без сървър и без мрежа.
+ *
+ * Пази същите откази като реализацията в паметта:
+ *   · seq извън реда → отказ (Журналът е само за добавяне)
+ *   · повторен opId → отказ (уникален индекс, не проверка в кода)
+ */
+
+import type { Dnevnik } from '../yadro/dnevnik.js';
+import { GreshkaDnevnik } from '../yadro/dnevnik.js';
+import type { Sabitie, Sashtnost } from '../yadro/sabitie.js';
+
+const HRANILISHTE = 'sabitiya';
+const INDEKS_OPID = 'po-opId';
+const INDEKS_SASHTNOST = 'po-sashtnost';
+
+/** Отваря (и при нужда създава) базата. */
+export function otvoriDnevnik(ime = 'masterbook'): Promise<DnevnikVIndexedDB> {
+  return new Promise((resolve, reject) => {
+    const zayavka = indexedDB.open(ime, 1);
+
+    zayavka.onupgradeneeded = () => {
+      const db = zayavka.result;
+      if (!db.objectStoreNames.contains(HRANILISHTE)) {
+        const hranilishte = db.createObjectStore(HRANILISHTE, {
+          keyPath: ['naematel', 'seq'],
+        });
+        hranilishte.createIndex(INDEKS_OPID, ['naematel', 'opId'], { unique: true });
+        hranilishte.createIndex(INDEKS_SASHTNOST, [
+          'naematel',
+          'sashtnost.vid',
+          'sashtnost.id',
+        ]);
+      }
+    };
+
+    zayavka.onsuccess = () => resolve(new DnevnikVIndexedDB(zayavka.result));
+    zayavka.onerror = () => reject(zayavka.error);
+  });
+}
+
+export class DnevnikVIndexedDB implements Dnevnik {
+  readonly #db: IDBDatabase;
+
+  constructor(db: IDBDatabase) {
+    this.#db = db;
+  }
+
+  zatvori(): void {
+    this.#db.close();
+  }
+
+  async posledno(naematel: string): Promise<Sabitie | undefined> {
+    const hranilishte = this.#chete();
+    const kursor = await naiPurviyat(hranilishte.openCursor(obhvat(naematel), 'prev'));
+    return kursor?.value as Sabitie | undefined;
+  }
+
+  async poOpId(naematel: string, opId: string): Promise<Sabitie | undefined> {
+    const indeks = this.#chete().index(INDEKS_OPID);
+    return (await obeshtay(indeks.get([naematel, opId]))) as Sabitie | undefined;
+  }
+
+  async tekushtRev(naematel: string, sashtnost: Sashtnost): Promise<number> {
+    const indeks = this.#chete().index(INDEKS_SASHTNOST);
+    const klyuch = [naematel, sashtnost.vid, sashtnost.id];
+    const kursor = await naiPurviyat(
+      indeks.openCursor(IDBKeyRange.only(klyuch), 'prev'),
+    );
+    return kursor ? (kursor.value as Sabitie).seq : 0;
+  }
+
+  async dobavi(s: Sabitie): Promise<void> {
+    const transaktsiya = this.#db.transaction(HRANILISHTE, 'readwrite');
+    const hranilishte = transaktsiya.objectStore(HRANILISHTE);
+
+    // Проверката и записът са в ЕДНА транзакция — тя е единичният писач.
+    const posledno = await naiPurviyat(
+      hranilishte.openCursor(obhvat(s.naematel), 'prev'),
+    );
+    const ochakvanSeq = ((posledno?.value as Sabitie | undefined)?.seq ?? 0) + 1;
+    if (s.seq !== ochakvanSeq) {
+      transaktsiya.abort();
+      throw new GreshkaDnevnik(
+        `Журналът е само за добавяне: очакван seq ${ochakvanSeq}, получен ${s.seq}`,
+      );
+    }
+
+    try {
+      await obeshtay(hranilishte.add(s));
+    } catch (greshka) {
+      if (greshka instanceof DOMException && greshka.name === 'ConstraintError') {
+        throw new GreshkaDnevnik(`opId вече съществува: ${s.opId}`);
+      }
+      throw greshka;
+    }
+
+    await zavursheno(transaktsiya);
+  }
+
+  async chetiVsichki(naematel: string): Promise<Sabitie[]> {
+    return (await obeshtay(this.#chete().getAll(obhvat(naematel)))) as Sabitie[];
+  }
+
+  async chetiZaSashtnost(naematel: string, sashtnost: Sashtnost): Promise<Sabitie[]> {
+    const indeks = this.#chete().index(INDEKS_SASHTNOST);
+    const klyuch = [naematel, sashtnost.vid, sashtnost.id];
+    const redove = (await obeshtay(indeks.getAll(IDBKeyRange.only(klyuch)))) as Sabitie[];
+    return redove.sort((a, b) => a.seq - b.seq);
+  }
+
+  #chete(): IDBObjectStore {
+    return this.#db.transaction(HRANILISHTE, 'readonly').objectStore(HRANILISHTE);
+  }
+}
+
+/**
+ * Всички събития на един наемател.
+ * `[naematel]` е по-малко от `[naematel, 0]` (по-късият масив е по-малък),
+ * а `[naematel, []]` е по-голямо от всяко число (числата се нареждат преди масиви).
+ */
+function obhvat(naematel: string): IDBKeyRange {
+  return IDBKeyRange.bound([naematel], [naematel, []]);
+}
+
+function obeshtay<T>(zayavka: IDBRequest<T>): Promise<T> {
+  return new Promise((resolve, reject) => {
+    zayavka.onsuccess = () => resolve(zayavka.result);
+    zayavka.onerror = () => reject(zayavka.error);
+  });
+}
+
+function naiPurviyat(
+  zayavka: IDBRequest<IDBCursorWithValue | null>,
+): Promise<IDBCursorWithValue | null> {
+  return obeshtay(zayavka);
+}
+
+function zavursheno(t: IDBTransaction): Promise<void> {
+  return new Promise((resolve, reject) => {
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
+    t.onabort = () => reject(t.error ?? new GreshkaDnevnik('Транзакцията беше прекъсната'));
+  });
+}

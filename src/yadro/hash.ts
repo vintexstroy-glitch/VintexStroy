@@ -5,14 +5,12 @@
 
 import type { Sabitie, ZaHeshirane } from './sabitie.js';
 
-/** Портът: асинхронен, за да върви и на Web Crypto в браузъра. */
+/**
+ * Портът: асинхронен, за да върви и на Web Crypto в браузъра.
+ * Реализациите живеят при носителите — `src/nositel/hash-node.ts` и `hash-web.ts`.
+ * Тук нарочно няма стойност по подразбиране: носителят се избира явно.
+ */
 export type Sha256 = (danni: string) => Promise<string>;
-
-/** Реализация за Node. В браузъра се подава Web Crypto вариант. */
-export const sha256Node: Sha256 = async (danni) => {
-  const { createHash } = await import('node:crypto');
-  return createHash('sha256').update(danni, 'utf8').digest('hex');
-};
 
 /**
  * Канонично представяне за хеширане.
@@ -45,7 +43,7 @@ function podredi(v: unknown): unknown {
   return v;
 }
 
-export async function izchisliHash(s: ZaHeshirane, sha: Sha256 = sha256Node): Promise<string> {
+export async function izchisliHash(s: ZaHeshirane, sha: Sha256): Promise<string> {
   return sha(kanonichno(s));
 }
 
@@ -64,7 +62,7 @@ export interface RezultatOtProverka {
  */
 export async function proveriVerigata(
   sabitiya: readonly Sabitie[],
-  sha: Sha256 = sha256Node,
+  sha: Sha256,
 ): Promise<RezultatOtProverka> {
   let ochakvanPrevHash = '';
   let ochakvanSeq = 1;

@@ -1,0 +1,162 @@
+/* Визуалният език от design/README.md — дословно. */
+
+:root {
+  --hartiya: #FBF8F3;
+  --panel: #F4EFE7;
+  --mastilo: #2A2521;
+  --mastilo2: #6E645B;
+  --liniya: #E3DACE;
+  --aktsent: #B25E38;
+  --aktsent-tumen: #8E4526;
+  --zeleno: #2E7D5E;
+  --toplo: #F6E7DE;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--hartiya);
+  color: var(--mastilo);
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  font-size: 14px;
+}
+
+a { color: var(--aktsent); text-decoration: none; }
+a:hover { color: var(--aktsent-tumen); }
+
+.ekran { display: flex; min-height: 100vh; }
+
+/* ── страничната лента ───────────────────────────────────────────── */
+.strana {
+  width: 232px;
+  flex-shrink: 0;
+  background: var(--panel);
+  border-right: 1px solid var(--liniya);
+  display: flex;
+  flex-direction: column;
+}
+.marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+.marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+.marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+
+.veriga {
+  margin-top: auto;
+  padding: 14px 20px 18px;
+  border-top: 1px solid var(--liniya);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+.tochka { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--zeleno); }
+.tochka.zle { background: var(--aktsent); }
+
+/* ── главното ────────────────────────────────────────────────────── */
+.glavno { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+.shapka {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 26px 32px 18px;
+  border-bottom: 1px solid var(--liniya);
+  flex-wrap: wrap;
+}
+.shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+.shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+.desno-gore { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.telo { flex-grow: 1; padding: 22px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
+
+/* ── бутони ──────────────────────────────────────────────────────── */
+button { font-family: inherit; cursor: pointer; }
+.glaven {
+  background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px;
+  padding: 10px 16px; font-size: 13px; font-weight: 600; min-height: 40px;
+}
+.glaven:hover { background: var(--aktsent-tumen); }
+.glaven:disabled { opacity: 0.5; cursor: not-allowed; }
+.vtorichen {
+  background: transparent; border: 1px solid var(--liniya); border-radius: 4px;
+  padding: 10px 14px; font-size: 13px; color: var(--mastilo); min-height: 40px;
+}
+.vtorichen:hover { background: var(--panel); }
+
+/* ── плочки ──────────────────────────────────────────────────────── */
+.plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.plochka {
+  background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px;
+  padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px;
+}
+.etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+.chislo {
+  font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05;
+}
+.pod { font-size: 12px; color: var(--mastilo2); }
+
+/* ── таблица ─────────────────────────────────────────────────────── */
+.dyalglava { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
+.dyalglava span { font-size: 12px; color: var(--mastilo2); }
+
+.tablitsa { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow-x: auto; }
+.glava, .red {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) 130px 120px 120px;
+  align-items: center; gap: 16px; padding: 13px 18px;
+  min-width: 720px;
+}
+.glava {
+  background: var(--panel); border-bottom: 1px solid var(--liniya);
+  font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px;
+}
+.red { border-bottom: 1px solid #EFE8DD; }
+.red:last-child { border-bottom: none; }
+.red:hover { background: #FDFBF7; }
+.kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kletka b { font-weight: 500; font-size: 13.5px; }
+.kletka span { font-size: 12px; color: var(--mastilo2); overflow: hidden; text-overflow: ellipsis; }
+.suma { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+
+.znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+.znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
+.znachka.tiha { background: var(--panel); color: var(--mastilo2); }
+
+.prazno { padding: 34px 18px; text-align: center; color: var(--mastilo2); font-size: 13.5px; line-height: 1.6; }
+
+/* ── форми ───────────────────────────────────────────────────────── */
+.karta {
+  border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
+  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+}
+.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+.pole { display: flex; flex-direction: column; gap: 6px; }
+.pole label { font-size: 12.5px; color: var(--mastilo2); }
+.pole input, .pole select {
+  font-family: inherit; font-size: 14px; color: var(--mastilo);
+  border: 1px solid var(--liniya); border-radius: 4px; padding: 10px 12px;
+  min-height: 44px; background: #FFFFFF;
+}
+.pole input:focus, .pole select:focus { outline: 2px solid var(--aktsent); outline-offset: -1px; }
+.pole input.zle { border-color: var(--aktsent); background: var(--toplo); }
+.greshka { font-size: 12px; color: var(--aktsent); min-height: 16px; }
+.deystviya { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.drebno { margin: 0; font-size: 11.5px; color: var(--mastilo2); line-height: 1.55; }
+
+/* ── съобщение ───────────────────────────────────────────────────── */
+.vest {
+  border-radius: 4px; padding: 11px 14px; font-size: 13px;
+  display: flex; align-items: center; gap: 8px;
+}
+.vest.dobre { background: #E6F0EA; color: #1F5C44; }
+.vest.zle { background: var(--toplo); color: var(--aktsent-tumen); }
+
+@media (max-width: 720px) {
+  .ekran { flex-direction: column; }
+  .strana { width: auto; border-right: none; border-bottom: 1px solid var(--liniya); }
+  .veriga { margin-top: 0; }
+  .telo, .shapka { padding-left: 18px; padding-right: 18px; }
+}

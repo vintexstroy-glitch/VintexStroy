@@ -10,11 +10,11 @@ import {
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
-import { operatsiya, seyalka } from './pomoshtni.js';
+import { operatsiya, seyalka, SHA } from './pomoshtni.js';
 
 function novaVrata() {
   const dnevnik = new DnevnikVPametta();
-  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno() }) };
+  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA }) };
 }
 
 describe('инвариант 8 · монотонен seq', () => {
@@ -38,7 +38,7 @@ describe('инвариант 8 · монотонен seq', () => {
     const vsichki = await dnevnik.chetiVsichki('vintexstroy');
     const seqове = vsichki.map((s) => s.seq).sort((a, b) => a - b);
     expect(seqове).toEqual(Array.from({ length: 200 }, (_, i) => i + 1));
-    expect((await proveriVerigata(vsichki)).tsyala).toBe(true);
+    expect((await proveriVerigata(vsichki, SHA)).tsyala).toBe(true);
   });
 
   it('всеки наемател има своя редица — броенето не се смесва', async () => {
@@ -62,7 +62,7 @@ describe('инвариант 8 · монотонен seq', () => {
         Array.from({ length: broi[naematel]! }, (_, i) => i + 1),
       );
       expect(vsichki.every((s) => s.naematel === naematel)).toBe(true);
-      expect((await proveriVerigata(vsichki)).tsyala).toBe(true);
+      expect((await proveriVerigata(vsichki, SHA)).tsyala).toBe(true);
     }
   });
 

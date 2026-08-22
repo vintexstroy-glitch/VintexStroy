@@ -12,7 +12,7 @@ import {
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
-import { operatsiya } from './pomoshtni.js';
+import { operatsiya, SHA } from './pomoshtni.js';
 
 const KOGATO = '2026-08-22T09:00:00.000Z';
 
@@ -46,7 +46,7 @@ describe('инвариант 3 · сверка вход↔изход', () => {
 
   it('пренос през Вратата затваря: колкото подадени, толкова записани', async () => {
     const zhurnal = new DnevnikVPametta();
-    const vrata = new Vrata({ dnevnik: zhurnal, pravata: new VsichkoRazresheno() });
+    const vrata = new Vrata({ dnevnik: zhurnal, pravata: new VsichkoRazresheno(), sha: SHA });
     const sverki = new DnevnikNaSverki();
 
     const vhod = 250;
@@ -62,7 +62,7 @@ describe('инвариант 3 · сверка вход↔изход', () => {
 
   it('сверката хваща тихата загуба от повторени opId', async () => {
     const zhurnal = new DnevnikVPametta();
-    const vrata = new Vrata({ dnevnik: zhurnal, pravata: new VsichkoRazresheno() });
+    const vrata = new Vrata({ dnevnik: zhurnal, pravata: new VsichkoRazresheno(), sha: SHA });
     const sverki = new DnevnikNaSverki();
 
     // 100 реда на входа, но 10 от тях носят вече ползван opId — тихо не влизат.

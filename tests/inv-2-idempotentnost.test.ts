@@ -11,11 +11,11 @@ import {
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
-import { operatsiya } from './pomoshtni.js';
+import { operatsiya, SHA } from './pomoshtni.js';
 
 function novaVrata() {
   const dnevnik = new DnevnikVPametta();
-  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno() }) };
+  return { dnevnik, vrata: new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA }) };
 }
 
 describe('инвариант 2 · идемпотентност по opId', () => {
@@ -86,6 +86,6 @@ describe('инвариант 2 · идемпотентност по opId', () =>
 
     const vsichki = await dnevnik.chetiVsichki('vintexstroy');
     expect(vsichki.map((s) => s.opId)).toEqual(['ok-1', 'ok-3']);
-    expect((await proveriVerigata(vsichki)).tsyala).toBe(true);
+    expect((await proveriVerigata(vsichki, SHA)).tsyala).toBe(true);
   });
 });
