@@ -22,3 +22,10 @@ Thumbs.db
 *.db
 *.sqlite
 *.sqlite3
+
+# Сглобеното платно за дизайна — генерира се от design/ с seed-canvas
+/masterbook-interfeys.html
+
+# Python
+__pycache__/
+*.py[cod]

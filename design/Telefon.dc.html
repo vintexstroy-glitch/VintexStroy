@@ -1,0 +1,170 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,400;7..72,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+  <style>
+    body { margin: 0; }
+    a { color: #B25E38; text-decoration: none; }
+    a:hover { color: #8E4526; }
+    .ekran {
+      --hartiya: #FBF8F3;
+      --panel: #F4EFE7;
+      --mastilo: #2A2521;
+      --mastilo2: #6E645B;
+      --liniya: #E3DACE;
+      --aktsent: #B25E38;
+      --zeleno: #2E7D5E;
+      --toplo: #F6E7DE;
+      --red: 14px;
+      width: 1440px; height: 900px; display: flex;
+      background: var(--hartiya); color: var(--mastilo);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px;
+      overflow: hidden;
+    }
+    .strana { width: 232px; flex-shrink: 0; background: var(--panel); border-right: 1px solid var(--liniya); display: flex; flex-direction: column; }
+    .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+    .marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
+    .marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+    .nav { display: flex; flex-direction: column; gap: 1px; padding: 4px 12px; }
+    .nav a { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 4px; color: var(--mastilo); font-size: 13.5px; }
+    .nav a:hover { background: #EAE2D6; color: var(--mastilo); }
+    .nav a.tuk { background: var(--mastilo); color: var(--hartiya); }
+    .nav a.tuk svg { stroke: var(--hartiya); }
+    .nav svg { width: 17px; height: 17px; stroke: var(--mastilo2); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+    .navdyal { padding: 14px 22px 6px; font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: #A2968A; }
+    .veriga { margin-top: auto; padding: 14px 20px 18px; border-top: 1px solid var(--liniya); display: flex; flex-direction: column; gap: 5px; }
+    .veriga .redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+    .tochka { width: 7px; height: 7px; border-radius: 50%; background: var(--zeleno); flex-shrink: 0; }
+    .glavno { flex-grow: 1; display: flex; flex-direction: column; min-width: 0; }
+    .shapka { display: flex; align-items: flex-end; justify-content: space-between; padding: 26px 32px 18px; border-bottom: 1px solid var(--liniya); }
+    .shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+    .shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+    .desno-gore { display: flex; align-items: center; gap: 10px; }
+    .glaven { display: flex; align-items: center; gap: 7px; background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px; padding: 9px 16px; font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .glaven svg { width: 15px; height: 15px; stroke: currentColor; fill: none; stroke-width: 1.8; }
+    .vtorichen { background: transparent; border: 1px solid var(--liniya); border-radius: 4px; padding: 9px 14px; font-family: inherit; font-size: 13px; color: var(--mastilo); cursor: pointer; }
+    .vtorichen:hover { background: var(--panel); }
+    .telo { flex-grow: 1; padding: 22px 32px 0; display: flex; flex-direction: column; gap: 18px; min-height: 0; overflow: hidden; }
+    .dyalglava { display: flex; align-items: baseline; justify-content: space-between; }
+    .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
+    .dyalglava span { font-size: 12px; color: var(--mastilo2); }
+    .plochki { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+    .plochka { background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px; padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px; }
+    .plochka .etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .plochka .chislo { font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .plochka .pod { font-size: 12px; color: var(--mastilo2); }
+    .plochka.trevoga { border-color: #E0B49E; background: var(--toplo); }
+    .plochka.trevoga .chislo { color: var(--aktsent); }
+    .tablitsa { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: hidden; }
+    .tablitsa .glava, .tablitsa .red { display: grid; align-items: center; gap: 16px; padding: var(--red) 18px; }
+    .tablitsa .glava { background: var(--panel); border-bottom: 1px solid var(--liniya); font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px; }
+    .tablitsa .red { border-bottom: 1px solid #EFE8DD; }
+    .tablitsa .red:last-child { border-bottom: none; }
+    .tablitsa .red:hover { background: #FDFBF7; }
+    .kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .kletka b { font-weight: 500; font-size: 13.5px; }
+    .kletka span { font-size: 12px; color: var(--mastilo2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .chislo-red { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+    .chislo-red.duljimo { color: var(--aktsent); }
+    .chislo-red.plateno { color: var(--zeleno); }
+    .znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+    .znachka svg { width: 12px; height: 12px; stroke: currentColor; fill: none; stroke-width: 2; }
+    .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
+    .znachka.trevoga { background: var(--toplo); color: var(--aktsent); }
+    .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
+    .filtri { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+    .chip { border: 1px solid var(--liniya); border-radius: 999px; padding: 6px 13px; font-size: 12.5px; color: var(--mastilo2); background: transparent; font-family: inherit; cursor: pointer; }
+    .chip.izbran { background: var(--mastilo); border-color: var(--mastilo); color: var(--hartiya); }
+    .tarsene { flex-grow: 1; min-width: 160px; display: flex; align-items: center; gap: 8px; border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 12px; background: #FFFFFF; color: #A2968A; font-size: 13px; }
+    .tarsene svg { width: 15px; height: 15px; stroke: #A2968A; fill: none; stroke-width: 1.7; }
+
+    .telefon {
+      --hartiya: #FBF8F3; --panel: #F4EFE7; --mastilo: #2A2521; --mastilo2: #6E645B;
+      --liniya: #E3DACE; --aktsent: #B25E38; --zeleno: #2E7D5E; --toplo: #F6E7DE;
+      width: 390px; height: 844px; display: flex; flex-direction: column;
+      background: var(--hartiya); color: var(--mastilo);
+      font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; overflow: hidden;
+    }
+    .tshapka { padding: 22px 20px 16px; border-bottom: 1px solid var(--liniya); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+    .tmarka { display: flex; flex-direction: column; gap: 3px; }
+    .tmarka b { font-family: Literata, Georgia, serif; font-size: 21px; font-weight: 600; letter-spacing: -0.015em; }
+    .tmarka span { font-size: 13.5px; color: var(--mastilo2); }
+    .ttelo { flex-grow: 1; padding: 18px 20px; display: flex; flex-direction: column; gap: 16px; overflow: hidden; }
+    .tkarta { border: 1px solid var(--liniya); border-radius: 8px; background: #FFFFFF; padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+    .tkarta.glavna { background: var(--toplo); border-color: #E0B49E; gap: 5px; }
+    .tetiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+    .tchislo { font-family: Literata, Georgia, serif; font-size: 40px; font-weight: 600; letter-spacing: -0.025em; color: var(--aktsent); font-variant-numeric: tabular-nums; line-height: 1.05; }
+    .tpod { font-size: 13px; color: var(--mastilo2); }
+    .tdyal { font-family: Literata, Georgia, serif; font-size: 16px; font-weight: 600; }
+    .tpole { display: flex; flex-direction: column; gap: 6px; }
+    .tvhod { border: 1px solid var(--liniya); border-radius: 6px; padding: 13px 14px; font-size: 16px; min-height: 48px; display: flex; align-items: center; font-variant-numeric: tabular-nums; }
+    .tbrz { display: flex; gap: 8px; }
+    .tbrz .chip { min-height: 44px; display: flex; align-items: center; border: 1px solid var(--liniya); border-radius: 999px; padding: 0 16px; font-size: 14px; color: var(--mastilo2); background: transparent; font-family: inherit; }
+    .tbrz .chip.izbran { background: var(--mastilo); border-color: var(--mastilo); color: var(--hartiya); }
+    .tdrebno { margin: 0; font-size: 13px; color: var(--mastilo2); line-height: 1.55; }
+    .tdrebno b { color: var(--mastilo); }
+    .tpodnozhie { padding: 14px 20px 26px; border-top: 1px solid var(--liniya); display: flex; gap: 10px; background: var(--panel); }
+    .tvtorichen { min-height: 52px; padding: 0 20px; border: 1px solid var(--liniya); border-radius: 8px; background: transparent; font-family: inherit; font-size: 15px; font-weight: 600; letter-spacing: 0.04em; color: var(--mastilo); }
+    .tglaven { flex-grow: 1; min-height: 52px; border: none; border-radius: 8px; background: var(--aktsent); color: #FFF9F4; font-family: inherit; font-size: 15.5px; font-weight: 600; }
+    .znachka { display: inline-flex; align-items: center; border-radius: 4px; padding: 5px 10px; font-size: 13px; font-weight: 500; }
+    .znachka.trevoga { background: var(--toplo); color: var(--aktsent); }
+  </style>
+</helmet>
+<div class="telefon">
+  <header class="tshapka">
+    <div class="tmarka">
+      <b>Лозенец · ап. 3</b>
+      <span>Стройпласт ЕООД</span>
+    </div>
+    <span class="znachka trevoga">просрочен 6 дни</span>
+  </header>
+
+  <div class="ttelo">
+    <div class="tkarta glavna">
+      <span class="tetiket">Дължимо</span>
+      <span class="tchislo">1 150,00</span>
+      <span class="tpod">падеж 16.08.2026 · лв.</span>
+    </div>
+
+    <span class="tdyal">Приеми плащане</span>
+
+    <div class="tkarta">
+      <label class="tpole">
+        <span class="tetiket">Сума</span>
+        <span class="tvhod">1 150,00</span>
+      </label>
+      <div class="tbrz">
+        <button type="button" class="chip izbran">цялото</button>
+        <button type="button" class="chip">половин</button>
+        <button type="button" class="chip">друга</button>
+      </div>
+      <label class="tpole">
+        <span class="tetiket">Начин</span>
+        <span class="tvhod">банка · по сметка</span>
+      </label>
+      <label class="tpole">
+        <span class="tetiket">Дата</span>
+        <span class="tvhod">22.08.2026 · днес</span>
+      </label>
+    </div>
+
+    <p class="tdrebno">Записва се веднага на телефона. Ако няма мрежа, тръгва щом има — <b>СЕГА</b> изпраща на ръка.</p>
+  </div>
+
+  <footer class="tpodnozhie">
+    <button type="button" class="tvtorichen">СЕГА</button>
+    <button type="button" class="tglaven">Приеми 1 150,00</button>
+  </footer>
+</div>
+</x-dc>
+<script data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>
