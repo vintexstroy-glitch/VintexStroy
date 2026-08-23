@@ -543,6 +543,159 @@ async function main() {
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('записът е отказан с думи', (await tekstNa(p, '#greshka-imot')).includes('котвата'), true);
     proveri('Журналът остава на 22', await broySabitiya(p), 22);
+    // ══ 14 · справката заключва, архивът излиза, филтрите режат ══════════
+    razdel = '14 · справка, архив, филтри';
+    // Котвата спря Вратата в раздел 13 — за тези проверки се тръгва начисто.
+    await p.evaluate(() => {
+      indexedDB.deleteDatabase('masterbook');
+      localStorage.clear();
+    });
+    await p.reload();
+    await p.waitForSelector('#forma-imot');
+
+    await dobaviImot(p, 'Дианабад', 'ОФИС № 3', '');
+    await dobaviNaem(p, { imot: 'Дианабад · ОФИС № 3', koy: 'Стройпласт ЕООД', suma: '1200,00', sektor: 'naem-targovski', padezh: '5' });
+    await dobaviNaem(p, { imot: 'Дианабад · ОФИС № 3', koy: 'Домакинство', suma: '400,00', sektor: 'naem-zhilishten', padezh: '5' });
+
+    // фините филтри: сектор „търговски" оставя един ред
+    await deystvieSPrerisuvane(p, () => p.click('.glava.naem [data-filtar-glava="naemi:sektor"]'));
+    await p.waitForSelector('.filtar-menyu');
+    const grupi = await p.$$eval('.otmetka span', (r) => r.map((x) => x.textContent));
+    proveri('менюто изброява секторите', grupi.some((g) => g.includes('търговски')), true);
+    const targovskata = await p.$('.otmetka:has-text("търговски") input');
+    await targovskata.check();
+    await p.waitForFunction(() => document.querySelectorAll('.red.naem').length === 1);
+    proveri('филтърът остави търговския наем', await p.$$eval('.red.naem', (r) => r.length), 1);
+    proveri('и казва колко крие', (await tekstNa(p, '.filtar-skrito')).includes('крие 1'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="naemi"]'));
+    proveri('покажи всичко връща двата', await p.$$eval('.red.naem', (r) => r.length), 2);
+
+    // начисляване и справка → месецът се заключва
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await p.fill('#period', '2026-03');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-nachisli button[type=submit]'));
+
+    await naEkran(p, 'smetki', '#forma-period');
+    await p.fill('#smetki-period', '2026-03');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Сметки'), '200,00');
+
+    await p.fill('#spravka-data', '2026-04-10');
+    await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
+    proveri('казва, че месецът е заключен', (await tekstNa(p, '.vest')).includes('заключен'), true);
+
+    // заключеният месец отказва разход през формата
+    await p.selectOption('#razhod-potok', 'fakturi');
+    await p.fill('#razhod-dostavchik', 'Опит ООД');
+    await p.fill('#razhod-opis', 'опит');
+    await p.fill('#razhod-suma', '100,00');
+    await p.fill('#razhod-data', '2026-03-15');
+    await p.click('#forma-razhod button[type=submit]');
+    await p.waitForFunction(() => document.querySelector('#greshka-razhod')?.textContent !== '');
+    proveri('формата отказва с думи', (await tekstNa(p, '#greshka-razhod')).includes('заключен'), true);
+
+    // внесеното на ръка — на части, разликата свети и после гасне
+    await p.fill('#dds-suma', '150,00');
+    await p.fill('#dds-data', '2026-04-14');
+    await sSabitie(p, () => p.click('#forma-dds-plateno button[type=submit]'));
+    proveri('остатъкът свети', await p.evaluate(() => document.body.innerText.includes('остават 50,00')), true);
+    await p.fill('#dds-suma', '50,00');
+    await p.fill('#dds-data', '2026-04-20');
+    await sSabitie(p, () => p.click('#forma-dds-plateno button[type=submit]'));
+    proveri('внесено докрай', await p.evaluate(() => document.body.innerText.includes('внесено докрай')), true);
+
+    // архивът за Ексел се сваля и е истински .xlsx (PK отпред)
+    const [arhiv] = await Promise.all([p.waitForEvent('download'), p.click('#arhiv')]);
+    const arhivPat = await arhiv.path();
+    const parviBajtove = new Uint8Array((await readFile(arhivPat)).buffer).slice(0, 2);
+    proveri('архивът е ZIP (PK)', String.fromCharCode(...parviBajtove), 'PK');
+    proveri('архивът се казва като файл', (await arhiv.suggestedFilename()).endsWith('.xlsx'), true);
+
+    // ══ 15 · таблото · кой съм, планът, отметките ════════════════════════
+    razdel = '15 · таблото';
+    await naEkran(p, 'tablo', '.vazmozhnosti');
+
+    proveri('казва кой е влязъл', await plochka(p, 'Влязъл като'), 'VintexStroy');
+    proveri('казва през кого', await plochka(p, 'През'), 'Google');
+    proveri('казва чие е хранилището', await plochka(p, 'Хранилище'), 'Безплатно');
+    proveri('казва ролята', await plochka(p, 'Роля'), 'стопанин');
+    proveri(
+      'никъде не пише „парола" като поле',
+      await p.evaluate(() => document.querySelectorAll('input[type=password]').length),
+      0,
+    );
+
+    // Планът по подразбиране е СТАРТЪПЪТ и носи цялата функционалност.
+    proveri(
+      'стартъпът е избраният план',
+      (await tekstNa(p, '.red.planred.tuk')).includes('Стандартен'),
+      true,
+    );
+    proveri(
+      'Личният е описан като САМО един акаунт',
+      (await tekstNa(p, '.red.planred:has-text("Личен")')).includes('САМО ЕДИН АКАУНТ'),
+      true,
+    );
+    proveri(
+      'ИИ е обявен като „скоро", без бутон който лъже',
+      (await tekstNa(p, '.vazm:has-text("Свързване на ИИ")')).includes('скоро'),
+      true,
+    );
+
+    // Отметката гаси бутон ВЕДНАГА — не при следващо влизане.
+    proveri('архивът е тук преди отметката', await p.$$eval('#arhiv', (b) => b.length), 1);
+    await deystvieSPrerisuvane(p, () =>
+      p.click('.vazm input[data-vazmozhnost="arhiv-eksel"]'),
+    );
+    proveri('бутонът „Архив за Ексел" изчезна', await p.$$eval('#arhiv', (b) => b.length), 0);
+    proveri(
+      'и си личи, че е ИЗКЛЮЧЕНА, а не липсваща',
+      (await tekstNa(p, '.vazm:has-text("Сваля архив")')).includes('изключена'),
+      true,
+    );
+    await deystvieSPrerisuvane(p, () => p.click('.vazm input[data-vazmozhnost="arhiv-eksel"]'));
+    proveri('отметката го връща', await p.$$eval('#arhiv', (b) => b.length), 1);
+
+    // Отметката гаси и цял ЕКРАН от лентата.
+    proveri('Сметки са в лентата', await p.$$eval('[data-ekran="smetki"]', (b) => b.length), 1);
+    await deystvieSPrerisuvane(p, () =>
+      p.click('.vazm input[data-vazmozhnost="smetki-dds"]'),
+    );
+    proveri('Сметки паднаха от лентата', await p.$$eval('[data-ekran="smetki"]', (b) => b.length), 0);
+    await deystvieSPrerisuvane(p, () => p.click('.vazm input[data-vazmozhnost="smetki-dds"]'));
+    proveri('и се връщат', await p.$$eval('[data-ekran="smetki"]', (b) => b.length), 1);
+
+    // Основата не се маха — иначе приложението престава да е приложение.
+    proveri(
+      'отметката на „Записва през Вратата" е заключена',
+      await p.$eval('.vazm input[data-vazmozhnost="zapis"]', (i) => i.disabled),
+      true,
+    );
+
+    // Личен план: ролите не са изключени — тях просто ги НЯМА там.
+    await deystvieSPrerisuvane(p, () => p.click('[data-plan="lichen"]'));
+    proveri('планът се смени', (await tekstNa(p, '.red.planred.tuk')).includes('Личен'), true);
+    proveri(
+      'ролите не се предлагат в Личния',
+      await p.$eval('.vazm input[data-vazmozhnost="roli-za-dostap"]', (i) => i.disabled),
+      true,
+    );
+    proveri(
+      'и е казано защо: няма я в този план',
+      (await tekstNa(p, '.vazm:has-text("Роля на всеки добавен имейл")')).includes('няма я'),
+      true,
+    );
+
+    // Изборът преживява презареждане — иначе е настроение, не нагласа.
+    await p.reload();
+    await p.waitForSelector('.nav');
+    await naEkran(p, 'tablo', '.vazmozhnosti');
+    proveri(
+      'Личният план се помни след презареждане',
+      (await tekstNa(p, '.red.planred.tuk')).includes('Личен'),
+      true,
+    );
+    await deystvieSPrerisuvane(p, () => p.click('[data-plan="standarten"]'));
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

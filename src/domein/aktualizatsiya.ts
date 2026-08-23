@@ -167,7 +167,9 @@ export async function prilozhi(
         klyuch: r.klyuch,
         izvor,
       },
-      { opId: `iztochnik:${beleg}:${r.klyuch}:nov` },
+      // „Сверена промяна": единственият вход в заключен период — партидата
+      // сама си носи сторно + ново + сверка + следа кой файл я е донесъл.
+      { opId: `iztochnik:${beleg}:${r.klyuch}:nov`, svereno: true },
     );
     if (!rezultat.povtoreno) zapisani += 1;
   };
@@ -175,8 +177,8 @@ export async function prilozhi(
   const storniray = async (star: Razhod, zashto: string) => {
     const rezultat = await deystviya.storniraj(
       `S:${beleg}:${star.klyuch}`,
-      { pogasyavaSeq: star.seq, prichina: `${zashto} · ${izvor}` },
-      { opId: `iztochnik:${beleg}:${star.klyuch}:storno` },
+      { pogasyavaSeq: star.seq, prichina: `сверена промяна · ${zashto} · ${izvor}` },
+      { opId: `iztochnik:${beleg}:${star.klyuch}:storno`, svereno: true },
       VID.razhod,
     );
     if (!rezultat.povtoreno) stornirani += 1;

@@ -11,6 +11,8 @@
 import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { MERKA } from '../src/yadro/sverka.js';
+import { eZamrazen } from '../src/domein/zamrazyavane.js';
+import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
 import { AKUMULATORI, akumulator, ddsOtObshta, sektoriNaRazhod } from '../src/domein/dds.js';
 import {
   potok,
@@ -24,6 +26,7 @@ import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
 import { opitajStorno } from './storno.js';
+import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
@@ -40,11 +43,21 @@ interface RedNaSmyatane {
 }
 let smyatane: RedNaSmyatane[] = [];
 
+/** Колоните на списъка „Разходи" — фините филтри в стил Уиндоус. */
+const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
+  { klyuch: 'koy', ime: 'Доставчик и описание', vid: 'tekst', vzemi: (r) => r.dostavchik },
+  { klyuch: 'potok', ime: 'Поток', vid: 'tekst', vzemi: (r) => potok(r.potok)?.ime ?? r.potok },
+  { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (r) => akumulator(r.sektor).sektor },
+  { klyuch: 'suma', ime: 'Обща сума', vid: 'suma', vzemi: (r) => r.suma_st },
+  { klyuch: 'data', ime: 'ДДС', vid: 'data', vzemi: (r) => r.data },
+];
+
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const mesets = period ?? dnes.slice(0, 7);
   const s = smetki(o, mesets, new Date().toISOString());
   const razlika = s.sverki.reduce((sbor, x) => sbor + x.razlika, 0);
   const razhodi = razhodiZaPerioda(o, mesets);
+  const filtriraniRazhodi = filtriray('razhodi', razhodi, KOLONI_RAZHODI, dnes);
 
   return `
     <div class="plochki">
@@ -127,6 +140,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>
 
+    ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
+
     <section>
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
@@ -161,11 +176,17 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
       <div class="tablitsa">
         <div class="glava razhod">
-          <span>Доставчик и описание</span><span>Поток</span><span>Сектор</span>
-          <span class="suma">Обща сума</span><span class="suma">ДДС</span><span></span>
+          ${KOLONI_RAZHODI.map((kol) =>
+            glavaSFiltar('razhodi', kol, razhodi, dnes, kol.vid !== 'tekst'),
+          ).join('')}<span></span>
         </div>
-        ${razhodi.map(redNaRazhod).join('')}
+        ${
+          filtriraniRazhodi.redove.length === 0
+            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            : filtriraniRazhodi.redove.map(redNaRazhod).join('')
+        }
       </div>
+      ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
     </section>`
     }
 
@@ -254,6 +275,115 @@ function redNaRazhod(r: Razhod): string {
 /** Стотинките се показват в левове; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
   return belezhka === MERKA.pari ? kakvoPishe(chislo as never) : String(chislo);
+}
+
+/**
+ * ТРИТЕ ЧИСЛА НА ДДС: изчислено ↔ декларирано ↔ платено.
+ * Разликата СВЕТИ, не се замазва — думата на собственика.
+ * Подадената справка ЗАКЛЮЧВА периода; сторно на справката го отключва.
+ */
+function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): string {
+  const spravka = o.spravki.get(mesets);
+  const plateno_st = platenoDDSZaPerioda(o, mesets);
+  const zakluchen = eZamrazen(o, mesets);
+
+  const razlikaDeklarirano = spravka ? spravka.deklarirano_st - izchisleno_st : 0;
+  const razlikaPlateno = spravka ? plateno_st - spravka.deklarirano_st : 0;
+
+  return `
+    <section class="karta${zakluchen ? ' izbrana' : ''}">
+      <div class="dyalglava">
+        <h2>Справка и внасяне</h2>
+        <span>${
+          zakluchen
+            ? `периодът е ЗАКЛЮЧЕН от справка от ${ekraniraj(spravka!.data)} — поправка само през сверена промяна`
+            : 'подадената справка заключва месеца'
+        }</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">Изчислено в Сметки</span>
+          <span class="chislo">${kakvoPishe(izchisleno_st as never)}</span>
+          <span class="pod">изход − вход, от Журнала</span>
+        </div>
+        <div class="plochka${spravka && razlikaDeklarirano !== 0 ? ' trevoga' : ''}">
+          <span class="etiket">Декларирано</span>
+          <span class="chislo">${spravka ? kakvoPishe(spravka.deklarirano_st as never) : '—'}</span>
+          <span class="pod">${
+            spravka
+              ? razlikaDeklarirano === 0
+                ? 'съвпада с изчисленото'
+                : `РАЗМИНАВАНЕ ${kakvoPishe(razlikaDeklarirano as never)} лв. — провери`
+              : 'още няма справка'
+          }</span>
+        </div>
+        <div class="plochka${spravka && razlikaPlateno !== 0 ? ' trevoga' : ''}">
+          <span class="etiket">Платено</span>
+          <span class="chislo">${kakvoPishe(plateno_st as never)}</span>
+          <span class="pod">${
+            !spravka
+              ? 'въвежда се от платежното'
+              : razlikaPlateno === 0
+                ? 'внесено докрай'
+                : razlikaPlateno < 0
+                  ? `остават ${kakvoPishe(-razlikaPlateno as never)} лв.`
+                  : `надвнесени ${kakvoPishe(razlikaPlateno as never)} лв.`
+          }</span>
+        </div>
+      </div>
+
+      ${
+        spravka
+          ? `<form id="forma-dds-plateno">
+        <div class="poleta">
+          <div class="pole">
+            <label for="dds-suma">Внесено, лв.</label>
+            <input id="dds-suma" name="suma" required inputmode="decimal" placeholder="200,00" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="dds-data">Дата на плащането</label>
+            <input id="dds-data" name="data" type="date" required>
+          </div>
+          <div class="pole">
+            <label for="dds-nachin">Начин</label>
+            <select id="dds-nachin" name="nachin">
+              <option value="банка">по банка</option>
+              <option value="в брой">в брой</option>
+            </select>
+          </div>
+        </div>
+        <p class="greshka" id="greshka-dds"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Запиши внесеното</button>
+          <button type="button" class="vtorichen" data-otkluchi="${spravka.seq}">Отключи периода (сторно на справката)</button>
+          <p class="drebno">Внесеното се въвежда НА РЪКА от платежното — може на части. Разликата с декларираното свети горе.</p>
+        </div>
+      </form>`
+          : `<form id="forma-spravka">
+        <div class="poleta">
+          <div class="pole">
+            <label for="spravka-dds">Деклариран ДДС, лв.</label>
+            <input id="spravka-dds" name="dds" required inputmode="decimal"
+              value="${kakvoPishe(izchisleno_st as never)}" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="spravka-data">Дата на подаване</label>
+            <input id="spravka-data" name="data" type="date" required>
+          </div>
+          <div class="pole">
+            <label for="spravka-belezhka">Бележка (по избор)</label>
+            <input id="spravka-belezhka" name="belezhka" placeholder="напр. вх. номер" autocomplete="off">
+          </div>
+        </div>
+        <p class="greshka" id="greshka-spravka"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Подай справката — заключи ${ekraniraj(mesets)}</button>
+          <p class="drebno">Предложеното е изчисленото, но се редактира — записва се каквото РЕАЛНО е декларирано, а разликата свети. След подаване вземания, плащания и разходи за месеца се отказват; поправка = сверена промяна от таблица или сторно на справката.</p>
+        </div>
+      </form>`
+      }
+    </section>`;
 }
 
 function redNaSmetka(r: RedSmetka): string {
@@ -450,6 +580,64 @@ export function zakachiSmetki(
     } finally {
       buton.disabled = false;
     }
+  });
+
+  // ── справката: подаване, внасяне, отключване ─────────────────────────────
+  const mesets = period ?? new Date().toISOString().slice(0, 7);
+
+  const formaSpravka = koren.querySelector<HTMLFormElement>('#forma-spravka');
+  formaSpravka?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const greshka = koren.querySelector<HTMLElement>('#greshka-spravka')!;
+    greshka.textContent = '';
+    const danni = new FormData(formaSpravka);
+    try {
+      await k.deystviya.podaySpravka(
+        {
+          period: mesets,
+          dds_deklarirano_st: otLeva(String(danni.get('dds'))),
+          data: otData(String(danni.get('data') ?? ''), 'Датата на подаване'),
+          belezhka: String(danni.get('belezhka') ?? '').trim(),
+        },
+        { opId: `spravka:${mesets}` },
+      );
+      k.vest('dobre', `Справката е записана. ${mesets} е заключен — поправка само през сверена промяна.`);
+      await prerisuvay();
+    } catch (err) {
+      greshka.textContent = err instanceof Error ? err.message : String(err);
+    }
+  });
+
+  const formaDDS = koren.querySelector<HTMLFormElement>('#forma-dds-plateno');
+  formaDDS?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const greshka = koren.querySelector<HTMLElement>('#greshka-dds')!;
+    greshka.textContent = '';
+    const danni = new FormData(formaDDS);
+    try {
+      const data = otData(String(danni.get('data') ?? ''), 'Датата на плащането');
+      await k.deystviya.platiDDS(
+        `DP:${mesets}:${crypto.randomUUID()}`,
+        {
+          period: mesets,
+          suma_st: otLeva(String(danni.get('suma'))),
+          data,
+          nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
+        },
+        { opId: `dds-plateno:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Внесеното е записано. Разликата с декларираното се вижда горе.');
+      await prerisuvay();
+    } catch (err) {
+      greshka.textContent = err instanceof Error ? err.message : String(err);
+    }
+  });
+
+  koren.querySelector<HTMLButtonElement>('[data-otkluchi]')?.addEventListener('click', async (e) => {
+    const buton = e.currentTarget as HTMLButtonElement;
+    const izhod = await opitajStorno(k, Number(buton.dataset['otkluchi']), VID.spravka, 'справката');
+    if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
+    await prerisuvay();
   });
 
   // ── сторно на разход ─────────────────────────────────────────────────────

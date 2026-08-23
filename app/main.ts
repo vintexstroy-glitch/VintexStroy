@@ -7,6 +7,7 @@
 
 import {
   KotvaVLocalStorage,
+  type Pravata,
   proveriKotvata,
   proveriVerigata,
   Vrata,
@@ -27,16 +28,48 @@ import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
+import { arhivZaEksel } from './arhiv.js';
+import { zakachiFiltri } from './filtri.js';
+import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
+import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
+import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 
 const NAEMATEL = 'vintexstroy';
-const ACTOR = 'vintexstroy@gmail.com';
 
-export type KoyEkran = 'imoti' | 'pari' | 'smetki';
+/**
+ * КОЙ Е ВЛЯЗЪЛ. Днес — един собственик, вече влязъл; истинският OAuth иска
+ * регистрация при тримата доставчици и негово решение с кого се почва.
+ * Портът обаче стои отсега, за да не се появи после втори вход отстрани.
+ */
+const SOBSTVENIKAT: Samolichnost = {
+  dostavchik: 'google',
+  imeyl: 'vintexstroy@gmail.com',
+  ime: 'VintexStroy',
+  hranilishte: 'безплатно',
+  nachin: 'dostavchik',
+  rolya: 'stopanin',
+  svarzani: [],
+};
+
+const vhod = new EdinSobstvenik(SOBSTVENIKAT);
+let kojSam: Samolichnost = SOBSTVENIKAT;
+let izbor: Izbor = chetiIzbor();
+
+export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'tablo';
+
+/**
+ * Кой екран от коя възможност зависи. Таблото го няма тук нарочно: то е
+ * мястото, където отметките се връщат — не бива да може да се самозаключи.
+ */
+const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
+  smetki: 'smetki-dds',
+};
 
 export interface Konteks {
   readonly deystviya: Deystviya;
   readonly dnevnik: DnevnikVIndexedDB;
   readonly vrata: Vrata;
+  readonly pravata: Pravata;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
 }
 
@@ -95,16 +128,26 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
     ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
   },
+  tablo: {
+    ime: 'Табло',
+    podnaslov: 'кой съм · какъв е планът · какво да се вижда',
+    ikona: '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
+  },
 };
 
 async function trugvay(): Promise<void> {
+  // Влизането е първото нещо: `actor` в Журнала е имейл от доставчика,
+  // а не низ по подразбиране — историята трябва да знае КОЙ е писал.
+  kojSam = await vhod.vlez(SOBSTVENIKAT.dostavchik);
+
   const dnevnik = await otvoriDnevnik('masterbook');
   const kotva = new KotvaVLocalStorage();
   // Един писач и МЕЖДУ разделите, не само в този.
   const klyuchalka = klyuchalkaMezhduRazdeli();
+  const pravata = new VsichkoRazresheno();
   const vrata = new Vrata({
     dnevnik,
-    pravata: new VsichkoRazresheno(),
+    pravata,
     sha: sha256Web,
     kotva,
     ...(klyuchalka ? { klyuchalka } : {}),
@@ -133,7 +176,7 @@ async function trugvay(): Promise<void> {
     vrata,
     dnevnik,
     naematel: NAEMATEL,
-    actor: ACTOR,
+    actor: kojSam.imeyl,
     chasovnik: () => new Date().toISOString(),
   });
 
@@ -141,6 +184,7 @@ async function trugvay(): Promise<void> {
     deystviya,
     dnevnik,
     vrata,
+    pravata,
     vest: (vid, tekst) => {
       poslednaVest = { vid, tekst };
     },
@@ -151,6 +195,9 @@ async function trugvay(): Promise<void> {
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
     const dnes = new Date().toISOString().slice(0, 10);
+    // Изключен екран не се показва празен — връщаме се на Имоти.
+    const iska = EKRAN_ISKA[ekran];
+    if (iska && !mozhe(izbor, iska)) ekran = 'imoti';
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
@@ -162,22 +209,37 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
-            ${narisuvayButona()}
+            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona() : ''}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
-            <button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>
-            <button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>
+            ${
+              mozhe(izbor, 'iznos-vnos')
+                ? '<button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>'
+                : ''
+            }
+            ${
+              mozhe(izbor, 'arhiv-eksel')
+                ? '<button type="button" class="vtorichen" id="arhiv">Архив за Ексел</button>'
+                : ''
+            }
+            ${
+              mozhe(izbor, 'iznos-vnos')
+                ? '<button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>'
+                : ''
+            }
             <input type="file" id="fayl" accept="application/json,.json" hidden>
           </div>
         </header>
         <div class="telo">
           ${vestHTML()}
-          ${narisuvayPlana()}
+          ${mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
           ${
             ekran === 'imoti'
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
               : ekran === 'pari'
                 ? narisuvayPari(ogledalo, dnes)
-                : narisuvaySmetki(ogledalo, dnes)
+                : ekran === 'smetki'
+                  ? narisuvaySmetki(ogledalo, dnes)
+                  : narisuvayTablo(kojSam, izbor)
           }
         </div>
       </main>`;
@@ -185,8 +247,19 @@ async function trugvay(): Promise<void> {
     poslednaVest = null;
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
-    else zakachiSmetki(koren, k, prerisuvay);
-    zakachiIztochnitsi(koren, k, prerisuvay);
+    else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
+    else {
+      zakachiTablo(
+        koren,
+        () => izbor,
+        (nov) => {
+          izbor = nov;
+        },
+        prerisuvay,
+      );
+    }
+    if (mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
+    if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
     zakachiGlavnite(k, prerisuvay);
   }
 
@@ -203,6 +276,10 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
   const zakasneli = prosrocheni(o, dnes).length;
 
   const punktove = (Object.keys(EKRANI) as KoyEkran[])
+    .filter((koy) => {
+      const iska = EKRAN_ISKA[koy];
+      return !iska || mozhe(izbor, iska);
+    })
     .map((koy) => {
       const e = EKRANI[koy];
       const znachka = koy === 'pari' && zakasneli > 0
@@ -294,6 +371,12 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   });
 
   koren.querySelector<HTMLButtonElement>('#iznesi')?.addEventListener('click', async () => {
+    // Свалянето е ПРАВО, не даденост — думата на собственика.
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+      k.vest('zle', 'Нямаш право да сваляш Журнала. Свалянето се дава по списък.');
+      await prerisuvay();
+      return;
+    }
     const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
@@ -315,6 +398,33 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       'dobre',
       `Изнесени ${sabitiya.length} събития. Последен hash: ${posledenHash.slice(0, 12)}… ` +
         'Запиши го някъде извън браузъра — той е котвата, с която после се доказва подмяна.',
+    );
+    await prerisuvay();
+  });
+
+  // ── архив за Ексел · всеки лист с готови филтри ──────────────────────────
+  koren.querySelector<HTMLButtonElement>('#arhiv')?.addEventListener('click', async () => {
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+      k.vest('zle', 'Нямаш право да сваляш архива. Свалянето се дава по списък.');
+      await prerisuvay();
+      return;
+    }
+    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const ogledalo = await k.deystviya.ogledalo();
+    const bajtove = arhivZaEksel(sabitiya, ogledalo, new Date().toISOString());
+    const fayl = new Blob([bajtove.slice().buffer], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const adres = URL.createObjectURL(fayl);
+    const vruzka = document.createElement('a');
+    vruzka.href = adres;
+    vruzka.download = `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`;
+    vruzka.click();
+    URL.revokeObjectURL(adres);
+    k.vest(
+      'dobre',
+      `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +
+        'Точният архив с хешовете остава JSON-износът.',
     );
     await prerisuvay();
   });
@@ -343,7 +453,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
         vrata: k.vrata,
         dnevnik: k.dnevnik,
         naematel: NAEMATEL,
-        actor: ACTOR,
+        actor: kojSam.imeyl,
         tekst: await izbran.text(),
         kogato: new Date().toISOString(),
       });

@@ -278,3 +278,70 @@ button { font-family: inherit; cursor: pointer; }
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 12.5px; }
 .karta.izbrana .tablitsa { background: #FFFFFF; }
+
+/* ── фините филтри в стил Уиндоус ────────────────────────────────────── */
+.glavicha { position: relative; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.glavicha.suma { justify-content: flex-end; text-align: right; }
+.strelka {
+  border: none; background: transparent; color: var(--mastilo2);
+  font-size: 10px; padding: 2px 4px; border-radius: 3px; line-height: 1;
+  cursor: pointer;
+}
+.strelka:hover { background: #EAE2D6; color: var(--mastilo); }
+.strelka.aktivna { color: var(--aktsent); font-weight: 700; }
+.filtar-menyu {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30;
+  min-width: 220px; max-height: 320px; overflow-y: auto;
+  background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(42, 37, 33, 0.14);
+  padding: 6px; display: flex; flex-direction: column; gap: 1px;
+  text-transform: none; letter-spacing: normal; font-size: 13px;
+  color: var(--mastilo); font-weight: 400; text-align: left; cursor: default;
+}
+.glavicha.suma .filtar-menyu { left: auto; right: 0; }
+.otmetka {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 8px; border-radius: 4px; cursor: pointer; min-height: 34px;
+}
+.otmetka:hover { background: var(--panel); }
+.otmetka input { accent-color: var(--aktsent); width: 15px; height: 15px; flex-shrink: 0; }
+.otmetka span { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.otmetka b { font-size: 11.5px; color: var(--mastilo2); font-weight: 500; font-variant-numeric: tabular-nums; }
+.izchisti-filtar {
+  border: none; background: transparent; color: var(--aktsent);
+  font-family: inherit; font-size: 12.5px; text-align: left;
+  padding: 8px; border-top: 1px solid var(--liniya); margin-top: 4px; cursor: pointer;
+}
+.filtar-skrito { margin-top: 6px; }
+.vrazka {
+  border: none; background: transparent; color: var(--aktsent);
+  font-family: inherit; font-size: inherit; padding: 0; cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── таблото · отметките и сравнението на плановете ─────────────────────── */
+.chislo.malak { font-size: 18px; letter-spacing: -0.01em; }
+
+.vazmozhnosti { display: flex; flex-direction: column; gap: 2px; }
+
+.vazm {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 11px 12px; border-radius: 5px; cursor: pointer;
+  border: 1px solid transparent;
+}
+.vazm:hover { background: #FDFBF7; border-color: var(--liniya); }
+.vazm input { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--aktsent); }
+.vazm input:disabled { cursor: not-allowed; }
+.vazm-tyalo { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
+.vazm-tyalo b { font-weight: 500; font-size: 13.5px; }
+.vazm-tyalo span { font-size: 12px; color: var(--mastilo2); line-height: 1.5; }
+
+/* Каквото планът изобщо не дава, се вижда — но избеляло и незакачаемо.
+   Скриването му би оставило въпроса „а къде е", а точно него плащат нагоре. */
+.vazm.nyama { cursor: default; opacity: 0.45; }
+.vazm.nyama:hover { background: transparent; border-color: transparent; }
+
+.glava.planred, .red.planred {
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+}
+.red.planred.tuk { background: var(--toplo); }

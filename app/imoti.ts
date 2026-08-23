@@ -15,6 +15,7 @@ import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno } from './storno.js';
+import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
 
 export interface SastoyanieNaEkrana {
@@ -40,6 +41,30 @@ function novOpId(): string {
   return crypto.randomUUID();
 }
 
+/** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
+function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
+  return [
+    { klyuch: 'koy', ime: 'Наемател', vid: 'tekst', vzemi: (n) => n.naemetel },
+    {
+      klyuch: 'imot',
+      ime: 'Имот',
+      vid: 'tekst',
+      vzemi: (n) => {
+        const i = o.imoti.get(n.imotId);
+        return i ? `${i.adres} · ${i.edinitsa}` : n.imotId;
+      },
+    },
+    { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
+    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'suma', vzemi: (n) => n.naem_st },
+    {
+      klyuch: 'sastoyanie',
+      ime: 'Състояние',
+      vid: 'tekst',
+      vzemi: (n) => (n.prekraten ? 'прекратен' : 'жив'),
+    },
+  ];
+}
+
 export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): string {
   const { ogledalo } = sastoyanie;
   const imoti = [...ogledalo.imoti.values()];
@@ -56,6 +81,8 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
   const zhivi = naemi.filter((n) => !n.prekraten);
   const mesechno = zhivi.reduce((sbor, n) => sbor + n.naem_st, 0);
   const zaeti = new Set(zhivi.map((n) => n.imotId));
+
+  const filtriraniNaemi = filtriray('naemi', naemi, koloniNaNaemite(ogledalo), dnesKato());
 
   const popravyanImot = rezhim.kakvo === 'popravi-imot' ? ogledalo.imoti.get(rezhim.id) : undefined;
   const popravyanNaem = rezhim.kakvo === 'popravi-naem' ? ogledalo.naemi.get(rezhim.id) : undefined;
@@ -232,11 +259,19 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
       </div>
       <div class="tablitsa">
         <div class="glava naem">
-          <span>Наемател</span><span>Имот</span><span>Сектор</span>
-          <span class="suma">Наем / мес.</span><span>Състояние</span><span></span>
+          ${koloniNaNaemite(ogledalo)
+            .map((kol) =>
+              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'suma'),
+            )
+            .join('')}<span></span>
         </div>
-        ${naemi.map((n) => redNaem(n, ogledalo)).join('')}
+        ${
+          filtriraniNaemi.redove.length === 0
+            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            : filtriraniNaemi.redove.map((n) => redNaem(n, ogledalo)).join('')
+        }
       </div>
+      ${redZaSkritoto(filtriraniNaemi, 'naemi')}
     </section>`
     }
   `;
@@ -535,6 +570,11 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
 
 function dnes(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+/** Днешният ден — за групите на филтъра по дата. */
+function dnesKato(): string {
+  return dnes();
 }
 
 /** Всичко, написано от човек, минава оттук, преди да влезе в HTML. */
