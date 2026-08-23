@@ -561,7 +561,18 @@ async function main() {
     // „Изчезват" последните две събития — направо от IndexedDB, както би
     // направил бъг, чистач на място или зла ръка. Веригата на остатъка е
     // ЦЯЛА — само котвата може да усети липсата.
-    await p.evaluate(async () => {
+    // Ключът на акаунта вече НЕ е закован: чете се от Таблото, където екранът
+    // го казва. Закован тук, той се разминава с приложението тихо — и котвата
+    // „не хваща" нищо, защото трие редове, които ги няма.
+    await naEkran(p, 'tablo', '.karta');
+    const akauntNaEkrana = await p.$$eval('.plochka', (r) => {
+      const n = r.find((x) => x.children[0]?.textContent?.includes('Кой Журнал'));
+      return n ? n.children[1].textContent.trim() : '';
+    });
+    proveri('Таблото казва под кой ключ работи', akauntNaEkrana, 'vintexstroy@gmail.com');
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    await p.evaluate(async (akaunt) => {
       const db = await new Promise((da, ne) => {
         const z = indexedDB.open('masterbook');
         z.onsuccess = () => da(z.result);
@@ -570,13 +581,13 @@ async function main() {
       await new Promise((da, ne) => {
         const t = db.transaction('sabitiya', 'readwrite');
         const hr = t.objectStore('sabitiya');
-        hr.delete(['vintexstroy', 25]);
-        hr.delete(['vintexstroy', 26]);
+        hr.delete([akaunt, 25]);
+        hr.delete([akaunt, 26]);
         t.oncomplete = () => da(undefined);
         t.onerror = () => ne(t.error);
       });
       db.close();
-    });
+    }, akauntNaEkrana);
 
     await p.reload();
     await p.waitForSelector('.vest.zle');

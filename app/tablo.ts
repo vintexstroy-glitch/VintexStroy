@@ -42,6 +42,7 @@ import {
   smeniPlan,
 } from '../src/domein/planove.js';
 import { ekraniraj } from './imoti.js';
+import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -97,7 +98,7 @@ const RED: readonly Vazmozhnost[] = [
   'svarzhi-ii',
 ];
 
-function kartaKoySam(koj: Samolichnost): string {
+function kartaKoySam(koj: Samolichnost, akaunt: string): string {
   const vrazki = koj.svarzani.length
     ? koj.svarzani.map((d) => IMENA_NA_DOSTAVCHITSITE[d]).join(' · ')
     : 'няма вързани';
@@ -130,6 +131,11 @@ function kartaKoySam(koj: Samolichnost): string {
           <div class="etiket">Роля</div>
           <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[koj.rolya]}</div>
           <div class="pod">вързани акаунти: ${ekraniraj(vrazki)}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Кой Журнал</div>
+          <div class="chislo malak" translate="no">${ekraniraj(akaunt)}</div>
+          <div class="pod">${ekraniraj(sDumiZaAkaunta(akaunt).split(' · ')[1] ?? '')}</div>
         </div>
       </div>
       <p class="drebno">
@@ -251,8 +257,8 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     </section>`;
 }
 
-export function narisuvayTablo(koj: Samolichnost, izbor: Izbor): string {
-  return kartaKoySam(koj) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
+export function narisuvayTablo(koj: Samolichnost, izbor: Izbor, akaunt: string): string {
+  return kartaKoySam(koj, akaunt) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
 }
 
 /**

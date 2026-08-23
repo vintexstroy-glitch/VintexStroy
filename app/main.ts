@@ -38,8 +38,19 @@ import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js'
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
+import { KLYUCH_OT_ALFA, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt.js';
 
-const NAEMATEL = 'vintexstroy';
+/**
+ * КЛЮЧЪТ НА АКАУНТА · вече не е закован ред.
+ *
+ * Решава се веднъж, при тръгване (`koyZhurnal`): ако на това устройство вече
+ * има Журнал от Алфа, отваря се ТОЙ — ключът му влиза в хеша и не се преселва
+ * (правило 4). Иначе акаунтът тръгва с имейла на влезлия.
+ *
+ * `let`, защото стойността се знае едва СЛЕД влизането и след първото четене
+ * от носителя; дотогава е ключът от Алфа, за да има какво да се прочете.
+ */
+let akaunt = KLYUCH_OT_ALFA;
 
 /**
  * КОЙ Е ВЛЯЗЪЛ. Днес — един собственик, вече влязъл; истинският OAuth иска
@@ -244,10 +255,15 @@ async function trugvay(): Promise<void> {
   // Постоянство: изтриваемото хранилище е дупката №1 за „нула загуба".
   hranilishte = await osiguriHranilishte();
 
+  // КОЙ ЖУРНАЛ · първо се пита има ли вече такъв от Алфа, после кой е влязъл.
+  // Обратният ред би оставил първия Журнал невидим в мига, в който истинският
+  // вход тръгне: данните му стоят на диска, но под ключ, който никой не пита.
+  akaunt = koyZhurnal(kojSam, (await dnevnik.chetiVsichki(KLYUCH_OT_ALFA)).length > 0);
+
   // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
-  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(NAEMATEL);
+  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(akaunt);
   const proverka = proveriKotvata(
-    kotva.cheti(NAEMATEL),
+    kotva.cheti(akaunt),
     sabitiyaVNachaloto[sabitiyaVNachaloto.length - 1]?.seq ?? 0,
     (seq) => sabitiyaVNachaloto.find((s) => s.seq === seq)?.hash,
   );
@@ -263,7 +279,7 @@ async function trugvay(): Promise<void> {
   const deystviya = new Deystviya({
     vrata,
     dnevnik,
-    naematel: NAEMATEL,
+    naematel: akaunt,
     actor: kojSam.imeyl,
     chasovnik: () => new Date().toISOString(),
   });
@@ -279,7 +295,7 @@ async function trugvay(): Promise<void> {
   };
 
   async function prerisuvay(): Promise<void> {
-    const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await dnevnik.chetiVsichki(akaunt);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
     const dnes = new Date().toISOString().slice(0, 10);
@@ -333,7 +349,7 @@ async function trugvay(): Promise<void> {
                       ? narisuvaySmetki(ogledalo, dnes)
                       : ekran === 'nastroyki'
                         ? narisuvayNastroyki(ogledalo)
-                        : narisuvayTablo(kojSam, izbor)
+                        : narisuvayTablo(kojSam, izbor, akaunt)
           }
         </div>
       </main>`;
@@ -453,7 +469,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   }
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const rezultat = await proveriVerigata(sabitiya, sha256Web);
     sastoyanieNaVerigata = {
       tsyala: rezultat.tsyala,
@@ -477,19 +493,19 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
   koren.querySelector<HTMLButtonElement>('#iznesi')?.addEventListener('click', async () => {
     // Свалянето е ПРАВО, не даденост — думата на собственика.
-    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, akaunt))) {
       k.vest('zle', 'Нямаш право да сваляш Журнала. Свалянето се дава по списък.');
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
     const adres = URL.createObjectURL(fayl);
     const vruzka = document.createElement('a');
     vruzka.href = adres;
-    vruzka.download = `zhurnal-${NAEMATEL}-${new Date().toISOString().slice(0, 10)}.json`;
+    vruzka.download = `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`;
     vruzka.click();
     URL.revokeObjectURL(adres);
 
@@ -509,12 +525,12 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
   // ── архив за Ексел · всеки лист с готови филтри ──────────────────────────
   koren.querySelector<HTMLButtonElement>('#arhiv')?.addEventListener('click', async () => {
-    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, akaunt))) {
       k.vest('zle', 'Нямаш право да сваляш архива. Свалянето се дава по списък.');
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const ogledalo = await k.deystviya.ogledalo();
     const bajtove = arhivZaEksel(sabitiya, ogledalo, new Date().toISOString());
     const fayl = new Blob([bajtove.slice().buffer], {
@@ -542,7 +558,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const izbran = fayl.files?.[0];
     if (!izbran) return;
 
-    const sega = (await k.dnevnik.chetiVsichki(NAEMATEL)).length;
+    const sega = (await k.dnevnik.chetiVsichki(akaunt)).length;
     const potvarzhdenie =
       sega === 0
         ? `Да внеса ли „${izbran.name}"?`
@@ -557,7 +573,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       const rezultat = await vnesiZhurnal({
         vrata: k.vrata,
         dnevnik: k.dnevnik,
-        naematel: NAEMATEL,
+        naematel: akaunt,
         actor: kojSam.imeyl,
         tekst: await izbran.text(),
         kogato: new Date().toISOString(),
