@@ -9,7 +9,7 @@
  * и то само когато вратарят пусне (`src/domein/storno.ts`).
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
@@ -103,7 +103,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
       <div class="plochka">
         <span class="etiket">Месечен наем</span>
         <span class="chislo" translate="no">${kakvoPishe(mesechno as never)}</span>
-        <span class="pod">начислено · лв.</span>
+        <span class="pod">начислено · €</span>
       </div>
       <div class="plochka">
         <span class="etiket">Събития</span>
@@ -138,7 +138,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
-                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kakvoPishe((popravyanImot.ploshtad_kvsm / 100) as never) : ''}">
+                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? zaPisane((popravyanImot.ploshtad_kvsm / 100) as never) : ''}">
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -188,9 +188,9 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
                    value="${popravyanNaem ? ekraniraj(popravyanNaem.naemetel) : ''}">
           </div>
           <div class="pole">
-            <label for="naem-suma">Наем на месец, лв. — с ДДС</label>
+            <label for="naem-suma">Наем на месец, € — с ДДС</label>
             <input translate="no" id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem ? kakvoPishe(popravyanNaem.naem_st as never) : ''}">
+                   value="${popravyanNaem ? zaPisane(popravyanNaem.naem_st as never) : ''}">
           </div>
           <div class="pole">
             <label for="naem-sektor">Сектор — определя ставката</label>
@@ -206,9 +206,9 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
             </select>
           </div>
           <div class="pole">
-            <label for="naem-depozit">Депозит, лв. (по избор)</label>
+            <label for="naem-depozit">Депозит, € (по избор)</label>
             <input translate="no" id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? kakvoPishe(popravyanNaem.depozit_st as never) : ''}">
+                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? zaPisane(popravyanNaem.depozit_st as never) : ''}">
           </div>
           <div class="pole">
             <label for="naem-padezh">Падеж — ден от месеца</label>
@@ -226,7 +226,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="deystviya">
           <button type="submit" class="glaven">${popravyanNaem ? 'Запиши поправката' : 'Запиши наема'}</button>
           ${popravyanNaem ? '<button type="button" class="vtorichen" data-otkazhi-rezhim>Откажи</button>' : ''}
-          <p class="drebno">1150,50 лв. става 115050 стотинки. Никакъв float — иначе стотинките се разминават в ДДС.<br>Сумата е <b>обща цена с ДДС</b>; ДДС-то се изважда на отделен ред в „Сметки", не се прибавя тук.</p>
+          <p class="drebno">1150,50 € става 115050 най-малки единици. Никакъв float — иначе центовете се разминават в ДДС.<br>Сумата е <b>обща цена с ДДС</b>; ДДС-то се изважда на отделен ред в „Сметки", не се прибавя тук.</p>
         </div>
       </form>`
       }

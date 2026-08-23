@@ -34,6 +34,13 @@ export interface Paket {
   /** кои страни и езици покрива — това е рекламният му смисъл */
   readonly zaKogo: string;
   readonly podmnozhestva: readonly Podmnozhestvo[];
+  /**
+   * Кои валути предлага регионът. Негова дума (23.08): „При създаване се
+   * избира азбука с ЕЗИК И ВАЛУТА, която се използва в сметките." Избира се
+   * ЕДНА; смяна значи ново сваляне — както при азбуките. Кодовете са ISO,
+   * самите валути живеят в `src/yadro/valuta.ts`.
+   */
+  readonly valuti: readonly string[];
 }
 
 /**
@@ -46,18 +53,21 @@ export const PAKETI: readonly Paket[] = Object.freeze([
     ime: 'България',
     zaKogo: 'българска кирилица и цялата латиница',
     podmnozhestva: ['latin', 'cyrillic'],
+    valuti: ['EUR'],
   },
   {
     klyuch: 'evropa',
     ime: 'Европа',
     zaKogo: 'плюс полски, чешки, турски, украински, сръбски',
     podmnozhestva: ['latin', 'cyrillic', 'latin-ext', 'cyrillic-ext'],
+    valuti: ['EUR', 'PLN', 'CZK', 'RON', 'TRY', 'UAH'],
   },
   {
     klyuch: 'plus',
     ime: 'Разширен',
     zaKogo: 'плюс гръцки и виетнамски',
     podmnozhestva: ['latin', 'cyrillic', 'latin-ext', 'cyrillic-ext', 'greek', 'greek-ext', 'vietnamese'],
+    valuti: ['EUR', 'PLN', 'CZK', 'RON', 'TRY', 'UAH', 'GBP', 'CHF'],
   },
 ]);
 

@@ -68,9 +68,9 @@ describe('разпределяне без загуба на стотинка', (
 
 describe('за четене от човек', () => {
   it('пише сумата с две цифри след запетаята', () => {
-    expect(kakvoPishe(stotinki(100_00))).toBe('100,00');
-    expect(kakvoPishe(stotinki(5))).toBe('0,05');
-    expect(kakvoPishe(stotinki(-1234_56))).toBe('-1234,56');
+    expect(kakvoPishe(stotinki(100_00))).toBe('100,00\u202F€');
+    expect(kakvoPishe(stotinki(5))).toBe('0,05\u202F€');
+    expect(kakvoPishe(stotinki(-1234_56))).toBe('-1\u202F234,56\u202F€');
   });
 });
 

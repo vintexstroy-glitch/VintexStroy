@@ -5,7 +5,7 @@
  * КОНКРЕТНО вземане. Поправка = сторно, не изтриване.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import {
   duljimo,
@@ -52,7 +52,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
       <div class="plochka">
         <span class="etiket">Дължимо общо</span>
         <span class="chislo" translate="no">${kakvoPishe(duljimo(o) as never)}</span>
-        <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · лв.</span>
+        <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · €</span>
       </div>
       <div class="plochka${prosrocheno_st > 0 ? ' trevoga' : ''}">
         <span class="etiket">Просрочено</span>
@@ -206,9 +206,9 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
       <form id="forma-plashtane" data-vzemane="${ekraniraj(v.id)}">
         <div class="poleta">
           <div class="pole">
-            <label for="pl-suma">Сума, лв.</label>
+            <label for="pl-suma">Сума, €</label>
             <input translate="no" id="pl-suma" name="suma" inputmode="decimal" required
-                   value="${kakvoPishe(v.ostatak_st as never)}" autocomplete="off">
+                   value="${zaPisane(v.ostatak_st as never)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="pl-nachin">Начин</label>
@@ -224,7 +224,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
         </div>
         <p class="greshka" id="greshka-plashtane"></p>
         <div class="deystviya">
-          <button type="submit" class="glaven">Приеми ${kakvoPishe(v.ostatak_st as never)} лв.</button>
+          <button type="submit" class="glaven">Приеми ${kakvoPishe(v.ostatak_st as never)}</button>
           <button type="button" class="vtorichen" data-otkazhi>Откажи</button>
           <p class="drebno">Сумата се редактира — частичното плащане е нормално и остатъкът се смята сам.</p>
         </div>

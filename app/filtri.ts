@@ -33,11 +33,11 @@ function klyuchNa(tablitsa: string, kolona: string): string {
 
 // ── групите: стойност → група, в която се отмята ──────────────────────────
 const GRUPI_SUMA: readonly { ime: string; do_st: number }[] = [
-  { ime: 'до 100 лв.', do_st: 100_00 },
-  { ime: '100 – 500 лв.', do_st: 500_00 },
-  { ime: '500 – 1000 лв.', do_st: 1000_00 },
-  { ime: '1000 – 5000 лв.', do_st: 5000_00 },
-  { ime: 'над 5000 лв.', do_st: Number.POSITIVE_INFINITY },
+  { ime: 'до 100 €', do_st: 100_00 },
+  { ime: '100 – 500 €', do_st: 500_00 },
+  { ime: '500 – 1000 €', do_st: 1000_00 },
+  { ime: '1000 – 5000 €', do_st: 5000_00 },
+  { ime: 'над 5000 €', do_st: Number.POSITIVE_INFINITY },
 ];
 
 function grupaNaSuma(st: number): string {

@@ -22,8 +22,8 @@ import { kakvoPishe } from '../src/yadro/pari.js';
 describe('изваждане на ДДС от обща цена', () => {
   it('120,00 при 20% дава основа 100,00 и ДДС 20,00', () => {
     const r = ddsOtObshta(120_00, 20);
-    expect(kakvoPishe(r.osnova_st)).toBe('100,00');
-    expect(kakvoPishe(r.dds_st)).toBe('20,00');
+    expect(kakvoPishe(r.osnova_st)).toBe('100,00\u202F€');
+    expect(kakvoPishe(r.dds_st)).toBe('20,00\u202F€');
   });
 
   it('1200,00 при 20% дава 1000,00 и 200,00', () => {

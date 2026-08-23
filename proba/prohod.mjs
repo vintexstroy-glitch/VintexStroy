@@ -91,8 +91,10 @@ const redove = (p, izbor) =>
   p.$$eval(izbor, (r) => r.map((x) => [...x.children].map((c) => c.innerText.replace(/\s+/g, ' ').trim())));
 
 async function plochka(p, etiket) {
+  // паузите се свеждат до обикновени — екранът пише тясната (U+202F), а
+  // очакванията в прохода се четат от човек и се пишат с интервал
   const vsichki = await p.$$eval('.plochka', (r) =>
-    r.map((x) => [...x.children].map((c) => c.innerText.trim())),
+    r.map((x) => [...x.children].map((c) => c.innerText.replace(/\s+/g, ' ').trim())),
   );
   const namerena = vsichki.find((x) => x[0]?.toUpperCase().includes(etiket.toUpperCase()));
   return namerena ? namerena[1] : `НЯМА ПЛОЧКА „${etiket}"`;
@@ -157,9 +159,9 @@ async function main() {
     proveri('без имоти', (await tekstNa(p, '.prazno')).includes('Още няма нито един имот'), true);
 
     await naEkran(p, 'pari', '#forma-nachisli');
-    proveri('Пари при празно: дължимо', await plochka(p, 'Дължимо общо'), '0,00');
+    proveri('Пари при празно: дължимо', await plochka(p, 'Дължимо общо'), '0,00 €');
     await naEkran(p, 'smetki', '#forma-period');
-    proveri('Сметки при празно: ДДС', await plochka(p, 'ДДС за внасяне'), '0,00');
+    proveri('Сметки при празно: ДДС', await plochka(p, 'ДДС за внасяне'), '0,00 €');
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 2 · имоти и наеми ════════════════════════════════════════════════
@@ -176,11 +178,11 @@ async function main() {
 
     proveri('единици', await plochka(p, 'Единици'), '2');
     proveri('отдадени', await plochka(p, 'Отдадени'), '2 / 2');
-    proveri('месечен наем', await plochka(p, 'Месечен наем'), '2000,00');
+    proveri('месечен наем', await plochka(p, 'Месечен наем'), '2 000,00 €');
 
     const imoti = await redove(p, '.red.imot');
     const malinova = imoti.find((r) => r[0]?.startsWith('Малинова'));
-    proveri('имот с два наема · сбор', malinova?.[3], '800,00');
+    proveri('имот с два наема · сбор', malinova?.[3], '800,00 €');
     proveri('имот с два наема · знак', malinova?.[4], '2 наема');
     proveri(
       'опасният текст не се изпълни, а се показва',
@@ -195,7 +197,7 @@ async function main() {
       await p.fill('#naem-suma', losha);
       await p.click('#forma-naem button[type=submit]');
       await p.waitForFunction(() => document.querySelector('#greshka-naem')?.textContent !== '');
-      proveri(`„${losha}" се отказва`, (await tekstNa(p, '#greshka-naem')).includes('Не е сума в левове'), true);
+      proveri(`„${losha}" се отказва`, (await tekstNa(p, '#greshka-naem')).includes('Не е сума'), true);
     }
     proveri('нито един отказан наем не влезе', await broySabitiya(p), 5);
 
@@ -206,7 +208,7 @@ async function main() {
     await p.click('#forma-nachisli button[type=submit]');
     await p.waitForFunction(() => document.body.innerText.includes('Сверката затваря'));
     proveri('осем събития след начисляване', await broySabitiya(p), 8);
-    proveri('дължимо общо', await plochka(p, 'Дължимо общо'), '2000,00');
+    proveri('дължимо общо', await plochka(p, 'Дължимо общо'), '2 000,00 €');
 
     const vzemaniya = await redove(p, '.red.vzemane');
     const stroy = vzemaniya.find((r) => r[0]?.startsWith('Стройпласт'));
@@ -221,22 +223,22 @@ async function main() {
     // ══ 5 · плащания, надплащане, сторно ═════════════════════════════════
     razdel = '5 · плащания';
     await plati(p, 'Стройпласт', '600,00', 'в брой', '2026-02-10');
-    proveri('частично · остатък', await ostatak(p, 'Стройпласт'), '600,00');
+    proveri('частично · остатък', await ostatak(p, 'Стройпласт'), '600,00 €');
     proveri('девет събития', await broySabitiya(p), 9);
 
     await plati(p, 'Стройпласт', '700,00', 'банка', '2026-02-15');
     proveri('надплатеното излиза от просрочените', await ostatak(p, 'Стройпласт'), 'НЯМА РЕД');
-    proveri('дължимо общо след надплащане', await plochka(p, 'Дължимо общо'), '700,00');
+    proveri('дължимо общо след надплащане', await plochka(p, 'Дължимо общо'), '700,00 €');
 
-    const zaStorno = (await redove(p, '.red.plashtane')).find((r) => r[3] === '700,00');
+    const zaStorno = (await redove(p, '.red.plashtane')).find((r) => r[3] === '700,00 €');
     proveri('плащането от 700,00 се вижда', Boolean(zaStorno), true);
     await sSabitie(p, () => p.click(`.red.plashtane:has-text("700,00") [data-storno]`));
     proveri('единайсет събития след сторно', await broySabitiya(p), 11);
-    proveri('сторното върна остатъка', await ostatak(p, 'Стройпласт'), '600,00');
+    proveri('сторното върна остатъка', await ostatak(p, 'Стройпласт'), '600,00 €');
 
     await plati(p, 'Стройпласт', '600,00', 'банка', '2026-02-15');
     proveri('дванайсет събития', await broySabitiya(p), 12);
-    proveri('дължимо общо накрая', await plochka(p, 'Дължимо общо'), '800,00');
+    proveri('дължимо общо накрая', await plochka(p, 'Дължимо общо'), '800,00 €');
 
     // ══ 6 · сметки и ДДС ═════════════════════════════════════════════════
     razdel = '6 · сметки';
@@ -245,29 +247,29 @@ async function main() {
     await p.click('#forma-period button[type=submit]');
     await p.waitForFunction(() => document.body.innerText.includes('наем · търговски'));
 
-    proveri('приход', await plochka(p, 'Приход за'), '2000,00');
-    proveri('ДДС за внасяне', await plochka(p, 'ДДС за внасяне'), '200,00');
-    proveri('разход · още няма', await plochka(p, 'Разход за'), '0,00');
-    proveri('разлика по сверката', await plochka(p, 'Разлика по сверката'), '0,00');
+    proveri('приход', await plochka(p, 'Приход за'), '2 000,00 €');
+    proveri('ДДС за внасяне', await plochka(p, 'ДДС за внасяне'), '200,00 €');
+    proveri('разход · още няма', await plochka(p, 'Разход за'), '0,00 €');
+    proveri('разлика по сверката', await plochka(p, 'Разлика по сверката'), '0,00 €');
 
     const smetki = Object.fromEntries((await redove(p, '.red.smetka')).map((r) => [r[0].split(' ')[0], r[3]]));
-    proveri('ред Наеми', smetki['Наеми'], '2000,00');
-    proveri('ред КЕШ', smetki['КЕШ'], '600,00');
-    proveri('ред БАНКА', smetki['БАНКА'], '600,00');
-    proveri('ред Заплати', smetki['Заплати'], '0,00');
-    proveri('ред Кредити', smetki['Кредити'], '0,00');
+    proveri('ред Наеми', smetki['Наеми'], '2 000,00 €');
+    proveri('ред КЕШ', smetki['КЕШ'], '600,00 €');
+    proveri('ред БАНКА', smetki['БАНКА'], '600,00 €');
+    proveri('ред Заплати', smetki['Заплати'], '0,00 €');
+    proveri('ред Кредити', smetki['Кредити'], '0,00 €');
 
     const dds = await redove(p, '.red.dds:not(.sbor)');
     const targ = dds.find((r) => r[1]?.startsWith('наем · търговски'));
     const zhil = dds.find((r) => r[1]?.startsWith('наем · жилищен'));
-    proveri('търговски · основа', targ?.[3], '1000,00');
-    proveri('търговски · ДДС', targ?.[4], '200,00');
-    proveri('жилищен · основа', zhil?.[3], '800,00');
-    proveri('жилищен · ДДС', zhil?.[4], '0,00');
+    proveri('търговски · основа', targ?.[3], '1 000,00 €');
+    proveri('търговски · ДДС', targ?.[4], '200,00 €');
+    proveri('жилищен · основа', zhil?.[3], '800,00 €');
+    proveri('жилищен · ДДС', zhil?.[4], '0,00 €');
 
     const sverki = await redove(p, '.red.sverka');
     proveri('двете сверки затварят', sverki.every((r) => r[4] === 'затваря'), true);
-    proveri('паричната сверка е в левове', sverki[0]?.[1], '2000,00');
+    proveri('паричната сверка е в левове', sverki[0]?.[1], '2 000,00 €');
     proveri('сверката по брой е в бройки', sverki[1]?.[1], '3');
 
     // ══ 7 · калкулатор ═══════════════════════════════════════════════════
@@ -275,21 +277,21 @@ async function main() {
     await smetni(p, 'фактура 1042', '1200,00', '20');
     await smetni(p, 'жилищен наем', '500,00', '0');
     const smyatane = await redove(p, '.red.smyatane');
-    proveri('ред с 20%', smyatane[0]?.slice(2), ['1000,00', '200,00', '1200,00'].join(','));
-    proveri('ред с 0%', smyatane[1]?.slice(2), ['500,00', '0,00', '500,00'].join(','));
-    proveri('сборът', smyatane[2]?.slice(2), ['1500,00', '200,00', '1700,00'].join(','));
+    proveri('ред с 20%', smyatane[0]?.slice(2), ['1 000,00 €', '200,00 €', '1 200,00 €'].join(','));
+    proveri('ред с 0%', smyatane[1]?.slice(2), ['500,00 €', '0,00 €', '500,00 €'].join(','));
+    proveri('сборът', smyatane[2]?.slice(2), ['1 500,00 €', '200,00 €', '1 700,00 €'].join(','));
 
     // ══ 8 · презареждане — Журналът живее в браузъра ═════════════════════
     razdel = '8 · презареждане';
     await p.reload();
     await p.waitForSelector('#forma-imot');
     proveri('събитията оцеляха', await broySabitiya(p), 12);
-    proveri('месечният наем оцеля', await plochka(p, 'Месечен наем'), '2000,00');
+    proveri('месечният наем оцеля', await plochka(p, 'Месечен наем'), '2 000,00 €');
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-02');
     await p.click('#forma-period button[type=submit]');
     await p.waitForFunction(() => document.body.innerText.includes('наем · търговски'));
-    proveri('ДДС оцеля', await plochka(p, 'ДДС за внасяне'), '200,00');
+    proveri('ДДС оцеля', await plochka(p, 'ДДС за внасяне'), '200,00 €');
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
     razdel = '9 · верига';
@@ -369,7 +371,7 @@ async function main() {
     proveri(
       'новата сума в списъка',
       (await redove(p, '.red.naem')).find((x) => x[0].startsWith('Стройпласт'))?.[3],
-      '1300,00',
+      '1 300,00 €',
     );
 
     // прекратяване
@@ -383,7 +385,7 @@ async function main() {
       (await redove(p, '.red.naem')).find((x) => x[0].startsWith('Домакинство'))?.[4],
       'прекратен 2026-02-28',
     );
-    proveri('месечният наем спадна', await plochka(p, 'Месечен наем'), '1600,00');
+    proveri('месечният наем спадна', await plochka(p, 'Месечен наем'), '1 600,00 €');
 
     // вратарят отказва, докато нещо живо виси
     await deystvieSPrerisuvane(p, () => p.click('.red.imot:has-text("Малинова") [data-storno-imot]'));
@@ -400,17 +402,17 @@ async function main() {
 
     // сторно на начисление БЕЗ плащания — минава
     await naEkran(p, 'pari', '#forma-nachisli');
-    proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00');
+    proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00 €');
     await sSabitie(p, () => p.click('.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
     proveri('шестнайсет събития', await broySabitiya(p), 16);
-    proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00');
+    proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00 €');
 
     // ══ 11в · разходите → входящият ДДС ══════════════════════════════════
     razdel = '11в · разходите';
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-02');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
-    proveri('ДДС преди разходите', await plochka(p, 'ДДС за внасяне'), '200,00');
+    proveri('ДДС преди разходите', await plochka(p, 'ДДС за внасяне'), '200,00 €');
 
     await zapishiRazhod(p, {
       potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Материали ООД',
@@ -427,26 +429,26 @@ async function main() {
     const smetkiR = Object.fromEntries(
       (await redove(p, '.red.smetka')).map((x) => [x[0].split(' ')[0], x[3]]),
     );
-    proveri('ред Фактури', smetkiR['Фактури'], '600,00');
-    proveri('ред Заплати', smetkiR['Заплати'], '2000,00');
-    proveri('плочка Разход', await plochka(p, 'Разход за'), '2600,00');
+    proveri('ред Фактури', smetkiR['Фактури'], '600,00 €');
+    proveri('ред Заплати', smetkiR['Заплати'], '2 000,00 €');
+    proveri('плочка Разход', await plochka(p, 'Разход за'), '2 600,00 €');
 
     const vhod = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
     proveri('две страни „вход" — материали и заплати', vhod.length, 2);
     const materiali = vhod.find((x) => x[1]?.startsWith('покупки · материали'));
-    proveri('входящ ДДС от фактурата', materiali?.[4], '100,00');
-    proveri('заплатите не носят ДДС', vhod.find((x) => x[1]?.startsWith('заплати'))?.[4], '0,00');
-    proveri('за внасяне пада наполовина', await plochka(p, 'ДДС за внасяне'), '100,00');
+    proveri('входящ ДДС от фактурата', materiali?.[4], '100,00 €');
+    proveri('заплатите не носят ДДС', vhod.find((x) => x[1]?.startsWith('заплати'))?.[4], '0,00 €');
+    proveri('за внасяне пада наполовина', await plochka(p, 'ДДС за внасяне'), '100,00 €');
 
     const sverkiR = await redove(p, '.red.sverka');
     proveri('четирите сверки затварят', sverkiR.every((x) => x[4] === 'затваря'), true);
-    proveri('сверката на разхода', sverkiR[2]?.[1], '2600,00');
+    proveri('сверката на разхода', sverkiR[2]?.[1], '2 600,00 €');
 
     // сторно на фактурата — входящият ДДС си отива с нея
     await sSabitie(p, () => p.click('.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
     proveri('деветнайсет събития', await broySabitiya(p), 19);
-    proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00');
-    proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2000,00');
+    proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
+    proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');
 
     // ══ 11г · източниците · таблица от Драйва ════════════════════════════
     razdel = '11г · източници';
@@ -473,7 +475,7 @@ async function main() {
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
     proveri('двайсет и две събития', await broySabitiya(p), 22);
     proveri('вестта казва, че сверката е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
-    proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3], '1200,00');
+    proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3], '1 200,00 €');
 
     // поправен файл за същия месец: една сума сменена, един ред махнат
     const vtoriCSV = join(tmpdir(), 'razhodi-fevruari-popraven.csv');
@@ -496,7 +498,7 @@ async function main() {
     proveri(
       'Фактури казват това, което казва новият файл',
       (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3],
-      '950,00',
+      '950,00 €',
     );
     proveri('веригата пак ще е цяла — сторно, не презапис', (await tekstNa(p, '.vest')).includes('сторнирани'), true);
 
@@ -616,7 +618,7 @@ async function main() {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-03');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
-    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Сметки'), '200,00');
+    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Сметки'), '200,00 €');
 
     await p.fill('#spravka-data', '2026-04-10');
     await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
@@ -911,8 +913,8 @@ async function main() {
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
     const vhodM = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
     proveri('един сектор, ДВЕ ставки — от колоната, не от сектора', vhodM.length, 2);
-    proveri('входящ ДДС на 20%', vhodM.find((x) => x[2] === '20%')?.[4], '100,00');
-    proveri('входящ ДДС на 9%', vhodM.find((x) => x[2] === '9%')?.[4], '9,00');
+    proveri('входящ ДДС на 20%', vhodM.find((x) => x[2] === '20%')?.[4], '100,00 €');
+    proveri('входящ ДДС на 9%', vhodM.find((x) => x[2] === '9%')?.[4], '9,00 €');
 
     // сверката на ДДС · движение в банката без фактура
     proveri('две движения без фактура светят', (await redove(p, '.red.nesvarshen')).length, 2);

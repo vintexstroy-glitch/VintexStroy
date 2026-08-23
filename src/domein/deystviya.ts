@@ -32,6 +32,7 @@ import type {
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
   PayloadPravoZapisano,
+  PayloadValutaIzbrana,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -199,6 +200,23 @@ export class Deystviya {
       danni,
       z,
     );
+  }
+
+  /**
+   * Записва валутата на Журнала — ВЕДНЪЖ, при създаване.
+   *
+   * НЕ иска отключен период. Втори запис с РАЗЛИЧНА валута се отказва още в
+   * Огледалото — смяната би преоценила цялата история.
+   */
+  async izberiValuta(danni: PayloadValutaIzbrana, z: Zayavka): Promise<Rezultat> {
+    const veche = (await this.ogledalo()).valuta;
+    if (veche !== undefined && veche !== danni.kod) {
+      throw new GreshkaZamrazen(
+        `Журналът вече е в ${veche}. Валутата не се сменя — смяната би ` +
+          'преоценила всяко записано число. Друга валута значи нов Журнал.',
+      );
+    }
+    return this.#pusni('ВалутаИзбрана', VID.valuta, 'VALUTA', danni, z);
   }
 
   /**

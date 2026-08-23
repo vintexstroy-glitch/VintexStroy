@@ -177,7 +177,7 @@ describe('разчитането не преглъща редове', () => {
 
     expect(s.redove).toHaveLength(1);
     expect(s.propusnati).toHaveLength(3);
-    expect(s.propusnati[0]!.zashto).toContain('Не е сума в левове');
+    expect(s.propusnati[0]!.zashto).toContain('Не е сума');
     expect(s.propusnati[1]!.zashto).toContain('извън 2026-02');
     expect(s.propusnati[2]!.zashto).toContain('липсва');
   });

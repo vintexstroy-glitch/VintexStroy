@@ -1,7 +1,15 @@
 /**
- * Парите са ЦЕЛИ СТОТИНКИ. Никога float.
+ * Парите са цели НАЙ-МАЛКИ ЕДИНИЦИ на валутата. Никога float.
  * Правило от Архитектурния документ §5 и План за изпълнение П2.1.
+ *
+ * Негова дума (23.08): „ЛЕВ НЯМА… пишеш в евро, не в евроцента." Затова всичко,
+ * което човек ВИЖДА, е в евро с думата и знака — а вътре се пази най-малката
+ * единица, защото ДДС, изваден от обща цена, я ражда: без нея инвариантът
+ * „основа + ДДС == обща" пада. Типът остава `Stotinki` — той е ЕДИНИЦАТА,
+ * не левът; преименуване би пипнало всеки запис в Журнала за нула полза.
  */
+
+import { EVRO, type Valuta } from './valuta.js';
 
 export type Stotinki = number & { readonly __stotinki: unique symbol };
 
@@ -57,26 +65,52 @@ export function razpredeli(suma: Stotinki, chasti: number): Stotinki[] {
   );
 }
 
-/** За четене от човек: 100_00 → "100,00" */
-export function kakvoPishe(s: Stotinki): string {
+/**
+ * За четене от човек: 123456 → „1 234,56 €".
+ *
+ * Знакът на валутата стои СЛЕД числото, с тясна пауза — както се пише в
+ * България. Хиляди се делят с тясна пауза, за да се четат едри цени.
+ */
+export function kakvoPishe(s: Stotinki, v: Valuta = EVRO): string {
   const znak = s < 0 ? '-' : '';
   const abs = Math.abs(s);
-  return `${znak}${Math.floor(abs / 100)},${String(abs % 100).padStart(2, '0')}`;
+  // хилядите на ръка, не през локала: не всяка среда носи български правила,
+  // а числото пред собственика трябва да е еднакво навсякъде
+  const tsyalo = String(Math.floor(abs / v.drobni)).replace(/\B(?=(\d{3})+(?!\d))/g, '\u202F');
+  return `${znak}${tsyalo},${String(abs % v.drobni).padStart(2, '0')}\u202F${v.znak}`;
 }
 
 /**
- * Чете сума, написана от човек, и я превръща в ЦЕЛИ СТОТИНКИ.
- * Приема „1150,50", „1150.50", „1 150,50", „1150". Отказва всичко друго —
- * входът е мястото, където се спира дробното, не Вратата.
+ * Чете сума, написана от човек, и я превръща в цели най-малки единици.
+ * Приема „1150,50", „1150.50", „1 150,50", „1150", със или без знак на валута.
+ * Отказва всичко друго — входът е мястото, където се спира дробното, не Вратата.
  */
-export function otLeva(tekst: string): Stotinki {
-  const chisto = tekst.replace(/[\s\u00A0\u202F]/g, '').replace(',', '.');
+export function otSuma(tekst: string): Stotinki {
+  const chisto = tekst
+    .replace(/[\s\u00A0\u202F]/g, '')
+    .replace(/€|EUR|евро/gi, '')
+    .replace(',', '.');
   const nameren = /^(-?)(\d+)(?:\.(\d{1,2}))?$/.exec(chisto);
   if (!nameren) {
-    throw new GreshkaPari(`Не е сума в левове: „${tekst}"`);
+    throw new GreshkaPari(`Не е сума: „${tekst}"`);
   }
   const [, znak, tsyala, drobna = ''] = nameren;
   const stotni = Number(drobna.padEnd(2, '0'));
   const sbor = Number(tsyala) * 100 + stotni;
   return stotinki(znak === '-' ? -sbor : sbor);
+}
+
+/** Старото име · остава като мост, за да не гръмне никой вносител. */
+export const otLeva = otSuma;
+
+/**
+ * ЗА ПИСАНЕ · чисто число за поле във форма: 123456 → „1234,56".
+ *
+ * Без знак на валута и без паузи за хиляди: полето е за РЕДАКТИРАНЕ, и
+ * човекът пише върху числото, не върху украсата. `kakvoPishe` е за четене.
+ */
+export function zaPisane(s: Stotinki, drobni = 100): string {
+  const znak = s < 0 ? '-' : '';
+  const abs = Math.abs(s);
+  return `${znak}${Math.floor(abs / drobni)},${String(abs % drobni).padStart(2, '0')}`;
 }

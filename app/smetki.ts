@@ -8,7 +8,7 @@
  * преизчислява при всяко показване — включително сверката.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { MERKA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -244,7 +244,7 @@ function formaRazhod(mesets: string): string {
             <input translate="no" id="razhod-opis" name="opis" required placeholder="напр. цимент" autocomplete="off">
           </div>
           <div class="pole">
-            <label for="razhod-suma">Обща сума, лв. — с ДДС</label>
+            <label for="razhod-suma">Обща сума, € — с ДДС</label>
             <input translate="no" id="razhod-suma" name="suma" required inputmode="decimal" placeholder="600,00" autocomplete="off">
           </div>
           <div class="pole">
@@ -336,7 +336,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
             spravka
               ? razlikaDeklarirano === 0
                 ? 'съвпада с изчисленото'
-                : `РАЗМИНАВАНЕ ${kakvoPishe(razlikaDeklarirano as never)} лв. — провери`
+                : `РАЗМИНАВАНЕ ${kakvoPishe(razlikaDeklarirano as never)} — провери`
               : 'още няма справка'
           }</span>
         </div>
@@ -349,8 +349,8 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
               : razlikaPlateno === 0
                 ? 'внесено докрай'
                 : razlikaPlateno < 0
-                  ? `остават ${kakvoPishe(-razlikaPlateno as never)} лв.`
-                  : `надвнесени ${kakvoPishe(razlikaPlateno as never)} лв.`
+                  ? `остават ${kakvoPishe(-razlikaPlateno as never)}`
+                  : `надвнесени ${kakvoPishe(razlikaPlateno as never)}`
           }</span>
         </div>
       </div>
@@ -360,7 +360,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           ? `<form id="forma-dds-plateno">
         <div class="poleta">
           <div class="pole">
-            <label for="dds-suma">Внесено, лв.</label>
+            <label for="dds-suma">Внесено, €</label>
             <input translate="no" id="dds-suma" name="suma" required inputmode="decimal" placeholder="200,00" autocomplete="off">
           </div>
           <div class="pole">
@@ -385,9 +385,9 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           : `<form id="forma-spravka">
         <div class="poleta">
           <div class="pole">
-            <label for="spravka-dds">Деклариран ДДС, лв.</label>
+            <label for="spravka-dds">Деклариран ДДС, €</label>
             <input translate="no" id="spravka-dds" name="dds" required inputmode="decimal"
-              value="${kakvoPishe(izchisleno_st as never)}" autocomplete="off">
+              value="${zaPisane(izchisleno_st as never)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="spravka-data">Дата на подаване</label>
@@ -489,7 +489,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
           )
           .join('')}
       </div>
-      <p class="drebno">Сдвоява се по <b>номер на документ</b>, не по сума и дата: две фактури за 1200 лв. в един ден се случват, а два документа с един номер — не. Движение без номер не се преглъща, а стои тук.</p>`
+      <p class="drebno">Сдвоява се по <b>номер на документ</b>, не по сума и дата: две фактури за 1200 € в един ден се случват, а два документа с един номер — не. Движение без номер не се преглъща, а стои тук.</p>`
       }
     </section>`;
 }
@@ -541,7 +541,7 @@ function kalkulator(): string {
             <input translate="no" id="smyatane-opis" name="opis" placeholder="напр. фактура 1042" autocomplete="off">
           </div>
           <div class="pole">
-            <label for="smyatane-suma">Обща цена, лв. — с ДДС</label>
+            <label for="smyatane-suma">Обща цена, € — с ДДС</label>
             <input translate="no" id="smyatane-suma" name="suma" required inputmode="decimal" placeholder="1200,00" autocomplete="off">
           </div>
           <div class="pole">
