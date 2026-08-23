@@ -207,6 +207,20 @@ export async function zapishiSverkata(
     partida: Partida;
     rezultat: { zapisani: number; stornirani: number; bezPromyana: number };
     kogato: string;
+    /**
+     * КЛЮЧЪТ НА ТОВА НАТИСКАНЕ · идва отвън, от екрана, и живее колкото
+     * партидата. Правило 20: „`opId` носи ДЕЙСТВИЕТО, не съдържанието."
+     *
+     * Дотук ключът се вадеше от отпечатъка на файловете — и точно това
+     * правило 20 нарича умно, докато не върнеш нещо към предишното му
+     * състояние. Втора сверка на същите файлове връщаше стария резултат и НЕ
+     * влизаше в Журнала: правило 7 обещава сверка „дори когато разликата е
+     * нула", а тя мълчеше.
+     *
+     * Пропуснат, ключът пада към отпечатъка — старото поведение, за да не
+     * гръмне вносител, който още не го подава.
+     */
+    klyuchNaPartidata?: string;
   },
 ): Promise<RezultatSveryavane> {
   const { partida, buton } = n;
@@ -242,7 +256,7 @@ export async function zapishiSverkata(
       izvori: partida.izvori,
       propusnati: partida.plan.snimka.propusnati.length,
     },
-    { opId: `sverka:${beleg}` },
+    { opId: `sverka:${n.klyuchNaPartidata ?? beleg}` },
   );
 
   return {

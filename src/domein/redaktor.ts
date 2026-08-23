@@ -330,6 +330,27 @@ function bezKolona(spisak: readonly number[], kolona: number): readonly number[]
 }
 
 /**
+ * Същото, но за КАРТА, чийто ключ е номер на колона.
+ *
+ * ЗАЩО СЪЩЕСТВУВА. Махането на колона мести номерата на всички след нея, а
+ * номерът е ключ на четири карти и на четири списъка. Списъците се местеха;
+ * `vidove` — не, защото беше единствената карта извън цикъла за `menyuta`.
+ * Едно място за двете значи, че следващата карта няма как да се забрави.
+ */
+function bezKolonaVKarta<T>(
+  karta: Readonly<Record<number, T>>,
+  kolona: number,
+): Readonly<Record<number, T>> {
+  const izhod: Record<number, T> = {};
+  for (const [k, stoynost] of Object.entries(karta)) {
+    const nomer = Number(k);
+    if (nomer === kolona) continue;
+    izhod[nomer > kolona ? nomer - 1 : nomer] = stoynost;
+  }
+  return Object.freeze(izhod);
+}
+
+/**
  * ПРЕМАХВА колона — и това е ИЗКЛЮЧЕНИЕТО, не правилото.
  *
  * Негово (ред 1572): само когато „няма данни в колоната, никаква информация
@@ -362,13 +383,8 @@ export function premahniKolona(
   for (const [rolya, k] of Object.entries(m.koloni) as [Rolya, number][]) {
     koloni[rolya] = k > kolona ? k - 1 : k;
   }
-  const menyuta: Record<number, readonly string[]> = {};
-  for (const [k, chlenove] of Object.entries(m.menyuta)) {
-    const nomer = Number(k);
-    if (nomer === kolona) continue;
-    menyuta[nomer > kolona ? nomer - 1 : nomer] = chlenove;
-  }
-
+  // ВСИЧКО, чийто ключ е номер на колона, се мести ЗАЕДНО. Пропуснатото поле
+  // не гърми — то тихо лепва стойността си за съседа отляво.
   return Object.freeze({
     ...m,
     glavi: Object.freeze(glavi),
@@ -379,7 +395,13 @@ export function premahniKolona(
     zatvoreni: bezKolona(m.zatvoreni, kolona),
     otVavezhdane: bezKolona(m.otVavezhdane, kolona),
     zaklyucheni: bezKolona(m.zaklyucheni, kolona),
-    menyuta: Object.freeze(menyuta),
+    menyuta: bezKolonaVKarta(m.menyuta, kolona),
+    // ТОВА ЛИПСВАШЕ. `vidove` казва коя колона е евро (ADR-014), а само
+    // `evro` влиза в двата сбора (правило 20). Останел на стария си ключ,
+    // видът се лепва за колоната отляво: колона с пари тихо пада към текст и
+    // изчезва от Приходи/Разходи, а колона с номер на фактура може да влезе
+    // в сбор. Числото си остава число — затова никой не забелязва.
+    vidove: bezKolonaVKarta(m.vidove, kolona),
   });
 }
 

@@ -170,6 +170,44 @@ describe('триенето — изключението, не правилото
     expect(m.menyuta[4]).toEqual(['Кеш', 'Банка']);
     expect(m.menyuta[5]).toBeUndefined();
   });
+
+  /**
+   * ВИДЪТ НА СТОЙНОСТТА СЕ МЕСТИ ЗАЕДНО С КОЛОНАТА.
+   *
+   * Намерено от сверката по шестте измерения: `premahniKolona` местеше шест
+   * неща по номер на колона и пропускаше седмото — `vidove`. Остане ли то на
+   * стария си ключ, видът се лепва за колоната ОТЛЯВО.
+   *
+   * Цената е в пари: само `evro` влиза в двата сбора (правило 20 · ADR-014).
+   * Колона с пари тихо пада към „текст" и изчезва от Приходи/Разходи, а
+   * колона с номер на фактура може да стане евро и да влезе в сбор. Числото
+   * си остава число — затова никой не забелязва.
+   */
+  it('видът на стойността слиза с колоната, не остава на съседа', () => {
+    let m = dobaviKolona(model(), { ime: 'Излишна', rolya: 'sobstvenik' });
+    m = dobaviKolona(m, { ime: 'Такса', rolya: 'sobstvenik' });
+    m = smeniVidNaStoynost(m, 5, 'evro', 'sobstvenik');
+    expect(m.glavi[5]).toBe('Такса');
+    expect(m.vidove[5]).toBe('evro');
+
+    m = premahniKolona(m, 4, { rolya: 'sobstvenik', imaDanni: false });
+
+    expect(m.glavi[4]).toBe('Такса');
+    expect(m.vidove[4]).toBe('evro'); // видът дойде със своята колона
+    expect(m.vidove[5]).toBeUndefined(); // и не остана на стария номер
+  });
+
+  it('видът на ТРЕТАТА колона не се лепва за следващата', () => {
+    let m = dobaviKolona(model(), { ime: 'Номер', rolya: 'sobstvenik' });
+    m = dobaviKolona(m, { ime: 'Бележка', rolya: 'sobstvenik' });
+    m = smeniVidNaStoynost(m, 4, 'evro', 'sobstvenik');
+
+    m = premahniKolona(m, 4, { rolya: 'sobstvenik', imaDanni: false });
+
+    // „Бележка" беше 5, става 4 — и НЕ наследява евро от третата колона.
+    expect(m.glavi[4]).toBe('Бележка');
+    expect(m.vidove[4]).toBeUndefined();
+  });
 });
 
 describe('семейството и старите файлове', () => {

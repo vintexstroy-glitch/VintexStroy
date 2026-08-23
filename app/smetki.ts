@@ -48,6 +48,17 @@ import type { Konteks } from './main.js';
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();
 let opIdSaldo = crypto.randomUUID();
+/**
+ * Ключът на ЕДНО подаване на справка · живее, докато формата стои отворена.
+ *
+ * Дотук стоеше `spravka:${mesets}` — ключ от СЪДЪРЖАНИЕТО, който правило 20
+ * забранява поименно. Последицата беше тиха и скъпа: сторнираш подадена
+ * справка, за да я поправиш, подаваш втора за същия месец — и `opId`-ът вече е
+ * минавал, значи Вратата връща стария резултат, нищо не влиза в Журнала, а
+ * екранът пише „Справката е записана". Месецът остава ОТКЛЮЧЕН, докато
+ * собственикът мисли, че е подал.
+ */
+let opIdSpravka = crypto.randomUUID();
 let greshkaSaldo = '';
 
 /** Кой месец се гледа. Живее, докато екранът стои отворен. */
@@ -881,8 +892,9 @@ export function zakachiSmetki(
           data: otData(String(danni.get('data') ?? ''), 'Датата на подаване'),
           belezhka: String(danni.get('belezhka') ?? '').trim(),
         },
-        { opId: `spravka:${mesets}` },
+        { opId: opIdSpravka },
       );
+      opIdSpravka = crypto.randomUUID();
       k.vest('dobre', `Справката е записана. ${mesets} е заключен — поправка само през сверена промяна.`);
       await prerisuvay();
     } catch (err) {

@@ -137,16 +137,33 @@ export class GreshkaAktualizatsiya extends Error {
 
 /**
  * Прилага плана: сторно за старото, ново за новото — и партидата завършва със
- * сверка. `opId` се вади от отпечатъка на файла, значи същият файл, прочетен
- * два пъти, не пише втори път.
+ * сверка.
+ *
+ * `klyuchNaPartidata` е ключът на ЕДНО натискане на „Приложи" и идва отвън.
+ * Правило 20, дословно: „`opId` носи ДЕЙСТВИЕТО, не съдържанието. Ключ от
+ * съдържанието изглежда умен, докато не върнеш нещо към предишното му
+ * състояние: тогава повторният ключ връща стария резултат и поправката
+ * изчезва мълчаливо."
+ *
+ * Точно това стоеше тук: ключът се вадеше от отпечатъка на файла. Поправяш
+ * ред, прилагаш, връщаш реда както е бил, прилагаш пак — вторият път носи
+ * отпечатък, който вече е минавал, и връщането НЕ влиза в Журнала. Файлът
+ * казва 600, Журналът казва 650, и никъде няма съобщение за грешка.
+ *
+ * Отпечатъкът остава там, където му е мястото: в `izvor` на записа като следа
+ * и в самоличността на същността, за да се хване „смени ли се нещо изобщо".
  */
 export async function prilozhi(
   deystviya: Deystviya,
   plan: Plan,
   n: Nastroyki,
   kogato: string,
+  klyuchNaPartidata?: string,
 ): Promise<RezultatAktualizatsiya> {
   const beleg = plan.snimka.izvor.otpechatak.slice(0, 16);
+  // Пропуснат ключ пада към отпечатъка — старото поведение, за да не гръмне
+  // вносител, който още не го подава.
+  const partida = klyuchNaPartidata ?? beleg;
   const izvor = `${plan.snimka.izvor.ime}@${beleg}`;
   let zapisani = 0;
   let stornirani = 0;
@@ -171,7 +188,7 @@ export async function prilozhi(
       },
       // „Сверена промяна": единственият вход в заключен период — партидата
       // сама си носи сторно + ново + сверка + следа кой файл я е донесъл.
-      { opId: `iztochnik:${beleg}:${r.klyuch}:nov`, svereno: true },
+      { opId: `iztochnik:${partida}:${r.klyuch}:nov`, svereno: true },
     );
     if (!rezultat.povtoreno) zapisani += 1;
   };
@@ -180,7 +197,7 @@ export async function prilozhi(
     const rezultat = await deystviya.storniraj(
       `S:${beleg}:${star.klyuch}`,
       { pogasyavaSeq: star.seq, prichina: `сверена промяна · ${zashto} · ${izvor}` },
-      { opId: `iztochnik:${beleg}:${star.klyuch}:storno`, svereno: true },
+      { opId: `iztochnik:${partida}:${star.klyuch}:storno`, svereno: true },
       VID.razhod,
     );
     if (!rezultat.povtoreno) stornirani += 1;

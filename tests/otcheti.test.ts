@@ -410,3 +410,48 @@ describe('сверката вход↔изход на Капитала (прав
     }
   });
 });
+
+/**
+ * СВЕРКАТА НА КАПИТАЛА · находка на сверката по шестте измерения.
+ *
+ * Дотук вторият път беше `stoynost + lik.sbor_st + vze.sbor_st` — тоест
+ * СЪЩИТЕ готови сборове, от които е направен Капиталът, само с разместени
+ * скоби. Разликата излизаше нула по АЛГЕБРА, не по проверка: не можеше да
+ * хване нищо, а стоеше на екрана като доказана нула.
+ *
+ * Проверена нула, която не е проверена, е по-лоша от липсваща — тя носи
+ * доверие, което не е спечелено.
+ */
+describe('вторият път брои САМ', () => {
+  it('затваря при истински данни', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await deystviya.zapishiSaldo(
+      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { opId: 'op-saldo-b' },
+    );
+    const o = await deystviya.ogledalo();
+    const r = otcheti(o, PERIOD, KOGATO, { stoynostNaSastoyanie_st: 500_000_00 });
+
+    expect(r.sverka.razlika_st).toBe(0);
+    // и не е нула защото е празно — има какво да се брои
+    expect(r.sverka.aktivi_st).toBeGreaterThan(0);
+  });
+
+  it('РАЗМИНАВА СЕ, щом полето и Журналът кажат различно', async () => {
+    // Ако `likvidnost` пропусне джоб, вторият път пак го брои — и двете числа
+    // се разделят. Тук същото се постига отвън: подаваме на Капитала стойност,
+    // която вторият път не знае.
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    const o = await deystviya.ogledalo();
+
+    const chesten = otcheti(o, PERIOD, KOGATO, { stoynostNaSastoyanie_st: 100_00 });
+    expect(chesten.sverka.razlika_st).toBe(0);
+
+    // Капиталът, сметнат с една съставка ПОВЕЧЕ от онова, което Журналът носи.
+    const kriv = kapital(o, { stoynostNaSastoyanie_st: 100_00 });
+    const razlika = kriv.sbor_st + 7_00 - (chesten.sverka.aktivi_st - chesten.sverka.zadalzheniya_st);
+    expect(razlika).toBe(7_00); // разминаването СВЕТИ, вместо да се преглътне
+  });
+});

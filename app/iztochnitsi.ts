@@ -39,13 +39,14 @@ import {
 import { sektoriNaRazhod } from '../src/domein/dds.js';
 import { potototsiNaRazhod } from '../src/domein/smetki.js';
 import {
+  GreshkaAktualizatsiya,
   imaShtoDaSePravi,
   prilozhi,
   sravni,
   type Plan,
   type Razlika,
 } from '../src/domein/aktualizatsiya.js';
-import { belegNaButon, napraviButon, type Buton } from '../src/domein/butoni.js';
+import { napraviButon, type Buton } from '../src/domein/butoni.js';
 import {
   chislovi,
   IMENA_NA_SBOROVETE,
@@ -95,8 +96,6 @@ let pitane: Pitane | null = null;
  * ръчният път остава като бутон без папка, за да няма два механизма.
  */
 let natisnat: Buton | null = null;
-/** Резултатът от последната сверка — числото, което тя записа в Журнала. */
-let posledna: { razlika_st: number; vhod_st: number; izhod_st: number } | null = null;
 /** Листове, които никой позволен модел не позна — броят се, не се преглъщат. */
 let nepoznati: string[] = [];
 /** Отпечатъците на всички файлове от партидата — влизат в записаната сверка. */
@@ -913,6 +912,31 @@ export function zakachiIztochnitsi(
     const buton = natisnat ?? PARVIYAT;
     const kogato = new Date().toISOString();
     const izvoriteNaPartidata = izvori.length ? izvori : [tekusht.snimka.izvor.otpechatak];
+    // Ключът на ТОВА натискане · правило 20: opId носи действието, не
+    // съдържанието. Вадеше се от отпечатъка на файла — и връщането на ред към
+    // предишното му състояние изчезваше мълчаливо.
+    const klyuchNaPartidata = crypto.randomUUID();
+
+    /**
+     * Сверката се пише ВИНАГИ, щом прилагането е тръгнало · правило 7.
+     *
+     * Дотук стоеше в успешния път и партида, която НЕ затваря, оставаше без
+     * записана сверка — точно обратното на правилото, при това след като
+     * събитията вече са влезли в Журнала. Разликата, която трябва да свети,
+     * умираше със съобщението за грешка.
+     */
+    const sveri = async (rezultat: {
+      zapisani: number;
+      stornirani: number;
+      bezPromyana: number;
+    }) =>
+      zapishiSverkata(k.deystviya, {
+        buton,
+        partida: { plan: tekusht, dvoyki: [], nepoznati: [], izvori: izvoriteNaPartidata },
+        rezultat,
+        kogato,
+        klyuchNaPartidata,
+      });
 
     natisnatiyat.disabled = true;
     try {
@@ -925,21 +949,10 @@ export function zakachiIztochnitsi(
           nachin: vzemi('#plan-nachin') as 'банка' | 'в брой',
         },
         kogato,
+        klyuchNaPartidata,
       );
 
-      // Сверката се ЗАПИСВА — и когато разликата е нула (правило 7). Дотук тя
-      // живееше само в паметта на екрана и умираше с презареждането.
-      const svereno = await zapishiSverkata(k.deystviya, {
-        buton,
-        partida: { plan: tekusht, dvoyki: [], nepoznati: [], izvori: izvoriteNaPartidata },
-        rezultat,
-        kogato,
-      });
-      posledna = {
-        razlika_st: svereno.razlika_st,
-        vhod_st: svereno.vhod_st,
-        izhod_st: svereno.izhod_st,
-      };
+      const svereno = await sveri(rezultat);
 
       k.vest(
         svereno.nared ? 'dobre' : 'zle',
@@ -953,6 +966,18 @@ export function zakachiIztochnitsi(
       greshka = '';
     } catch (err) {
       greshka = err instanceof Error ? err.message : String(err);
+      if (err instanceof GreshkaAktualizatsiya) {
+        // Числата на партидата ги няма — изключението ги отнесе. Сверката обаче
+        // не ги пита: тя чете снимката и Журнала наново.
+        try {
+          const svereno = await sveri({ zapisani: 0, stornirani: 0, bezPromyana: 0 });
+          greshka += ` Сверката Е ЗАПИСАНА въпреки това · разлика ${pishi(svereno.razlika_st)}.`;
+        } catch (vtora) {
+          greshka += ` И сверката не можа да се запише: ${
+            vtora instanceof Error ? vtora.message : String(vtora)
+          }`;
+        }
+      }
     } finally {
       natisnatiyat.disabled = false;
       await prerisuvay();

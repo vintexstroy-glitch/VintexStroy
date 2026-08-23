@@ -202,3 +202,53 @@ describe('разчитането не преглъща редове', () => {
     ).toThrow(/главата на таблицата/);
   });
 });
+
+/**
+ * ВРЪЩАНЕТО НАЗАД · находка на сверката по шестте измерения.
+ *
+ * Правило 20, дословно: „`opId` носи ДЕЙСТВИЕТО, не съдържанието. Ключ от
+ * съдържанието изглежда умен, докато не върнеш нещо към предишното му
+ * състояние: тогава повторният ключ връща стария резултат и поправката
+ * изчезва мълчаливо."
+ *
+ * Точно това стоеше в `prilozhi`: ключът се вадеше от отпечатъка на файла.
+ * Поправяш ред → прилагаш → връщаш реда както е бил → прилагаш пак, и вторият
+ * път Вратата вижда стар `opId` и не пише нищо. Файлът казва 600, Журналът
+ * казва 650, и никъде няма съобщение за грешка.
+ */
+describe('файл, върнат към предишната си версия', () => {
+  it('връщането ВЛИЗА в Журнала, вместо да мълчи', async () => {
+    const { deystviya: d } = stend();
+    const popraven = ['Материали ООД;цимент;650,00;14.02.2026;1042', 'Ток ЕАД;ток;120,00;20.02.2026;7788'].join('\n');
+
+    await prilozhi(d, sravni(await d.ogledalo(), snimka(PARV, 'aaa111')), NASTROYKI, KOGATO, 'partida-1');
+    expect(smetki(await d.ogledalo(), PERIOD, KOGATO).razhod_st).toBe(720_00);
+
+    await prilozhi(d, sravni(await d.ogledalo(), snimka(popraven, 'bbb222')), NASTROYKI, KOGATO, 'partida-2');
+    expect(smetki(await d.ogledalo(), PERIOD, KOGATO).razhod_st).toBe(770_00);
+
+    // НАЗАД към първия файл — същите байтове, същият отпечатък „aaa111".
+    const r = await prilozhi(
+      d,
+      sravni(await d.ogledalo(), snimka(PARV, 'aaa111')),
+      NASTROYKI,
+      KOGATO,
+      'partida-3',
+    );
+
+    expect(r.zapisani).toBe(1);
+    expect(r.stornirani).toBe(1);
+    expect(smetki(await d.ogledalo(), PERIOD, KOGATO).razhod_st).toBe(720_00);
+  });
+
+  it('СЪЩАТА партида, пусната два пъти, пак пише веднъж', async () => {
+    // Идемпотентността не се губи — тя просто вече виси на действието.
+    const { deystviya: d } = stend();
+    const plan = sravni(await d.ogledalo(), snimka(PARV, 'aaa111'));
+    await prilozhi(d, plan, NASTROYKI, KOGATO, 'edno-natiskane');
+    const vtori = await prilozhi(d, plan, NASTROYKI, KOGATO, 'edno-natiskane');
+
+    expect(vtori.zapisani).toBe(0);
+    expect(smetki(await d.ogledalo(), PERIOD, KOGATO).razhod_st).toBe(720_00);
+  });
+});

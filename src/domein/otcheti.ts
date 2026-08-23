@@ -248,11 +248,35 @@ export function otcheti(
   const vze = vzemaniya(o);
   const sre = sredstva(o, period, kogato);
 
-  // ВТОРИЯТ ПЪТ · Активи и Задължения, събрани поотделно (правило: втора сметка
-  // по независим път, `matematika`). Ако двата пътя се разминат, нещо в
-  // съставките е броено два пъти или е изпуснато.
+  // ВТОРИЯТ ПЪТ · Активи и Задължения, събрани ОТ ЖУРНАЛА наново.
+  //
+  // Дотук тук пишеше `stoynost + lik.sbor_st + vze.sbor_st` — тоест същите
+  // готови сборове, от които е направен и Капиталът, само с разместени скоби.
+  // Разликата излизаше нула по АЛГЕБРА, не по проверка: не можеше да хване
+  // нищо, а стоеше на екрана като доказана нула. Проверена нула, която не е
+  // проверена, е по-лоша от липсваща — тя носи доверие, което не е спечелено.
+  //
+  // Сега вторият път брои сам, от същите Огледала, но без да минава през
+  // полетата: ако `likvidnost` или `vzemaniya` пропусне джоб, забрави знак или
+  // преброи нещо два пъти, двата пътя се разминават и разликата светва.
+  //
+  // Какво ТОЗИ път НЕ хваща, казано на глас: грешка в самото Огледало (ако
+  // едно плащане изобщо не е стигнало до `o.plashtaniya`, липсва и в двата
+  // пътя). За това пази сверката при партидите — тя гледа файл ↔ Журнал.
+  let vlyazlo_st = 0;
+  for (const pl of o.plashtaniya.values()) vlyazlo_st += pl.suma_st;
+  let izlyazlo_st = 0;
+  for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
+  let vzemaniya_st = 0;
+  for (const v of o.vzemaniya.values()) vzemaniya_st += v.ostatak_st;
+
   const aktivi_st =
-    (vanshni.stoynostNaSastoyanie_st ?? 0) + lik.sbor_st + vze.sbor_st;
+    (vanshni.stoynostNaSastoyanie_st ?? 0) +
+    saldoNa(o, 'banka') +
+    saldoNa(o, 'trezor') +
+    vlyazlo_st -
+    izlyazlo_st +
+    vzemaniya_st;
   const zadalzheniya_st = vanshni.kredititeOstatak_st ?? 0;
 
   return {
