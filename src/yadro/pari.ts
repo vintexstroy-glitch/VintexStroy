@@ -114,3 +114,30 @@ export function zaPisane(s: Stotinki, drobni = 100): string {
   const abs = Math.abs(s);
   return `${znak}${Math.floor(abs / drobni)},${String(abs % drobni).padStart(2, '0')}`;
 }
+
+/**
+ * ЗА ЕКРАНА · същото, но приема гол `number`.
+ *
+ * ЗАЩО СЪЩЕСТВУВА. `Stotinki` е маркиран тип и това е правилно: там, където се
+ * СМЯТА, марката пази да не влезе цена в левове или наполовина закръглено
+ * число. Но полетата в Огледалото са `number` — марката се губи, щом сумата
+ * мине през Журнала.
+ *
+ * Затова екраните пишеха `kakvoPishe(x as never)` на **71 места**. `as never`
+ * не е тесен кръпка: то изключва проверката на типа ИЗЦЯЛО за този довод.
+ * `undefined as never` минаваше компилацията и рисуваше „NaN €" — тихо грешно
+ * число на екран за пари.
+ *
+ * Тези две функции приемат `number`, значи проверката остава, а невъзможното
+ * число се КАЗВА, вместо да мине за нула.
+ */
+export function pishi(st: number, v: Valuta = EVRO): string {
+  if (!Number.isSafeInteger(st)) return `⚠ не е цели стотинки: ${String(st)}`;
+  return kakvoPishe(st as Stotinki, v);
+}
+
+/** Същото за полето за писане — без знака на валутата. */
+export function pishiVPole(st: number, drobni = 100): string {
+  if (!Number.isSafeInteger(st)) return '';
+  return zaPisane(st as Stotinki, drobni);
+}

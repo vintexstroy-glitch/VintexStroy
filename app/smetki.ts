@@ -8,7 +8,7 @@
  * преизчислява при всяко показване — включително сверката.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
+import { GreshkaPari, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { MERKA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -81,22 +81,22 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Приход за ${ekraniraj(mesets)}</span>
-        <span class="chislo" translate="no">${kakvoPishe(s.prihod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.prihod_st)}</span>
         <span class="pod">начислено · обща цена с ДДС</span>
       </div>
       <div class="plochka">
         <span class="etiket">ДДС ${s.zaVnasyane_st < 0 ? 'за възстановяване' : 'за внасяне'}</span>
-        <span class="chislo" translate="no">${kakvoPishe(s.zaVnasyane_st as never)}</span>
-        <span class="pod">изход ${kakvoPishe(s.dds_izhod_st as never)} − вход ${kakvoPishe(s.dds_vhod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.zaVnasyane_st)}</span>
+        <span class="pod">изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span>
       </div>
       <div class="plochka">
         <span class="etiket">Разход за ${ekraniraj(mesets)}</span>
-        <span class="chislo" translate="no">${kakvoPishe(s.razhod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.razhod_st)}</span>
         <span class="pod">заплати + кредити + фактури</span>
       </div>
       <div class="plochka${s.nared ? '' : ' trevoga'}">
         <span class="etiket">Разлика по сверката</span>
-        <span class="chislo" translate="no">${kakvoPishe(razlika as never)}</span>
+        <span class="chislo" translate="no">${pishi(razlika)}</span>
         <span class="pod">${s.nared ? 'сверката затваря' : 'НЕ затваря — виж долу'}</span>
       </div>
     </div>
@@ -149,12 +149,10 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         }
         <div class="red dds sbor" translate="no">
           <span></span>
-          <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${kakvoPishe(
-            s.dds_izhod_st as never,
-          )} − вход ${kakvoPishe(s.dds_vhod_st as never)}</span></span>
+          <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span></span>
           <span></span>
           <span class="suma"></span>
-          <span class="suma duljimo">${kakvoPishe(s.zaVnasyane_st as never)}</span>
+          <span class="suma duljimo">${pishi(s.zaVnasyane_st)}</span>
         </div>
       </div>
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
@@ -240,8 +238,8 @@ function formaSalda(o: Ogledalo): string {
           <div class="pole">
             <label for="saldo-kade">Джоб</label>
             <select id="saldo-kade" name="kade">
-              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${kakvoPishe(banka_st as never)}</option>
-              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${kakvoPishe(trezor_st as never)}</option>
+              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${pishi(banka_st)}</option>
+              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${pishi(trezor_st)}</option>
             </select>
           </div>
           <div class="pole">
@@ -301,11 +299,9 @@ function blokNaOtchetite(o: Ogledalo, mesets: string): string {
         </div>
         <div class="red sverka otchet-sverka" translate="no">
           <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
-          <span class="suma">${kakvoPishe(r.sverka.ot_sastavki_st as never)}</span>
-          <span class="suma">${kakvoPishe((r.sverka.aktivi_st - r.sverka.zadalzheniya_st) as never)}</span>
-          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${kakvoPishe(
-            r.sverka.razlika_st as never,
-          )}</span>
+          <span class="suma">${pishi(r.sverka.ot_sastavki_st)}</span>
+          <span class="suma">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${pishi(r.sverka.razlika_st)}</span>
           <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
             r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
           }</span></span>
@@ -320,7 +316,7 @@ function poleNaOtcheta(p: Pole): string {
     <article class="pole-otchet" data-pole="${ekraniraj(p.klyuch)}">
       <div class="glavata">
         <span class="etiket">${ekraniraj(p.ime)}</span>
-        <span class="chislo" translate="no">${kakvoPishe(p.sbor_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(p.sbor_st)}</span>
       </div>
       <p class="kakvo">${ekraniraj(p.kakvo)}</p>
       <ul class="formula" translate="no">
@@ -328,7 +324,7 @@ function poleNaOtcheta(p: Pole): string {
           .map(
             (c) => `<li>
               <span class="ime">${ekraniraj(c.ime)}</span>
-              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${kakvoPishe(c.suma_st as never)}</span>
+              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${pishi(c.suma_st)}</span>
               <span class="otkade">${ekraniraj(c.otkade)}</span>
             </li>`,
           )
@@ -434,7 +430,7 @@ function redNaRazhod(r: Razhod): string {
 
 /** Стотинките се показват в левове; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
-  return belezhka === MERKA.pari ? kakvoPishe(chislo as never) : String(chislo);
+  return belezhka === MERKA.pari ? pishi(chislo) : String(chislo);
 }
 
 /**
@@ -464,31 +460,31 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
       <div class="plochki">
         <div class="plochka">
           <span class="etiket">Изчислено в Сметки</span>
-          <span class="chislo" translate="no">${kakvoPishe(izchisleno_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(izchisleno_st)}</span>
           <span class="pod">изход − вход, от Журнала</span>
         </div>
         <div class="plochka${spravka && razlikaDeklarirano !== 0 ? ' trevoga' : ''}">
           <span class="etiket">Декларирано</span>
-          <span class="chislo" translate="no">${spravka ? kakvoPishe(spravka.deklarirano_st as never) : '—'}</span>
+          <span class="chislo" translate="no">${spravka ? pishi(spravka.deklarirano_st) : '—'}</span>
           <span class="pod">${
             spravka
               ? razlikaDeklarirano === 0
                 ? 'съвпада с изчисленото'
-                : `РАЗМИНАВАНЕ ${kakvoPishe(razlikaDeklarirano as never)} — провери`
+                : `РАЗМИНАВАНЕ ${pishi(razlikaDeklarirano)} — провери`
               : 'още няма справка'
           }</span>
         </div>
         <div class="plochka${spravka && razlikaPlateno !== 0 ? ' trevoga' : ''}">
           <span class="etiket">Платено</span>
-          <span class="chislo" translate="no">${kakvoPishe(plateno_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(plateno_st)}</span>
           <span class="pod">${
             !spravka
               ? 'въвежда се от платежното'
               : razlikaPlateno === 0
                 ? 'внесено докрай'
                 : razlikaPlateno < 0
-                  ? `остават ${kakvoPishe(-razlikaPlateno as never)}`
-                  : `надвнесени ${kakvoPishe(razlikaPlateno as never)}`
+                  ? `остават ${pishi(-razlikaPlateno)}`
+                  : `надвнесени ${pishi(razlikaPlateno)}`
           }</span>
         </div>
       </div>
@@ -525,7 +521,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           <div class="pole">
             <label for="spravka-dds">Деклариран ДДС, €</label>
             <input translate="no" id="spravka-dds" name="dds" required inputmode="decimal"
-              value="${zaPisane(izchisleno_st as never)}" autocomplete="off">
+              value="${pishiVPole(izchisleno_st)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="spravka-data">Дата на подаване</label>
@@ -638,9 +634,7 @@ function redNaSmetka(r: RedSmetka): string {
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>
-      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${kakvoPishe(
-        r.suma_st as never,
-      )}</span>
+      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${pishi(r.suma_st)}</span>
     </div>`;
 }
 
@@ -656,10 +650,10 @@ function redNaDDS(r: RedDDS): string {
           : r.broi === 1
             ? 'разход'
             : 'разхода'
-      } · ${kakvoPishe(r.obshta_st as never)} с ДДС</span></span>
+      } · ${pishi(r.obshta_st)} с ДДС</span></span>
       <span>${r.stavka}%</span>
-      <span class="suma">${kakvoPishe(r.osnova_st as never)}</span>
-      <span class="suma">${kakvoPishe(r.dds_st as never)}</span>
+      <span class="suma">${pishi(r.osnova_st)}</span>
+      <span class="suma">${pishi(r.dds_st)}</span>
     </div>`;
 }
 
@@ -722,9 +716,9 @@ function kalkulator(): string {
           .join('')}
         <div class="red smyatane sbor" translate="no">
           <span><b>Сбор</b></span><span></span>
-          <span class="suma">${kakvoPishe(sborOsnova as never)}</span>
-          <span class="suma">${kakvoPishe(sborDDS as never)}</span>
-          <span class="suma">${kakvoPishe(sborObshta as never)}</span>
+          <span class="suma">${pishi(sborOsnova)}</span>
+          <span class="suma">${pishi(sborDDS)}</span>
+          <span class="suma">${pishi(sborObshta)}</span>
         </div>
       </div>`
       }

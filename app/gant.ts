@@ -25,7 +25,7 @@
  */
 
 import { otData, GreshkaData } from '../src/yadro/data.js';
-import { kakvoPishe } from '../src/yadro/pari.js';
+import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,
   OTSENKI,
@@ -262,9 +262,7 @@ function tablitsataSOcveteniPoleta(
                 (s, i) =>
                   `<span class="gant-suma${r.koloni[i]!.dnes ? ' dnes' : ''}">${
                     s.prihod_st || s.razhod_st
-                      ? `<b translate="no">${kakvoPishe(s.prihod_st as never)}</b><i translate="no">${kakvoPishe(
-                          s.razhod_st as never,
-                        )}</i>`
+                      ? `<b translate="no">${pishi(s.prihod_st)}</b><i translate="no">${pishi(s.razhod_st)}</i>`
                       : ''
                   }</span>`,
               )

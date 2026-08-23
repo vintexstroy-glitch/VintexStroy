@@ -5,7 +5,7 @@
  * КОНКРЕТНО вземане. Поправка = сторно, не изтриване.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
+import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import {
   duljimo,
@@ -51,17 +51,17 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Дължимо общо</span>
-        <span class="chislo" translate="no">${kakvoPishe(duljimo(o) as never)}</span>
+        <span class="chislo" translate="no">${pishi(duljimo(o))}</span>
         <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · €</span>
       </div>
       <div class="plochka${prosrocheno_st > 0 ? ' trevoga' : ''}">
         <span class="etiket">Просрочено</span>
-        <span class="chislo" translate="no">${kakvoPishe(prosrocheno_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(prosrocheno_st)}</span>
         <span class="pod">${zakasneli.length} ${zakasneli.length === 1 ? 'вземане' : 'вземания'}</span>
       </div>
       <div class="plochka">
         <span class="etiket">Събрано през ${mesets}</span>
-        <span class="chislo" translate="no">${kakvoPishe(sabranoMesets as never)}</span>
+        <span class="chislo" translate="no">${pishi(sabranoMesets)}</span>
         <span class="pod">по дата на плащане</span>
       </div>
       <div class="plochka">
@@ -168,7 +168,7 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
         <span>${v.padezh}</span>
         ${dni > 0 ? `<span class="zakasnenie">закъснял ${dni} ${dni === 1 ? 'ден' : 'дни'}</span>` : ''}
       </span>
-      <span class="suma${dni > 0 ? ' duljimo' : ''}">${kakvoPishe(v.ostatak_st as never)}</span>
+      <span class="suma${dni > 0 ? ' duljimo' : ''}">${pishi(v.ostatak_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
@@ -186,7 +186,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
-      <span class="suma plateno">${kakvoPishe(p.suma_st as never)}</span>
+      <span class="suma plateno">${pishi(p.suma_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
       </span>
@@ -208,7 +208,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
           <div class="pole">
             <label for="pl-suma">Сума, €</label>
             <input translate="no" id="pl-suma" name="suma" inputmode="decimal" required
-                   value="${zaPisane(v.ostatak_st as never)}" autocomplete="off">
+                   value="${pishiVPole(v.ostatak_st)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="pl-nachin">Начин</label>
@@ -224,7 +224,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
         </div>
         <p class="greshka" id="greshka-plashtane"></p>
         <div class="deystviya">
-          <button type="submit" class="glaven">Приеми ${kakvoPishe(v.ostatak_st as never)}</button>
+          <button type="submit" class="glaven">Приеми ${pishi(v.ostatak_st)}</button>
           <button type="button" class="vtorichen" data-otkazhi>Откажи</button>
           <p class="drebno">Сумата се редактира — частичното плащане е нормално и остатъкът се смята сам.</p>
         </div>

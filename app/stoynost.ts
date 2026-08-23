@@ -22,7 +22,7 @@
  * показват; в Журнала влиза изборът на матрица, не самите цени.
  */
 
-import { kakvoPishe } from '../src/yadro/pari.js';
+import { pishi } from '../src/yadro/pari.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -81,7 +81,7 @@ export function narisuvayStoynost(): string {
     <div class="plochki">
       <div class="plochka golyama">
         <span class="etiket">А · по площ</span>
-        <span class="chislo" translate="no">${smetnato ? kakvoPishe(smetnato.obshto_st as never) : '—'}</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.obshto_st) : '—'}</span>
         <span class="pod">${
           smetnato
             ? `${smetnato.broy} ${smetnato.broy === 1 ? 'обект' : 'обекта'} в движение${
@@ -92,7 +92,7 @@ export function narisuvayStoynost(): string {
       </div>
       <div class="plochka golyama">
         <span class="etiket">Б · по състояние</span>
-        <span class="chislo" translate="no">${smetnato ? kakvoPishe(smetnato.sastoyanie_st as never) : '—'}</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.sastoyanie_st) : '—'}</span>
         <span class="pod">${
           smetnato
             ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ`
@@ -102,7 +102,7 @@ export function narisuvayStoynost(): string {
       <div class="plochka">
         <span class="etiket">Матрица</span>
         <span class="chislo malka" translate="no">${ekraniraj(MATRITSA_ZA_RAZRABOTKA.rayon)}</span>
-        <span class="pod">база ${kakvoPishe(MATRITSA_ZA_RAZRABOTKA.baza_st.apartament as never)}/м² · доходност ${vProtsent(MATRITSA_ZA_RAZRABOTKA.dohodnost_bt)}</span>
+        <span class="pod">база ${pishi(MATRITSA_ZA_RAZRABOTKA.baza_st.apartament)}/м² · доходност ${vProtsent(MATRITSA_ZA_RAZRABOTKA.dohodnost_bt)}</span>
       </div>
     </div>
 
@@ -158,8 +158,8 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>
           <span></span><span></span><span></span><span></span><span></span>
-          <span class="suma plateno">${kakvoPishe(s.obshto_st as never)}</span>
-          <span class="suma plateno">${kakvoPishe(s.sastoyanie_st as never)}</span>
+          <span class="suma plateno">${pishi(s.obshto_st)}</span>
+          <span class="suma plateno">${pishi(s.sastoyanie_st)}</span>
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
         </div>
       </div>
@@ -179,14 +179,14 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
       <span class="suma">${kvSmVM2(r.chista_kvsm)}</span>
       <span class="suma">${kvSmVM2(r.obshta_kvsm)}</span>
       <span>${ekraniraj(r.izlozhenie) || '—'}</span>
-      <span class="kletka"><span>${kakvoPishe(r.naem_mesechen_st as never)}</span><span class="znachka ${
+      <span class="kletka"><span>${pishi(r.naem_mesechen_st)}</span><span class="znachka ${
         r.naemOt === 'zhurnal' ? 'dobre' : 'tiha'
       }">${r.naemOt === 'zhurnal' ? 'от Журнала' : 'очакван'}</span></span>
       <span class="suma${r.prodaden ? '' : ' plateno'}">${
-        r.prodaden ? '<span class="znachka tiha">ПРОДАДЕН</span>' : kakvoPishe(r.tsena_st as never)
+        r.prodaden ? '<span class="znachka tiha">ПРОДАДЕН</span>' : pishi(r.tsena_st)
       }</span>
       <span class="suma${r.prodaden ? '' : ' plateno'}">${
-        r.prodaden ? '' : kakvoPishe(r.sastoyanie_st as never)
+        r.prodaden ? '' : pishi(r.sastoyanie_st)
       }</span>
       <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>
     </div>`;
@@ -200,7 +200,7 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
  * също се казва — проверената нула е различна от нулата, за която никой не пита.
  */
 function sZnak(razlika_st: number): string {
-  const kakvo = kakvoPishe(Math.abs(razlika_st) as never);
+  const kakvo = pishi(Math.abs(razlika_st));
   return razlika_st < 0 ? `−${kakvo}` : `+${kakvo}`;
 }
 

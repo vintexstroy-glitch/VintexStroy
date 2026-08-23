@@ -26,7 +26,7 @@
  */
 
 import { kletka, svedenaGlava, type Tablitsa } from '../iztochnik/tablitsa.js';
-import { kakvoPishe } from '../yadro/pari.js';
+import { pishi } from '../yadro/pari.js';
 import { kvSmVM2, ploshtVKvSm } from './chetene.js';
 import type { OtTsenovaLista, RedNaStoynost } from './stoynost.js';
 import type { KolonaNaLista, List } from '../iznos/excel.js';
@@ -201,7 +201,7 @@ function procentOtChasti(r: RedNaStoynost): string {
 
 /** Сумата без знака на валутата — колоната вече казва, че е евро. */
 function bezZnak(suma_st: number): string {
-  return kakvoPishe(suma_st as never)
+  return pishi(suma_st)
     .replace(/ ?€$/, '')
     .trim();
 }

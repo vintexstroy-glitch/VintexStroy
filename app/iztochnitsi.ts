@@ -11,7 +11,7 @@
  * име, големина, час на промяна и sha256 на прочетените байтове.
  */
 
-import { kakvoPishe } from '../src/yadro/pari.js';
+import { pishi } from '../src/yadro/pari.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
@@ -189,17 +189,17 @@ export function narisuvayPlana(): string {
       <div class="plochki">
         <div class="plochka">
           <span class="etiket">Сега в Журнала</span>
-          <span class="chislo" translate="no">${kakvoPishe(p.sega_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(p.sega_st)}</span>
           <span class="pod">${p.rachni ? `${p.rachni} ръчни не се пипат` : 'от източник'}</span>
         </div>
         <div class="plochka">
           <span class="etiket">Според файла</span>
-          <span class="chislo" translate="no">${kakvoPishe(p.sled_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(p.sled_st)}</span>
           <span class="pod">${p.snimka.redove.length} ${p.snimka.redove.length === 1 ? 'ред' : 'реда'}</span>
         </div>
         <div class="plochka${p.sled_st !== p.sega_st ? ' trevoga' : ''}">
           <span class="etiket">Разлика</span>
-          <span class="chislo" translate="no">${kakvoPishe((p.sled_st - p.sega_st) as never)}</span>
+          <span class="chislo" translate="no">${pishi(p.sled_st - p.sega_st)}</span>
           <span class="pod">${broy('nov')} нови · ${broy('promenen')} поправени · ${broy('izchezval')} махнати</span>
         </div>
         <div class="plochka${p.snimka.propusnati.length ? ' trevoga' : ''}">
@@ -432,9 +432,7 @@ function blokNaSborovete(): string {
         k.broy === 1 ? 'число' : 'числа'
       }${k.rolya ? ` · роля „${ekraniraj(IMENA_NA_ROLITE[k.rolya])}"` : ''}</span></span>
       <span class="kletka"><span>напр. ${ekraniraj(primer(sborove!.model, sborove!.tablitsa, k.kolona))}</span></span>
-      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}">${kakvoPishe(
-        Math.abs(k.sbor_st) as never,
-      )}</span>
+      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}">${pishi(Math.abs(k.sbor_st))}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-znak="${k.kolona}">${
           k.izklyuchena ? 'Върни' : 'Махни'
@@ -460,8 +458,8 @@ function blokNaSborovete(): string {
           <span></span>
           <span class="kletka"><b>${IMENA_NA_SBOROVETE.prihod} ${ZNAK.prihod} · ${IMENA_NA_SBOROVETE.razhod} ${ZNAK.razhod}</b><span>двата сбора не се махат — само се скриват</span></span>
           <span></span>
-          <span class="suma plateno">${kakvoPishe(dvata.prihod_st as never)}</span>
-          <span class="suma duljimo">${kakvoPishe(dvata.razhod_st as never)}</span>
+          <span class="suma plateno">${pishi(dvata.prihod_st)}</span>
+          <span class="suma duljimo">${pishi(dvata.razhod_st)}</span>
         </div>
       </div>
       <div class="deystviya">
@@ -494,9 +492,9 @@ function redNaRazlika(r: Razlika): string {
       <span>${znachki[r.kakvo]}</span>
       <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(opis)}${dokument ? ` · док. ${ekraniraj(dokument)}` : ''}</span></span>
       <span>${ekraniraj(r.nov?.data ?? r.star?.data ?? '')}</span>
-      <span class="suma">${r.star ? kakvoPishe(r.star.suma_st as never) : '—'}</span>
+      <span class="suma">${r.star ? pishi(r.star.suma_st) : '—'}</span>
       <span class="suma${r.kakvo === 'izchezval' ? ' duljimo' : ''}">${
-        r.nov ? kakvoPishe(r.nov.suma_st as never) : '—'
+        r.nov ? pishi(r.nov.suma_st) : '—'
       }</span>
     </div>`;
 }
@@ -834,7 +832,7 @@ export function zakachiIztochnitsi(
       const { prihod_st, razhod_st } = sboroveNaPartida(redove);
       k.vest(
         'dobre',
-        `Изпратено: ${kakvoPishe(prihod_st as never)} в Приходи · ${kakvoPishe(razhod_st as never)} в Разходи.`,
+        `Изпратено: ${pishi(prihod_st)} в Приходи · ${pishi(razhod_st)} в Разходи.`,
       );
       greshka = '';
     } catch (err) {
@@ -948,7 +946,7 @@ export function zakachiIztochnitsi(
         `${rezultat.zapisani} ${rezultat.zapisani === 1 ? 'записан' : 'записани'}` +
           `${rezultat.stornirani ? `, ${rezultat.stornirani} сторнирани` : ''}` +
           `${rezultat.bezPromyana ? `, ${rezultat.bezPromyana} без промяна` : ''}. ` +
-          `Сверката е ЗАПИСАНА в Журнала · разлика ${kakvoPishe(svereno.razlika_st as never)}.`,
+          `Сверката е ЗАПИСАНА в Журнала · разлика ${pishi(svereno.razlika_st)}.`,
       );
       plan = null;
       nepoznati = [];

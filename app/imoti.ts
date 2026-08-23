@@ -9,7 +9,7 @@
  * и то само когато вратарят пусне (`src/domein/storno.ts`).
  */
 
-import { GreshkaPari, kakvoPishe, otLeva, zaPisane } from '../src/yadro/pari.js';
+import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
@@ -102,7 +102,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
       </div>
       <div class="plochka">
         <span class="etiket">Месечен наем</span>
-        <span class="chislo" translate="no">${kakvoPishe(mesechno as never)}</span>
+        <span class="chislo" translate="no">${pishi(mesechno)}</span>
         <span class="pod">начислено · €</span>
       </div>
       <div class="plochka">
@@ -138,7 +138,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
-                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? zaPisane((popravyanImot.ploshtad_kvsm / 100) as never) : ''}">
+                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? pishiVPole(popravyanImot.ploshtad_kvsm / 100) : ''}">
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -190,7 +190,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="naem-suma">Наем на месец, € — с ДДС</label>
             <input translate="no" id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem ? zaPisane(popravyanNaem.naem_st as never) : ''}">
+                   value="${popravyanNaem ? pishiVPole(popravyanNaem.naem_st) : ''}">
           </div>
           <div class="pole">
             <label for="naem-sektor">Сектор — определя ставката</label>
@@ -208,7 +208,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="naem-depozit">Депозит, € (по избор)</label>
             <input translate="no" id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? zaPisane(popravyanNaem.depozit_st as never) : ''}">
+                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? pishiVPole(popravyanNaem.depozit_st) : ''}">
           </div>
           <div class="pole">
             <label for="naem-padezh">Падеж — ден от месеца</label>
@@ -328,8 +328,8 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
     <div class="red imot" translate="no">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
-      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${kakvoPishe((imot.ploshtad_kvsm / 100) as never)} м²` : '—'}</span></span>
-      <span class="suma">${zhivi.length ? kakvoPishe(sbor as never) : '—'}</span>
+      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${pishi(imot.ploshtad_kvsm / 100)} м²` : '—'}</span></span>
+      <span class="suma">${zhivi.length ? pishi(sbor) : '—'}</span>
       <span>${
         zhivi.length > 1
           ? `<span class="znachka trevoga">${zhivi.length} наема</span>`
@@ -352,7 +352,7 @@ function redNaem(naem: Naem, o: Ogledalo): string {
       <span class="kletka"><b>${ekraniraj(naem.naemetel)}</b><span>падеж ${naem.padezhDen}-о число · от ${ekraniraj(naem.ot.slice(0, 10))}</span></span>
       <span class="kletka"><span>${imot ? ekraniraj(opisi(imot)) : ekraniraj(naem.imotId)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
-      <span class="suma">${kakvoPishe(naem.naem_st as never)}</span>
+      <span class="suma">${pishi(naem.naem_st)}</span>
       <span>${
         naem.prekraten
           ? `<span class="znachka tiha">прекратен${naem.kraj ? ` ${ekraniraj(naem.kraj.slice(0, 10))}` : ''}</span>`
