@@ -276,7 +276,7 @@ async function main() {
     proveri('жилищен · основа', zhil?.[3], '800,00 €');
     proveri('жилищен · ДДС', zhil?.[4], '0,00 €');
 
-    const sverki = await redove(p, '.red.sverka');
+    const sverki = await redove(p, '.red.sverka:not(.otchet-sverka)');
     proveri('двете сверки затварят', sverki.every((r) => r[4] === 'затваря'), true);
     proveri('паричната сверка е в левове', sverki[0]?.[1], '2 000,00 €');
     proveri('сверката по брой е в бройки', sverki[1]?.[1], '3');
@@ -449,7 +449,7 @@ async function main() {
     proveri('заплатите не носят ДДС', vhod.find((x) => x[1]?.startsWith('заплати'))?.[4], '0,00 €');
     proveri('за внасяне пада наполовина', await plochka(p, 'ДДС за внасяне'), '100,00 €');
 
-    const sverkiR = await redove(p, '.red.sverka');
+    const sverkiR = await redove(p, '.red.sverka:not(.otchet-sverka)');
     proveri('четирите сверки затварят', sverkiR.every((x) => x[4] === 'затваря'), true);
     proveri('сверката на разхода', sverkiR[2]?.[1], '2 600,00 €');
 
@@ -1210,6 +1210,66 @@ async function main() {
     proveri('изборът се задържа след прерисуване', await p.$eval('#koya-tsena', (e) => e.value), 'sastoyanie');
     proveri('таблицата на екрана НЕ се мени — изборът е за износа', (await redove(p, '.red.stoynost:not(.sbor)')).length, 5);
 
+    // ══ 23 · Отчетите · всяко число с формулата си ═══════════════════════
+    razdel = '23 · Отчети';
+    await naEkran(p, 'smetki', '#forma-period');
+
+    // Формата за салдата стои ГОРЕ — негова дума: „Редактируеми отгоре в Сметки".
+    const redNaSekcii = await p.$$eval('section .dyalglava h2', (h) => h.map((x) => x.textContent.trim()));
+    proveri('Салда стои преди Период', redNaSekcii.indexOf('Салда') < redNaSekcii.indexOf('Период'), true);
+    proveri('Отчети има своя секция', redNaSekcii.includes('Отчети'), true);
+
+    const poleta = await p.$$eval('.pole-otchet .etiket', (e) => e.map((x) => x.textContent.trim()));
+    proveri('четирите полета, в нарочния си ред', poleta.join(' · '),
+      'КАПИТАЛ · ЛИКВИДНОСТ · ВЗЕМАНИЯ · СРЕДСТВА');
+
+    // ФОРМУЛАТА не се крие зад клик: съставките се виждат веднага.
+    const sastavkiNaKapitala = await p.$$eval(
+      '[data-pole="kapital"] .formula .ime', (e) => e.map((x) => x.textContent.trim()));
+    proveri('Капиталът показва от какво е съставен', sastavkiNaKapitala.join(' · '),
+      'Стойност на Състояние · Ликвидност · Вземания · Кредити · остатъчна главница');
+
+    // Правило 15 · изключено ≠ липсващо: непълното число го КАЗВА.
+    // Калкулаторът вече е смятал в §22 и сборът му ВЛИЗА — затова тук се чака
+    // само това, което наистина липсва: кредитите (M04 · нула код).
+    proveri('Капиталът казва какво чака',
+      (await p.$eval('[data-pole="kapital"] .chaka', (e) => e.textContent)).includes('кредит'), true);
+    proveri('и НЕ чака Калкулатора — той вече е смятал',
+      (await p.$eval('[data-pole="kapital"] .chaka', (e) => e.textContent)).includes('Калкулатора'), false);
+    proveri('Вземанията НЕ крият празната половина',
+      (await p.$$eval('[data-pole="vzemaniya"] .formula .ime', (e) => e.map((x) => x.textContent))).length, 2);
+
+    // САЛДОТО · записва се, вижда се в Ликвидността, поправя се без втори ред.
+    // Ликвидността вече носи движенията от по-ранните раздели, затова се мери
+    // РАЗЛИКАТА, не абсолютното число: салдото трябва да добави точно 10 000.
+    const likvidnostPredi = await chisloNaPoleto(p, 'likvidnost');
+    const predSaldoto = await broySabitiya(p);
+    await p.selectOption('#saldo-kade', 'banka');
+    await p.fill('#saldo-suma', '10 000,00');
+    await p.fill('#saldo-ot', '2026-08-01');
+    await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
+    proveri('салдото роди ЕДНО събитие', (await broySabitiya(p)) - predSaldoto, 1);
+
+    const likvidnost1 = await chisloNaPoleto(p, 'likvidnost');
+    proveri('началото добавя ТОЧНО 10 000 към Ликвидността', likvidnost1 - likvidnostPredi, 10_000_00);
+    proveri('и вече не чака Банка',
+      (await p.$eval('[data-pole="likvidnost"] .chaka', (e) => e.textContent)).includes('Банка'), false);
+
+    // Поправка на същия джоб · последният запис бие, втори ред не се ражда.
+    await p.fill('#saldo-suma', '12 500,00');
+    await p.fill('#saldo-ot', '2026-08-01');
+    await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
+    const likvidnost2 = await chisloNaPoleto(p, 'likvidnost');
+    proveri('поправката добавя разликата, не второ салдо', likvidnost2 - likvidnost1, 2_500_00);
+    proveri('Банка се показва веднъж в формулата',
+      (await p.$$eval('[data-pole="likvidnost"] .formula .ime',
+        (e) => e.filter((x) => x.textContent.includes('Банка')).length)), 1);
+
+    // СВЕРКАТА вход↔изход на Капитала · нулата се ПОКАЗВА (правило 7).
+    proveri('сверката на Капитала затваря',
+      await p.$eval('.dyalglava:has(h2:text-is("Отчети")) ~ .tablitsa .red.sverka .znachka',
+        (e) => e.textContent.trim()), 'затваря');
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -1336,6 +1396,14 @@ async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin,
   await p.fill('#razhod-data', data);
   await p.fill('#razhod-dokument', dokument);
   await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
+}
+
+/** Числото на едно поле от Отчети, в цели стотинки — за да се СМЯТА, не да се сравнява текст. */
+async function chisloNaPoleto(p, klyuch) {
+  const tekst = await p.$eval(`[data-pole="${klyuch}"] .chislo`, (e) => e.textContent.trim());
+  // „−12 500,00 €" → −1250000; неразделимите интервали и знакът за евро падат
+  const chist = tekst.replace(/[^\d,−-]/g, '').replace('−', '-').replace(',', '.');
+  return Math.round(Number(chist) * 100);
 }
 
 async function smetni(p, opis, suma, stavka) {

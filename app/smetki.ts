@@ -30,6 +30,14 @@ import {
   type RedSmetka,
 } from '../src/domein/smetki.js';
 import { sDumi, type RezultatSverka } from '../src/domein/sverka-dds.js';
+import {
+  IMENA_NA_DZHOBOVETE,
+  otcheti,
+  saldoNa,
+  type Otcheti,
+  type Pole,
+} from '../src/domein/otcheti.js';
+import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
@@ -39,6 +47,8 @@ import type { Konteks } from './main.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();
+let opIdSaldo = crypto.randomUUID();
+let greshkaSaldo = '';
 
 /** Кой месец се гледа. Живее, докато екранът стои отворен. */
 let period: string | null = null;
@@ -90,6 +100,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         <span class="pod">${s.nared ? 'сверката затваря' : 'НЕ затваря — виж долу'}</span>
       </div>
     </div>
+
+    ${formaSalda(o)}
 
     <section class="karta">
       <div class="dyalglava"><h2>Период</h2><span>сметките се смятат наново за всеки месец</span></div>
@@ -148,6 +160,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>
 
+    ${blokNaOtchetite(o, mesets)}
+
     ${blokNaSverkataDDS(s.ddsSverka)}
 
     ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
@@ -202,6 +216,130 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${kalkulator()}
   `;
+}
+
+/**
+ * САЛДАТА · „Редактируеми отгоре в Сметки" *(р57·[18])*.
+ *
+ * Тук влиза САМО началото. Движенията се четат от Журнала — ако и двете се
+ * пишеха, едно движение би се броило два пъти и Ликвидността щеше да лъже
+ * точно там, където се гледа.
+ */
+function formaSalda(o: Ogledalo): string {
+  const banka_st = saldoNa(o, 'banka');
+  const trezor_st = saldoNa(o, 'trezor');
+  const lipsvat = !o.salda.has('banka') || !o.salda.has('trezor');
+  return `
+    <section class="karta">
+      <div class="dyalglava">
+        <h2>Салда</h2>
+        <span>ръчно начало · движенията идват от Журнала</span>
+      </div>
+      <form id="forma-saldo">
+        <div class="poleta tesni">
+          <div class="pole">
+            <label for="saldo-kade">Джоб</label>
+            <select id="saldo-kade" name="kade">
+              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${kakvoPishe(banka_st as never)}</option>
+              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${kakvoPishe(trezor_st as never)}</option>
+            </select>
+          </div>
+          <div class="pole">
+            <label for="saldo-suma">Начално салдо</label>
+            <input translate="no" id="saldo-suma" name="suma" inputmode="decimal" placeholder="10 000,00" required>
+          </div>
+          <div class="pole">
+            <label for="saldo-ot">От дата</label>
+            <input translate="no" id="saldo-ot" name="ot" type="date" required>
+          </div>
+        </div>
+        <div class="deystviya">
+          <button type="submit" class="vtorichen">Запиши салдото</button>
+          <p class="greshka" id="greshka-saldo">${ekraniraj(greshkaSaldo)}</p>
+        </div>
+        <p class="drebno">${
+          lipsvat
+            ? 'Липсващо салдо се брои за нула — Ликвидността го казва, вместо да го скрие.'
+            : 'Повторен запис ПОПРАВЯ салдото на джоба; втори ред не се ражда.'
+        } Отрицателно се приема — овърдрафтът е дълг, не грешка.</p>
+      </form>
+    </section>`;
+}
+
+/**
+ * ОТЧЕТИТЕ · всяко число с формулата си под него.
+ *
+ * Негова поръчка (И90): „ще правиш полета в Секция Отчети където ще се сложар
+ * полета които да покзват тези стойности с формули между всички таблици."
+ *
+ * Затова тук няма голо число: под всяко стои от какво е съставено и откъде се
+ * чете. Число, което никой не може да разглоби, е усещане с цифра пред себе си.
+ */
+function blokNaOtchetite(o: Ogledalo, mesets: string): string {
+  // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
+  // може да различи „нула" от „още не е смятано" (правило 15).
+  const stoynost_st = sboratZaKapitala();
+  const r: Otcheti = otcheti(
+    o,
+    mesets,
+    new Date().toISOString(),
+    stoynost_st === undefined ? {} : { stoynostNaSastoyanie_st: stoynost_st },
+  );
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Отчети</h2>
+        <span>${ekraniraj(mesets)} · всяко число с формулата си</span>
+      </div>
+      <div class="otcheti">
+        ${r.poleta.map(poleNaOtcheta).join('')}
+      </div>
+      <div class="tablitsa">
+        <div class="glava sverka">
+          <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
+          <span class="suma">Разлика</span><span></span>
+        </div>
+        <div class="red sverka otchet-sverka" translate="no">
+          <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
+          <span class="suma">${kakvoPishe(r.sverka.ot_sastavki_st as never)}</span>
+          <span class="suma">${kakvoPishe((r.sverka.aktivi_st - r.sverka.zadalzheniya_st) as never)}</span>
+          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${kakvoPishe(
+            r.sverka.razlika_st as never,
+          )}</span>
+          <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
+            r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
+          }</span></span>
+        </div>
+      </div>
+      <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+    </section>`;
+}
+
+function poleNaOtcheta(p: Pole): string {
+  return `
+    <article class="pole-otchet" data-pole="${ekraniraj(p.klyuch)}">
+      <div class="glavata">
+        <span class="etiket">${ekraniraj(p.ime)}</span>
+        <span class="chislo" translate="no">${kakvoPishe(p.sbor_st as never)}</span>
+      </div>
+      <p class="kakvo">${ekraniraj(p.kakvo)}</p>
+      <ul class="formula" translate="no">
+        ${p.sastavki
+          .map(
+            (c) => `<li>
+              <span class="ime">${ekraniraj(c.ime)}</span>
+              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${kakvoPishe(c.suma_st as never)}</span>
+              <span class="otkade">${ekraniraj(c.otkade)}</span>
+            </li>`,
+          )
+          .join('')}
+      </ul>
+      ${
+        p.chaka.length === 0
+          ? '<p class="drebno palno">Числото е пълно — нищо не липсва.</p>'
+          : `<p class="drebno chaka">Чака: ${p.chaka.map(ekraniraj).join(' · ')}</p>`
+      }
+    </article>`;
 }
 
 function formaRazhod(mesets: string): string {
@@ -634,6 +772,45 @@ export function zakachiSmetki(
   koren.querySelector<HTMLButtonElement>('#izchisti-smyatane')?.addEventListener('click', async () => {
     smyatane = [];
     await prerisuvay();
+  });
+
+  // ── салдото на един джоб ─────────────────────────────────────────────────
+  const formaNaSaldo = koren.querySelector<HTMLFormElement>('#forma-saldo');
+  formaNaSaldo?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    greshkaSaldo = '';
+    const izhod = koren.querySelector<HTMLElement>('#greshka-saldo')!;
+    izhod.textContent = '';
+    const danni = new FormData(formaNaSaldo);
+    const buton = formaNaSaldo.querySelector<HTMLButtonElement>('button[type=submit]')!;
+
+    let saldo_st: number;
+    let ot: string;
+    try {
+      saldo_st = otLeva(String(danni.get('suma')));
+      ot = otData(String(danni.get('ot') ?? ''), 'Датата, от която важи салдото');
+    } catch (err) {
+      izhod.textContent =
+        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
+      return;
+    }
+
+    buton.disabled = true;
+    try {
+      await k.deystviya.zapishiSaldo(
+        { kade: String(danni.get('kade')) as 'banka' | 'trezor', saldo_st, ot },
+        { opId: opIdSaldo },
+      );
+      // нов opId чак СЛЕД успешен запис — дотогава повторното натискане е
+      // същата операция и Журналът връща същия резултат (правило 5)
+      opIdSaldo = crypto.randomUUID();
+      k.vest('dobre', 'Салдото е записано.');
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = err instanceof Error ? err.message : String(err);
+    } finally {
+      buton.disabled = false;
+    }
   });
 
   // ── нов разход ───────────────────────────────────────────────────────────

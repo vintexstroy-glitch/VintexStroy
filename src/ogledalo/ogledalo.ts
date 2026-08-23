@@ -16,7 +16,11 @@ import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
-import type { PayloadSluzhitelZapisan, PayloadPotokZapisan } from '../domein/sabitiya.js';
+import type {
+  PayloadSluzhitelZapisan,
+  PayloadPotokZapisan,
+  PayloadSaldoZapisano,
+} from '../domein/sabitiya.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -171,6 +175,13 @@ export interface Ogledalo {
    * изпращане ПОПРАВЯ същия ред, вместо да ражда втори. Вж. `src/domein/potok.ts`.
    */
   readonly pototsi: ReadonlyMap<string, PayloadPotokZapisan>;
+  /**
+   * „banka" · „trezor" → началното салдо на джоба.
+   *
+   * Ръчно начало; движенията се четат от плащанията и разходите и НЕ се
+   * дублират тук. Повторен запис ПОПРАВЯ джоба, не ражда втори.
+   */
+  readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -205,6 +216,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
   const prava = new Map<string, PravaZaModel>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
+  const salda = new Map<string, PayloadSaldoZapisano>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -304,6 +316,13 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Последният запис за същата колона в същия месец надделява —
         // поправка, не втори ред.
         pototsi.set(`${p.model}|${p.kolona}|${p.period}`, p);
+        break;
+      }
+
+      case 'СалдоЗаписано': {
+        const p = s.payload as unknown as PayloadSaldoZapisano;
+        // Джобът е един; последният запис за него е поправка, не втори ред.
+        salda.set(p.kade, p);
         break;
       }
 
@@ -443,6 +462,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     sluzhiteli,
     prava,
     pototsi,
+    salda,
     sverki,
     prilozheni,
     pogaseni,

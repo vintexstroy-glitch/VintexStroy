@@ -703,3 +703,41 @@ button { font-family: inherit; cursor: pointer; }
    да се вижда, вместо да се помни. */
 .pravo.skrita { opacity: 0.5; }
 .pravo.skrita > span:first-of-type { text-decoration: line-through; }
+
+/* ── ОТЧЕТИТЕ · всяко число с формулата си ──────────────────────────────────
+   Негова поръчка (И90): „полета в Секция Отчети… които да покзват тези
+   стойности с формули между всички таблици."
+
+   Затова формулата НЕ е в подсказка при посочване и не е скрита зад бутон:
+   тя стои под числото, винаги. Число, което трябва да се разглобява с клик,
+   се чете като готово — а половината от тези числа още не са пълни. */
+.otcheti {
+  display: grid; gap: 10px; margin: 12px 0;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+}
+.pole-otchet {
+  padding: 12px 14px; border-radius: 6px;
+  background: var(--fon); border: 1px solid var(--liniya);
+}
+.pole-otchet .glavata {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+}
+.pole-otchet .chislo { font-size: 21px; }
+.pole-otchet .kakvo {
+  margin: 6px 0 9px; font-size: 12px; line-height: 1.45; color: var(--mastilo2);
+}
+.pole-otchet .formula {
+  list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px dashed var(--liniya);
+}
+.pole-otchet .formula li {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  padding: 4px 0; font-size: 12.5px;
+}
+.pole-otchet .formula .otkade {
+  grid-column: 1 / -1; font-size: 11px; color: var(--mastilo2);
+}
+.pole-otchet .formula .suma { font-variant-numeric: tabular-nums; }
+/* Непълното число го КАЗВА. Скритото „чака" е по-лошо от липсващото число:
+   първото изглежда като отговор. */
+.pole-otchet .chaka { margin-top: 8px; color: var(--aktsent); }
+.pole-otchet .palno { margin-top: 8px; }

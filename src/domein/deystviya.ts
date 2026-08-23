@@ -33,6 +33,7 @@ import type {
   PayloadSluzhitelZapisan,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
+  PayloadSaldoZapisano,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -132,6 +133,23 @@ export class Deystviya {
       danni,
       z,
     );
+  }
+
+  /**
+   * ЗАПИСВА НАЧАЛНОТО САЛДО НА ЕДИН ДЖОБ · Банка или Трезор.
+   *
+   * Негов трети вариант *(р48·[71])*: „Комбинация — ръчно начало + автоматични
+   * движения". Тук влиза САМО началото; движенията се четат от плащанията и
+   * разходите. Ако и двете влизаха в Журнала, едно движение би се броило два
+   * пъти — и Ликвидността щеше да лъже точно там, където се гледа.
+   *
+   * НЕ иска отключен период. Салдото е НАЧАЛО, не число за месец: то не влиза
+   * в подадена справка и затова не я разминава.
+   *
+   * Същността е ДЖОБЪТ — повторният запис поправя салдото му, не ражда втори.
+   */
+  async zapishiSaldo(danni: PayloadSaldoZapisano, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('СалдоЗаписано', VID.saldo, `SALDO:${danni.kade}`, danni, z);
   }
 
   async zapishiRazhod(
