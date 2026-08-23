@@ -27,6 +27,7 @@ export const VID = {
   pravo: 'pravo',
   potok: 'potok',
   saldo: 'saldo',
+  delo: 'delo',
   /**
    * НЕ СЕ ПИШЕ ПОВЕЧЕ. Валутата е една и се държи в колоната
    * (`vid-stoynost.ts`); видът остава, за да се четат СТАРИ събития —
@@ -55,6 +56,7 @@ export type TipSabitie =
   | 'ПравоЗаписано'
   | 'ПотокЗаписан'
   | 'СалдоЗаписано'
+  | 'ДелоЗаписано'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -308,6 +310,33 @@ export interface PayloadPotokZapisan {
   readonly period: string;
   /** белегът на партидата — „смени ли се нещо изобщо" (`potok.ts`) */
   readonly beleg: string;
+}
+
+/**
+ * ЕДНО ДЕЛО · трите колони, срокът, оценката и отговорникът.
+ *
+ * Негово преименуване *(р52·[269])*: „Навсякъде заменяш Проект с Място, за
+ * Задача навсякъде заменяй с Дело."
+ *
+ * Записът е ЦЯЛОТО дело, не разлика: повторен запис на същия `id` го поправя.
+ * Така срокът, сменен от Управлението, и срокът, сменен от Ганта, са едно и
+ * също събитие — негово „сроковете… се променят и от Управлението и са свързани
+ * с всяка задача" *(р48·[75])*.
+ */
+export interface PayloadDeloZapisano {
+  readonly myasto: string;
+  readonly obekt: string;
+  readonly ime: string;
+  readonly otgovornik: string;
+  readonly ot: string;
+  readonly do: string;
+  /** ключ от `OTSENKI` в `dela.ts` */
+  readonly otsenka: string;
+  /** ключ от `SASTOYANIYA` в `dela.ts` */
+  readonly sastoyanie: string;
+  /** id на надделото; празно значи самостоятелно */
+  readonly nadDelo: string;
+  readonly dokument: string;
 }
 
 /**

@@ -34,6 +34,7 @@ import type {
   PayloadPravoZapisano,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
+  PayloadDeloZapisano,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -133,6 +134,24 @@ export class Deystviya {
       danni,
       z,
     );
+  }
+
+  /**
+   * ЗАПИСВА ЕДНО ДЕЛО · ново или поправено.
+   *
+   * НЕ иска отключен период. Делото не е число за месец: то не влиза в ДДС
+   * справка и затова не я разминава. Срокът може да мине през заключен месец
+   * и това е нормално — работата не спира, защото данъкът е подаден.
+   *
+   * Повторният запис на същия `id` ПОПРАВЯ делото. Срок, сменен от
+   * Управлението, и срок, сменен от Ганта, са едно събитие *(р48·[75])*.
+   */
+  async zapishiDelo(
+    id: string,
+    danni: PayloadDeloZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
   }
 
   /**

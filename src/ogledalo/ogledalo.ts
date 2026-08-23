@@ -16,7 +16,9 @@ import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
+import type { Delo } from '../domein/dela.js';
 import type {
+  PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
@@ -182,6 +184,8 @@ export interface Ogledalo {
    * дублират тук. Повторен запис ПОПРАВЯ джоба, не ражда втори.
    */
   readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
+  /** id → делото; последният запис за същия id е ПОПРАВКА, не втори ред */
+  readonly dela: ReadonlyMap<string, Delo>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -217,6 +221,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prava = new Map<string, PravaZaModel>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
+  const dela = new Map<string, Delo>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -316,6 +321,27 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Последният запис за същата колона в същия месец надделява —
         // поправка, не втори ред.
         pototsi.set(`${p.model}|${p.kolona}|${p.period}`, p);
+        break;
+      }
+
+      case 'ДелоЗаписано': {
+        const p = s.payload as unknown as PayloadDeloZapisano;
+        const id = s.sashtnost.id;
+        dela.set(id, {
+          id,
+          // seq-ът на СЪЗДАВАНЕТО не се мени от поправки — сторното сочи него
+          seq: dela.get(id)?.seq ?? s.seq,
+          myasto: p.myasto,
+          obekt: p.obekt,
+          ime: p.ime,
+          otgovornik: p.otgovornik,
+          ot: p.ot,
+          do: p.do,
+          otsenka: p.otsenka as Delo['otsenka'],
+          sastoyanie: p.sastoyanie as Delo['sastoyanie'],
+          nadDelo: p.nadDelo,
+          dokument: p.dokument,
+        });
         break;
       }
 
@@ -463,6 +489,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prava,
     pototsi,
     salda,
+    dela,
     sverki,
     prilozheni,
     pogaseni,

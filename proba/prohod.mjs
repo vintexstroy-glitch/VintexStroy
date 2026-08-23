@@ -1270,6 +1270,100 @@ async function main() {
       await p.$eval('.dyalglava:has(h2:text-is("Отчети")) ~ .tablitsa .red.sverka .znachka',
         (e) => e.textContent.trim()), 'затваря');
 
+    // ══ 24 · Гантът · решетката, лентите и диаграмата ════════════════════
+    razdel = '24 · Гант';
+    await naEkran(p, 'gant', '#forma-delo');
+
+    proveri('седмият екран носи неговото име',
+      await p.$eval('.shapka h1', (e) => e.textContent.trim()), 'Управление');
+    proveri('и подзаглавието е дословно негово',
+      (await p.$eval('.shapka p', (e) => e.textContent)).includes('Времевия Ред в Делата'), true);
+    proveri('празният екран го КАЗВА',
+      (await p.$eval('.prazno', (e) => e.textContent)).includes('Мястото е първата колона'), true);
+
+    // ТРИТЕ КОЛОНИ · дело БЕЗ обект е нормално (негов случай).
+    await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Акт 15',
+      otgovornik: 'Николай Петков', ot: '2026-08-23', do: '2026-09-30', otsenka: 'спешно-важно' });
+    await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Кофраж',
+      otgovornik: 'Тихомир Иванов', ot: '2026-08-23', do: '2026-08-24', otsenka: 'спешно-неважно' });
+    await zapishiDelo(p, { myasto: 'Хисаря', obekt: '', ime: 'Оглед без обект',
+      otgovornik: 'Ивайло Петков', ot: '2026-08-23', do: '2026-08-23', otsenka: 'важно-неспешно' });
+
+    proveri('три дела на екрана', (await p.$$eval('.gant-delo', (e) => e.length)), 3);
+    proveri('двете места стоят като редове', (await p.$$eval('.gant-myasto', (e) => e.length)), 2);
+    proveri('делото без обект се показва с тире',
+      (await p.$$eval('.gant-delo .drebno', (e) => e.map((x) => x.textContent)))
+        .some((t) => t.startsWith('—')), true);
+
+    // ПОДРЕДБАТА · спешно и важно горе.
+    proveri('спешното и важно е първо',
+      await p.$eval('.gant-delo b', (e) => e.textContent), 'Акт 15');
+
+    // СВЕТОФАРЪТ · неговите две числа. „Кофраж" свършва вдругиден → червено.
+    proveri('делото до 2 дни свети червено',
+      await p.$$eval('.gant-delo', (e) => e.filter((x) => x.classList.contains('cherveno')).length), 2);
+    proveri('плочката „Горят до 2 дни" го брои', await plochka(p, 'Горят до 2 дни'), '2');
+
+    // ЛЕНТИТЕ · еднодневното носи свой белег.
+    proveri('всяко дело има лента', (await p.$$eval('.gant-lenta', (e) => e.length)), 3);
+    // Само „Оглед без обект" е еднодневно; „Кофраж" тече два дни и затова е
+    // червено, но НЕ еднодневно. Двете не се сливат.
+    proveri('еднодневното е белязано',
+      (await p.$$eval('.gant-lenta.ednodnevno', (e) => e.length)), 1);
+
+    // ДНЕС Е ПЪРВАТА КОЛОНА · и се вижда.
+    proveri('точно една колона е „днес"', (await p.$$eval('.gant-glava-vreme .dnes', (e) => e.length)), 1);
+
+    // ТАКТЪТ мени решетката · неговите числа.
+    proveri('подразбраният такт е месец',
+      await p.$eval('[data-takt="mesets"]', (e) => e.classList.contains('izbran')), true);
+    const koloniMesets = await p.$$eval('.gant-glava-vreme span', (e) => e.length);
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="sedmitsa"]'));
+    const koloniSedmitsa = await p.$$eval('.gant-glava-vreme span', (e) => e.length);
+    proveri('месецът дава 31×5 + 31 колони', koloniMesets, 31 * 5 + 31);
+    proveri('седмицата дава 7×5 + 7', koloniSedmitsa, 7 * 5 + 7);
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
+
+    // ФИЛТРИТЕ · три колони, независими една от друга.
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', 'Хисаря'));
+    proveri('филтърът по Място оставя едно дело', (await p.$$eval('.gant-delo', (e) => e.length)), 1);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', ''));
+
+    // СГЪВАНЕТО · само дела и поддела (И88). Мястото няма сгъвач.
+    proveri('мястото НЯМА сгъвач',
+      await p.$$eval('.gant-myasto .sgavach', (e) => e.length), 0);
+    await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Арматура',
+      otgovornik: 'Тихомир Иванов', ot: '2026-08-25', do: '2026-08-28', otsenka: 'нито-едно',
+      nad: 'Акт 15' });
+    proveri('подделото се вижда', (await p.$$eval('.gant-delo.poddelo', (e) => e.length)), 1);
+    await deystvieSPrerisuvane(p, () => p.click('.gant-delo:has-text("Акт 15") [data-sgavi]'));
+    proveri('сгъването скри подделото', (await p.$$eval('.gant-delo.poddelo', (e) => e.length)), 0);
+    proveri('а надделото остана', (await p.$$eval('.gant-delo', (e) => e.length)), 3);
+
+    // ВЛАЧЕНЕ НЯМА · негова забрана.
+    proveri('лентата не се влачи',
+      await p.$eval('.gant-lenta', (e) => e.draggable), false);
+
+    // ДИАГРАМАТА · дизайнът на графиката, който И56 чака.
+    await deystvieSPrerisuvane(p, () => p.click('#kam-diagrama'));
+    proveri('диаграмата се появи', await p.$$eval('svg.diagrama', (e) => e.length), 1);
+    proveri('носи днешната линия', await p.$$eval('.diagrama-dnes', (e) => e.length), 1);
+    proveri('лентите са ленти на време, не клетки',
+      await p.$$eval('.diagrama-lenta', (e) => e.length), 3);
+    proveri('и всяка носи title за четец на екран',
+      await p.$eval('.diagrama-lenta title', (e) => e.textContent.includes('→')), true);
+    proveri('таблицата с оцветени полета отстъпи',
+      await p.$$eval('.gant-lenta', (e) => e.length), 0);
+    await deystvieSPrerisuvane(p, () => p.click('#kam-diagrama'));
+    proveri('и се връща с бутон', await p.$$eval('.gant-lenta', (e) => e.length), 3);
+
+    // БУТОНЪТ СЕГА · подрежда, не решава.
+    const predSega = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#sega'));
+    proveri('СЕГА не пипа нито едно дело', await broySabitiya(p), predSega);
+    proveri('СЕГА филтрира по спешно и важно',
+      await p.$eval('#f-otsenka', (e) => e.value), 'спешно-важно');
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -1404,6 +1498,18 @@ async function chisloNaPoleto(p, klyuch) {
   // „−12 500,00 €" → −1250000; неразделимите интервали и знакът за евро падат
   const chist = tekst.replace(/[^\d,−-]/g, '').replace('−', '-').replace(',', '.');
   return Math.round(Number(chist) * 100);
+}
+
+async function zapishiDelo(p, { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad }) {
+  await p.fill('#d-myasto', myasto);
+  await p.fill('#d-obekt', obekt);
+  await p.fill('#d-ime', ime);
+  await p.fill('#d-otgovornik', otgovornik);
+  await p.fill('#d-ot', ot);
+  await p.fill('#d-do', doData);
+  await p.selectOption('#d-otsenka', otsenka);
+  if (nad) await p.selectOption('#d-nad', { label: nad });
+  await sSabitie(p, () => p.click('#forma-delo button[type=submit]'));
 }
 
 async function smetni(p, opis, suma, stavka) {
