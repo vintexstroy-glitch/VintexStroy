@@ -56,6 +56,27 @@ export interface Matritsa {
   readonly etazhi: Readonly<Record<string, number>>;
   /** изложение („Ю", „СИ"…) → коефициент в б.т. */
   readonly izlozheniya: Readonly<Record<string, number>>;
+  /**
+   * ОЧАКВАН НАЕМ в евроцента за квадратен метър на МЕСЕЦ, по вид обект.
+   *
+   * Ползва се САМО когато обектът няма действителен наем в Журнала. Негово
+   * (чрез отчета): „наемът, плащан и неплатен, ВЕЧЕ Е В ЖУРНАЛА. Оценката може
+   * да ползва ДЕЙСТВИТЕЛНАТА събираемост на този имот, вместо пазарно
+   * предположение." Затова това тук е втори избор, не първи.
+   */
+  readonly naem_st_kvm: Readonly<Record<VidObekt, number>>;
+  /**
+   * ДОХОДНОСТТА, с която се капитализира, в базисни точки.
+   *
+   * „При доходност 5 % множителят е 20; при 6 % — 16.7. Тоест разликата от един
+   * процентен пункт мени стойността с 20 % — затова доходността е параметър,
+   * който човек вижда и мени, а не число в кода."
+   */
+  readonly dohodnost_bt: number;
+  /** незаетост в б.т. — колко от годината имотът стои празен */
+  readonly nezaetost_bt: number;
+  /** оперативни разходи в б.т. ОТ НАЕМА — поддръжка, данъци, такси */
+  readonly operativni_bt: number;
 }
 
 /**
@@ -95,6 +116,19 @@ export const MATRITSA_ZA_RAZRABOTKA: Matritsa = Object.freeze({
     СЗ: 9_700,
     С: 9_600,
   }),
+  // Наемите за разработка: нов апартамент в София върви по 8–9 €/м²/месец.
+  naem_st_kvm: Object.freeze({
+    apartament: 850, // 8,50 €
+    garazh: 120,
+    parkomyasto: 80,
+    sklad: 100,
+    drug: 850,
+  }),
+  // Брутната доходност на жилища в София се движи около 3 %. Числото е негово
+  // решение („негов апетит за риск") — тук стои само за да работи сметката.
+  dohodnost_bt: 320, // 3,20 %
+  nezaetost_bt: 800, // 8,00 % — един месец на година празен
+  operativni_bt: 1_500, // 15,00 % от наема — поддръжка, данъци, такси
 });
 
 /** Коефициент по ключ; липсващият е 1,00 — не се измисля, не се отказва. */
@@ -140,6 +174,69 @@ export function tsenaTochno(n: {
   // към най-близкото — точната среда отива нагоре, както човек смята на ръка
   const rezultat = (gore * 2n + dolu) / (dolu * 2n);
   return Number(rezultat);
+}
+
+/**
+ * ЦЕНАТА ПО СЪСТОЯНИЕ · доходният подход, точно, в евроцента.
+ *
+ * Негови думи (09.08), които дадоха и името на екрана:
+ *
+ *   „…казва се Стойност на Състояние… и е **калкулатор за пресмятане на
+ *    стойността на всеки обект и цялата стойност** на участващото и въведено
+ *    състояние."
+ *
+ * Формулата е на занаята и стои в `docs/otcheti/kalkulator-metodologii.md` §2.2:
+ *
+ *   Стойност = ЧОД ÷ доходност
+ *   ЧОД = годишен наем × (1 − незаетост) − оперативни разходи
+ *
+ * ЗАЩО ТОВА Е ДРУГА КОЛОНА, А НЕ ДРУГА ЦЕНА. Негово: „За методът на калкулиране
+ * не знам. Добре е да има две таблици едновременно с ДВЕ ЦЕНОВИ КОЛОНИ ЕДНА ДО
+ * ДРУГА за сравнение." А отчетът го обяснява: „А продава, Б оценява" — един и
+ * същ апартамент има продажна цена по листата и балансова стойност по
+ * състоянието си, и те се разминават. Разминаването е информацията.
+ *
+ * НАЕМЪТ ИДВА ОТВЪН, защото има два източника и редът им е нарочен:
+ * действителният от Журнала бие очаквания от матрицата (`stoynost.ts`).
+ *
+ * Нулев наем дава нулева стойност — обект без доход не се оценява доходно, и
+ * това не е грешка, а отговор.
+ */
+export function tsenaPoSastoyanie(n: {
+  /** месечният наем в евроцента — действителен или очакван */
+  readonly naem_mesechen_st: number;
+  readonly matritsa?: Matritsa;
+}): number {
+  const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
+  if (!Number.isSafeInteger(n.naem_mesechen_st) || n.naem_mesechen_st < 0) {
+    throw new GreshkaMatritsa(`Наемът се дава в цели стотинки; получено: ${n.naem_mesechen_st}`);
+  }
+  if (m.dohodnost_bt <= 0) {
+    throw new GreshkaMatritsa('Доходност нула или под нула не капитализира — сметката е невъзможна.');
+  }
+  if (n.naem_mesechen_st === 0) return 0;
+
+  // Всичко в цели числа, делене ВЕДНЪЖ накрая (умението `matematika` §1).
+  //   год. наем × (1 − незаетост) × (1 − оперативни) ÷ доходност
+  const godishen = BigInt(n.naem_mesechen_st) * 12n;
+  const zaet = BigInt(EDINITSA_BT - m.nezaetost_bt);
+  const chist = BigInt(EDINITSA_BT - m.operativni_bt);
+  const gore = godishen * zaet * chist * BigInt(EDINITSA_BT);
+  const dolu = BigInt(EDINITSA_BT) * BigInt(EDINITSA_BT) * BigInt(m.dohodnost_bt);
+  return Number((gore * 2n + dolu) / (dolu * 2n));
+}
+
+/** Очакваният месечен наем за обект без наем в Журнала — от матрицата. */
+export function ochakvanNaem_st(
+  obshta_kvsm: number,
+  vid: VidObekt,
+  matritsa?: Matritsa,
+): number {
+  const m = matritsa ?? MATRITSA_ZA_RAZRABOTKA;
+  const naem_st_kvm = m.naem_st_kvm[vid];
+  if (naem_st_kvm === undefined) return 0;
+  // площ (кв.см) × наем (ст./м²) ÷ 10 000 → стотинки на месец
+  return Math.round((obshta_kvsm * naem_st_kvm) / 10_000);
 }
 
 /**

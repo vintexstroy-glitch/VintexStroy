@@ -41,7 +41,13 @@ import {
   type OtTsenovaLista,
   type StoynostNaSastoyanie,
 } from '../src/kalkulator/stoynost.js';
-import { listNaTsenite, prochetiTsenovaLista } from '../src/kalkulator/tsenova-lista.js';
+import {
+  IMENA_NA_IZBORA,
+  listNaTsenite,
+  prochetiTsenovaLista,
+  type KoyaTsena,
+} from '../src/kalkulator/tsenova-lista.js';
+import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
@@ -49,6 +55,9 @@ import type { Konteks } from './main.js';
 let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 let smetnato: StoynostNaSastoyanie | null = null;
+let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
+/** Коя цена се пуска при износ. Негов отговор: „и двете". */
+let koyaTsena: KoyaTsena = 'dvete';
 let vest = '';
 let greshka = '';
 
@@ -56,29 +65,29 @@ export function narisuvayStoynost(): string {
   return `
     <div class="plochki">
       <div class="plochka golyama">
-        <span class="etiket">Стойност на Състояние</span>
+        <span class="etiket">А · по площ</span>
         <span class="chislo" translate="no">${smetnato ? kakvoPishe(smetnato.obshto_st as never) : '—'}</span>
         <span class="pod">${
           smetnato
             ? `${smetnato.broy} ${smetnato.broy === 1 ? 'обект' : 'обекта'} в движение${
                 smetnato.prodadeni ? ` · ${smetnato.prodadeni} продадени не влизат` : ''
-              }`
+              } · закръглено ${sZnak(smetnato.razlika_st)}`
             : 'прочети площообразуването, за да се смята'
         }</span>
       </div>
-      <div class="plochka">
-        <span class="etiket">Точно, преди закръгляне</span>
-        <span class="chislo" translate="no">${smetnato ? kakvoPishe(smetnato.obshto_tochno_st as never) : '—'}</span>
+      <div class="plochka golyama">
+        <span class="etiket">Б · по състояние</span>
+        <span class="chislo" translate="no">${smetnato ? kakvoPishe(smetnato.sastoyanie_st as never) : '—'}</span>
         <span class="pod">${
           smetnato
-            ? `закръглено: ${smetnato.razlika_st >= 0 ? '+' : ''}${kakvoPishe(Math.abs(smetnato.razlika_st) as never)}`
-            : 'сборът се смята точно и се закръгля веднъж'
+            ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ`
+            : 'оценката · годишен наем ÷ доходност'
         }</span>
       </div>
       <div class="plochka">
         <span class="etiket">Матрица</span>
         <span class="chislo malka" translate="no">${ekraniraj(MATRITSA_ZA_RAZRABOTKA.rayon)}</span>
-        <span class="pod">база ${kakvoPishe(MATRITSA_ZA_RAZRABOTKA.baza_st.apartament as never)}/м² за апартамент</span>
+        <span class="pod">база ${kakvoPishe(MATRITSA_ZA_RAZRABOTKA.baza_st.apartament as never)}/м² · доходност ${vProtsent(MATRITSA_ZA_RAZRABOTKA.dohodnost_bt)}</span>
       </div>
     </div>
 
@@ -93,11 +102,23 @@ export function narisuvayStoynost(): string {
       <div class="deystviya">
         <button type="button" class="glaven" id="cheti-ploshti">Чети от Площообразуване</button>
         <button type="button" class="vtorichen" id="cheti-tseni">Чети Ценова листа</button>
+        <label class="pole tyasno">
+          <span>Кои цени се пускат</span>
+          <select id="koya-tsena">
+            ${(['dvete', 'plosht', 'sastoyanie'] as const)
+              .map(
+                (k) =>
+                  `<option value="${k}"${k === koyaTsena ? ' selected' : ''}>${IMENA_NA_IZBORA[k]}</option>`,
+              )
+              .join('')}
+          </select>
+        </label>
         <button type="button" class="vtorichen" id="pishi-tseni"${smetnato ? '' : ' disabled'}>Запиши в Ценови листи</button>
       </div>
       <input type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
       <input type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
+      <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
     </section>
 
     ${smetnato ? tablitsaNaStoynostta(smetnato) : ''}`;
@@ -112,16 +133,19 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
       </div>
       <div class="tablitsa">
         <div class="glava stoynost">
-          <span>Обект</span><span>Етаж</span><span>Вид</span>
+          <span>Обект</span><span>Етаж · вид</span>
           <span class="suma">Чиста</span><span class="suma">Обща</span>
-          <span>Изложение</span><span class="suma">Цена</span><span class="suma">€/м²</span>
+          <span>Изложение</span><span>Наем</span>
+          <span class="suma">А · по площ</span><span class="suma">Б · по състояние</span>
+          <span class="suma">Δ</span>
         </div>
         ${s.redove.map(redNaObekt).join('')}
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>
           <span></span><span></span><span></span><span></span><span></span>
           <span class="suma plateno">${kakvoPishe(s.obshto_st as never)}</span>
-          <span></span>
+          <span class="suma plateno">${kakvoPishe(s.sastoyanie_st as never)}</span>
+          <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
         </div>
       </div>
       <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор.</p>
@@ -134,16 +158,47 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
       <span class="kletka"><b>${ekraniraj(r.obekt)}</b>${
         r.terasi_kvsm ? `<span>тераса ${kvSmVM2(r.terasi_kvsm)} м²</span>` : ''
       }</span>
-      <span>${ekraniraj(r.etazh)}</span>
-      <span>${IMENA_NA_VIDOVETE_OBEKT[r.vid]}${r.stai ? ` · ${r.stai} стаи` : ''}</span>
+      <span class="kletka"><span>${ekraniraj(r.etazh) || '—'}</span><span>${IMENA_NA_VIDOVETE_OBEKT[r.vid]}${
+        r.stai ? ` · ${r.stai} стаи` : ''
+      }</span></span>
       <span class="suma">${kvSmVM2(r.chista_kvsm)}</span>
       <span class="suma">${kvSmVM2(r.obshta_kvsm)}</span>
       <span>${ekraniraj(r.izlozhenie) || '—'}</span>
+      <span class="kletka"><span>${kakvoPishe(r.naem_mesechen_st as never)}</span><span class="znachka ${
+        r.naemOt === 'zhurnal' ? 'dobre' : 'tiha'
+      }">${r.naemOt === 'zhurnal' ? 'от Журнала' : 'очакван'}</span></span>
       <span class="suma${r.prodaden ? '' : ' plateno'}">${
         r.prodaden ? '<span class="znachka tiha">ПРОДАДЕН</span>' : kakvoPishe(r.tsena_st as never)
       }</span>
-      <span class="suma">${r.prodaden ? '' : kakvoPishe(r.evroNaKvadrat_st as never)}</span>
+      <span class="suma${r.prodaden ? '' : ' plateno'}">${
+        r.prodaden ? '' : kakvoPishe(r.sastoyanie_st as never)
+      }</span>
+      <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>
     </div>`;
+}
+
+/**
+ * Разликата от закръглянето, СЪС знака си.
+ *
+ * Тя се вижда, а не се преглъща (правило 7): сборът се смята от ТОЧНИТЕ цени,
+ * показва се закръгленият, и колко е „изяло" закръглянето стои под него. Нулата
+ * също се казва — проверената нула е различна от нулата, за която никой не пита.
+ */
+function sZnak(razlika_st: number): string {
+  const kakvo = kakvoPishe(Math.abs(razlika_st) as never);
+  return razlika_st < 0 ? `−${kakvo}` : `+${kakvo}`;
+}
+
+/** Базисни точки → четимо: −2 543 б.т. става „−25,4 %". */
+function vBT(bt: number): string {
+  const znak = bt > 0 ? '+' : bt < 0 ? '−' : '';
+  const a = Math.abs(bt);
+  return `${znak}${Math.floor(a / 100)},${String(Math.round((a % 100) / 10))} %`;
+}
+
+/** Базисни точки като процент: 320 → „3,20 %". */
+function vProtsent(bt: number): string {
+  return `${Math.floor(bt / 100)},${String(bt % 100).padStart(2, '0')} %`;
 }
 
 // ── закачането ─────────────────────────────────────────────────────────────
@@ -153,7 +208,20 @@ export function zakachiStoynost(
   prerisuvay: () => Promise<void>,
 ): void {
   const presmetni = (): void => {
-    smetnato = obekti.length === 0 ? null : stoynostNaSastoyanie(obekti, otLista);
+    smetnato =
+      obekti.length === 0
+        ? null
+        : stoynostNaSastoyanie(obekti, otLista, undefined, naemiOtZhurnala);
+  };
+
+  /** Наемите от Журнала — четат се при всяко смятане, не се помнят стари. */
+  const vzemiNaemite = async (): Promise<void> => {
+    const og = await k.deystviya.ogledalo();
+    const imoti = [...og.imoti.values()].map((i) => {
+      const naem = [...og.naemi.values()].find((n) => n.imotId === i.id && !n.prekraten);
+      return { edinitsa: i.edinitsa, naem_mesechen_st: naem?.naem_st ?? 0 };
+    });
+    naemiOtZhurnala = kartaNaNaemite(imoti);
   };
 
   const poleto = (id: string): HTMLInputElement | null =>
@@ -179,6 +247,7 @@ export function zakachiStoynost(
         propusnati += r.propusnati;
       }
       obekti = Object.freeze(vsichki);
+      await vzemiNaemite();
       presmetni();
       // Сверката вход↔изход се казва на глас, дори когато е нула (правило 7).
       const sv = smetnato ? sverkaNaPartida(obekti, smetnato) : { vhod: 0, izhod: 0, razlika: 0 };
@@ -211,10 +280,15 @@ export function zakachiStoynost(
     await prerisuvay();
   });
 
+  koren.querySelector<HTMLSelectElement>('#koya-tsena')?.addEventListener('change', async (e) => {
+    koyaTsena = (e.target as HTMLSelectElement).value as KoyaTsena;
+    await prerisuvay();
+  });
+
   koren.querySelector<HTMLButtonElement>('#pishi-tseni')?.addEventListener('click', async () => {
     if (!smetnato) return;
     try {
-      const bajtove = await rabotnaKniga([listNaTsenite(smetnato.redove)]);
+      const bajtove = await rabotnaKniga([listNaTsenite(smetnato.redove, 'ЦЕНИ', koyaTsena)]);
       const fayl = new Blob([bajtove.slice().buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
@@ -224,7 +298,10 @@ export function zakachiStoynost(
       vruzka.download = `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`;
       vruzka.click();
       URL.revokeObjectURL(adres);
-      k.vest('dobre', `Ценовата листа е записана: ${smetnato.redove.length} реда с неговия хедър.`);
+      k.vest(
+        'dobre',
+        `Ценовата листа е записана: ${smetnato.redove.length} реда · ${IMENA_NA_IZBORA[koyaTsena]}.`,
+      );
     } catch (err) {
       greshka = err instanceof Error ? err.message : String(err);
       await prerisuvay();

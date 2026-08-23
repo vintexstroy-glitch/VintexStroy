@@ -112,36 +112,86 @@ function bezopasnaPlosht(surovo: string): number {
 }
 
 /**
+ * КОЯ ЦЕНА СЕ ПУСКА · негов избор, с три възможности.
+ *
+ * Негови думи (23.08): „Добре е да има две таблици едновременно с две ценови
+ * колони една до друга за сравнение. И **когато искаш да пуснеш цените,
+ * избираш само едната да се вижда**." А на въпроса коя е готовият избор —
+ * **„и двете"**.
+ *
+ * Затова по подразбиране излизат ДВЕТЕ, а свиването до една е действие.
+ */
+export type KoyaTsena = 'dvete' | 'plosht' | 'sastoyanie';
+
+export const IMENA_NA_IZBORA: Readonly<Record<KoyaTsena, string>> = Object.freeze({
+  dvete: 'и двете — за сравнение',
+  plosht: 'само по площ · за продажба',
+  sastoyanie: 'само по състояние · оценката',
+});
+
+/** Двете колони, които се долепят отдясно при избор „и двете". */
+export const DOPALNITELNI_KOLONI: readonly string[] = Object.freeze([
+  'Стойност на Състояние',
+  'Евро / кв.м. (състояние)',
+]);
+
+/**
  * ПИША ценовата листа — с ТОЧНО неговия хедър.
  *
  * Не се пресъздава чужда таблица: това е неговият формат, попълнен с изчислени
  * цени. „ПРОДАДЕН" се връща както е било — Калкулаторът не преоценява продадено.
  *
+ * ХЕДЪРЪТ МУ ОСТАВА НЕПОКЪТНАТ И В ТРИТЕ СЛУЧАЯ. При „и двете" сравнението се
+ * ДОЛЕПЯ отдясно (колони 12 и 13); неговите единайсет не се разместват и не
+ * сменят смисъла си. Файл, който мени реда на чужди колони, спира да е същият
+ * файл.
+ *
  * Числата излизат като ТЕКСТ в българския формат, защото такъв е файлът, от
  * който идват („45,22" с десетична запетая).
  */
-export function listNaTsenite(redove: readonly RedNaStoynost[], ime = 'ЦЕНИ'): List {
-  const koloni: KolonaNaLista[] = GLAVA_NA_TSENITE.map((ime) => ({
-    ime,
-    shirina: ime === 'Имоти' ? 28 : 14,
+export function listNaTsenite(
+  redove: readonly RedNaStoynost[],
+  ime = 'ЦЕНИ',
+  koya: KoyaTsena = 'dvete',
+): List {
+  const zaglaviya =
+    koya === 'dvete' ? [...GLAVA_NA_TSENITE, ...DOPALNITELNI_KOLONI] : GLAVA_NA_TSENITE;
+  const koloni: KolonaNaLista[] = zaglaviya.map((zaglavie) => ({
+    ime: zaglavie,
+    shirina: zaglavie === 'Имоти' ? 28 : 16,
   }));
 
   return {
     ime,
     koloni,
-    redove: redove.map((r) => [
-      r.obekt,
-      [r.etazh, r.kota].filter((x) => x !== '').join(' · '),
-      r.stai === 0 ? '' : String(r.stai),
-      kvSmVM2(r.chista_kvsm),
-      procentOtChasti(r),
-      kvSmVM2(r.obshti_chasti_kvsm),
-      kvSmVM2(r.obshta_kvsm),
-      r.izlozhenie,
-      r.terasi_kvsm === 0 ? '' : kvSmVM2(r.terasi_kvsm),
-      r.prodaden ? PRODADEN : bezZnak(r.tsena_st),
-      r.prodaden ? '' : bezZnak(r.evroNaKvadrat_st),
-    ]),
+    redove: redove.map((r) => {
+      // При „само по състояние" оценката влиза в НЕГОВАТА колона „Цена с ДДС" —
+      // тя е мястото за цената, каквато и да е тя.
+      const tsena_st = koya === 'sastoyanie' ? r.sastoyanie_st : r.tsena_st;
+      const naKvadrat_st =
+        koya === 'sastoyanie' ? r.sastoyanieNaKvadrat_st : r.evroNaKvadrat_st;
+
+      const negovite: (string | number)[] = [
+        r.obekt,
+        [r.etazh, r.kota].filter((x) => x !== '').join(' · '),
+        r.stai === 0 ? '' : String(r.stai),
+        kvSmVM2(r.chista_kvsm),
+        procentOtChasti(r),
+        kvSmVM2(r.obshti_chasti_kvsm),
+        kvSmVM2(r.obshta_kvsm),
+        r.izlozhenie,
+        r.terasi_kvsm === 0 ? '' : kvSmVM2(r.terasi_kvsm),
+        r.prodaden ? PRODADEN : bezZnak(tsena_st),
+        r.prodaden ? '' : bezZnak(naKvadrat_st),
+      ];
+
+      if (koya !== 'dvete') return negovite;
+      return [
+        ...negovite,
+        r.prodaden ? PRODADEN : bezZnak(r.sastoyanie_st),
+        r.prodaden ? '' : bezZnak(r.sastoyanieNaKvadrat_st),
+      ];
+    }),
   };
 }
 

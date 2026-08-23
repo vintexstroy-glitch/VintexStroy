@@ -1165,28 +1165,50 @@ async function main() {
 
     await naEkran(p, 'stoynost', '#cheti-ploshti');
     proveri('шестият екран го има', (await tekstNa(p, '.shapka h1')).includes('Стойност на Състояние'), true);
-    proveri('сборът мълчи, докато няма данни', (await plochka(p, 'Стойност на Състояние')), '—');
+    proveri('А мълчи, докато няма данни', (await plochka(p, 'А · по площ')), '—');
+    proveri('Б мълчи също', (await plochka(p, 'Б · по състояние')), '—');
     proveri('и трите пътя са налице', (await p.$$('#cheti-ploshti, #cheti-tseni, #pishi-tseni')).length, 3);
+    proveri('изборът коя цена се пуска стои до бутона', (await p.$$('#koya-tsena')).length, 1);
 
     await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-ploshti', ploshtiCSV));
     await p.waitForSelector('.red.stoynost');
     const obekti = await redove(p, '.red.stoynost:not(.sbor)');
     proveri('прочете петте обекта, а контролният ред не влиза', obekti.length, 5);
     proveri('и казва СВЕРКАТА вход↔изход', (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
-    proveri('общите части се смятат — чиста 40,00 и обща 45,22', obekti[2]?.[3], '40,00');
-    proveri('видът се познава по името', obekti[0]?.[2], 'гараж');
+    proveri('общите части се смятат — чиста 40,00 и обща 45,22', obekti[2]?.[2], '40,00');
+    proveri('и общата стои до нея', obekti[2]?.[3], '45,22');
+    proveri('видът се познава по името', obekti[0]?.[1].includes('гараж'), true);
 
-    const bezLista = await plochka(p, 'Стойност на Състояние');
-    proveri('сборът вече говори', bezLista !== '—', true);
+    // ДВЕТЕ КОЛОНИ, ЕДНА ДО ДРУГА · негово: „две ценови колони за сравнение"
+    // Хедърът минава през text-transform, затова се сверява без регистър.
+    const glavaNaStoynostta = (await tekstNa(p, '.glava.stoynost')).toLowerCase();
+    proveri('хедърът носи А', glavaNaStoynostta.includes('по площ'), true);
+    proveri('хедърът носи Б', glavaNaStoynostta.includes('по състояние'), true);
+    proveri('и разликата между тях', glavaNaStoynostta.includes('δ'), true);
+    proveri('всеки ред носи и двете цени', obekti[3]?.[6] !== '' && obekti[3]?.[7] !== '', true);
+    proveri('и казва ОТКЪДЕ е наемът', obekti[3]?.[5].includes('очакван'), true);
+
+    const bezLista = await plochka(p, 'А · по площ');
+    const bezListaB = await plochka(p, 'Б · по състояние');
+    proveri('А вече говори', bezLista !== '—', true);
+    proveri('Б също', bezListaB !== '—', true);
+    proveri('и Б казва с колко стои под А', (await plochkaPod(p, 'Б · по състояние')).includes('%'), true);
     proveri('нищо не е продадено, докато листата мълчи', (await p.$$('.red.stoynost.mahnata')).length, 0);
+    proveri('закръглянето се ВИЖДА, не се преглъща', (await plochkaPod(p, 'А · по площ')).includes('закръглено'), true);
 
     await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-tseni', tseniCSV));
     await p.waitForSelector('.red.stoynost.mahnata');
     proveri('ценовата листа каза кое е ПРОДАДЕН', (await p.$$('.red.stoynost.mahnata')).length, 3);
     const sIzlozhenie = await redove(p, '.red.stoynost:not(.sbor)');
-    proveri('и даде изложението', sIzlozhenie[3]?.[5], 'И');
-    proveri('продаденото НЕ влиза в стойността', (await plochka(p, 'Стойност на Състояние')) !== bezLista, true);
-    proveri('закръглянето се ВИЖДА, не се преглъща', (await plochkaPod(p, 'Точно, преди закръгляне')).includes('закръглено'), true);
+    proveri('и даде изложението', sIzlozhenie[3]?.[4], 'И');
+    proveri('продаденото НЕ влиза в А', (await plochka(p, 'А · по площ')) !== bezLista, true);
+    proveri('нито в Б', (await plochka(p, 'Б · по състояние')) !== bezListaB, true);
+
+    // ПРЕВКЛЮЧВАТЕЛЯТ · „избираш само едната да се вижда"
+    proveri('подразбраното е „и двете"', await p.$eval('#koya-tsena', (e) => e.value), 'dvete');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koya-tsena', 'sastoyanie'));
+    proveri('изборът се задържа след прерисуване', await p.$eval('#koya-tsena', (e) => e.value), 'sastoyanie');
+    proveri('таблицата на екрана НЕ се мени — изборът е за износа', (await redove(p, '.red.stoynost:not(.sbor)')).length, 5);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

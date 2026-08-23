@@ -38,8 +38,16 @@ import {
   evroNaKvadrat_st,
   koefitsient,
   MATRITSA_ZA_RAZRABOTKA,
+  ochakvanNaem_st,
+  tsenaPoSastoyanie,
   tsenaTochno,
 } from '../src/kalkulator/matritsa.js';
+import {
+  deystvitelenNaem_st,
+  kartaNaNaemite,
+  klyuchOtIme,
+  sashtiyat,
+} from '../src/kalkulator/svarzvane.js';
 import {
   sverkaNaPartida,
   stoynostNaSastoyanie,
@@ -228,8 +236,16 @@ describe('изходът · неговият хедър, дословно', () =
   it('листът носи точно единайсетте му колони, по ред', () => {
     const { obekti } = prochetiPloshti(ploshti());
     const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
-    const list = listNaTsenite(s.redove);
+    // При една цена излиза ТОЧНО неговият хедър — единайсет колони, по ред.
+    const list = listNaTsenite(s.redove, 'ЦЕНИ', 'plosht');
     expect(list.koloni.map((k) => k.ime)).toEqual([...GLAVA_NA_TSENITE]);
+  });
+
+  it('и при „и двете" първите единайсет са НЕГОВИТЕ, непокътнати', () => {
+    const { obekti } = prochetiPloshti(ploshti());
+    const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
+    const list = listNaTsenite(s.redove); // подразбраното е „и двете"
+    expect(list.koloni.map((k) => k.ime).slice(0, 11)).toEqual([...GLAVA_NA_TSENITE]);
   });
 
   it('продаденото се връща както е било — Калкулаторът не го преоценява', () => {
@@ -247,5 +263,163 @@ describe('изходът · неговият хедър, дословно', () =
     const danni = await rabotnaKniga([listNaTsenite(s.redove)]);
     expect(danni.byteLength).toBeGreaterThan(1000);
     expect(new Uint8Array(danni.slice(0, 2))).toEqual(new Uint8Array([0x50, 0x4b])); // „PK"
+  });
+});
+
+// ══ ДВЕТЕ ЦЕНОВИ КОЛОНИ · негова поръчка (23.08) ═══════════════════════════
+//
+//   „За методът на калкулиране не знам. Добре е да има ДВЕ ТАБЛИЦИ ЕДНОВРЕМЕННО
+//    С ДВЕ ЦЕНОВИ КОЛОНИ ЕДНА ДО ДРУГА за сравнение. И когато искаш да пуснеш
+//    цените, избираш само едната да се вижда."
+//
+// Отчетът вече беше стигнал дотам: „А продава, Б оценява… точно затова са две
+// колони, а не една."
+
+describe('колона Б · оценката по състояние', () => {
+  it('годишен наем ÷ доходност, с незаетост и оперативни', () => {
+    // 500 €/мес → 6 000 €/год × 0,92 (незаетост) × 0,85 (оперативни) = 4 692 €
+    // ÷ 0,032 = 146 625 €
+    expect(tsenaPoSastoyanie({ naem_mesechen_st: 500_00 })).toBe(146_625_00);
+  });
+
+  it('обект без доход не се оценява доходно — това е ОТГОВОР, не грешка', () => {
+    expect(tsenaPoSastoyanie({ naem_mesechen_st: 0 })).toBe(0);
+  });
+
+  it('доходност нула се отказва на глас — не капитализира', () => {
+    expect(() =>
+      tsenaPoSastoyanie({
+        naem_mesechen_st: 100_00,
+        matritsa: { ...MATRITSA_ZA_RAZRABOTKA, dohodnost_bt: 0 },
+      }),
+    ).toThrow(/не капитализира/);
+  });
+
+  it('очакваният наем е по площ и вид', () => {
+    // 64,44 м² × 8,50 €/м² = 547,74 €
+    expect(ochakvanNaem_st(644_400, 'apartament')).toBe(547_74);
+    expect(ochakvanNaem_st(644_400, 'garazh')).toBe(77_33);
+  });
+});
+
+describe('свързването · „Апартамент 1" ↔ „АП. № 1"', () => {
+  it('двата начина на писане дават един ключ', () => {
+    expect(sashtiyat(klyuchOtIme('Апартамент 1'), klyuchOtIme('АП. № 1'))).toBe(true);
+    expect(sashtiyat(klyuchOtIme('Гараж 3 и склад'), klyuchOtIme('ГАРАЖ № 3'))).toBe(true);
+  });
+
+  it('еднакъв номер при различен вид НЕ е същият обект', () => {
+    expect(sashtiyat(klyuchOtIme('Апартамент 1'), klyuchOtIme('Гараж 1'))).toBe(false);
+  });
+
+  it('име без номер не се свързва — по-добре очакван наем, отколкото чужд', () => {
+    expect(klyuchOtIme('Мазе')).toBeUndefined();
+    expect(klyuchOtIme('')).toBeUndefined();
+  });
+
+  it('прекратеният наем не влиза в картата', () => {
+    const karta = kartaNaNaemite([
+      { edinitsa: 'АП. № 1', naem_mesechen_st: 550_00 },
+      { edinitsa: 'АП. № 2', naem_mesechen_st: 0 }, // прекратен
+    ]);
+    expect(deystvitelenNaem_st('Апартамент 1', karta)).toBe(550_00);
+    expect(deystvitelenNaem_st('Апартамент 2', karta)).toBeUndefined();
+  });
+});
+
+describe('двете колони, една до друга', () => {
+  const ploshtiSDve = () => otCSV(PLOSHTI, 'площо');
+
+  it('всеки ред носи И ДВЕТЕ цени', () => {
+    const { obekti } = prochetiPloshti(ploshtiSDve());
+    const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
+    for (const r of s.redove) {
+      expect(r.tsena_st).toBeGreaterThan(0);
+      expect(r.sastoyanie_st).toBeGreaterThan(0);
+      expect(r.tsena_st % 10_000).toBe(0); // и двете · нагоре до стотица
+      expect(r.sastoyanie_st % 10_000).toBe(0);
+    }
+  });
+
+  it('Ап. 2 · неговата цена срещу оценката · разликата Е информацията', () => {
+    const { obekti } = prochetiPloshti(ploshtiSDve());
+    const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
+    const ap2 = s.redove.find((r) => r.obekt === 'Апартамент 2')!;
+    // А · по площ: 64,44 м² × 3 000 € × 0,97 (първи етаж) × 1,02 (И) = 191 250 €
+    expect(ap2.tsena_st).toBe(191_300_00);
+    // Б · по състояние: 64,44 м² × 8,50 €/м²/мес = 547,74 €/мес →
+    // × 12 × 0,92 (заетост) × 0,85 (чист доход) ÷ 3,20 % = 160 624,75 € →
+    // нагоре до стотица
+    expect(ap2.sastoyanie_st).toBe(160_700_00);
+    // оценката стои ПОД продажната цена — обичайното при ново строителство
+    expect(ap2.razlika_bt).toBeLessThan(0);
+    expect(ap2.razlika_bt).toBeGreaterThan(-3_000); // около −16 %
+  });
+
+  it('НАЕМЪТ ОТ ЖУРНАЛА бие очаквания — и редът го казва', () => {
+    const { obekti } = prochetiPloshti(ploshtiSDve());
+    const karta = kartaNaNaemite([{ edinitsa: 'АП. № 2', naem_mesechen_st: 700_00 }]);
+    const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()), undefined, karta);
+
+    const ap2 = s.redove.find((r) => r.obekt === 'Апартамент 2')!;
+    expect(ap2.naemOt).toBe('zhurnal');
+    expect(ap2.naem_mesechen_st).toBe(700_00);
+
+    const ap1 = s.redove.find((r) => r.obekt === 'Апартамент 1')!;
+    expect(ap1.naemOt).toBe('matritsa'); // няма го в Журнала
+
+    // по-високият действителен наем вдига оценката
+    const bez = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
+    const ap2Bez = bez.redove.find((r) => r.obekt === 'Апартамент 2')!;
+    expect(ap2.sastoyanie_st).toBeGreaterThan(ap2Bez.sastoyanie_st);
+  });
+
+  it('ДВАТА сбора · продаденото не влиза в нито един', () => {
+    const { obekti } = prochetiPloshti(ploshtiSDve());
+    const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
+    const zhivi = s.redove.filter((r) => !r.prodaden);
+    expect(s.obshto_tochno_st).toBe(zhivi.reduce((a, r) => a + r.tsena_tochno_st, 0));
+    expect(s.sastoyanie_tochno_st).toBe(
+      zhivi.reduce((a, r) => a + r.sastoyanie_tochno_st, 0),
+    );
+    expect(s.razlika_na_metodite_bt).toBeLessThan(0);
+  });
+});
+
+describe('износът · трите избора', () => {
+  function redove() {
+    const { obekti } = prochetiPloshti(otCSV(PLOSHTI, 'площо'));
+    return stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni())).redove;
+  }
+
+  it('„и двете" долепя две колони ОТДЯСНО · неговите единайсет не мърдат', () => {
+    const list = listNaTsenite(redove(), 'ЦЕНИ', 'dvete');
+    expect(list.koloni).toHaveLength(13);
+    expect(list.koloni.slice(0, 11).map((k) => k.ime)).toEqual([...GLAVA_NA_TSENITE]);
+    expect(list.koloni[11]?.ime).toBe('Стойност на Състояние');
+    expect(list.koloni[12]?.ime).toBe('Евро / кв.м. (състояние)');
+  });
+
+  it('„само по площ" дава неговите единайсет и цената по площ', () => {
+    const list = listNaTsenite(redove(), 'ЦЕНИ', 'plosht');
+    expect(list.koloni).toHaveLength(11);
+    const ap2 = list.redove.find((r) => r[0] === 'Апартамент 2')!;
+    expect(ap2[9]).toBe('191 300,00'.replace(/ /g, ' '));
+  });
+
+  it('„само по състояние" слага ОЦЕНКАТА в неговата колона „Цена с ДДС"', () => {
+    const list = listNaTsenite(redove(), 'ЦЕНИ', 'sastoyanie');
+    expect(list.koloni).toHaveLength(11);
+    expect(list.koloni[9]?.ime).toBe('Цена с ДДС'); // името му остава
+    const ap2 = list.redove.find((r) => r[0] === 'Апартамент 2')!;
+    expect(ap2[9]).toBe('160 700,00'.replace(/ /g, ' '));
+  });
+
+  it('продаденото си остава ПРОДАДЕН и в трите избора', () => {
+    for (const koya of ['dvete', 'plosht', 'sastoyanie'] as const) {
+      const list = listNaTsenite(redove(), 'ЦЕНИ', koya);
+      const ap1 = list.redove.find((r) => r[0] === 'Апартамент 1')!;
+      expect(ap1[9]).toBe(PRODADEN);
+    }
   });
 });
