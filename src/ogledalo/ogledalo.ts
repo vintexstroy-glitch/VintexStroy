@@ -12,6 +12,7 @@
  */
 
 import type { Sabitie } from '../yadro/index.js';
+import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
@@ -319,7 +320,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'СлужителЗаписан': {
         const p = s.payload as unknown as PayloadSluzhitelZapisan;
         // Смяна на ролята е ново събитие върху същия човек — последното бие.
-        sluzhiteli.set(p.imeyl, p);
+        // Ролята се ЧЕТЕ през моста: запис отпреди преименуването носи старата
+        // дума, а Журналът не се преписва (правило 1).
+        sluzhiteli.set(p.imeyl, { ...p, rolya: chetiRolya(p.rolya) });
         break;
       }
 

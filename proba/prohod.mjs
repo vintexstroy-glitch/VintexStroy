@@ -667,7 +667,7 @@ async function main() {
     proveri('казва кой е влязъл', await plochka(p, 'Влязъл като'), 'VintexStroy');
     proveri('казва през кого', await plochka(p, 'През'), 'Google');
     proveri('казва чие е хранилището', await plochka(p, 'Хранилище'), 'Безплатно');
-    proveri('казва ролята', await plochka(p, 'Роля'), 'стопанин');
+    proveri('казва ролята', await plochka(p, 'Роля'), 'собственик');
     proveri(
       'никъде не пише „парола" като поле',
       await p.evaluate(() => document.querySelectorAll('input[type=password]').length),

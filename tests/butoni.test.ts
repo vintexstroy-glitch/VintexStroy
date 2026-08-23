@@ -363,8 +363,8 @@ describe('връщането към предишно състояние · кр�
 
 describe('видимостта', () => {
   it('празна видимост значи ВСИЧКИ', () => {
-    const skrit = napraviButon({ ...BUTON, klyuch: 'Скрит', vidimost: ['stopanin'] });
+    const skrit = napraviButon({ ...BUTON, klyuch: 'Скрит', vidimost: ['sobstvenik'] });
     expect(vidimiButoni([BUTON, skrit], []).map((b) => b.klyuch)).toEqual(['Извлечения ОББ']);
-    expect(vidimiButoni([BUTON, skrit], ['stopanin'])).toHaveLength(2);
+    expect(vidimiButoni([BUTON, skrit], ['sobstvenik'])).toHaveLength(2);
   });
 });

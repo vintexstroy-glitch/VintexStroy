@@ -21,7 +21,7 @@
  *    само тогава може да промениш." (ред 1572)
  *
  *   „Раждането/триенето на колона само за управител… САМО УПРАВИТЕЛИТЕ."
- *    (ред 1494) — при нас управителят е ролята `stopanin`.
+ *    (ред 1494) — при нас управителят е ролята `sobstvenik`.
  *
  *   „…може и да се изтрие всичко в списъка — тогава се пише директно,
  *    премахва се падащото меню и СЕ ЗАКЛЮЧВА НАИМЕНОВАНИЕТО НА ПОЛЕТО от
@@ -103,7 +103,7 @@ function proveriIme(m: ModelNaTablitsa, ime: string, osven?: number): string {
 }
 
 function samoUpravitel(rolya: RolyaNaChovek, deystvie: string): void {
-  if (rolya !== 'stopanin') {
+  if (rolya !== 'sobstvenik') {
     throw new GreshkaRedaktor(
       `${deystvie} е само за управителите (ред 1494) — ролята тук е „${rolya}".`,
     );

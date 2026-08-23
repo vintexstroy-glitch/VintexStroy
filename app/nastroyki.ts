@@ -265,7 +265,7 @@ function redNaModel(m: ModelNaTablitsa): string {
  * със смяна на редактора. Правата са след завършване на таблицата."
  *
  * Затова правата („Кой какво вижда") стоят ПОД този блок — първо таблицата се
- * завършва тук, после се раздава. И затова редакцията подава роля „стопанин":
+ * завършва тук, после се раздава. И затова редакцията подава роля „собственик":
  * Настройки е екранът на главния акаунт (И57); кой точно е натиснал, записва
  * Вратата в `actor`, не този файл.
  */
@@ -489,7 +489,7 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string 
           <select name="rolya">
             <option value="redaktor">редактира</option>
             <option value="nablyudatel">наблюдава</option>
-            <option value="stopanin">стопанин</option>
+            <option value="sobstvenik">собственик</option>
           </select>
         </label>
         <div class="dugmeta">
@@ -798,7 +798,7 @@ export function zakachiNastroyki(
       const opts = {
         ime: String(danni.get('ime') ?? ''),
         // Настройки е екранът на главния акаунт (И57); кой е натиснал, пише Вратата.
-        rolya: 'stopanin' as RolyaNaChovek,
+        rolya: 'sobstvenik' as RolyaNaChovek,
         zatvorena: String(danni.get('vid')) === 'zatvorena',
         ...(nomenklatura === 'opis' ? { menyu: chlenoveOt(String(danni.get('menyu') ?? '')) } : {}),
         ...(nomenklatura === 'vavezhdane' ? { otVavezhdane: true } : {}),
@@ -837,12 +837,12 @@ export function zakachiNastroyki(
         if (!star) return;
         let nov = star;
         if (ime.trim() !== '' && ime.trim() !== star.glavi[kolona]) {
-          nov = preimenuvayKolona(nov, kolona, ime, 'stopanin');
+          nov = preimenuvayKolona(nov, kolona, ime, 'sobstvenik');
         }
         const chlenove = chlenoveOt(menyuTekst);
         const stari = nov.menyuta[kolona] ?? [];
         if (chlenove.length > 0 && chlenove.join('¦') !== stari.join('¦')) {
-          nov = zadayMenyu(nov, kolona, chlenove, 'stopanin');
+          nov = zadayMenyu(nov, kolona, chlenove, 'sobstvenik');
         }
         // ВИДЪТ НА СТОЙНОСТТА · това е потвърждението, което `podskazhiVid()`
         // чакаше. Смяната минава само ако наистина се мени — иначе всеки запис
@@ -851,7 +851,7 @@ export function zakachiNastroyki(
           `[data-vid-stoynost="${kolona}"]`,
         )?.value as VidStoynost | undefined;
         if (izbranVid && izbranVid !== (nov.vidove[kolona] ?? 'tekst')) {
-          nov = smeniVidNaStoynost(nov, kolona, izbranVid, 'stopanin');
+          nov = smeniVidNaStoynost(nov, kolona, izbranVid, 'sobstvenik');
         }
         await zapishiHedar(star, nov, `Колоната е записана в „${star.klyuch}".`);
         greshka = '';
@@ -870,7 +870,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = iztriyMenyu(star, kolona, 'stopanin');
+        const nov = iztriyMenyu(star, kolona, 'sobstvenik');
         await zapishiHedar(star, nov, 'Менюто е изтрито — името на полето е заключено.');
         greshka = '';
       } catch (err) {
@@ -886,7 +886,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = otbelezhiVavezhdane(star, kolona, 'stopanin');
+        const nov = otbelezhiVavezhdane(star, kolona, 'sobstvenik');
         await zapishiHedar(star, nov, 'Номенклатурата ще се ражда от въвеждането.');
         greshka = '';
       } catch (err) {
@@ -910,7 +910,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = premahniKolona(star, kolona, { rolya: 'stopanin', imaDanni: false });
+        const nov = premahniKolona(star, kolona, { rolya: 'sobstvenik', imaDanni: false });
         await zapishiHedar(star, nov, `Колоната е премахната от „${star.klyuch}".`);
         greshka = '';
       } catch (err) {

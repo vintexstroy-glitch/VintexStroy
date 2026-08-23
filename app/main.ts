@@ -52,7 +52,7 @@ const SOBSTVENIKAT: Samolichnost = {
   ime: 'VintexStroy',
   hranilishte: 'безплатно',
   nachin: 'dostavchik',
-  rolya: 'stopanin',
+  rolya: 'sobstvenik',
   svarzani: [],
 };
 

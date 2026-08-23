@@ -69,7 +69,7 @@ function model() {
 
 describe('добавянето на колона', () => {
   it('расте в края; старият отпечатък влиза в историята', () => {
-    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'stopanin' });
+    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'sobstvenik' });
     expect(m.glavi).toEqual(['Дата', 'Място', 'Имот', 'Наем', 'Наемател']);
     expect(m.otpechatak).toBe('дата|място|имот|наем|наемател');
     expect(m.predishni).toEqual(['дата|място|имот|наем']);
@@ -83,7 +83,7 @@ describe('добавянето на колона', () => {
   });
 
   it('две колони с едно име не минават — и със сменени букви', () => {
-    expect(() => dobaviKolona(model(), { ime: ' мЯсто ', rolya: 'stopanin' })).toThrow(
+    expect(() => dobaviKolona(model(), { ime: ' мЯсто ', rolya: 'sobstvenik' })).toThrow(
       /вече носи колона/,
     );
   });
@@ -91,7 +91,7 @@ describe('добавянето на колона', () => {
   it('ражда се наведнъж с вида и номенклатурата си', () => {
     const m = dobaviKolona(model(), {
       ime: 'Начин',
-      rolya: 'stopanin',
+      rolya: 'sobstvenik',
       menyu: ['Кеш', 'Банка'],
     });
     expect(vidNomenklatura(m, 4)).toBe('opis');
@@ -100,9 +100,9 @@ describe('добавянето на колона', () => {
 
   it('затворената колона не носи меню — тя е сметка', () => {
     expect(() =>
-      dobaviKolona(model(), { ime: 'Сбор', rolya: 'stopanin', zatvorena: true, menyu: ['а'] }),
+      dobaviKolona(model(), { ime: 'Сбор', rolya: 'sobstvenik', zatvorena: true, menyu: ['а'] }),
     ).toThrow(/меню не ѝ трябва/);
-    const m = dobaviKolona(model(), { ime: 'Сбор', rolya: 'stopanin', zatvorena: true });
+    const m = dobaviKolona(model(), { ime: 'Сбор', rolya: 'sobstvenik', zatvorena: true });
     expect(vidNaKolona(m, 4)).toBe('zatvorena');
   });
 });
@@ -113,36 +113,36 @@ describe('трите вида номенклатура (И58)', () => {
   });
 
   it('готовото меню от Описа е вторият вид', () => {
-    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря', 'Студентски град'], 'stopanin');
+    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря', 'Студентски град'], 'sobstvenik');
     expect(vidNomenklatura(m, 1)).toBe('opis');
   });
 
   it('раждането от въвеждането е третият вид и готовото меню го измества', () => {
-    let m = otbelezhiVavezhdane(model(), 2, 'stopanin');
+    let m = otbelezhiVavezhdane(model(), 2, 'sobstvenik');
     expect(vidNomenklatura(m, 2)).toBe('vavezhdane');
-    m = zadayMenyu(m, 2, ['АП. № 1'], 'stopanin');
+    m = zadayMenyu(m, 2, ['АП. № 1'], 'sobstvenik');
     expect(vidNomenklatura(m, 2)).toBe('opis');
     expect(m.otVavezhdane).toEqual([]);
   });
 
   it('върху готово меню видът не се сменя направо — първо изтриване', () => {
-    const m = zadayMenyu(model(), 1, ['Малинова'], 'stopanin');
-    expect(() => otbelezhiVavezhdane(m, 1, 'stopanin')).toThrow(/първо то се изтрива/);
+    const m = zadayMenyu(model(), 1, ['Малинова'], 'sobstvenik');
+    expect(() => otbelezhiVavezhdane(m, 1, 'sobstvenik')).toThrow(/първо то се изтрива/);
   });
 });
 
 describe('изтритото меню заключва името (ред 1994)', () => {
   it('менюто пада, името се заключва, преименуването отказва', () => {
-    let m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'stopanin');
-    m = iztriyMenyu(m, 1, 'stopanin');
+    let m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'sobstvenik');
+    m = iztriyMenyu(m, 1, 'sobstvenik');
     expect(vidNomenklatura(m, 1)).toBe('svobodna');
     expect(m.zaklyucheni).toEqual([1]);
-    expect(() => preimenuvayKolona(m, 1, 'Град', 'stopanin')).toThrow(/заключено/);
+    expect(() => preimenuvayKolona(m, 1, 'Град', 'sobstvenik')).toThrow(/заключено/);
   });
 
   it('незаключеното име се преименува и това е промяна за белега', () => {
     const staro = model();
-    const novo = preimenuvayKolona(staro, 3, 'Наем €', 'stopanin');
+    const novo = preimenuvayKolona(staro, 3, 'Наем €', 'sobstvenik');
     expect(novo.glavi[3]).toBe('Наем €');
     expect(belegNaModel(novo)).not.toBe(belegNaModel(staro));
   });
@@ -150,22 +150,22 @@ describe('изтритото меню заключва името (ред 1994)'
 
 describe('триенето — изключението, не правилото (ред 1572)', () => {
   it('колона с данни не се трие', () => {
-    const m = dobaviKolona(model(), { ime: 'Бележка', rolya: 'stopanin' });
-    expect(() => premahniKolona(m, 4, { rolya: 'stopanin', imaDanni: true })).toThrow(
+    const m = dobaviKolona(model(), { ime: 'Бележка', rolya: 'sobstvenik' });
+    expect(() => premahniKolona(m, 4, { rolya: 'sobstvenik', imaDanni: true })).toThrow(
       /не се трият, а само се добавят/,
     );
   });
 
   it('колона, която носи роля, не се трие — редът спира да става запис', () => {
-    expect(() => premahniKolona(model(), 3, { rolya: 'stopanin', imaDanni: false })).toThrow(
+    expect(() => premahniKolona(model(), 3, { rolya: 'sobstvenik', imaDanni: false })).toThrow(
       /ролята „сума"/,
     );
   });
 
   it('празна колона без роля пада и номерата слизат с едно', () => {
-    let m = dobaviKolona(model(), { ime: 'Излишна', rolya: 'stopanin' });
-    m = dobaviKolona(m, { ime: 'Начин', rolya: 'stopanin', menyu: ['Кеш', 'Банка'] });
-    m = premahniKolona(m, 4, { rolya: 'stopanin', imaDanni: false });
+    let m = dobaviKolona(model(), { ime: 'Излишна', rolya: 'sobstvenik' });
+    m = dobaviKolona(m, { ime: 'Начин', rolya: 'sobstvenik', menyu: ['Кеш', 'Банка'] });
+    m = premahniKolona(m, 4, { rolya: 'sobstvenik', imaDanni: false });
     expect(m.glavi).toEqual(['Дата', 'Място', 'Имот', 'Наем', 'Начин']);
     expect(m.menyuta[4]).toEqual(['Кеш', 'Банка']);
     expect(m.menyuta[5]).toBeUndefined();
@@ -174,7 +174,7 @@ describe('триенето — изключението, не правилото
 
 describe('семейството и старите файлове', () => {
   it('старият файл се познава и след като главата порасне', () => {
-    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'stopanin' });
+    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'sobstvenik' });
     expect(poznavaLi(m, otCSV(CSV, 'старият износ'))).toBe(true);
   });
 
@@ -196,7 +196,7 @@ describe('семейството и старите файлове', () => {
       'Наеми Банка',
     ]);
     // Пораслият остава роднина: старата му глава е в историята.
-    const porasnal = dobaviKolona(naemi, { ime: 'Наемател', rolya: 'stopanin' });
+    const porasnal = dobaviKolona(naemi, { ime: 'Наемател', rolya: 'sobstvenik' });
     expect(semeystvo([porasnal, banka, chuzhd], porasnal).map((m) => m.klyuch)).toEqual([
       'Наеми Банка',
     ]);
@@ -205,7 +205,7 @@ describe('семейството и старите файлове', () => {
 
 describe('Описът на Подредба — всичко именувано е ред (ред 1970)', () => {
   it('хедър, колони и членове на менюта, всяко със своя дом', () => {
-    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'stopanin');
+    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'sobstvenik');
     const opis = opisNaPodredba([m]);
     expect(opis.filter((r) => r.vid === 'hedar')).toHaveLength(1);
     expect(opis.filter((r) => r.vid === 'kolona')).toHaveLength(4);
@@ -224,7 +224,7 @@ describe('промяната е ново събитие, не презапис',
     const { dnevnik, deystviya } = stend();
     const staro = model();
     await deystviya.zapishiModel(staro, { opId: 'model:1' });
-    const novo = dobaviKolona(staro, { ime: 'Наемател', rolya: 'stopanin' });
+    const novo = dobaviKolona(staro, { ime: 'Наемател', rolya: 'sobstvenik' });
     await deystviya.zapishiModel(novo, { opId: 'model:2' });
 
     const og = await deystviya.ogledalo();
@@ -240,32 +240,32 @@ describe('видът на СТОЙНОСТТА · втората половин�
     // ИСТИНСКИЯТ случай, а не измислен: речникът на подсказката е тесен
     // нарочно. „Неустойка" е пари, но не е в него — колоната се ражда „текст"
     // и сборът ѝ ТИХО не влиза в Приходи. Дотук нямаше къде да се поправи.
-    const s = dobaviKolona(model(), { ime: 'Неустойка', rolya: 'stopanin' });
+    const s = dobaviKolona(model(), { ime: 'Неустойка', rolya: 'sobstvenik' });
     const k = s.glavi.indexOf('Неустойка');
     expect(k).toBeGreaterThan(-1);
     expect(ePari(s.vidove[k] ?? 'tekst')).toBe(false);
 
-    const sled = smeniVidNaStoynost(s, k, 'evro', 'stopanin');
+    const sled = smeniVidNaStoynost(s, k, 'evro', 'sobstvenik');
     expect(sled.vidove[k]).toBe('evro');
     expect(ePari(sled.vidove[k]!)).toBe(true);
   });
 
   it('НЕ пипа данните — видът е свойство на КОЛОНАТА, не на клетките', () => {
     const m = model();
-    const sled = smeniVidNaStoynost(m, 0, 'protsent', 'stopanin');
+    const sled = smeniVidNaStoynost(m, 0, 'protsent', 'sobstvenik');
     expect(sled.glavi).toEqual(m.glavi);
     expect(sled.menyuta).toEqual(m.menyuta);
     expect(sled.zaklyucheni).toEqual(m.zaklyucheni);
   });
 
   it('отказва непознат вид, вместо да го запише', () => {
-    expect(() => smeniVidNaStoynost(model(), 0, 'левче' as never, 'stopanin')).toThrow(
+    expect(() => smeniVidNaStoynost(model(), 0, 'левче' as never, 'sobstvenik')).toThrow(
       GreshkaRedaktor,
     );
   });
 
   it('отказва колона, която я няма', () => {
-    expect(() => smeniVidNaStoynost(model(), 999, 'evro', 'stopanin')).toThrow(GreshkaRedaktor);
+    expect(() => smeniVidNaStoynost(model(), 999, 'evro', 'sobstvenik')).toThrow(GreshkaRedaktor);
   });
 
   it('иска УПРАВИТЕЛ — редактор не мени накъде отиват парите', () => {
