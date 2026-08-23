@@ -61,6 +61,14 @@ export interface ModelNaTablitsa {
    *   `suma`   — самата сума на ДДС в левове
    */
   readonly ddsE?: 'stavka' | 'suma';
+  /**
+   * Номерата на колоните, които човекът е МАХНАЛ от двата сбора.
+   *
+   * Знакът (+ или −) НЕ се записва — той се смята от сбора при всяко показване,
+   * затова колоната сменя мястото си сама. Записва се само изключването:
+   * то е решение на човек и иска следа. Вж. `src/domein/chisla.ts`.
+   */
+  readonly izklyucheni: readonly number[];
   /** отпечатък на ХЕДЪРА — по него се познава същата таблица втори път */
   readonly otpechatak: string;
 }
@@ -119,6 +127,7 @@ export function napraviModel(n: {
   redNaGlavata: number;
   koloni: Readonly<Partial<Record<Rolya, number>>>;
   ddsE?: 'stavka' | 'suma';
+  izklyucheni?: readonly number[];
 }): ModelNaTablitsa {
   const { klyuch, tablitsa, redNaGlavata, koloni } = n;
 
@@ -159,23 +168,27 @@ export function napraviModel(n: {
     redNaGlavata,
     koloni: Object.freeze({ ...koloni }),
     ...(n.ddsE ? { ddsE: n.ddsE } : {}),
+    izklyucheni: Object.freeze([...(n.izklyucheni ?? [])].sort((a, b) => a - b)),
     otpechatak: otpechatakNaGlavata(tablitsa, redNaGlavata),
   });
 }
 
 /**
- * КРАТЪК БЕЛЕГ НА СЪДЪРЖАНИЕТО · за `opId`.
+ * КРАТЪК БЕЛЕГ НА СЪДЪРЖАНИЕТО · „смени ли се нещо изобщо".
  *
- * Идемпотентността иска ключ, който се мени точно когато се мени моделът.
- * Ключ по име на файл или по отпечатък на хедъра НЕ става: поправиш ли една
- * колона и запишеш пак, повторният `opId` би върнал СТАРИЯ резултат и
- * поправката щеше да изчезне мълчаливо. Затова белегът е от самата карта.
+ * Служи за едно: да се сравни новият модел със записания, преди да се пише.
+ * Еднакъв белег значи, че няма промяна — и тогава в Журнала не влиза нищо.
+ *
+ * НЕ става за `opId`. Пробвано беше и се счупи в прохода: махнеш колона и я
+ * върнеш, съдържанието се връща към предишното, повторният `opId` върна
+ * СТАРИЯ резултат — и колоната остана махната, макар екранът да казваше
+ * друго. Затова `opId` носи самото действие, а белегът — само сравнението.
  */
 export function belegNaModel(m: ModelNaTablitsa): string {
   const koloni = (Object.keys(IMENA_NA_ROLITE) as Rolya[])
     .map((r) => `${r}=${m.koloni[r] ?? ''}`)
     .join(',');
-  return `${m.redNaGlavata}|${koloni}|${m.ddsE ?? ''}`;
+  return `${m.redNaGlavata}|${koloni}|${m.ddsE ?? ''}|${[...m.izklyucheni].join('.')}`;
 }
 
 /** Клетката за тази роля в този ред. Празен низ, ако ролята я няма в модела. */

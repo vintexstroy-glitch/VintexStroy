@@ -70,3 +70,26 @@ export function otCSV(tekst: string, ime = 'CSV', razdelitel?: string): Tablitsa
 
   return { ime, redove };
 }
+
+/**
+ * ТЕКСТЪТ ОТ БАЙТОВЕ · UTF-8, а ако не е — CP1251.
+ *
+ * Българските банки още изнасят CSV в `windows-1251`. Прочетен като UTF-8, той
+ * излиза на маймуница — и това е ТИХ провал: файлът се отваря, редовете се
+ * броят, само имената са нечетими. Точно затова тук няма гадаене по вид на
+ * файла, а ПРОБА: UTF-8 със `fatal`, и при първия невалиден байт — CP1251.
+ *
+ * Двете кодировки са в самия браузър (`TextDecoder`), значи правило 10 остава
+ * цяло: нула зависимости.
+ *
+ * BOM-ът се маха и в двата случая — `otCSV` го чака в началото на низа.
+ */
+export function tekstOtBaytove(danni: Uint8Array): string {
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(danni);
+  } catch {
+    // Невалиден UTF-8 значи чужда кодировка. CP1251 е тази, която идва от
+    // българските банки; тя няма невалидни байтове, затова не хвърля.
+    return new TextDecoder('windows-1251').decode(danni);
+  }
+}

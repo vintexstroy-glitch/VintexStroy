@@ -424,9 +424,9 @@ async function main() {
     );
 
     await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
-    proveri('менюто се отваря с четирите източника', (await p.$$('[data-iztochnik]')).length, 4);
+    proveri('менюто се отваря с първия бутон', (await p.$$('[data-buton]')).length, 1);
 
-    await p.click('[data-iztochnik=csv]');
+    await p.click('[data-buton="Въведи разходи"]');
     await p.setInputFiles('#fayl-iztochnik', parviCSV);
     await p.waitForSelector('#prilozhi');
     proveri('казва, че е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Прочетено'), true);
@@ -435,8 +435,10 @@ async function main() {
     proveri('два нови реда', razlikiPredi.length, 2);
     proveri('първият е нов', razlikiPredi[0]?.[0], 'нов');
 
-    await sSabitiya(p, 2, () => p.click('#prilozhi'));
-    proveri('двайсет и едно събития', await broySabitiya(p), 21);
+    // +2 записа И +1 СверкаЗаписана: сверката вече живее в Журнала, не в паметта.
+    await sSabitiya(p, 3, () => p.click('#prilozhi'));
+    proveri('двайсет и две събития', await broySabitiya(p), 22);
+    proveri('вестта казва, че сверката е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
     proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3], '1200,00');
 
     // поправен файл за същия месец: една сума сменена, един ред махнат
@@ -444,7 +446,7 @@ async function main() {
     await writeFile(vtoriCSV, [GLAVA, 'Бетон ЕООД;бетон;950,00;10.02.2026;5001'].join('\n'));
 
     await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
-    await p.click('[data-iztochnik=csv]');
+    await p.click('[data-buton="Въведи разходи"]');
     await p.setInputFiles('#fayl-iztochnik', vtoriCSV);
     await p.waitForSelector('#prilozhi');
     proveri('вече не е първо четене', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Разликите'), true);
@@ -455,8 +457,8 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('[data-filtar=vsichko]'));
     proveri('филтърът „всичко" пак дава два', (await redove(p, '.red.razlika')).length, 2);
 
-    await sSabitiya(p, 3, () => p.click('#prilozhi'));
-    proveri('двайсет и четири събития', await broySabitiya(p), 24);
+    await sSabitiya(p, 4, () => p.click('#prilozhi'));
+    proveri('двайсет и шест събития', await broySabitiya(p), 26);
     proveri(
       'Фактури казват това, което казва новият файл',
       (await redove(p, '.red.smetka')).find((x) => x[0].startsWith('Фактури'))?.[3],
@@ -496,7 +498,7 @@ async function main() {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 24);
+    proveri('Журналът не е пипан', await broySabitiya(p), 26);
 
     await naEkran(p, 'imoti', '#forma-imot');
     await p.fill('#imot-adres', 'След инцидента');
@@ -504,7 +506,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 24);
+    proveri('нищо ново не влезе', await broySabitiya(p), 26);
 
     // ══ 13 · хранилището и котвата ═══════════════════════════════════════
     razdel = '13 · хранилище и котва';
@@ -523,8 +525,8 @@ async function main() {
       await new Promise((da, ne) => {
         const t = db.transaction('sabitiya', 'readwrite');
         const hr = t.objectStore('sabitiya');
-        hr.delete(['vintexstroy', 23]);
-        hr.delete(['vintexstroy', 24]);
+        hr.delete(['vintexstroy', 25]);
+        hr.delete(['vintexstroy', 26]);
         t.oncomplete = () => da(undefined);
         t.onerror = () => ne(t.error);
       });
@@ -544,7 +546,7 @@ async function main() {
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('записът е отказан с думи', (await tekstNa(p, '#greshka-imot')).includes('котвата'), true);
-    proveri('Журналът остава на 22', await broySabitiya(p), 22);
+    proveri('Журналът остава на 24', await broySabitiya(p), 24);
     // ══ 14 · справката заключва, архивът излиза, филтрите режат ══════════
     razdel = '14 · справка, архив, филтри';
     // Котвата спря Вратата в раздел 13 — за тези проверки се тръгва начисто.
@@ -856,7 +858,7 @@ async function main() {
     );
 
     await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
-    await p.click('[data-iztochnik=csv]');
+    await p.click('[data-buton="Въведи разходи"]');
     await p.setInputFiles('#fayl-iztochnik', parvoIzvlechenie);
     await p.waitForSelector('#zapomni-model');
     proveri('непознат хедър → ПИТА, не гадае', await tekstNa(p, '.karta.izbrana .dyalglava h2'), 'Не познавам тази таблица');
@@ -872,7 +874,7 @@ async function main() {
     proveri('картата се записва и файлът се чете', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Прочетено'), true);
     proveri('два реда от извлечението', (await redove(p, '.red.razlika')).length, 2);
 
-    await sSabitiya(p, 2, () => p.click('#prilozhi'));
+    await sSabitiya(p, 3, () => p.click('#prilozhi'));
     const vhodM = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
     proveri('един сектор, ДВЕ ставки — от колоната, не от сектора', vhodM.length, 2);
     proveri('входящ ДДС на 20%', vhodM.find((x) => x[2] === '20%')?.[4], '100,00');
@@ -902,23 +904,94 @@ async function main() {
       ].join('\n'),
     );
     await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
-    await p.click('[data-iztochnik=csv]');
+    await p.click('[data-buton="Въведи разходи"]');
     await p.setInputFiles('#fayl-iztochnik', vtoroIzvlechenie);
     await p.waitForSelector('#prilozhi');
     proveri('вторият файл със същата глава НЕ пита', (await p.$('#zapomni-model')) === null, true);
     proveri('вижда само новия ред', (await redove(p, '.red.razlika')).length, 1);
-    await sSabitiya(p, 1, () => p.click('#prilozhi'));
+    await sSabitiya(p, 2, () => p.click('#prilozhi'));
     proveri('новото движение също търси фактурата си', (await redove(p, '.red.nesvarshen')).length, 2);
 
     // крив ред НЕ се преглъща — влиза в „непрочетени" с думи защо
     const krivo = join(tmpdir(), 'izvlechenie-april-krivo.csv');
     await writeFile(krivo, [OBB, '25.04.2026;боя;Бои ООД;150,00;3004;21'].join('\n'));
     await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
-    await p.click('[data-iztochnik=csv]');
+    await p.click('[data-buton="Въведи разходи"]');
     await p.setInputFiles('#fayl-iztochnik', krivo);
     await p.waitForSelector('.red.propusnat');
     proveri('непозволена ставка не се закръгля — казва се', (await redove(p, '.red.propusnat'))[0]?.[1]?.includes('Ставка 21 не съществува'), true);
     await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
+
+
+    // ══ 19 · бутонът · моделът на ПЪТЯ ═══════════════════════════════════
+    razdel = '19 · бутонът';
+    await naEkran(p, 'nastroyki', '#nov-buton');
+    proveri('Настройки казват колко пътя са ПОСТРОЕНИ', await plochka(p, 'Построени действия'), '1 / 10');
+    proveri('моделът от §18 се вижда тук', (await redove(p, '.red.model')).length, 1);
+    // §14 тръгна начисто; оттам насам са двете прилагания на §18.
+    proveri('записаните сверки са две', (await redove(p, '.red.zapisanasverka')).length, 2);
+
+    await deystvieSPrerisuvane(p, () => p.click('#nov-buton'));
+    await p.fill('#buton-ime', 'Извлечения ОББ');
+    await p.fill('#buton-papka', 'Извлечения');
+    await p.selectOption('#buton-deystvie', 'sveryavane-eksel');
+    await p.click('[data-model="Банка ОББ"]');
+    await sSabitie(p, () => p.click('#forma-buton button[type=submit]'));
+
+    const redButon = (await redove(p, '.red.buton'))[0];
+    proveri('бутонът стои в папката си', redButon?.[0], 'Извлечения ОББ Извлечения');
+    proveri('посоката е ЕДНА и се вади от действието', redButon?.[2], 'чете');
+    proveri('позволен е точно един модел', redButon?.[3], 'Банка ОББ');
+
+    await naEkran(p, 'smetki', '#forma-period');
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    proveri('менюто вече има ДВА бутона', (await p.$$('[data-buton]')).length, 2);
+
+    // ЧУЖД файл в правилния бутон → отказва се НА ГЛАС
+    const chuzhd = join(tmpdir(), 'razhodi-chuzhd.csv');
+    await writeFile(chuzhd, ['Доставчик;За какво;Сума;Дата;Документ', 'Х ООД;нещо;10,00;05.05.2026;9'].join('\n'));
+    await natisniButon(p, 'Извлечения ОББ');
+    await p.setInputFiles('#fayl-iztochnik', chuzhd);
+    await p.waitForSelector('.vest.zle');
+    proveri('чужд файл се отказва на глас', (await tekstNa(p, '.vest.zle')).includes('не позна нито един лист'), true);
+    proveri('и НЕ се чете по стария път', (await p.$('#prilozhi')) === null, true);
+
+    // ДВА файла наведнъж → ЕДНА партида, едно число
+    const dvaA = join(tmpdir(), 'obb-may-a.csv');
+    const dvaB = join(tmpdir(), 'obb-may-b.csv');
+    await writeFile(dvaA, [OBB, '05.05.2026;цимент;Материали ООД;600,00;5001;20'].join('\n'));
+    await writeFile(dvaB, [OBB, '12.05.2026;тухли;Тухли АД;240,00;5002;20'].join('\n'));
+
+    await naEkran(p, 'smetki', '#forma-period');
+    await p.fill('#smetki-period', '2026-05');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await natisniButon(p, 'Извлечения ОББ');
+    await p.setInputFiles('#fayl-iztochnik', [dvaA, dvaB]);
+    await p.waitForSelector('#prilozhi');
+    proveri('двата файла са ЕДНА партида', (await tekstNa(p, '.karta.izbrana .dyalglava span')).includes('2 файла'), true);
+    proveri('и два реда в нея', (await redove(p, '.red.razlika')).length, 2);
+
+    // знакът · числовите колони се появяват САМИ
+    const znatsi = await redove(p, '.red.znak:not(.sbor)');
+    proveri('числовата колона се появява сама', znatsi.length, 1);
+    proveri('и то със знак /+/', znatsi[0]?.[0], '+');
+    proveri('колоната за ДДС като процент НЕ е сума', znatsi.every((x) => !x[1]?.startsWith('ДДС')), true);
+
+    // махането е РЕШЕНИЕ и се записва в модела
+    await sSabitie(p, () => p.click('.red.znak [data-znak]'));
+    proveri('махнатата колона не е в нито един сбор', (await redove(p, '.red.znak:not(.sbor)'))[0]?.[0], 'махната');
+    await sSabitie(p, () => p.click('.red.znak [data-znak]'));
+    proveri('и се връща със същия бутон', (await redove(p, '.red.znak:not(.sbor)'))[0]?.[0], '+');
+
+    await sSabitiya(p, 3, () => p.click('#prilozhi'));
+    proveri('сверката пак е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
+
+    await naEkran(p, 'nastroyki', '#nov-buton');
+    const posledna = (await redove(p, '.red.zapisanasverka'))[0];
+    proveri('последната сверка носи името на бутона', posledna?.[0]?.startsWith('Извлечения ОББ'), true);
+    proveri('и казва от колко файла е', posledna?.[0]?.includes('2 файла'), true);
+    proveri('разликата ѝ затваря', posledna?.[4], 'затваря');
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
@@ -985,6 +1058,18 @@ async function deystvieSPrerisuvane(p, deystvie) {
     const shapka = document.querySelector('.shapka');
     return Boolean(shapka) && !shapka.dataset['beleg'];
   });
+}
+
+/**
+ * Натиска бутон от менюто и ЧАКА той да стане текущият.
+ *
+ * Обработчикът е асинхронен (чете Огледалото, за да намери бутона). Ако
+ * файловете се подадат веднага след клика, те влизат ПРЕДИ бутонът да е избран
+ * и партидата тръгва през стария път. Затова се чака името в шапката.
+ */
+async function natisniButon(p, ime) {
+  await p.click(`[data-buton="${ime}"]`);
+  await p.waitForFunction((n) => document.querySelector('#vzemi')?.innerText.includes(n), ime);
 }
 
 /** Действие, което ТРЯБВА да сложи точно N нови събития в Журнала. */

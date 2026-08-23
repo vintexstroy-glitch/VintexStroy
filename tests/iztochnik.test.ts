@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { readFile } from 'node:fs/promises';
-import { otCSV, pogadniRazdelitel } from '../src/iztochnik/csv.js';
+import { otCSV, pogadniRazdelitel, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { GreshkaXLSX, kolonaOtAdres, otXLSX } from '../src/iztochnik/xlsx.js';
 import { bezPrazni, nameriGlavata, nameriKolona } from '../src/iztochnik/tablitsa.js';
 import { GreshkaPDF, otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
@@ -103,5 +103,20 @@ describe('PDF · чете текста, казва когато не може', 
   it('отказва шифрован PDF с думи какво да се направи', async () => {
     const shifrovan = new TextEncoder().encode('%PDF-1.4\n<< /Encrypt 9 0 R >>');
     await expect(otPDF(shifrovan)).rejects.toThrow(/без парола/);
+  });
+});
+
+describe('кодировката на CSV', () => {
+  it('CP1251 се чете като кирилица, не като маймуница', () => {
+    // „Материали ООД" в windows-1251 — така го изнасят българските банки.
+    const cp1251 = new Uint8Array([
+      0xcc, 0xe0, 0xf2, 0xe5, 0xf0, 0xe8, 0xe0, 0xeb, 0xe8, 0x20, 0xce, 0xce, 0xc4,
+    ]);
+    expect(tekstOtBaytove(cp1251)).toBe('Материали ООД');
+  });
+
+  it('UTF-8 си остава UTF-8', () => {
+    const utf8 = new TextEncoder().encode('Материали ООД');
+    expect(tekstOtBaytove(utf8)).toBe('Материали ООД');
   });
 });

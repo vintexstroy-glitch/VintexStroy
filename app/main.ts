@@ -31,6 +31,7 @@ import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnit
 import { arhivZaEksel } from './arhiv.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
+import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
@@ -56,7 +57,7 @@ const vhod = new EdinSobstvenik(SOBSTVENIKAT);
 let kojSam: Samolichnost = SOBSTVENIKAT;
 let izbor: Izbor = chetiIzbor();
 
-export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'tablo';
+export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'nastroyki' | 'tablo';
 
 /**
  * Кой екран от коя възможност зависи. Таблото го няма тук нарочно: то е
@@ -64,6 +65,7 @@ export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'tablo';
  */
 const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
   smetki: 'smetki-dds',
+  nastroyki: 'iztochnitsi',
 };
 
 export interface Konteks {
@@ -189,6 +191,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
     ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
   },
+  nastroyki: {
+    ime: 'Настройки',
+    podnaslov: 'бутоните са модели на пътища · нищо не е константа',
+    ikona: '<circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"></path>',
+  },
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
@@ -270,7 +277,7 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
-            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona() : ''}
+            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             ${
               mozhe(izbor, 'iznos-vnos')
@@ -300,7 +307,9 @@ async function trugvay(): Promise<void> {
                 ? narisuvayPari(ogledalo, dnes)
                 : ekran === 'smetki'
                   ? narisuvaySmetki(ogledalo, dnes)
-                  : narisuvayTablo(kojSam, izbor)
+                  : ekran === 'nastroyki'
+                    ? narisuvayNastroyki(ogledalo)
+                    : narisuvayTablo(kojSam, izbor)
           }
         </div>
       </main>`;
@@ -309,6 +318,7 @@ async function trugvay(): Promise<void> {
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
+    else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
     else {
       zakachiTablo(
         koren,

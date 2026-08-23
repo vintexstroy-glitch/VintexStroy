@@ -9,6 +9,7 @@
 
 import type { Sashtnost } from '../yadro/index.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
+import type { Buton } from './butoni.js';
 
 export const VID = {
   imot: 'imot',
@@ -18,6 +19,8 @@ export const VID = {
   razhod: 'razhod',
   spravka: 'spravka',
   model: 'model',
+  buton: 'buton',
+  sverka: 'sverka',
 } as const;
 
 export type Vid = (typeof VID)[keyof typeof VID];
@@ -34,6 +37,8 @@ export type TipSabitie =
   | 'ИмотПоправен'
   | 'НаемПоправен'
   | 'МоделЗаписан'
+  | 'БутонЗаписан'
+  | 'СверкаЗаписана'
   | 'Сторно';
 
 export interface PayloadImotDobaven {
@@ -192,6 +197,38 @@ export interface PayloadDDSPlateno {
  * точно като при `ИмотПоправен`.
  */
 export type PayloadModelZapisan = ModelNaTablitsa;
+
+/**
+ * БУТОНЪТ · моделът на ПЪТЯ, записан в Журнала.
+ *
+ * Същата причина като при модела: бутонът решава кой файл къде отива. Смени ли
+ * се тихо, старите сверки стават необясними. Същността е `BUTON:<име>` —
+ * поправка е НОВО събитие върху същата същност, не втори бутон.
+ */
+export type PayloadButonZapisan = Buton;
+
+/**
+ * СВЕРКАТА · вход ↔ изход ↔ разлика, записана ЗАВИНАГИ.
+ *
+ * Негови думи: „Ако има разлика, се регистрира промяната на данните в Журнала."
+ *
+ * Дотук сверките живееха само в паметта на екрана и умираха с презареждането:
+ * човек виждаше „затваря", но утре нямаше как да докаже, че е гледал. Оттук
+ * всяка сверка на бутон има ред в Журнала — И КОГАТО РАЗЛИКАТА Е НУЛА
+ * (правило 7). Проверената нула е различна от нулата, за която никой не е питал.
+ */
+export interface PayloadSverkaZapisana {
+  /** името на бутона, който я е поръчал */
+  readonly buton: string;
+  readonly period: string;
+  readonly vhod_st: number;
+  readonly izhod_st: number;
+  readonly razlika_st: number;
+  /** отпечатъците на прочетените файлове — по един на файл */
+  readonly izvori: readonly string[];
+  /** какво не се е разчело — броят се, не се преглъщат */
+  readonly propusnati: number;
+}
 
 export interface PayloadStorno {
   /** seq на събитието, което се погасява */

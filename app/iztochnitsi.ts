@@ -13,7 +13,7 @@
 
 import { kakvoPishe } from '../src/yadro/pari.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
-import { otCSV } from '../src/iztochnik/csv.js';
+import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
 import { otpechatak, type Izvor, type Snimka, type VidIzvor } from '../src/iztochnik/snimka.js';
@@ -39,6 +39,24 @@ import {
   type Plan,
   type Razlika,
 } from '../src/domein/aktualizatsiya.js';
+import { belegNaButon, napraviButon, type Buton } from '../src/domein/butoni.js';
+import {
+  chislovi,
+  IMENA_NA_SBOROVETE,
+  primer,
+  sDumi,
+  sPrevklyuchena,
+  vDvataSbora,
+  ZNAK,
+  type ChislovaKolona,
+  type DvataSbora,
+} from '../src/domein/chisla.js';
+import {
+  GreshkaSveryavane,
+  sgloviPartida,
+  zapishiSverkata,
+  type PodadenFayl,
+} from '../src/domein/sveryavane.js';
 import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
@@ -65,33 +83,77 @@ interface Pitane {
 }
 let pitane: Pitane | null = null;
 
-const IZTOCHNITSI: readonly { vid: VidIzvor; ime: string; opis: string; vidove: string }[] = [
-  { vid: 'raka', ime: 'На ръка, тук в приложението', opis: 'формите долу', vidove: '' },
-  { vid: 'xlsx', ime: 'От Excel (.xlsx)', opis: 'чете файла от Драйва', vidove: '.xlsx' },
-  { vid: 'csv', ime: 'От таблица (.csv)', opis: 'изнесена от Excel или от банката', vidove: '.csv,.txt' },
-  { vid: 'pdf', ime: 'От PDF', opis: 'чете текста, ако PDF-ът има такъв', vidove: '.pdf' },
-];
+/**
+ * Кой бутон е натиснат. Бутоните са модели на пътища (`src/domein/butoni.ts`);
+ * ръчният път остава като бутон без папка, за да няма два механизма.
+ */
+let natisnat: Buton | null = null;
+/** Резултатът от последната сверка — числото, което тя записа в Журнала. */
+let posledna: { razlika_st: number; vhod_st: number; izhod_st: number } | null = null;
+/** Листове, които никой позволен модел не позна — броят се, не се преглъщат. */
+let nepoznati: string[] = [];
+/** Отпечатъците на всички файлове от партидата — влизат в записаната сверка. */
+let izvori: string[] = [];
+/**
+ * Числовите колони на прочетеното, разпределени в двата задължителни сбора.
+ * Смятат се при ЧЕТЕНЕ, защото само тогава таблицата е под ръка.
+ */
+let sborove: { model: ModelNaTablitsa; tablitsa: Tablitsa; dvata: DvataSbora } | null = null;
 
-export function narisuvayButona(): string {
+/**
+ * ПЪРВИЯТ БУТОН · онзи, който съществуваше преди Настройки.
+ *
+ * Пази се като бутон, за да няма два механизма: старият път „Въведи разходи"
+ * е просто бутон без записани модели — приема всеки познат хедър и пита за
+ * непознатия. Папката му е „Разходи", защото точно там влизаше досега.
+ */
+const PARVIYAT: Buton = napraviButon({
+  klyuch: 'Въведи разходи',
+  papka: 'Разходи',
+  deystvie: 'sveryavane-eksel',
+});
+
+/**
+ * МЕНЮТО · списък от БУТОНИ, групирани по папка.
+ *
+ * Дотук пунктовете бяха четири закована вида файл. Оттук са толкова, колкото
+ * бутона има човекът — плюс четирите вида, които всеки бутон приема.
+ */
+export function narisuvayButona(butoni: readonly Buton[] = []): string {
+  const vsichki = [PARVIYAT, ...butoni.filter((b) => b.klyuch !== PARVIYAT.klyuch)];
+  const poPapka = [...new Set(vsichki.map((b) => b.papka))].sort((a, b) => a.localeCompare(b));
+
   return `
     <div class="padashto">
       <button type="button" class="glaven" id="vzemi" aria-expanded="${otvoreno}">
-        Въведи разходи ▾
+        ${natisnat ? ekraniraj(natisnat.klyuch) : 'Въведи разходи'} ▾
       </button>
       ${
         otvoreno
           ? `<div class="menyu" id="menyu">
-        ${IZTOCHNITSI.map(
-          (i) => `<button type="button" class="punkt" data-iztochnik="${i.vid}">
-            <b>${ekraniraj(i.ime)}</b><span>${ekraniraj(i.opis)}</span>
-          </button>`,
-        ).join('')}
-        <p class="drebno">Файлът не се качва и не се запазва — чете се и се взима снимка на числата. В Журнала влиза само следата: име, час и отпечатък.</p>
+        ${poPapka
+          .map(
+            (p) => `<p class="menyupapka">${ekraniraj(p)}</p>
+          ${vsichki
+            .filter((b) => b.papka === p)
+            .map(
+              (b) => `<button type="button" class="punkt" data-buton="${ekraniraj(b.klyuch)}">
+              <b>${ekraniraj(b.klyuch)}</b><span>${
+                b.modeli.length === 0
+                  ? 'приема всеки познат хедър'
+                  : `само: ${ekraniraj(b.modeli.join(' · '))}`
+              }</span>
+            </button>`,
+            )
+            .join('')}`,
+          )
+          .join('')}
+        <p class="drebno">Може да посочиш <b>няколко файла наведнъж</b> — влизат като ЕДНА партида с едно число. Файловете не се качват: чете се и се взима снимка. Нови бутони се правят в <b>Настройки</b>.</p>
       </div>`
           : ''
       }
     </div>
-    <input translate="no" type="file" id="fayl-iztochnik" hidden>`;
+    <input translate="no" type="file" id="fayl-iztochnik" multiple hidden>`;
 }
 
 export function narisuvayPlana(): string {
@@ -185,6 +247,19 @@ export function narisuvayPlana(): string {
             : pokazani.map(redNaRazlika).join('')
         }
       </div>
+
+      ${blokNaSborovete()}
+
+      ${
+        nepoznati.length === 0
+          ? ''
+          : `<div class="tablitsa">
+        <div class="glava propusnat"><span>Непознат лист</span><span>нито един позволен модел не го позна</span></div>
+        ${nepoznati
+          .map((x) => `<div class="red propusnat" translate="no"><span>лист</span><span>${ekraniraj(x)}</span></div>`)
+          .join('')}
+      </div>`
+      }
 
       ${
         p.snimka.propusnati.length === 0
@@ -310,6 +385,70 @@ function narisuvayPitaneto(pi: Pitane): string {
     </section>`;
 }
 
+/**
+ * ДВАТА ЗАДЪЛЖИТЕЛНИ СБОРА · Приход /+/ и Разход /−/.
+ *
+ * Негови думи: „Те не са бутон, а УМЕНИЕ НА ДАННИТЕ… появява се падащо меню с
+ * името на избраната колона от тези възможни С ЦИФРИ, сумарно от цялата
+ * колона… и има възможност просто да се изключи там."
+ *
+ * Затова тук нищо не се избира и нищо не се добавя: всяка числова колона се
+ * ПОЯВЯВА сама, от страната, която сборът ѝ ѝ дава. Човекът само маха.
+ *
+ * ЧЕСТНО ЗА ДНЕШНИЯ ОБХВАТ: в Журнала днес влиза колоната с роля „сума".
+ * Останалите числови колони се виждат, носят знак и се помнят изключени —
+ * пътят им до Сметки е следващият резен, и това е казано и на екрана.
+ */
+function blokNaSborovete(): string {
+  if (!sborove) return '';
+  const { dvata } = sborove;
+  if (dvata.prihod.length + dvata.razhod.length + dvata.izklyucheni.length === 0) return '';
+
+  const red = (k: ChislovaKolona, sbor: 'prihod' | 'razhod' | null): string => `
+    <div class="red znak${k.izklyuchena ? ' mahnata' : ''}" translate="no">
+      <span>${
+        sbor === null
+          ? '<span class="znachka tiha">махната</span>'
+          : `<span class="znachka ${sbor === 'prihod' ? 'plyus' : 'minus'}">${ZNAK[sbor]}</span>`
+      }</span>
+      <span class="kletka"><b>${ekraniraj(k.ime)}</b><span>${k.broy} ${
+        k.broy === 1 ? 'число' : 'числа'
+      }${k.rolya ? ` · роля „${ekraniraj(IMENA_NA_ROLITE[k.rolya])}"` : ''}</span></span>
+      <span class="kletka"><span>напр. ${ekraniraj(primer(sborove!.model, sborove!.tablitsa, k.kolona))}</span></span>
+      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}">${kakvoPishe(
+        Math.abs(k.sbor_st) as never,
+      )}</span>
+      <span class="butoni">
+        <button type="button" class="vtorichen malak" data-znak="${k.kolona}">${
+          k.izklyuchena ? 'Върни' : 'Махни'
+        }</button>
+      </span>
+    </div>`;
+
+  return `
+      <div class="dyalglava">
+        <h2 class="malko">Приход /+/ и Разход /−/</h2>
+        <span>${ekraniraj(sDumi(dvata))}</span>
+      </div>
+      <div class="tablitsa">
+        <div class="glava znak">
+          <span>Знак</span><span>Колона</span><span>Пример</span>
+          <span class="suma">Сбор</span><span></span>
+        </div>
+        ${dvata.prihod.map((k) => red(k, 'prihod')).join('')}
+        ${dvata.razhod.map((k) => red(k, 'razhod')).join('')}
+        ${dvata.izklyucheni.map((k) => red(k, null)).join('')}
+        <div class="red znak sbor" translate="no">
+          <span></span>
+          <span class="kletka"><b>${IMENA_NA_SBOROVETE.prihod} ${ZNAK.prihod} · ${IMENA_NA_SBOROVETE.razhod} ${ZNAK.razhod}</b><span>двата сбора не се махат — само се скриват</span></span>
+          <span></span>
+          <span class="suma plateno">${kakvoPishe(dvata.prihod_st as never)}</span>
+          <span class="suma duljimo">${kakvoPishe(dvata.razhod_st as never)}</span>
+        </div>
+      </div>
+      <p class="drebno">Знакът се <b>смята</b> от сбора, не се записва — затова следващия месец колоната сменя мястото си сама. Записва се само <b>махането</b>: то е решение и иска следа. Днес в Журнала влиза колоната с роля „сума"; пътят на останалите до Сметки е следващият резен.</p>`;
+}
+
 /** Име по подразбиране: файлът без наставка и без брояча „(3)". */
 function imeOtIzvor(ime: string): string {
   return ime
@@ -348,38 +487,120 @@ async function tablitsiOtFayl(
 ): Promise<Tablitsa[]> {
   if (vid === 'xlsx') return (await otXLSX(danni, ime)).map(bezPrazni);
   if (vid === 'pdf') return [bezPrazni(tablitsaOtPDF(await otPDF(danni), ime))];
-  return [bezPrazni(otCSV(new TextDecoder().decode(danni), ime))];
+  return [bezPrazni(otCSV(tekstOtBaytove(danni), ime))];
 }
 
-async function napraviPlan(fayl: File, vid: VidIzvor, k: Konteks): Promise<void> {
-  // Файлът се чете ВЕДНЪЖ: същите байтове дават и отпечатъка, и таблицата.
+/** Видът на файла се вади от името, защото един бутон приема всички. */
+function vidPoIme(ime: string): VidIzvor {
+  const dolu = ime.toLowerCase();
+  if (dolu.endsWith('.xlsx')) return 'xlsx';
+  if (dolu.endsWith('.pdf')) return 'pdf';
+  return 'csv';
+}
+
+/** Един файл, прочетен ВЕДНЪЖ: същите байтове дават и отпечатъка, и листовете. */
+async function prochetiFayla(fayl: File): Promise<PodadenFayl> {
+  const vid = vidPoIme(fayl.name);
   const danni = new Uint8Array(await fayl.arrayBuffer());
-  const izvor: Izvor = {
-    vid,
-    ime: fayl.name,
-    golemina: fayl.size,
-    promenen: new Date(fayl.lastModified).toISOString(),
-    otpechatak: await otpechatak(danni, sha256Web),
+  return {
+    izvor: {
+      vid,
+      ime: fayl.name,
+      golemina: fayl.size,
+      promenen: new Date(fayl.lastModified).toISOString(),
+      otpechatak: await otpechatak(danni, sha256Web),
+    },
+    tablitsi: await tablitsiOtFayl(danni, fayl.name, vid),
   };
+}
 
-  const tablitsi = await tablitsiOtFayl(danni, fayl.name, vid);
+/**
+ * ПАРТИДАТА · няколко файла, няколко листа, ЕДНО число.
+ *
+ * Бутонът решава кои модели са позволени. Ако никой не познае нищо и файлът е
+ * един, се пада към стария път: разпознаване по думи, а ако и то не хване —
+ * питане за картата на хедъра. Така нищо от резен 12 не се губи, а бутонът
+ * добавя отгоре това, което той поиска: няколко файла и списък от модели.
+ */
+async function napraviPartida(faylove: readonly File[], buton: Buton, k: Konteks): Promise<void> {
+  const podadeni: PodadenFayl[] = [];
+  for (const f of faylove) podadeni.push(await prochetiFayla(f));
+
   const o = await k.deystviya.ogledalo();
-  const s = nameriTablitsata(tablitsi, izvor, [...o.modeli.values()]);
+  try {
+    const partida = await sgloviPartida({
+      buton,
+      faylove: podadeni,
+      modeli: [...o.modeli.values()],
+      ogledalo: o,
+      sha: sha256Web,
+    });
+    pitane = null;
+    plan = partida.plan;
+    nepoznati = partida.nepoznati.map((x) => `„${x.list}" от ${x.fayl}`);
+    izvori = [...partida.izvori];
+    sborove = presmetniSborovete(partida.dvoyki);
+    filtar = 'promenite';
+    greshka = '';
+  } catch (err) {
+    // „Не позна нито един лист" при ЕДИН файл не е грешка — това е моментът,
+    // в който приложението пита. Три условия обаче трябва да са налице:
+    //
+    //   · грешката е точно тази (чужд модел хвърля `GreshkaButon`, не тази);
+    //   · файлът е ЕДИН — при няколко питането би било гадаене за кой от тях;
+    //   · бутонът НЯМА списък с модели.
+    //
+    // Третото е кръвно платено: без него бутон, ограничен до „Банка ОББ",
+    // приемаше таблица с разходи през стария път по думи — тоест списъкът с
+    // позволени модели се заобикаляше тихо. Проход §19 го хвана.
+    if (!(err instanceof GreshkaSveryavane) || podadeni.length !== 1) throw err;
+    if (buton.modeli.length > 0) throw err;
+    await staraPateka(podadeni[0]!, o, k);
+  }
+}
 
-  // Никой модел не позна и нито един лист не се разчита сам — питаме.
+/** Пътят отпреди бутоните: разпознаване по думи, иначе питане за картата. */
+async function staraPateka(
+  f: PodadenFayl,
+  o: Awaited<ReturnType<Konteks['deystviya']['ogledalo']>>,
+  _k: Konteks,
+): Promise<void> {
+  const s = nameriTablitsata(f.tablitsi, f.izvor, [...o.modeli.values()]);
   if (!s) {
-    const t = tablitsi.find((x) => x.redove.length > 0) ?? tablitsi[0];
+    const t = f.tablitsi.find((x) => x.redove.length > 0) ?? f.tablitsi[0];
     if (!t) throw new Error('Файлът няма нито един ред.');
-    pitane = { izvor, tablitsa: t, redNaGlavata: pogadniRedNaGlavata(t) };
+    pitane = { izvor: f.izvor, tablitsa: t, redNaGlavata: pogadniRedNaGlavata(t) };
     plan = null;
+    nepoznati = [];
     greshka = '';
     return;
   }
-
   pitane = null;
   plan = sravni(o, s);
+  nepoznati = [];
+  izvori = [f.izvor.otpechatak];
+  sborove = null;
   filtar = 'promenite';
   greshka = '';
+}
+
+/**
+ * Двата сбора се смятат от ПЪРВИЯ прочетен лист.
+ *
+ * Нарочно не се сливат листовете: колона „Такса" в два различни модела не е
+ * една и съща колона, и събирането ѝ би дало число, което не значи нищо.
+ * Слепването на няколко модела в един сбор чака своя резен.
+ */
+function presmetniSborovete(
+  dvoyki: readonly { model: ModelNaTablitsa; tablitsa: Tablitsa }[],
+): { model: ModelNaTablitsa; tablitsa: Tablitsa; dvata: DvataSbora } | null {
+  const parva = dvoyki[0];
+  if (!parva) return null;
+  return {
+    model: parva.model,
+    tablitsa: parva.tablitsa,
+    dvata: vDvataSbora(chislovi(parva.model, parva.tablitsa)),
+  };
 }
 
 /**
@@ -425,6 +646,21 @@ function pogadniRedNaGlavata(t: Tablitsa): number {
   return i < 0 ? 0 : i;
 }
 
+/**
+ * Добавя новия модел към списъка на бутона — ако бутонът има списък.
+ *
+ * Бутон с ПРАЗЕН списък приема всичко и няма какво да се добавя. Бутон със
+ * списък трябва да поеме модела, иначе следващия път ще откаже същия файл,
+ * който човекът току-що му е обяснил — и това би изглеждало като повреда.
+ */
+async function pomniVButona(b: Buton | null, model: string, k: Konteks): Promise<boolean> {
+  if (!b || b.modeli.length === 0 || b.modeli.includes(model)) return false;
+  const nov = napraviButon({ ...b, modeli: [...b.modeli, model] });
+  await k.deystviya.zapishiButon(nov, { opId: `buton:${crypto.randomUUID()}` });
+  natisnat = nov;
+  return true;
+}
+
 /** Прочита таблицата на питането през вече записания модел. */
 async function prilozhiModela(m: ModelNaTablitsa, k: Konteks): Promise<void> {
   const pi = pitane!;
@@ -455,35 +691,31 @@ export function zakachiIztochnitsi(
 
   const fayl = koren.querySelector<HTMLInputElement>('#fayl-iztochnik');
 
-  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-iztochnik]')) {
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-buton]')) {
     b.addEventListener('click', async () => {
-      const vid = b.dataset['iztochnik'] as VidIzvor;
+      const ime = b.dataset['buton']!;
+      const o = await k.deystviya.ogledalo();
+      natisnat = o.butoni.get(ime) ?? (ime === PARVIYAT.klyuch ? PARVIYAT : null);
       otvoreno = false;
       greshka = '';
-      if (vid === 'raka') {
-        plan = null;
-        await prerisuvay();
-        return;
-      }
-      const opis = IZTOCHNITSI.find((i) => i.vid === vid)!;
       await prerisuvay();
-      await izberiFayl(vid, opis.vidove, k, prerisuvay);
+      if (natisnat) await izberiFayl(natisnat, k, prerisuvay);
     });
   }
 
   fayl?.addEventListener('change', async () => {
-    const izbran = fayl.files?.[0];
-    const vid = (fayl.dataset['vid'] ?? 'csv') as VidIzvor;
+    const izbrani = [...(fayl.files ?? [])];
     fayl.value = '';
-    if (!izbran) return;
+    if (izbrani.length === 0) return;
     drazhka = null;
-    await opitaj(() => napraviPlan(izbran, vid, k), prerisuvay);
+    const buton = natisnat ?? PARVIYAT;
+    await opitaj(() => napraviPartida(izbrani, buton, k), prerisuvay);
   });
 
   koren.querySelector<HTMLButtonElement>('#prechetii')?.addEventListener('click', async () => {
     if (!drazhka || !plan) return;
-    const vid = plan.snimka.izvor.vid;
-    await opitaj(async () => napraviPlan(await drazhka!.getFile(), vid, k), prerisuvay);
+    const buton = natisnat ?? PARVIYAT;
+    await opitaj(async () => napraviPartida([await drazhka!.getFile()], buton, k), prerisuvay);
   });
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar]')) {
@@ -497,8 +729,43 @@ export function zakachiIztochnitsi(
     plan = null;
     greshka = '';
     drazhka = null;
+    nepoznati = [];
+    sborove = null;
     await prerisuvay();
   });
+
+  // ── знакът · махане и връщане на числова колона ──────────────────────────
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-znak]')) {
+    b.addEventListener('click', async () => {
+      if (!sborove) return;
+      const kolona = Number(b.dataset['znak']);
+      const stariyat = sborove.model;
+      b.disabled = true;
+      try {
+        // Махането е РЕШЕНИЕ — записва се в модела, за да важи и утре.
+        const nov = napraviModel({
+          klyuch: stariyat.klyuch,
+          tablitsa: sborove.tablitsa,
+          redNaGlavata: stariyat.redNaGlavata,
+          koloni: stariyat.koloni,
+          ...(stariyat.ddsE ? { ddsE: stariyat.ddsE } : {}),
+          izklyucheni: sPrevklyuchena(stariyat, kolona),
+        });
+        // `opId` носи ДЕЙСТВИЕТО, не съдържанието: махнеш ли колона и я върнеш,
+        // съдържанието се връща към предишното, а действията са две.
+        await k.deystviya.zapishiModel(nov, { opId: `znak:${crypto.randomUUID()}` });
+        sborove = {
+          model: nov,
+          tablitsa: sborove.tablitsa,
+          dvata: vDvataSbora(chislovi(nov, sborove.tablitsa)),
+        };
+        greshka = '';
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   // ── картата на хедъра ────────────────────────────────────────────────────
   koren.querySelector<HTMLSelectElement>('#karta-glava')?.addEventListener('change', async (e) => {
@@ -540,14 +807,20 @@ export function zakachiIztochnitsi(
         ...(koloni.dds === undefined ? {} : { ddsE }),
       });
       // Първо в Журнала, после на екрана: моделът трябва да ПРЕЖИВЕЕ прочита.
-      await k.deystviya.zapishiModel(model, {
-        // Белегът е от СЪДЪРЖАНИЕТО: поправена карта е нов запис, не повторение.
-        opId: `model:${model.klyuch}:${belegNaModel(model)}`,
-      });
+      // Нищо не се пише, ако картата е същата — иначе Журналът пълнее с
+      // еднакви записи, а човекът мисли, че е поправил нещо.
+      const veche = (await k.deystviya.ogledalo()).modeli.get(model.klyuch);
+      if (!veche || belegNaModel(veche) !== belegNaModel(model)) {
+        await k.deystviya.zapishiModel(model, { opId: `model:${crypto.randomUUID()}` });
+      }
+      // Бутонът, през който дойде файлът, ПОЕМА новия модел: човекът вече е
+      // казал „това минава оттук". Иначе следващия път пак ще го откаже.
+      const poet = await pomniVButona(natisnat, model.klyuch, k);
       await prilozhiModela(model, k);
       k.vest(
         'dobre',
-        `Моделът „${model.klyuch}" е записан. Следващият файл със същата глава минава без питане.`,
+        `Моделът „${model.klyuch}" е записан. Следващият файл със същата глава минава без питане` +
+          (poet ? `, а бутонът „${natisnat!.klyuch}" вече го приема.` : '.'),
       );
     } catch (err) {
       greshka =
@@ -560,56 +833,84 @@ export function zakachiIztochnitsi(
 
   koren.querySelector<HTMLButtonElement>('#prilozhi')?.addEventListener('click', async (e) => {
     if (!plan) return;
-    const buton = e.currentTarget as HTMLButtonElement;
+    const natisnatiyat = e.currentTarget as HTMLButtonElement;
     const vzemi = (izbor: string) => koren.querySelector<HTMLSelectElement>(izbor)!.value;
+    const tekusht = plan;
+    const buton = natisnat ?? PARVIYAT;
+    const kogato = new Date().toISOString();
+    const izvoriteNaPartidata = izvori.length ? izvori : [tekusht.snimka.izvor.otpechatak];
 
-    buton.disabled = true;
+    natisnatiyat.disabled = true;
     try {
       const rezultat = await prilozhi(
         k.deystviya,
-        plan,
+        tekusht,
         {
           potok: vzemi('#plan-potok'),
           sektor: vzemi('#plan-sektor'),
           nachin: vzemi('#plan-nachin') as 'банка' | 'в брой',
         },
-        new Date().toISOString(),
+        kogato,
       );
+
+      // Сверката се ЗАПИСВА — и когато разликата е нула (правило 7). Дотук тя
+      // живееше само в паметта на екрана и умираше с презареждането.
+      const svereno = await zapishiSverkata(k.deystviya, {
+        buton,
+        partida: { plan: tekusht, dvoyki: [], nepoznati: [], izvori: izvoriteNaPartidata },
+        rezultat,
+        kogato,
+      });
+      posledna = {
+        razlika_st: svereno.razlika_st,
+        vhod_st: svereno.vhod_st,
+        izhod_st: svereno.izhod_st,
+      };
+
       k.vest(
-        'dobre',
+        svereno.nared ? 'dobre' : 'zle',
         `${rezultat.zapisani} ${rezultat.zapisani === 1 ? 'записан' : 'записани'}` +
           `${rezultat.stornirani ? `, ${rezultat.stornirani} сторнирани` : ''}` +
           `${rezultat.bezPromyana ? `, ${rezultat.bezPromyana} без промяна` : ''}. ` +
-          'Сверката затваря; следата за файла остава в Журнала.',
+          `Сверката е ЗАПИСАНА в Журнала · разлика ${kakvoPishe(svereno.razlika_st as never)}.`,
       );
       plan = null;
+      nepoznati = [];
       greshka = '';
     } catch (err) {
       greshka = err instanceof Error ? err.message : String(err);
     } finally {
-      buton.disabled = false;
+      natisnatiyat.disabled = false;
       await prerisuvay();
     }
   });
 }
 
-/** Показва файла за четене. Където има модерен избирач, дръжката се пази. */
+/**
+ * Показва файловете за четене · МНОЖЕСТВЕН избор.
+ *
+ * Негов избор: няколко файла наведнъж, една сверка. Затова и модерният, и
+ * старият избирач приемат повече от един. Където има модерен, дръжката на
+ * ПЪРВИЯ се пази — „Препрочети" има смисъл само за един файл.
+ */
+const VSICHKI_VIDOVE = '.xlsx,.csv,.txt,.pdf';
+
 async function izberiFayl(
-  vid: VidIzvor,
-  vidove: string,
+  buton: Buton,
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): Promise<void> {
   const izbirach = (globalThis as { showOpenFilePicker?: unknown }).showOpenFilePicker;
   if (typeof izbirach === 'function') {
     try {
-      const [dr] = (await (izbirach as (n: unknown) => Promise<FileSystemFileHandle[]>)({
-        multiple: false,
-        types: [{ description: vidove, accept: { '*/*': vidove.split(',') } }],
+      const drazhki = (await (izbirach as (n: unknown) => Promise<FileSystemFileHandle[]>)({
+        multiple: true,
+        types: [{ description: 'таблици', accept: { '*/*': VSICHKI_VIDOVE.split(',') } }],
       })) as FileSystemFileHandle[];
-      if (!dr) return;
-      drazhka = dr;
-      await opitaj(async () => napraviPlan(await dr.getFile(), vid, k), prerisuvay);
+      if (drazhki.length === 0) return;
+      drazhka = drazhki.length === 1 ? drazhki[0]! : null;
+      const faylove = await Promise.all(drazhki.map((d) => d.getFile()));
+      await opitaj(() => napraviPartida(faylove, buton, k), prerisuvay);
       return;
     } catch (err) {
       // Отказан избор не е грешка; всичко друго пада към стария избирач.
@@ -619,8 +920,7 @@ async function izberiFayl(
 
   const fayl = document.getElementById('fayl-iztochnik') as HTMLInputElement | null;
   if (!fayl) return;
-  fayl.accept = vidove;
-  fayl.dataset['vid'] = vid;
+  fayl.accept = VSICHKI_VIDOVE;
   fayl.click();
 }
 

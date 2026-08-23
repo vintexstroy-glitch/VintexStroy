@@ -18,7 +18,9 @@ import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
   PayloadImotPopraven,
+  PayloadButonZapisan,
   PayloadModelZapisan,
+  PayloadSverkaZapisana,
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
@@ -140,6 +142,27 @@ export class Deystviya {
    */
   async zapishiModel(danni: PayloadModelZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('МоделЗаписан', VID.model, `MODEL:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * Записва бутон — модела на един ПЪТ (Настройки).
+   *
+   * НЕ иска отключен период, както и моделът: бутонът не е запис за месец, а
+   * описание на път. Каквото той после ражда, минава през своите проверки.
+   */
+  async zapishiButon(danni: PayloadButonZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('БутонЗаписан', VID.buton, `BUTON:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * Записва сверка — И КОГАТО РАЗЛИКАТА Е НУЛА (правило 7).
+   *
+   * НЕ иска отключен период НАРОЧНО: сверката не мени нито едно число, тя само
+   * казва какво е видяла. Заключен месец се сверява точно толкова, колкото и
+   * отворен — иначе замразяването щеше да значи и „не гледай".
+   */
+  async zapishiSverka(id: string, danni: PayloadSverkaZapisana, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('СверкаЗаписана', VID.sverka, id, danni, z);
   }
 
   /**

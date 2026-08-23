@@ -14,6 +14,7 @@
 import type { Sabitie } from '../yadro/index.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
+import type { Buton } from '../domein/butoni.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -23,8 +24,10 @@ import type {
   PayloadPlashtanePrieto,
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
+  PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSpravkaPodadena,
+  PayloadSverkaZapisana,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -124,6 +127,19 @@ export interface PlashtaneDDS {
   readonly nachin: string;
 }
 
+/** Една сверка, както живее в Журнала: числата плюс кога и кой seq. */
+export interface ZapisanaSverka {
+  readonly seq: number;
+  readonly kogato: string;
+  readonly buton: string;
+  readonly period: string;
+  readonly vhod_st: number;
+  readonly izhod_st: number;
+  readonly razlika_st: number;
+  readonly izvori: readonly string[];
+  readonly propusnati: number;
+}
+
 export interface Ogledalo {
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
@@ -135,6 +151,10 @@ export interface Ogledalo {
   readonly platenoDDS: ReadonlyMap<string, PlashtaneDDS>;
   /** име на модела → картата на хедъра; вж. `src/iztochnik/model.ts` */
   readonly modeli: ReadonlyMap<string, ModelNaTablitsa>;
+  /** име на бутона → моделът на пътя; вж. `src/domein/butoni.ts` */
+  readonly butoni: ReadonlyMap<string, Buton>;
+  /** записаните сверки, най-новата последна — включително нулевите */
+  readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
   /** seq-овете, които сторно е погасило (и самите сторна) */
@@ -163,6 +183,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const spravki = new Map<string, Spravka>();
   const platenoDDS = new Map<string, PlashtaneDDS>();
   const modeli = new Map<string, ModelNaTablitsa>();
+  const butoni = new Map<string, Buton>();
+  const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
   for (const s of sabitiya) {
@@ -226,7 +248,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'МоделЗаписан': {
         const p = s.payload as unknown as PayloadModelZapisan;
         // Последният запис за същото име надделява — поправка, не втори модел.
-        modeli.set(p.klyuch, p);
+        // Моделите отпреди резен 13 нямат `izklyucheni` — падат към празен
+        // списък, вместо да пукат при първото четене.
+        modeli.set(p.klyuch, { ...p, izklyucheni: p.izklyucheni ?? [] });
+        break;
+      }
+
+      case 'БутонЗаписан': {
+        const p = s.payload as unknown as PayloadButonZapisan;
+        butoni.set(p.klyuch, p);
+        break;
+      }
+
+      case 'СверкаЗаписана': {
+        const p = s.payload as unknown as PayloadSverkaZapisana;
+        sverki.push({ ...p, seq: s.seq, kogato: s.ts });
         break;
       }
 
@@ -349,6 +385,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     spravki,
     platenoDDS,
     modeli,
+    butoni,
+    sverki,
     prilozheni,
     pogaseni,
   };
