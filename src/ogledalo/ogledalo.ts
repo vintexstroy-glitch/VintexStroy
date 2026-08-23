@@ -55,6 +55,10 @@ export interface Naem {
   readonly seq: number;
   readonly imotId: string;
   readonly naemetel: string;
+  /** телефон за връзка · празно, когато не е записан */
+  readonly telefon: string;
+  /** имейл за връзка · празно значи, че писмо не може да тръгне */
+  readonly imeyl: string;
   readonly naem_st: number;
   readonly padezhDen: number;
   readonly ot: string;
@@ -249,6 +253,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           seq: s.seq,
           imotId: p.imotId,
           naemetel: p.naemetel,
+          // Наем, записан преди контактите, ги няма — празно, не „липсва".
+          telefon: p.telefon ?? '',
+          imeyl: p.imeyl ?? '',
           naem_st: p.naem_st,
           padezhDen: p.padezhDen,
           ot: p.ot,
@@ -413,6 +420,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           naemi.set(naem.id, {
             ...naem,
             naemetel: p.naemetel,
+            telefon: p.telefon ?? '',
+            imeyl: p.imeyl ?? '',
             naem_st: p.naem_st,
             padezhDen: p.padezhDen,
             ot: p.ot,

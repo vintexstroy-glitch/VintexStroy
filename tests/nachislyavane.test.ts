@@ -71,7 +71,8 @@ async function nasadi(d: Deystviya, naemi: readonly OpisNaem[]) {
 
 describe('кой наем се начислява', () => {
   const naem = {
-    id: 'N-1', seq: 2, imotId: 'I-1', naemetel: 'X', naem_st: 100_00, padezhDen: 5,
+    id: 'N-1', seq: 2, imotId: 'I-1', naemetel: 'X', telefon: '', imeyl: '',
+    naem_st: 100_00, padezhDen: 5,
     ot: '2024-03-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten', prekraten: false,
   };
 
@@ -99,7 +100,8 @@ describe('кой наем се начислява', () => {
 
 describe('падежът', () => {
   const naem = {
-    id: 'N-1', seq: 2, imotId: 'I-1', naemetel: 'X', naem_st: 100_00, padezhDen: 16,
+    id: 'N-1', seq: 2, imotId: 'I-1', naemetel: 'X', telefon: '', imeyl: '',
+    naem_st: 100_00, padezhDen: 16,
     ot: '2024-01-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten', prekraten: false,
   };
 

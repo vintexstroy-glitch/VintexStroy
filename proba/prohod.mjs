@@ -1383,6 +1383,40 @@ async function main() {
     proveri('СЕГА филтрира по спешно и важно',
       await p.$eval('#f-otsenka', (e) => e.value), 'спешно-важно');
 
+    // ══ 25 · контактите и писмото при закъснение ═════════════════════════
+    razdel = '25 · писмото при закъснение';
+    await naEkran(p, 'imoti', '#forma-imot');
+    await dobaviNaem(p, {
+      koy: 'Иван Контактен', suma: '250,00',
+      sektor: 'naem-zhilishten', padezh: '5',
+      telefon: '0888 123 456', imeyl: 'ivan@primer.bg',
+    });
+    proveri('телефонът и пощата се четат в реда на наема',
+      (await p.$$eval('.red.naem', (r) => r.map((x) => x.innerText)))
+        .some((t) => t.includes('0888 123 456') && t.includes('ivan@primer.bg')), true);
+
+    // Начисляваме СТАР период — падежът минава и вземането става просрочено.
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await p.fill('#period', '2026-02');
+    await p.click('#forma-nachisli button[type=submit]');
+    await p.waitForFunction(() => document.body.innerText.includes('Сверката затваря'));
+
+    const redSPismo = '.red.vzemane:has-text("Иван Контактен")';
+    proveri('просроченият ред носи бутон „Писмо"',
+      await p.$$eval(`${redSPismo} [data-pismo]`, (e) => e.length), 1);
+
+    const adres = await p.$eval(`${redSPismo} [data-pismo]`, (e) => e.getAttribute('href'));
+    proveri('писмото тръгва към неговата поща',
+      adres.startsWith('mailto:ivan%40primer.bg?'), true);
+    const chetimo = decodeURIComponent(adres);
+    proveri('темата носи сумата', chetimo.includes('250,00'), true);
+    proveri('тялото носи периода', chetimo.includes('2026-02'), true);
+    proveri('и допуска, че вече е платено', chetimo.includes('вече е направено'), true);
+
+    // БЕЗ ИМЕЙЛ НЯМА БУТОН · „Домакинство" е записан преди двете полета.
+    proveri('наем без поща не показва празен бутон',
+      await p.$$eval('.red.vzemane:has-text("Домакинство") [data-pismo]', (e) => e.length), 0);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
@@ -1423,9 +1457,13 @@ async function dobaviImot(p, adres, edinitsa, ploshtad) {
   }, predi);
 }
 
-async function dobaviNaem(p, { imot, koy, suma, sektor, padezh }) {
-  await p.selectOption('#naem-imot', { label: imot });
+async function dobaviNaem(p, { imot, koy, suma, sektor, padezh, telefon, imeyl }) {
+  // По име, когато е подадено; иначе първият в списъка — по §25 имотите вече са
+  // минали през поправки и сторно, и заковано име би се разминало.
+  await p.selectOption('#naem-imot', imot ? { label: imot } : { index: 0 });
   await p.fill('#naem-naemetel', koy);
+  if (telefon) await p.fill('#naem-telefon', telefon);
+  if (imeyl) await p.fill('#naem-imeyl', imeyl);
   await p.fill('#naem-suma', suma);
   await p.selectOption('#naem-sektor', sektor);
   await p.fill('#naem-padezh', padezh);

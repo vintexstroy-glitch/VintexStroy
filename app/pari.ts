@@ -20,6 +20,7 @@ import {
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
 import { VID } from '../src/domein/sabitiya.js';
+import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { ekraniraj } from './imoti.js';
 import { opitajStorno } from './storno.js';
 import type { Konteks } from './main.js';
@@ -149,20 +150,55 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
   `;
 }
 
-function opisiVzemane(o: Ogledalo, v: Vzemane): { koy: string; kade: string } {
+function opisiVzemane(
+  o: Ogledalo,
+  v: Vzemane,
+): { koy: string; kade: string; telefon: string; imeyl: string } {
   const naem = o.naemi.get(v.naemId);
   const imot = naem ? o.imoti.get(naem.imotId) : undefined;
   return {
     koy: naem?.naemetel ?? '—',
     kade: imot ? `${imot.adres} · ${imot.edinitsa}` : v.naemId,
+    telefon: naem?.telefon ?? '',
+    imeyl: naem?.imeyl ?? '',
   };
 }
 
+/**
+ * БУТОНЪТ ЗА ПИСМО · само когато има КЪДЕ да отиде.
+ *
+ * Писмото тръгва от пощата на собственика с попълнен текст — той го чете и
+ * натиска Изпрати. Автоматичното изпращане иска сървър (правило 10), а писмо
+ * за пари, което никой не е прочел, отива и до онзи, който е платил в брой
+ * вчера.
+ *
+ * Без имейл бутон НЯМА, но телефонът се вижда: тогава се звъни.
+ */
+function butonPismo(o: Ogledalo, v: Vzemane, dni: number): string {
+  const { koy, kade, imeyl } = opisiVzemane(o, v);
+  const adres = adresZaPoshta(
+    napishiPismo({
+      naemetel: koy,
+      imeyl,
+      imot: kade,
+      period: v.period,
+      padezh: v.padezh,
+      ostatak_st: v.ostatak_st,
+      dniZakasnenie: dni,
+    }),
+  );
+  if (!adres) return '';
+  return `<a class="vtorichen malak kato-buton" href="${ekraniraj(adres)}" data-pismo="${ekraniraj(v.id)}">Писмо</a>`;
+}
+
 function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
-  const { koy, kade } = opisiVzemane(o, v);
+  const { koy, kade, telefon, imeyl } = opisiVzemane(o, v);
+  const zavrazka = [telefon, imeyl].filter((x) => x !== '').join(' · ');
   return `
     <div class="red vzemane" translate="no">
-      <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(kade)}</span></span>
+      <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(kade)}${
+        zavrazka ? ` · ${ekraniraj(zavrazka)}` : ''
+      }</span></span>
       <span class="kletka"><span>${v.period}</span></span>
       <span class="kletka">
         <span>${v.padezh}</span>
@@ -170,6 +206,7 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
       </span>
       <span class="suma${dni > 0 ? ' duljimo' : ''}">${pishi(v.ostatak_st)}</span>
       <span class="butoni">
+        ${dni > 0 ? butonPismo(o, v, dni) : ''}
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>

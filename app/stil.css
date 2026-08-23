@@ -359,6 +359,9 @@ button { font-family: inherit; cursor: pointer; }
   padding: 10px 14px; font-size: 13px; color: var(--mastilo); min-height: 40px;
 }
 .vtorichen:hover { background: var(--panel); }
+/* Връзка, която изглежда като бутон: „Писмо" отваря пощата, значи е <a>, не
+   <button> — така работят и „отвори в нов раздел", и десният бутон. */
+a.kato-buton { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* ── плочки ──────────────────────────────────────────────────────── */
 .plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }

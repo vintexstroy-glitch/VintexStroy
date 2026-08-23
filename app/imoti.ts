@@ -54,6 +54,8 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
         return i ? `${i.adres} · ${i.edinitsa}` : n.imotId;
       },
     },
+    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon },
+    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl },
     { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
     { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (n) => n.naem_st },
     {
@@ -186,6 +188,16 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
             <label for="naem-naemetel">Наемател</label>
             <input translate="no" id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off"
                    value="${popravyanNaem ? ekraniraj(popravyanNaem.naemetel) : ''}">
+          </div>
+          <div class="pole">
+            <label for="naem-telefon">Телефон (по избор)</label>
+            <input translate="no" id="naem-telefon" name="telefon" placeholder="0888 123 456" autocomplete="off"
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.telefon) : ''}">
+          </div>
+          <div class="pole">
+            <label for="naem-imeyl">Имейл (по избор)</label>
+            <input translate="no" id="naem-imeyl" name="imeyl" type="email" placeholder="ime@primer.bg" autocomplete="off"
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.imeyl) : ''}">
           </div>
           <div class="pole">
             <label for="naem-suma">Наем на месец, € — с ДДС</label>
@@ -349,7 +361,9 @@ function redNaem(naem: Naem, o: Ogledalo): string {
   const a = akumulator(naem.sektor);
   return `
     <div class="red naem" translate="no">
-      <span class="kletka"><b>${ekraniraj(naem.naemetel)}</b><span>падеж ${naem.padezhDen}-о число · от ${ekraniraj(naem.ot.slice(0, 10))}</span></span>
+      <span class="kletka"><b>${ekraniraj(naem.naemetel)}</b><span>падеж ${naem.padezhDen}-о число · от ${ekraniraj(naem.ot.slice(0, 10))}${
+        naem.telefon ? ` · ${ekraniraj(naem.telefon)}` : ''
+      }${naem.imeyl ? ` · ${ekraniraj(naem.imeyl)}` : ''}</span></span>
       <span class="kletka"><span>${imot ? ekraniraj(opisi(imot)) : ekraniraj(naem.imotId)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
       <span class="suma">${pishi(naem.naem_st)}</span>
@@ -452,6 +466,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           {
             naemId: rezhim.id,
             naemetel: String(danni.get('naemetel')).trim(),
+            telefon: String(danni.get('telefon') ?? '').trim(),
+            imeyl: String(danni.get('imeyl') ?? '').trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
             ot,
@@ -471,6 +487,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           {
             imotId: String(danni.get('imotId')),
             naemetel: String(danni.get('naemetel')).trim(),
+            telefon: String(danni.get('telefon') ?? '').trim(),
+            imeyl: String(danni.get('imeyl') ?? '').trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
             ot,

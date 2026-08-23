@@ -77,6 +77,16 @@ export interface PayloadImotDobaven {
 export interface PayloadNaemDobaven {
   readonly imotId: string;
   readonly naemetel: string;
+  /**
+   * ЗА ВРЪЗКА, когато наемът закъснее. Негови думи: „Едно име и телефон и
+   * имейл, за да му се праща имейл, ако закъснее."
+   *
+   * По ИЗБОР, и това е нарочно: наем, записан преди тези две полета, е също
+   * толкова валиден наем. Задължителното поле би превърнало стар запис в
+   * невалиден — а Журналът не се преписва (правило 1).
+   */
+  readonly telefon?: string;
+  readonly imeyl?: string;
   readonly naem_st: number;
   /** ден от месеца, на който пада наемът */
   readonly padezhDen: number;
@@ -112,6 +122,9 @@ export interface PayloadImotPopraven {
 export interface PayloadNaemPopraven {
   readonly naemId: string;
   readonly naemetel: string;
+  /** виж `PayloadNaemDobaven` — поправката носи и двете, за да се сменят */
+  readonly telefon?: string;
+  readonly imeyl?: string;
   readonly naem_st: number;
   readonly padezhDen: number;
   readonly ot: string;
