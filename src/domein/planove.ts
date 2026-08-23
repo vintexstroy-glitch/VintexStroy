@@ -85,10 +85,46 @@ export interface Plan {
   readonly klyuch: string;
   readonly ime: string;
   readonly zaKogo: string;
+  /**
+   * БЕЗ ОБЛАК ли работи — Журналът живее само в устройството.
+   *
+   * Това е СВОЙСТВО на плана, не възможност с отметка: не можеш да „изключиш"
+   * това, че нямаш драйв. Затова стои тук, до `iskaPlatenOblak`, а не в
+   * таблицата от възможности.
+   *
+   * Оттук идва и другото: офлайн планът НЕ е по-долно стъпало на облачната
+   * стълба, а ДРУГ КЛОН — същият двигател, друг носител. Стълбата се мери
+   * само между облачните.
+   */
+  readonly bezOblak: boolean;
   /** иска ли ПЛАТЕН план при Google/Microsoft/Apple */
   readonly iskaPlatenOblak: boolean;
   readonly vazmozhnosti: ReadonlySet<Vazmozhnost>;
 }
+
+/** Облачните планове, по ред. Стълбата важи МЕЖДУ ТЯХ, не спрямо офлайн. */
+export function oblachni(): readonly Plan[] {
+  return PLANOVE.filter((p) => !p.bezOblak);
+}
+
+/**
+ * ЛИЧНИЯТ ОФЛАЙН · без облак изобщо (ADR-006, план 1).
+ *
+ * Няма драйв, значи няма и `iztochnitsi` — няма таблица, от която да се чете.
+ * Всичко останало от двигателя е налично: Журналът, Сметките, филтрите,
+ * износът. Влиза се с ключа на машината, не през доставчик.
+ *
+ * Изборът, който купувачът прави: пълна независимост срещу пълна отговорност.
+ * Без облак няма автоматично копие — затова износът тук не е удобство.
+ */
+const OFLAYN: readonly Vazmozhnost[] = [
+  'zapis',
+  'smetki-dds',
+  'arhiv-eksel',
+  'iznos-vnos',
+  'fini-filtri',
+  'ogledala',
+];
 
 /**
  * ЛИЧНИЯТ · работата на ЕДИН човек. Носи всичко от двигателя ОСВЕН трите неща,
@@ -118,16 +154,31 @@ const STANDARTNI: readonly Vazmozhnost[] = [
 ];
 
 /**
- * Четирите плана, от малкия към големия. Таблицата е ЗАКОН: тест пази всеки
- * по-голям план да носи всичко от по-малкия.
+ * Плановете. Таблицата е ЗАКОН, но с ЕДНА уговорка:
+ *
+ *   ОФЛАЙН планът е отделен КЛОН, не по-долно стъпало. Той няма `iztochnitsi`
+ *   (няма драйв, от който да чете), затова не е подмножество на Личния.
+ *   Стълбата „по-големият носи всичко от по-малкия" се мери само между
+ *   ОБЛАЧНИТЕ — виж `oblachni()`.
  */
 export const PLANOVE: readonly Plan[] = Object.freeze([
+  {
+    klyuch: 'lichen-oflayn',
+    ime: 'Личен · офлайн',
+    zaKogo:
+      'БЕЗ облак изобщо · Журналът е само на устройството, отваря се без мрежа — ' +
+      'пълна независимост срещу пълна отговорност за копието',
+    bezOblak: true,
+    iskaPlatenOblak: false,
+    vazmozhnosti: new Set<Vazmozhnost>(OFLAYN),
+  },
   {
     klyuch: 'lichen',
     ime: 'Личен',
     zaKogo:
       'физическо лице с натоварен график и малки проекти · САМО ЕДИН АКАУНТ — ' +
       'без други имейли и без роли за редакция или наблюдение',
+    bezOblak: false,
     iskaPlatenOblak: false,
     vazmozhnosti: new Set<Vazmozhnost>(LICHNI),
   },
@@ -137,6 +188,7 @@ export const PLANOVE: readonly Plan[] = Object.freeze([
     zaKogo:
       'СТАРТЪПЪТ · малък и среден бизнес: добавят се ДРУГИ ИМЕЙЛИ за достъп от ' +
       'съответната поща — сигурността за това е при доставчика, не в нас',
+    bezOblak: false,
     iskaPlatenOblak: false,
     vazmozhnosti: new Set<Vazmozhnost>(STANDARTNI),
   },
@@ -144,6 +196,7 @@ export const PLANOVE: readonly Plan[] = Object.freeze([
     klyuch: 'razshiren',
     ime: 'Разширен',
     zaKogo: 'екипи с обем — същата функционалност, купен капацитет',
+    bezOblak: false,
     iskaPlatenOblak: true,
     vazmozhnosti: new Set<Vazmozhnost>([...STANDARTNI, 'poveche-hranilishte']),
   },
@@ -151,6 +204,7 @@ export const PLANOVE: readonly Plan[] = Object.freeze([
     klyuch: 'holding',
     ime: 'Холдинг',
     zaKogo: 'корпорации — капацитет по договор и поръчкови разработки',
+    bezOblak: false,
     iskaPlatenOblak: true,
     vazmozhnosti: new Set<Vazmozhnost>([
       ...STANDARTNI,

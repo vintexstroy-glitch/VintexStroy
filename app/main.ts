@@ -112,6 +112,40 @@ let hranilishte: SastoyanieNaHranilishteto = {
 };
 let ekran: KoyEkran = 'imoti';
 
+/**
+ * ДЖОБЪТ · служебният работник.
+ *
+ * Той прави приложението продукт, който се отваря без мрежа — план 1 от
+ * ADR-006. Регистрацията е тиха: провали ли се, приложението работи както
+ * досега, само че иска мрежа за да се отвори.
+ *
+ * `imaNova` пали ТИХ ред в лентата, когато нова версия чака. Нарочно не
+ * презарежда сама: човек може да въвежда плащане точно в този миг.
+ */
+let imaNova = false;
+
+async function zakachiDzhoba(prerisuvay: () => Promise<void>): Promise<void> {
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  try {
+    const zapis = await navigator.serviceWorker.register('./sw.js');
+    // Нова версия, която чака реда си да влезе.
+    if (zapis.waiting) imaNova = true;
+    zapis.addEventListener('updatefound', () => {
+      const nov = zapis.installing;
+      nov?.addEventListener('statechange', () => {
+        // `controller` значи, че вече има стара версия — иначе е първо пускане.
+        if (nov.state === 'installed' && navigator.serviceWorker.controller) {
+          imaNova = true;
+          void prerisuvay();
+        }
+      });
+    });
+  } catch {
+    // Частен прозорец, забранени работници, или подаден през `file://`.
+    // Приложението работи; само джобът го няма.
+  }
+}
+
 const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }> = {
   imoti: {
     ime: 'Имоти',
@@ -264,6 +298,8 @@ async function trugvay(): Promise<void> {
   }
 
   await prerisuvay();
+  // Последно, за да не бави първото рисуване.
+  await zakachiDzhoba(prerisuvay);
 }
 
 function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
@@ -304,6 +340,12 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
         </div>
         <div class="redche" data-broi="${v.broi}">${v.broi} ${v.broi === 1 ? 'събитие' : 'събития'} · местно, в този браузър</div>
         <div class="redche">${redZaIznos(v.broi)}</div>
+        ${
+          imaNova
+            ? `<div class="redche"><span class="tochka"></span>
+                 <b>Има нова версия</b> · затвори и отвори пак</div>`
+            : ''
+        }
         <div class="redche">
           <span class="tochka ${hranilishte.postoyanstvo === 'изтриваемо' ? 'zle' : ''}"></span>
           ${

@@ -197,7 +197,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     const broi = p.vazmozhnosti.size;
 
     return `
-      <div class="red planred${tuk ? ' tuk' : ''}">
+      <div class="red planred${tuk ? ' tuk' : ''}" data-plan-red="${p.klyuch}">
         <div class="kletka">
           <b>${ekraniraj(p.ime)}${tuk ? ' · сега' : ''}</b>
           <span>${ekraniraj(p.zaKogo)}</span>

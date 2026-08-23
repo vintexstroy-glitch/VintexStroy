@@ -94,10 +94,12 @@ async function main() {
   const brauzar = await chromium.launch({ executablePath: HROM });
   const stranitsa = await brauzar.newPage();
   const greshkiVKonzolata = [];
+  let ochakvanaTishina = false;
   stranitsa.on('pageerror', (e) => greshkiVKonzolata.push(`pageerror: ${e.message}`));
   stranitsa.on('console', (m) => {
-    // Шрифтовете на Google не се теглят в тази кутия — това не е повреда.
-    if (m.type() === 'error' && !/Failed to load resource/.test(m.text())) {
+    // Вече нищо не се тегли отвън — шрифтовете са в пакета. Единственото
+    // очаквано мълчание е в раздел 16, където мрежата се къса НАРОЧНО.
+    if (m.type() === 'error' && !ochakvanaTishina) {
       greshkiVKonzolata.push(`console: ${m.text()}`);
     }
   });
@@ -633,7 +635,7 @@ async function main() {
     );
     proveri(
       'Личният е описан като САМО един акаунт',
-      (await tekstNa(p, '.red.planred:has-text("Личен")')).includes('САМО ЕДИН АКАУНТ'),
+      (await tekstNa(p, '[data-plan-red="lichen"]')).includes('САМО ЕДИН АКАУНТ'),
       true,
     );
     proveri(
@@ -696,6 +698,66 @@ async function main() {
       true,
     );
     await deystvieSPrerisuvane(p, () => p.click('[data-plan="standarten"]'));
+
+    // ══ 16 · ДЖОБЪТ · отваря ли се БЕЗ мрежа ═══════════════════════════════
+    razdel = '16 · офлайн джобът';
+
+    // Шрифтовете са в пакета, не при Google. Проверява се РЕАЛНО заредено
+    // семейство, не само че правилото стои в стила.
+    proveri(
+      'шрифтовете са наши, не чужди',
+      await p.evaluate(async () => {
+        await document.fonts.ready;
+        return document.fonts.check('600 16px Literata', 'Имоти');
+      }),
+      true,
+    );
+
+    const rabotnikGotov = await p.evaluate(async () => {
+      if (!('serviceWorker' in navigator)) return 'няма поддръжка';
+      const zapis = await navigator.serviceWorker.ready;
+      return zapis.active ? 'готов' : 'не се активира';
+    });
+    proveri('служебният работник е активен', rabotnikGotov, 'готов');
+
+    proveri(
+      'черупката е в джоба',
+      await p.evaluate(async () => {
+        const imena = await caches.keys();
+        const moi = imena.filter((i) => i.startsWith('masterbook-'));
+        if (moi.length !== 1) return `кешове: ${moi.length}`;
+        const kesh = await caches.open(moi[0]);
+        return (await kesh.keys()).length > 0 ? 'да' : 'празен кеш';
+      }),
+      'да',
+    );
+
+    const predi = await broySabitiya(p);
+
+    // ── и сега истината: мрежата се КЪСА ──
+    ochakvanaTishina = true;
+    await p.context().setOffline(true);
+    await p.reload();
+    await p.waitForSelector('.nav', { timeout: 15_000 });
+
+    proveri('приложението се отвори БЕЗ мрежа', await p.$$eval('.nav', (n) => n.length), 1);
+    proveri('Журналът е непокътнат офлайн', await broySabitiya(p), predi);
+    proveri(
+      'и шрифтовете пак са наши',
+      await p.evaluate(async () => {
+        await document.fonts.ready;
+        return document.fonts.check('600 16px Literata', 'Имоти');
+      }),
+      true,
+    );
+
+    // Работи ли се офлайн, или само се гледа: нов имот трябва да влезе.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await dobaviImot(p, 'Офлайн', 'без мрежа', '');
+    proveri('и се ПИШЕ офлайн', await broySabitiya(p), predi + 1);
+
+    await p.context().setOffline(false);
+    ochakvanaTishina = false;
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

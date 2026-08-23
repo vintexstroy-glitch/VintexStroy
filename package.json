@@ -6,13 +6,14 @@
   "description": "MasterBook · имоти, наеми, продажби, кредити, счетоводство, проекти",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node stroezh/pechat-sw.mjs",
     "preview": "vite preview",
     "test": "vitest run --exclude proba/merki.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "proba": "vite build && node proba/prohod.mjs",
-    "merki": "vitest run proba/merki.test.ts"
+    "proba": "npm run build && node proba/prohod.mjs",
+    "merki": "vitest run proba/merki.test.ts",
+    "ikoni": "node stroezh/risuvai-ikoni.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
