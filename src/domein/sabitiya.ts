@@ -10,6 +10,8 @@
 import type { Sashtnost } from '../yadro/index.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
+import type { PravaZaModel } from './kolonno.js';
+import type { Rolya } from '../yadro/samolichnost.js';
 
 export const VID = {
   imot: 'imot',
@@ -21,6 +23,8 @@ export const VID = {
   model: 'model',
   buton: 'buton',
   sverka: 'sverka',
+  sluzhitel: 'sluzhitel',
+  pravo: 'pravo',
 } as const;
 
 export type Vid = (typeof VID)[keyof typeof VID];
@@ -39,6 +43,8 @@ export type TipSabitie =
   | 'МоделЗаписан'
   | 'БутонЗаписан'
   | 'СверкаЗаписана'
+  | 'СлужителЗаписан'
+  | 'ПравоЗаписано'
   | 'Сторно';
 
 export interface PayloadImotDobaven {
@@ -229,6 +235,39 @@ export interface PayloadSverkaZapisana {
   /** какво не се е разчело — броят се, не се преглъщат */
   readonly propusnati: number;
 }
+
+/**
+ * СЛУЖИТЕЛЯТ · имейл, име и роля — записани, не поканени.
+ *
+ * Негови думи (23.08): „Аз съм дал на редактор от драйва, за да може все пак да
+ * е отворена вратата за проба дали филтърът работи."
+ *
+ * Значи достъпът е даден при ДОСТАВЧИКА (правило 14). Тук се записва само
+ * онова, което приложението знае: кой е пуснат и с каква роля работи вътре.
+ * Затова събитието се казва „Записан", а не „Поканен" — покана не изпращаме.
+ *
+ * Същността е `SLUZHITEL:<имейл>`: смяна на ролята е НОВО събитие върху същия
+ * човек, не втори човек. Негови думи защо: „вече създал един път история с
+ * това име, акаунт, имейл — можеш да го изтриеш, но историята в Журнала и
+ * навсякъде седи."
+ */
+export interface PayloadSluzhitelZapisan {
+  readonly imeyl: string;
+  readonly ime: string;
+  readonly rolya: Rolya;
+}
+
+/**
+ * ПРАВОТО ПО КОЛОНА · кои колони са СКРИТИ за един служител в един хедър.
+ *
+ * Негови думи: „За всеки служител с дадена му вече роля и достъп, може с тази
+ * функция не да редактира, а да скрива само."
+ *
+ * Защо е СЪБИТИЕ: „защо това число не се вижда в екрана на Бамстера" трябва да
+ * има отговор в Журнала, не в нечия памет. Скриването не мени нито един сбор —
+ * затова НЕ иска отключен период, точно както моделът и бутонът.
+ */
+export type PayloadPravoZapisano = PravaZaModel;
 
 export interface PayloadStorno {
   /** seq на събитието, което се погасява */

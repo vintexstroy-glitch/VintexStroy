@@ -960,7 +960,7 @@ async function main() {
     // ══ 19 · бутонът · моделът на ПЪТЯ ═══════════════════════════════════
     razdel = '19 · бутонът';
     await naEkran(p, 'nastroyki', '#nov-buton');
-    proveri('Настройки казват колко пътя са ПОСТРОЕНИ', await plochka(p, 'Построени действия'), '1 / 10');
+    proveri('Настройки казват колко пътя са ПОСТРОЕНИ', await plochka(p, 'Построени действия'), '2 / 10');
     proveri('моделът от §18 се вижда тук', (await redove(p, '.red.model')).length, 1);
     // §14 тръгна начисто; оттам насам са двете прилагания на §18.
     proveri('записаните сверки са две', (await redove(p, '.red.zapisanasverka')).length, 2);
@@ -1026,6 +1026,47 @@ async function main() {
     proveri('последната сверка носи името на бутона', posledna?.[0]?.startsWith('Извлечения ОББ'), true);
     proveri('и казва от колко файла е', posledna?.[0]?.includes('2 файла'), true);
     proveri('разликата ѝ затваря', posledna?.[4], 'затваря');
+
+
+    // ══ 20 · колонното право · Бамстера и скритата колона ════════════════
+    razdel = '20 · колонното право';
+    await naEkran(p, 'nastroyki', '#forma-sluzhitel');
+    proveri('още няма записан служител', (await p.$$('#izbor-sluzhitel')).length, 0);
+
+    await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
+    await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
+    await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
+    await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
+
+    await p.waitForSelector('.pravo');
+    const optsii = await p.$$eval('#izbor-sluzhitel option', (o) => o.map((x) => x.textContent.trim()));
+    proveri('служителят е записан с ролята си', optsii.includes('Бамстера · редактира'), true);
+
+    const kletki = await p.$$eval('.pravo', (x) => x.map((k) => k.textContent.replace(/\s+/g, ' ').trim()));
+    proveri('скритият ред показва колона по колона', kletki.length, 6);
+    proveri('и казва вида на всяка', kletki[0]?.includes('променяща се'), true);
+    proveri('нищо не е скрито в началото', (await p.$$('.pravo.skrita')).length, 0);
+
+    // Числото в Сметки ПРЕДИ скриването — то не бива да мръдне.
+    await naEkran(p, 'smetki', '#forma-period');
+    const razhodPredi = await plochka(p, 'Разход');
+
+    // Скрий колоната „Сума по документа" за Бамстера
+    await naEkran(p, 'nastroyki', '.pravo');
+    await sSabitie(p, () => p.click('.pravo input'));
+    await p.waitForSelector('.pravo.skrita');
+    proveri('колоната е скрита за него', (await p.$$('.pravo.skrita')).length, 1);
+    proveri('и се казва на глас, че сборът остава', (await tekstNa(p, '.vest')).includes('Сборът ѝ остава'), true);
+
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('СКРИТОТО ПАК СЕ СМЯТА · числото не е мръднало', await plochka(p, 'Разход'), razhodPredi);
+
+    // Върни я — скрий → покажи → скрий не се губи (правило 20)
+    await naEkran(p, 'nastroyki', '.pravo');
+    await sSabitie(p, () => p.click('.pravo input'));
+    proveri('връща се със същата отметка', (await p.$$('.pravo.skrita')).length, 0);
+    await sSabitie(p, () => p.click('.pravo input'));
+    proveri('и се скрива пак — ключът носи ДЕЙСТВИЕТО', (await p.$$('.pravo.skrita')).length, 1);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

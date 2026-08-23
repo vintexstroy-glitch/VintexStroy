@@ -13,6 +13,7 @@ import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/ind
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
+import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import type {
   PayloadImotDobaven,
@@ -29,6 +30,8 @@ import type {
   PayloadSpravkaPodadena,
   PayloadStorno,
   PayloadVzemaneNachisleno,
+  PayloadSluzhitelZapisan,
+  PayloadPravoZapisano,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -163,6 +166,39 @@ export class Deystviya {
    */
   async zapishiSverka(id: string, danni: PayloadSverkaZapisana, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('СверкаЗаписана', VID.sverka, id, danni, z);
+  }
+
+  /**
+   * Записва служител — имейл, име и роля.
+   *
+   * НЕ иска отключен период: човекът не е запис за месец. И НЕ кани никого —
+   * достъпът е даден при доставчика (правило 14); тук се записва само кой е
+   * пуснат и с каква роля работи вътре.
+   */
+  async zapishiSluzhitel(danni: PayloadSluzhitelZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'СлужителЗаписан',
+      VID.sluzhitel,
+      `SLUZHITEL:${danni.imeyl}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * Записва колонното право — кои колони са СКРИТИ за един служител в един хедър.
+   *
+   * НЕ иска отключен период НАРОЧНО: скриването не мени нито едно число.
+   * Заключен месец се гледа през същите скрити колони, както и отворен.
+   */
+  async zapishiPravo(danni: PayloadPravoZapisano, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'ПравоЗаписано',
+      VID.pravo,
+      sashtnostNaPravo(danni.imeyl, danni.model),
+      danni,
+      z,
+    );
   }
 
   /**

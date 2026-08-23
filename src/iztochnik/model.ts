@@ -69,6 +69,32 @@ export interface ModelNaTablitsa {
    * то е решение на човек и иска следа. Вж. `src/domein/chisla.ts`.
    */
   readonly izklyucheni: readonly number[];
+  /**
+   * Номерата на колоните, обявени за ЗАТВОРЕНИ.
+   *
+   * Негово деление: „има два вида колони. Едните са променящи се, а другите
+   * затворени с изчисления и други неща." Променящата се носи падащо меню и
+   * параметри; затворената показва сметка или пренесен текст.
+   *
+   * Записва се САМО затвореността — както при изключването, тя е решение на
+   * човек и иска следа. Празен списък значи „всички са променящи се", защото
+   * колона, прочетена от файл, е писана от някого, докато някой не каже друго.
+   *
+   * От нея зависи правото: затворена колона не се редактира от НИКОГО, колкото
+   * и висока да е ролята. Вж. `src/domein/kolonno.ts`.
+   */
+  readonly zatvoreni: readonly number[];
+  /**
+   * ЗАГЛАВИЯТА, КАКТО ГИ Е НАПИСАЛ ИЗТОЧНИКЪТ · дума по дума, с главните букви.
+   *
+   * Отпечатъкът отдолу е СВЕДЕН (малки букви, слети интервали) — така се
+   * познава същата глава, дошла от друг износ. Но „Сума по документа" и „сума
+   * по документа" не са едно и също, когато таблицата се ПРЕТВОРЯВА обратно
+   * навън (`src/iznos/ot-model.ts`). Затова оригиналът се пази отделно.
+   *
+   * Платено с тест: първият образец излезе с главата на малки букви.
+   */
+  readonly glavi: readonly string[];
   /** отпечатък на ХЕДЪРА — по него се познава същата таблица втори път */
   readonly otpechatak: string;
 }
@@ -89,6 +115,17 @@ export class GreshkaModel extends Error {
  * Празните колони в края отпадат: Excel ражда по десет на всеки лист и те
  * менят отпечатъка, без да менят таблицата.
  */
+/**
+ * Заглавията на един ред, изчистени от празните в края.
+ *
+ * Excel ражда по десет празни колони на всеки лист; те не са част от главата.
+ */
+export function glaviNaRed(t: Tablitsa, redNaGlavata: number): string[] {
+  const red = [...(t.redove[redNaGlavata] ?? [])].map((k) => k.trim());
+  while (red.length && red[red.length - 1] === '') red.pop();
+  return red;
+}
+
 export function otpechatakNaGlavata(t: Tablitsa, redNaGlavata: number): string {
   const red = [...(t.redove[redNaGlavata] ?? [])];
   while (red.length && red[red.length - 1]!.trim() === '') red.pop();
@@ -128,6 +165,7 @@ export function napraviModel(n: {
   koloni: Readonly<Partial<Record<Rolya, number>>>;
   ddsE?: 'stavka' | 'suma';
   izklyucheni?: readonly number[];
+  zatvoreni?: readonly number[];
 }): ModelNaTablitsa {
   const { klyuch, tablitsa, redNaGlavata, koloni } = n;
 
@@ -169,6 +207,8 @@ export function napraviModel(n: {
     koloni: Object.freeze({ ...koloni }),
     ...(n.ddsE ? { ddsE: n.ddsE } : {}),
     izklyucheni: Object.freeze([...(n.izklyucheni ?? [])].sort((a, b) => a - b)),
+    zatvoreni: Object.freeze([...(n.zatvoreni ?? [])].sort((a, b) => a - b)),
+    glavi: Object.freeze(glaviNaRed(tablitsa, redNaGlavata)),
     otpechatak: otpechatakNaGlavata(tablitsa, redNaGlavata),
   });
 }
@@ -188,7 +228,10 @@ export function belegNaModel(m: ModelNaTablitsa): string {
   const koloni = (Object.keys(IMENA_NA_ROLITE) as Rolya[])
     .map((r) => `${r}=${m.koloni[r] ?? ''}`)
     .join(',');
-  return `${m.redNaGlavata}|${koloni}|${m.ddsE ?? ''}|${[...m.izklyucheni].join('.')}`;
+  return (
+    `${m.redNaGlavata}|${koloni}|${m.ddsE ?? ''}|` +
+    `${[...m.izklyucheni].join('.')}|${[...m.zatvoreni].join('.')}`
+  );
 }
 
 /** Клетката за тази роля в този ред. Празен низ, ако ролята я няма в модела. */

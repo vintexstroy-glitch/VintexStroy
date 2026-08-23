@@ -27,6 +27,17 @@ import {
   type Deystvie,
 } from '../src/domein/butoni.js';
 import { IMENA_NA_ROLITE, type ModelNaTablitsa } from '../src/iztochnik/model.js';
+import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
+import {
+  IMENA_NA_VIDOVETE,
+  napraviPrava,
+  pravoNaKolona,
+  sPrevklyuchenaVidimost,
+  vidNaKolona,
+  type PravaZaModel,
+} from '../src/domein/kolonno.js';
+import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
+import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
@@ -40,6 +51,9 @@ const POSOKA_S_DUMI: Readonly<Record<string, string>> = Object.freeze({
   pishe: 'пише',
   smyata: 'смята',
 });
+
+/** Кой служител се редактира в момента. Празно значи „никой" — нагласа, не факт. */
+let izbranSluzhitel = '';
 
 export function narisuvayNastroyki(o: Ogledalo): string {
   const butoni = [...o.butoni.values()];
@@ -74,6 +88,7 @@ export function narisuvayNastroyki(o: Ogledalo): string {
     ${blokNaButonite(butoni)}
     ${dobavyam ? formaNaButon(modeli) : ''}
     ${blokNaModelite(modeli)}
+    ${blokNaPravata(o, modeli)}
     ${blokNaSverkite(o)}
     ${blokNaDeystviyata()}`;
 }
@@ -213,6 +228,116 @@ function redNaModel(m: ModelNaTablitsa): string {
 }
 
 // ── сверките ───────────────────────────────────────────────────────────────
+// ── колонното право · скритият ред над хедъра ──────────────────────────────
+/**
+ * ПРАВАТА ПО КОЛОНА · точно неговата картина, без нов екран.
+ *
+ *   „Когато през настройки от падащо меню избереш служител, в всеки хедър се
+ *    показва СКРИТ РЕД НАД ХЕДЪРА с отметки… само криене от служителя на колони
+ *    по избор." (12.08)
+ *
+ * И последната му дума какво прави правото: „За всеки служител с дадена му вече
+ * роля и достъп, може с тази функция НЕ ДА РЕДАКТИРА, А ДА СКРИВА САМО."
+ *
+ * Затова тук няма отметка „редактира": тя се СМЯТА от ролята и от вида на
+ * колоната (`mozheDaRedaktiraKolona`), а не се раздава.
+ */
+function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string {
+  const hora = podredeni(o.sluzhiteli.values());
+  const izbran = hora.find((h) => h.imeyl === izbranSluzhitel);
+
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Кой какво вижда</h2>
+        <span>колонно право · скрива, не редактира</span>
+      </div>
+      ${
+        hora.length === 0
+          ? `<p class="prazno">Още няма записан служител.<br>Достъпът се дава при доставчика; тук се записва кой работи и с каква роля.</p>`
+          : `<label class="pole">
+        <span>Служител</span>
+        <select id="izbor-sluzhitel">
+          <option value="">— избери —</option>
+          ${hora.map((h) => optsiyaZaChovek(h, h.imeyl === izbranSluzhitel)).join('')}
+        </select>
+      </label>`
+      }
+      ${izbran === undefined ? '' : hedariteNa(izbran, o, modeli)}
+      <form id="forma-sluzhitel" class="forma">
+        <label class="pole"><span>Имейл</span><input name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
+        <label class="pole"><span>Име</span><input name="ime" required placeholder="как му казваш"></label>
+        <label class="pole"><span>Роля</span>
+          <select name="rolya">
+            <option value="redaktor">редактира</option>
+            <option value="nablyudatel">наблюдава</option>
+            <option value="stopanin">стопанин</option>
+          </select>
+        </label>
+        <div class="dugmeta">
+          <button type="submit" class="glavno">Запиши служителя</button>
+          <span id="greshka-sluzhitel" class="greshka"></span>
+        </div>
+      </form>
+      <p class="drebno">Не каним никого и не отнемаме достъп — това е при доставчика (правило 14). Тук се записва кой е пуснат и с каква роля работи вътре.</p>
+      <p class="drebno">Скритата колона пак се смята: сборовете ѝ остават в Сметки и в Управление. Скриването пипа екрана, не числата.</p>
+    </section>`;
+}
+
+function optsiyaZaChovek(h: Sluzhitel, izbran: boolean): string {
+  return `<option value="${ekraniraj(h.imeyl)}"${izbran ? ' selected' : ''}>${ekraniraj(
+    h.ime,
+  )} · ${ROLI_NA_HORATA[h.rolya]}</option>`;
+}
+
+function hedariteNa(
+  chovek: Sluzhitel,
+  o: Ogledalo,
+  modeli: readonly ModelNaTablitsa[],
+): string {
+  if (modeli.length === 0) {
+    return '<p class="prazno">Още няма нито един хедър — правото важи за модел, не за екран.</p>';
+  }
+  return modeli
+    .map((m) => hedaraNa(chovek, o.prava.get(`${chovek.imeyl}|${m.klyuch}`), m))
+    .join('');
+}
+
+function hedaraNa(
+  chovek: Sluzhitel,
+  prava: PravaZaModel | undefined,
+  m: ModelNaTablitsa,
+): string {
+  const glavi = m.otpechatak.split('|');
+  return `
+    <div class="hedar" translate="no">
+      <b>${ekraniraj(m.klyuch)}</b>
+      <div class="skritred">
+        ${glavi.map((ime, k) => kletkaNaPravo(chovek, prava, m, ime, k)).join('')}
+      </div>
+    </div>`;
+}
+
+function kletkaNaPravo(
+  chovek: Sluzhitel,
+  prava: PravaZaModel | undefined,
+  m: ModelNaTablitsa,
+  ime: string,
+  kolona: number,
+): string {
+  const vid = vidNaKolona(m, kolona);
+  const skrita = pravoNaKolona(prava, kolona) === 'skrito';
+  return `
+    <label class="pravo${skrita ? ' skrita' : ''}">
+      <input type="checkbox"${skrita ? '' : ' checked'}
+        data-pravo="${ekraniraj(chovek.imeyl)}"
+        data-hedar="${ekraniraj(m.klyuch)}"
+        data-kolona="${kolona}">
+      <span>${ekraniraj(ime || `колона ${kolona + 1}`)}</span>
+      <span class="drebno">${IMENA_NA_VIDOVETE[vid]}</span>
+    </label>`;
+}
+
 function blokNaSverkite(o: Ogledalo): string {
   const posledni = [...o.sverki].reverse().slice(0, 12);
   return `
@@ -314,10 +439,18 @@ export function zakachiNastroyki(
         deystvie: String(danni.get('deystvie')) as Deystvie,
         modeli,
       });
-      await k.deystviya.zapishiButon(buton, {
-        // Белегът е от СЪДЪРЖАНИЕТО: поправен бутон е нов запис, не повторение.
-        opId: `buton:${buton.klyuch}:${belegNaButon(buton)}`,
-      });
+      // Ключът носи ДЕЙСТВИЕТО, не съдържанието (правило 20). Ключ от белега
+      // би счупил А → Б → А: третият запис би върнал резултата на първия и
+      // бутонът щеше да остане с настройките на Б, макар екранът да казва А.
+      // Белегът си остава — но за друго: „смени ли се нещо изобщо".
+      const star = (await k.deystviya.ogledalo()).butoni.get(buton.klyuch);
+      if (star && belegNaButon(star) === belegNaButon(buton)) {
+        dobavyam = false;
+        k.vest('dobre', `„${buton.klyuch}" е същият — нищо не влиза в Журнала.`);
+        await prerisuvay();
+        return;
+      }
+      await k.deystviya.zapishiButon(buton, { opId: `buton:${crypto.randomUUID()}` });
       dobavyam = false;
       greshka = '';
       k.vest('dobre', `Бутонът „${buton.klyuch}" е записан в папка „${buton.papka}".`);
@@ -327,6 +460,63 @@ export function zakachiNastroyki(
     }
   });
 
+  const formaChovek = koren.querySelector<HTMLFormElement>('#forma-sluzhitel');
+  formaChovek?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-sluzhitel')!;
+    kazhi.textContent = '';
+    const danni = new FormData(formaChovek);
+    try {
+      const chovek = napraviSluzhitel({
+        imeyl: String(danni.get('imeyl') ?? ''),
+        ime: String(danni.get('ime') ?? ''),
+        rolya: String(danni.get('rolya')) as RolyaNaChovek,
+      });
+      await k.deystviya.zapishiSluzhitel(chovek, { opId: `sluzhitel:${crypto.randomUUID()}` });
+      izbranSluzhitel = chovek.imeyl;
+      k.vest('dobre', `${chovek.ime} е записан · ${ROLI_NA_HORATA[chovek.rolya]}.`);
+      await prerisuvay();
+    } catch (err) {
+      kazhi.textContent = err instanceof Error ? err.message : String(err);
+    }
+  });
+
+  koren
+    .querySelector<HTMLSelectElement>('#izbor-sluzhitel')
+    ?.addEventListener('change', async (e) => {
+      izbranSluzhitel = (e.target as HTMLSelectElement).value;
+      await prerisuvay();
+    });
+
+  for (const otmetka of koren.querySelectorAll<HTMLInputElement>('[data-pravo]')) {
+    otmetka.addEventListener('change', async () => {
+      const imeyl = otmetka.dataset['pravo']!;
+      const model = otmetka.dataset['hedar']!;
+      const kolona = Number(otmetka.dataset['kolona']);
+      otmetka.disabled = true;
+      try {
+        const og = await k.deystviya.ogledalo();
+        const sega = og.prava.get(`${imeyl}|${model}`) ?? napraviPrava({ imeyl, model });
+        const prava = napraviPrava({
+          imeyl,
+          model,
+          skriti: sPrevklyuchenaVidimost(sega, kolona),
+        });
+        // Ключът носи ДЕЙСТВИЕТО: скрий → покажи → скрий не бива да се загуби.
+        await k.deystviya.zapishiPravo(prava, { opId: `pravo:${crypto.randomUUID()}` });
+        k.vest(
+          'dobre',
+          prava.skriti.includes(kolona)
+            ? `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`
+            : `Колоната е върната за ${imeyl}.`,
+        );
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
+
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-mahni-buton]')) {
     b.addEventListener('click', async () => {
       const ime = b.dataset['mahniButon']!;
@@ -335,9 +525,7 @@ export function zakachiNastroyki(
       b.disabled = true;
       try {
         const nov = napraviButon({ ...star, modeli: [] });
-        await k.deystviya.zapishiButon(nov, {
-          opId: `buton:${nov.klyuch}:${belegNaButon(nov)}`,
-        });
+        await k.deystviya.zapishiButon(nov, { opId: `buton:${crypto.randomUUID()}` });
         k.vest('dobre', `„${ime}" вече приема кой да е познат хедър.`);
       } catch (err) {
         greshka = err instanceof Error ? err.message : String(err);

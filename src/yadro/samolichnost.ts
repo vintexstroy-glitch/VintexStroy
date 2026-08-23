@@ -132,8 +132,13 @@ export function sParola(koj: Samolichnost): boolean {
   return koj.nachin === 'parola';
 }
 
-/** Може ли да пише. Наблюдателят гледа и сваля, но не мърда Журнала. */
-export function mozheDaRedaktira(koj: Samolichnost): boolean {
+/**
+ * Може ли да пише. Наблюдателят гледа и сваля, но не мърда Журнала.
+ *
+ * Иска само РОЛЯТА, не цялата самоличност: колонното право пита същото за
+ * колона (`kolonno.ts`), а един факт живее на едно място (правило 17).
+ */
+export function mozheDaRedaktira(koj: { readonly rolya: Rolya }): boolean {
   return koj.rolya !== 'nablyudatel';
 }
 

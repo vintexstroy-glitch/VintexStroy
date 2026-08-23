@@ -651,3 +651,26 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
 }
 .red.planred.tuk { background: var(--toplo); }
+
+/* ── КОЛОННОТО ПРАВО · скритият ред над хедъра ─────────────────────────────
+   Негови думи: „в всеки хедър се показва СКРИТ РЕД НАД ХЕДЪРА с отметки…
+   само криене от служителя на колони по избор." Затова редът стои НАД името
+   на колоната, а не в отделен диалог: човек вижда какво пипа. */
+.hedar { margin: 14px 0; }
+.hedar > b { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.skritred {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px; border-radius: 5px;
+  background: var(--toplo); border: 1px dashed var(--liniya);
+}
+.pravo {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 9px; border-radius: 4px; cursor: pointer;
+  background: var(--fon); border: 1px solid var(--liniya); font-size: 12.5px;
+}
+.pravo input { width: 15px; height: 15px; accent-color: var(--aktsent); flex-shrink: 0; }
+.pravo .drebno { font-size: 11px; color: var(--mastilo2); }
+/* Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
+   да се вижда, вместо да се помни. */
+.pravo.skrita { opacity: 0.5; }
+.pravo.skrita > span:first-of-type { text-decoration: line-through; }

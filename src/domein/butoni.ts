@@ -64,7 +64,10 @@ export const DEYSTVIYA: readonly OpisNaDeystvie[] = Object.freeze([
   { klyuch: 'sveryavane-eksel', ime: 'Сверяване от Ексел', posoka: 'chete', postroeno: true },
   { klyuch: 'prezapisvane-eksel', ime: 'Презаписване в Ексел', posoka: 'pishe', postroeno: false },
   { klyuch: 'sveryavane-pdf', ime: 'Сверяване от ПДФ', posoka: 'chete', postroeno: false },
-  { klyuch: 'sazdavane-tablitsa', ime: 'Създаване на таблица', posoka: 'pishe', postroeno: false },
+  // Построен в резен 14: `src/iznos/ot-model.ts` претворява модела на хедъра
+  // в лист, а `rabotnaKniga` го изкарва като .xlsx. Негови думи: „функцията
+  // дава възможност да претвориш модела на таблицата, от която четеш".
+  { klyuch: 'sazdavane-tablitsa', ime: 'Създаване на таблица', posoka: 'pishe', postroeno: true },
   { klyuch: 'sazdavane-pdf', ime: 'Създаване на ПДФ', posoka: 'pishe', postroeno: false },
   { klyuch: 'zasnemane-arhiv', ime: 'Заснемане и архив', posoka: 'pishe', postroeno: false },
   { klyuch: 'smyatane', ime: 'Смятане', posoka: 'smyata', postroeno: false },

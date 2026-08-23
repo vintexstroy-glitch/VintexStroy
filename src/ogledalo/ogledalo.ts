@@ -15,6 +15,8 @@ import type { Sabitie } from '../yadro/index.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
+import type { PravaZaModel } from '../domein/kolonno.js';
+import type { PayloadSluzhitelZapisan } from '../domein/sabitiya.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -153,6 +155,15 @@ export interface Ogledalo {
   readonly modeli: ReadonlyMap<string, ModelNaTablitsa>;
   /** име на бутона → моделът на пътя; вж. `src/domein/butoni.ts` */
   readonly butoni: ReadonlyMap<string, Buton>;
+  /** имейл → служителят с ролята му; вж. `src/domein/sluzhiteli.ts` */
+  readonly sluzhiteli: ReadonlyMap<string, PayloadSluzhitelZapisan>;
+  /**
+   * „<имейл>|<модел>" → скритите за него колони в този хедър.
+   *
+   * Ключът е двоен, защото правото важи за ДВОЙКА: един човек в един хедър.
+   * Вж. `src/domein/kolonno.ts`.
+   */
+  readonly prava: ReadonlyMap<string, PravaZaModel>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -184,6 +195,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const platenoDDS = new Map<string, PlashtaneDDS>();
   const modeli = new Map<string, ModelNaTablitsa>();
   const butoni = new Map<string, Buton>();
+  const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
+  const prava = new Map<string, PravaZaModel>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -248,15 +261,34 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'МоделЗаписан': {
         const p = s.payload as unknown as PayloadModelZapisan;
         // Последният запис за същото име надделява — поправка, не втори модел.
-        // Моделите отпреди резен 13 нямат `izklyucheni` — падат към празен
-        // списък, вместо да пукат при първото четене.
-        modeli.set(p.klyuch, { ...p, izklyucheni: p.izklyucheni ?? [] });
+        // Моделите отпреди резен 13 нямат `izklyucheni`, отпреди резен 14 —
+        // `zatvoreni` и `glavi`. Падат към празно и към сведения отпечатък,
+        // вместо да пукат при първото четене на стар Журнал.
+        modeli.set(p.klyuch, {
+          ...p,
+          izklyucheni: p.izklyucheni ?? [],
+          zatvoreni: p.zatvoreni ?? [],
+          glavi: p.glavi ?? p.otpechatak.split('|'),
+        });
         break;
       }
 
       case 'БутонЗаписан': {
         const p = s.payload as unknown as PayloadButonZapisan;
         butoni.set(p.klyuch, p);
+        break;
+      }
+
+      case 'СлужителЗаписан': {
+        const p = s.payload as unknown as PayloadSluzhitelZapisan;
+        // Смяна на ролята е ново събитие върху същия човек — последното бие.
+        sluzhiteli.set(p.imeyl, p);
+        break;
+      }
+
+      case 'ПравоЗаписано': {
+        const p = s.payload as unknown as PravaZaModel;
+        prava.set(`${p.imeyl}|${p.model}`, p);
         break;
       }
 
@@ -386,6 +418,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     platenoDDS,
     modeli,
     butoni,
+    sluzhiteli,
+    prava,
     sverki,
     prilozheni,
     pogaseni,

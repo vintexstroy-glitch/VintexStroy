@@ -35,6 +35,7 @@ import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
+import { SEGA } from '../src/izdanie.js';
 
 const NAEMATEL = 'vintexstroy';
 
@@ -368,7 +369,7 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
     <aside class="strana">
       <div class="marka">
         <b>VintexStroy</b>
-        <span>MasterBook</span>
+        <span>MasterBook · ${SEGA.ime}</span>
       </div>
       <nav class="nav">${punktove}</nav>
       <div class="veriga">
