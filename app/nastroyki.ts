@@ -26,7 +26,20 @@ import {
   type Buton,
   type Deystvie,
 } from '../src/domein/butoni.js';
-import { IMENA_NA_ROLITE, type ModelNaTablitsa } from '../src/iztochnik/model.js';
+import { belegNaModel, IMENA_NA_ROLITE, type ModelNaTablitsa } from '../src/iztochnik/model.js';
+import {
+  dobaviKolona,
+  IMENA_NA_NOMENKLATURITE,
+  IMENA_V_OPISA,
+  iztriyMenyu,
+  opisNaPodredba,
+  otbelezhiVavezhdane,
+  preimenuvayKolona,
+  premahniKolona,
+  semeystvo,
+  vidNomenklatura,
+  zadayMenyu,
+} from '../src/domein/redaktor.js';
 import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
 import {
   IMENA_NA_VIDOVETE,
@@ -54,6 +67,16 @@ const POSOKA_S_DUMI: Readonly<Record<string, string>> = Object.freeze({
 
 /** Кой служител се редактира в момента. Празно значи „никой" — нагласа, не факт. */
 let izbranSluzhitel = '';
+
+/**
+ * ЕДНОТО МЯСТО с двете лица (И58): „Две отделни, но свързани, и се редактират
+ * от едно място СЪС СМЯНА НА РЕДАКТОРА." Смяната е това поле, не втори екран.
+ */
+let litseNaRedaktora: 'hedari' | 'opis' = 'hedari';
+/** Кой хедър е отворен в Редактора. Празно значи „никой". */
+let izbranHedar = '';
+/** Отворена ли е формата за нова колона. */
+let dobavyamKolona = false;
 
 export function narisuvayNastroyki(o: Ogledalo): string {
   const butoni = [...o.butoni.values()];
@@ -88,6 +111,7 @@ export function narisuvayNastroyki(o: Ogledalo): string {
     ${blokNaButonite(butoni)}
     ${dobavyam ? formaNaButon(modeli) : ''}
     ${blokNaModelite(modeli)}
+    ${blokNaRedaktora(modeli)}
     ${blokNaPravata(o, modeli)}
     ${blokNaSverkite(o)}
     ${blokNaDeystviyata()}`;
@@ -227,6 +251,177 @@ function redNaModel(m: ModelNaTablitsa): string {
     </div>`;
 }
 
+// ── Редакторът на хедъри и Описът на Подредба ──────────────────────────────
+/**
+ * ЕДНОТО МЯСТО (И58): „Две отделни, но свързани, и се редактират от едно място
+ * със смяна на редактора. Правата са след завършване на таблицата."
+ *
+ * Затова правата („Кой какво вижда") стоят ПОД този блок — първо таблицата се
+ * завършва тук, после се раздава. И затова редакцията подава роля „стопанин":
+ * Настройки е екранът на главния акаунт (И57); кой точно е натиснал, записва
+ * Вратата в `actor`, не този файл.
+ */
+function blokNaRedaktora(modeli: readonly ModelNaTablitsa[]): string {
+  const izbran = modeli.find((m) => m.klyuch === izbranHedar);
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Редакторът на хедъри</h2>
+        <span>и Описът на Подредба · две отделни, но свързани · едно място</span>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="${litseNaRedaktora === 'hedari' ? 'glaven' : 'vtorichen'}" id="litse-hedari">Редактор на хедъри</button>
+        <button type="button" class="${litseNaRedaktora === 'opis' ? 'glaven' : 'vtorichen'}" id="litse-opis">Опис на Подредба</button>
+      </div>
+      ${litseNaRedaktora === 'opis' ? litseOpis(modeli) : litseHedari(modeli, izbran)}
+    </section>`;
+}
+
+/** Лицето „Опис на Подредба" — всичко именувано е ред (ред 1970). Изглед, не втора истина. */
+function litseOpis(modeli: readonly ModelNaTablitsa[]): string {
+  const redove = opisNaPodredba(modeli);
+  if (redove.length === 0) {
+    return '<p class="prazno">Още няма нищо именувано.<br>Всеки хедър, колона и член на меню ще е ред тук.</p>';
+  }
+  return `
+    <div class="tablitsa">
+      <div class="glava opis"><span>Име</span><span>Какво е</span><span>Дом</span><span>Бележка</span></div>
+      ${redove
+        .map(
+          (r) => `<div class="red opis" translate="no">
+        <span><b>${ekraniraj(r.ime)}</b></span>
+        <span>${IMENA_V_OPISA[r.vid]}</span>
+        <span>${ekraniraj(r.dom)}</span>
+        <span>${ekraniraj(r.belezhka)}</span>
+      </div>`,
+        )
+        .join('')}
+    </div>
+    <p class="drebno">Описът се смята от моделите при всяко показване — записът е самият модел, затова тук няма какво да се разсинхронизира.</p>`;
+}
+
+/** Лицето „Редактор на хедъри" — избран хедър, колоните му, нова колона. */
+function litseHedari(
+  modeli: readonly ModelNaTablitsa[],
+  izbran: ModelNaTablitsa | undefined,
+): string {
+  if (modeli.length === 0) {
+    return '<p class="prazno">Още няма хедъри.<br>Първата непозната таблица ражда модел — и той се редактира тук.</p>';
+  }
+  return `
+    <label class="pole">
+      <span>Хедър</span>
+      <select id="izbor-hedar">
+        <option value="">— избери —</option>
+        ${modeli
+          .map(
+            (m) =>
+              `<option value="${ekraniraj(m.klyuch)}"${m.klyuch === izbranHedar ? ' selected' : ''}>${ekraniraj(m.klyuch)} · ${m.glavi.length} колони</option>`,
+          )
+          .join('')}
+      </select>
+    </label>
+    ${izbran === undefined ? '' : koloniteNa(izbran, modeli)}`;
+}
+
+function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
+  return `
+    <div class="tablitsa">
+      <div class="glava redaktor">
+        <span>Колона</span><span>Вид</span><span>Номенклатура</span><span>Готово меню</span><span></span>
+      </div>
+      ${m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')}
+    </div>
+    <div class="deystviya">
+      <button type="button" class="glaven" id="nova-kolona"${dobavyamKolona ? ' disabled' : ''}>Нова колона</button>
+      <p class="drebno">Работеща таблица само расте: „колони не се трият, а само се добавят" — празна колона без роля е единственото изключение, и то само за управителите.</p>
+    </div>
+    ${dobavyamKolona ? formaNaKolona(m, modeli) : ''}`;
+}
+
+function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
+  const vid = vidNaKolona(m, k);
+  const nomenklatura = vidNomenklatura(m, k);
+  const zaklyucheno = m.zaklyucheni.includes(k);
+  const nosiRolya = Object.values(m.koloni).includes(k);
+  return `
+    <div class="red redaktor" translate="no">
+      <span class="kletka">
+        <input data-ime-vhod="${k}" value="${ekraniraj(ime)}"${zaklyucheno ? ' disabled title="името е заключено — падащото меню беше изтрито"' : ''} aria-label="име на колоната">
+        ${zaklyucheno ? '<span>🔒 името е заключено</span>' : ''}
+      </span>
+      <span>${IMENA_NA_VIDOVETE[vid]}</span>
+      <span>${IMENA_NA_NOMENKLATURITE[nomenklatura]}</span>
+      <span class="kletka">${
+        vid === 'zatvorena'
+          ? '<span>—</span>'
+          : `<input data-menyu-vhod="${k}" value="${ekraniraj((m.menyuta[k] ?? []).join(' · '))}" placeholder="членове през ·" aria-label="готово меню">`
+      }</span>
+      <span class="butoni">
+        <button type="button" class="vtorichen malak" data-zapishi-kolona="${k}">Запиши</button>
+        ${nomenklatura === 'opis' ? `<button type="button" class="vtorichen malak" data-iztriy-menyu="${k}">Изтрий менюто</button>` : ''}
+        ${nomenklatura === 'svobodna' && vid === 'promenlyva' ? `<button type="button" class="vtorichen malak" data-vavezhdane="${k}">От въвеждането</button>` : ''}
+        ${nosiRolya ? '' : `<button type="button" class="vtorichen malak" data-premahni-kolona="${k}">Премахни</button>`}
+      </span>
+    </div>`;
+}
+
+function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
+  const rodnini = semeystvo(modeli, m);
+  return `
+    <section class="karta izbrana">
+      <div class="dyalglava"><h2>Нова колона</h2><span>ражда се с вида и номенклатурата си</span></div>
+      <form id="forma-kolona">
+        <div class="poleta">
+          <div class="pole">
+            <label for="kolona-ime">Име на колоната</label>
+            <input translate="no" id="kolona-ime" name="ime" required placeholder="напр. Наемател" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kolona-vid">Вид</label>
+            <select translate="no" id="kolona-vid" name="vid">
+              <option value="promenlyva">променяща се</option>
+              <option value="zatvorena">затворена · сметка или пренесен текст</option>
+            </select>
+          </div>
+          <div class="pole">
+            <label for="kolona-nomenklatura">Номенклатура</label>
+            <select translate="no" id="kolona-nomenklatura" name="nomenklatura">
+              <option value="svobodna">${IMENA_NA_NOMENKLATURITE.svobodna}</option>
+              <option value="opis">${IMENA_NA_NOMENKLATURITE.opis}</option>
+              <option value="vavezhdane">${IMENA_NA_NOMENKLATURITE.vavezhdane}</option>
+            </select>
+          </div>
+          <div class="pole">
+            <label for="kolona-menyu">Членове на готовото меню</label>
+            <input translate="no" id="kolona-menyu" name="menyu" placeholder="Кеш · Банка" autocomplete="off">
+          </div>
+        </div>
+        ${
+          rodnini.length === 0
+            ? ''
+            : `<div class="tablitsa">
+          <div class="glava propusnat"><span>Семейството · еднакви хедъри</span><span>отметнатите получават колоната</span></div>
+          ${rodnini
+            .map(
+              (r) => `<div class="red propusnat" translate="no">
+            <span><label class="vazm"><input type="checkbox" data-rodnina="${ekraniraj(r.klyuch)}" checked> ${ekraniraj(r.klyuch)}</label></span>
+            <span>новата колона „се появява на таблици, които работят с еднакви хедъри"</span>
+          </div>`,
+            )
+            .join('')}
+        </div>`
+        }
+        <p class="greshka" id="greshka-kolona"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Добави колоната</button>
+          <button type="button" class="vtorichen" id="otkazhi-kolona">Откажи</button>
+          <p class="drebno">Промяната е нов <b>МоделЗаписан</b> със същия ключ — поправка, не презапис. Старата глава остава в историята и старите файлове пак се познават.</p>
+        </div>
+      </form>
+    </section>`;
+}
+
 // ── сверките ───────────────────────────────────────────────────────────────
 // ── колонното право · скритият ред над хедъра ──────────────────────────────
 /**
@@ -308,7 +503,8 @@ function hedaraNa(
   prava: PravaZaModel | undefined,
   m: ModelNaTablitsa,
 ): string {
-  const glavi = m.otpechatak.split('|');
+  // Главите дословно, не сведеният отпечатък: „Наем €" и „наем €" не са едно.
+  const glavi = m.glavi;
   return `
     <div class="hedar" translate="no">
       <b>${ekraniraj(m.klyuch)}</b>
@@ -510,6 +706,181 @@ export function zakachiNastroyki(
             ? `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`
             : `Колоната е върната за ${imeyl}.`,
         );
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
+
+  // ── Редакторът на хедъри · двете лица и операциите му ────────────────────
+  koren.querySelector<HTMLButtonElement>('#litse-hedari')?.addEventListener('click', async () => {
+    litseNaRedaktora = 'hedari';
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#litse-opis')?.addEventListener('click', async () => {
+    litseNaRedaktora = 'opis';
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLSelectElement>('#izbor-hedar')?.addEventListener('change', async (e) => {
+    izbranHedar = (e.target as HTMLSelectElement).value;
+    dobavyamKolona = false;
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#nova-kolona')?.addEventListener('click', async () => {
+    dobavyamKolona = true;
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#otkazhi-kolona')?.addEventListener('click', async () => {
+    dobavyamKolona = false;
+    await prerisuvay();
+  });
+
+  /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */
+  const hedarSega = async (): Promise<ModelNaTablitsa | undefined> =>
+    (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+
+  /**
+   * Записва променения хедър: нов МоделЗаписан със същия ключ — поправка, не
+   * презапис. Еднакъв белег значи „нищо ново" и в Журнала не влиза нищо.
+   */
+  const zapishiHedar = async (star: ModelNaTablitsa, nov: ModelNaTablitsa, vest: string) => {
+    if (belegNaModel(star) === belegNaModel(nov) && star.otpechatak === nov.otpechatak) {
+      k.vest('dobre', `„${star.klyuch}" е същият — нищо не влиза в Журнала.`);
+      return;
+    }
+    await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
+    k.vest('dobre', vest);
+  };
+
+  const chlenoveOt = (tekst: string): string[] =>
+    tekst
+      .split(/[·,;]/)
+      .map((c) => c.trim())
+      .filter((c) => c !== '');
+
+  const formaKolona = koren.querySelector<HTMLFormElement>('#forma-kolona');
+  formaKolona?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-kolona')!;
+    kazhi.textContent = '';
+    const danni = new FormData(formaKolona);
+    const nomenklatura = String(danni.get('nomenklatura'));
+    const rodnini = [...koren.querySelectorAll<HTMLInputElement>('[data-rodnina]')]
+      .filter((x) => x.checked)
+      .map((x) => x.dataset['rodnina']!);
+    try {
+      const star = await hedarSega();
+      if (!star) throw new Error('Хедърът вече го няма — избери наново.');
+      const opts = {
+        ime: String(danni.get('ime') ?? ''),
+        // Настройки е екранът на главния акаунт (И57); кой е натиснал, пише Вратата.
+        rolya: 'stopanin' as RolyaNaChovek,
+        zatvorena: String(danni.get('vid')) === 'zatvorena',
+        ...(nomenklatura === 'opis' ? { menyu: chlenoveOt(String(danni.get('menyu') ?? '')) } : {}),
+        ...(nomenklatura === 'vavezhdane' ? { otVavezhdane: true } : {}),
+      };
+      const nov = dobaviKolona(star, opts);
+      await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
+      // Семейството: „когато създаваш нови колони в хедърите, те се появяват
+      // на таблици, които работят с еднакви хедъри" — отметнатите роднини.
+      const og = await k.deystviya.ogledalo();
+      for (const ime of rodnini) {
+        const rodnina = og.modeli.get(ime);
+        if (!rodnina) continue;
+        await k.deystviya.zapishiModel(dobaviKolona(rodnina, opts), {
+          opId: `model:${crypto.randomUUID()}`,
+        });
+      }
+      dobavyamKolona = false;
+      k.vest(
+        'dobre',
+        `Колоната „${opts.ime.trim()}" е добавена${rodnini.length ? ` · и при ${rodnini.length} от семейството` : ''}.`,
+      );
+      await prerisuvay();
+    } catch (err) {
+      kazhi.textContent = err instanceof Error ? err.message : String(err);
+    }
+  });
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-kolona]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['zapishiKolona']);
+      const ime = koren.querySelector<HTMLInputElement>(`[data-ime-vhod="${kolona}"]`)?.value ?? '';
+      const menyuTekst =
+        koren.querySelector<HTMLInputElement>(`[data-menyu-vhod="${kolona}"]`)?.value ?? '';
+      try {
+        const star = await hedarSega();
+        if (!star) return;
+        let nov = star;
+        if (ime.trim() !== '' && ime.trim() !== star.glavi[kolona]) {
+          nov = preimenuvayKolona(nov, kolona, ime, 'stopanin');
+        }
+        const chlenove = chlenoveOt(menyuTekst);
+        const stari = nov.menyuta[kolona] ?? [];
+        if (chlenove.length > 0 && chlenove.join('¦') !== stari.join('¦')) {
+          nov = zadayMenyu(nov, kolona, chlenove, 'stopanin');
+        }
+        await zapishiHedar(star, nov, `Колоната е записана в „${star.klyuch}".`);
+        greshka = '';
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-iztriy-menyu]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['iztriyMenyu']);
+      // Негово (ред 1994): изтритото меню отваря директно писане и ЗАКЛЮЧВА името.
+      if (!confirm('Изтритото меню отваря писане на текст или число — и ЗАКЛЮЧВА името на полето. Продължаваш ли?')) return;
+      try {
+        const star = await hedarSega();
+        if (!star) return;
+        const nov = iztriyMenyu(star, kolona, 'stopanin');
+        await zapishiHedar(star, nov, 'Менюто е изтрито — името на полето е заключено.');
+        greshka = '';
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-vavezhdane]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['vavezhdane']);
+      try {
+        const star = await hedarSega();
+        if (!star) return;
+        const nov = otbelezhiVavezhdane(star, kolona, 'stopanin');
+        await zapishiHedar(star, nov, 'Номенклатурата ще се ражда от въвеждането.');
+        greshka = '';
+      } catch (err) {
+        greshka = err instanceof Error ? err.message : String(err);
+      }
+      await prerisuvay();
+    });
+  }
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-premahni-kolona]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['premahniKolona']);
+      // „Ако няма данни в колоната, никаква информация в таблиците — само
+      // тогава може да промениш." (ред 1572) Дали е празна, знае човекът.
+      if (
+        !confirm(
+          'Колони не се трият, а само се добавят. Премахването минава САМО за колона БЕЗ данни в никоя таблица. Потвърждаваш ли, че е празна?',
+        )
+      )
+        return;
+      try {
+        const star = await hedarSega();
+        if (!star) return;
+        const nov = premahniKolona(star, kolona, { rolya: 'stopanin', imaDanni: false });
+        await zapishiHedar(star, nov, `Колоната е премахната от „${star.klyuch}".`);
+        greshka = '';
       } catch (err) {
         greshka = err instanceof Error ? err.message : String(err);
       }

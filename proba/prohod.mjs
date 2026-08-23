@@ -1070,6 +1070,60 @@ async function main() {
     await sSabitie(p, () => p.click('.pravo input'));
     proveri('и се скрива пак — ключът носи ДЕЙСТВИЕТО', (await p.$$('.pravo.skrita')).length, 1);
 
+
+    // ══ 21 · Редакторът на хедъри · трите вида номенклатура ══════════════
+    razdel = '21 · Редакторът на хедъри';
+    await naEkran(p, 'nastroyki', '#litse-hedari');
+    proveri('едно място, две лица', (await p.$$('#litse-opis')).length, 1);
+
+    await p.selectOption('#izbor-hedar', { index: 1 });
+    await p.waitForSelector('.red.redaktor');
+    const koloniPredi = (await redove(p, '.red.redaktor')).length;
+    proveri('колоните на хедъра се редят', koloniPredi > 0, true);
+    proveri(
+      'по подразбиране колоната е БЕЗ падащо меню',
+      (await redove(p, '.red.redaktor'))[0]?.[2],
+      'без падащо меню',
+    );
+
+    // Нова колона с ГОТОВО меню от Описа — вторият вид номенклатура
+    await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
+    await p.fill('#kolona-ime', 'Начин');
+    await p.selectOption('#kolona-nomenklatura', 'opis');
+    await p.fill('#kolona-menyu', 'Кеш · Банка');
+    await sSabitie(p, () => p.click('#forma-kolona button[type=submit]'));
+    await p.waitForSelector('.red.redaktor');
+    const sledDobavyane = await redove(p, '.red.redaktor');
+    proveri('колоната е добавена в КРАЯ', sledDobavyane.length, koloniPredi + 1);
+    const nova = sledDobavyane[sledDobavyane.length - 1];
+    proveri('и носи готовото меню от Описа', nova?.[2], 'готово меню от Описа');
+    // Членовете стоят в полето за писане, не в текста на клетката.
+    const chlenoveNaEkran = await p.$$eval('[data-menyu-vhod]', (x) => x.map((i) => i.value));
+    proveri('членовете са запазени', chlenoveNaEkran.some((v) => v.includes('Кеш · Банка')), true);
+
+    // Описът на Подредба — всичко именувано е ред
+    await deystvieSPrerisuvane(p, () => p.click('#litse-opis'));
+    await p.waitForSelector('.red.opis');
+    const opis = await redove(p, '.red.opis');
+    proveri('Описът брои и хедъри, и колони, и членове', opis.length > koloniPredi, true);
+    proveri('членът на менюто си има дом', opis.some((r) => r[0] === 'Кеш' && r[1] === 'член на меню'), true);
+
+    // Изтритото меню ЗАКЛЮЧВА името (ред 1994)
+    await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
+    await p.waitForSelector('.red.redaktor');
+    await sSabitie(p, () => p.click('[data-iztriy-menyu]'));
+    await p.waitForSelector('.red.redaktor input:disabled');
+    proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
+    proveri(
+      'и колоната пада на първия вид',
+      (await redove(p, '.red.redaktor')).pop()?.[2],
+      'без падащо меню',
+    );
+
+    // Числата в Сметки не мърдат от редакция на глава
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('РЕДАКЦИЯТА НА ГЛАВА НЕ ПИПА ЧИСЛАТА', await plochka(p, 'Разход'), razhodPredi);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

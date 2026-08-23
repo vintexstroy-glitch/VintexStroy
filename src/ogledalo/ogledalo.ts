@@ -268,13 +268,18 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadModelZapisan;
         // Последният запис за същото име надделява — поправка, не втори модел.
         // Моделите отпреди резен 13 нямат `izklyucheni`, отпреди резен 14 —
-        // `zatvoreni` и `glavi`. Падат към празно и към сведения отпечатък,
-        // вместо да пукат при първото четене на стар Журнал.
+        // `zatvoreni` и `glavi`, отпреди резен 15 — номенклатурите на
+        // Редактора. Падат към празно и към сведения отпечатък, вместо да
+        // пукат при първото четене на стар Журнал.
         modeli.set(p.klyuch, {
           ...p,
           izklyucheni: p.izklyucheni ?? [],
           zatvoreni: p.zatvoreni ?? [],
           glavi: p.glavi ?? p.otpechatak.split('|'),
+          menyuta: p.menyuta ?? {},
+          otVavezhdane: p.otVavezhdane ?? [],
+          zaklyucheni: p.zaklyucheni ?? [],
+          predishni: p.predishni ?? [],
         });
         break;
       }

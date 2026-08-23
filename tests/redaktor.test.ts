@@ -1,0 +1,229 @@
+/**
+ * РЕДАКТОРЪТ НА ХЕДЪРИ · обещанията, всяко от негово изречение.
+ *
+ *   1. „Колони не се трият, а само се добавят" — работеща таблица само расте;
+ *      празна колона без роля е единственото изключение. (ред 1572)
+ *   2. „Раждането/триенето на колона само за управител." (ред 1494)
+ *   3. Изтрито меню = директно писане + ЗАКЛЮЧЕНО име. (ред 1994)
+ *   4. Трите вида номенклатура — поименно, по И58.
+ *   5. Новата колона се появява при семейството — еднакви хедъри. (ред 1982)
+ *   6. „Всичко именувано = ред" в Описа на Подредба. (ред 1970)
+ *   7. Старият файл се познава и след като главата порасне.
+ *   8. Промяната на глава е ново събитие — поправка, не презапис.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { Deystviya } from '../src/domein/deystviya.js';
+import { otCSV } from '../src/iztochnik/csv.js';
+import { belegNaModel, napraviModel, poznavaLi } from '../src/iztochnik/model.js';
+import {
+  dobaviKolona,
+  GreshkaRedaktor,
+  iztriyMenyu,
+  opisNaPodredba,
+  otbelezhiVavezhdane,
+  preimenuvayKolona,
+  premahniKolona,
+  semeystvo,
+  vidNomenklatura,
+  zadayMenyu,
+} from '../src/domein/redaktor.js';
+import { vidNaKolona } from '../src/domein/kolonno.js';
+import { SHA } from './pomoshtni.js';
+
+const NAEMATEL = 'vintexstroy';
+
+function stend() {
+  const dnevnik = new DnevnikVPametta();
+  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
+  let tik = 0;
+  const deystviya = new Deystviya({
+    vrata,
+    dnevnik,
+    naematel: NAEMATEL,
+    actor: 'vintexstroy@gmail.com',
+    chasovnik: () => new Date(Date.UTC(2026, 7, 23, 13, 0, tik++)).toISOString(),
+  });
+  return { dnevnik, deystviya };
+}
+
+// Главата на „Наеми КЕШ" — неговият собствен образец от Драйва, свит.
+const CSV = 'Дата;Място;Имот;Наем\n05.08.2026;Малинова;АП. № 1;550,00';
+
+function model() {
+  return napraviModel({
+    klyuch: 'Наеми КЕШ',
+    tablitsa: otCSV(CSV, 'наеми'),
+    redNaGlavata: 0,
+    koloni: { data: 0, kontragent: 1, suma: 3 },
+  });
+}
+
+describe('добавянето на колона', () => {
+  it('расте в края; старият отпечатък влиза в историята', () => {
+    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'stopanin' });
+    expect(m.glavi).toEqual(['Дата', 'Място', 'Имот', 'Наем', 'Наемател']);
+    expect(m.otpechatak).toBe('дата|място|имот|наем|наемател');
+    expect(m.predishni).toEqual(['дата|място|имот|наем']);
+  });
+
+  it('НЕ е за редактора и наблюдателя — само управителите (ред 1494)', () => {
+    expect(() => dobaviKolona(model(), { ime: 'Х', rolya: 'redaktor' })).toThrow(GreshkaRedaktor);
+    expect(() => dobaviKolona(model(), { ime: 'Х', rolya: 'nablyudatel' })).toThrow(
+      GreshkaRedaktor,
+    );
+  });
+
+  it('две колони с едно име не минават — и със сменени букви', () => {
+    expect(() => dobaviKolona(model(), { ime: ' мЯсто ', rolya: 'stopanin' })).toThrow(
+      /вече носи колона/,
+    );
+  });
+
+  it('ражда се наведнъж с вида и номенклатурата си', () => {
+    const m = dobaviKolona(model(), {
+      ime: 'Начин',
+      rolya: 'stopanin',
+      menyu: ['Кеш', 'Банка'],
+    });
+    expect(vidNomenklatura(m, 4)).toBe('opis');
+    expect(m.menyuta[4]).toEqual(['Кеш', 'Банка']);
+  });
+
+  it('затворената колона не носи меню — тя е сметка', () => {
+    expect(() =>
+      dobaviKolona(model(), { ime: 'Сбор', rolya: 'stopanin', zatvorena: true, menyu: ['а'] }),
+    ).toThrow(/меню не ѝ трябва/);
+    const m = dobaviKolona(model(), { ime: 'Сбор', rolya: 'stopanin', zatvorena: true });
+    expect(vidNaKolona(m, 4)).toBe('zatvorena');
+  });
+});
+
+describe('трите вида номенклатура (И58)', () => {
+  it('по подразбиране колоната е БЕЗ падащо меню — първият вид', () => {
+    expect(vidNomenklatura(model(), 1)).toBe('svobodna');
+  });
+
+  it('готовото меню от Описа е вторият вид', () => {
+    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря', 'Студентски град'], 'stopanin');
+    expect(vidNomenklatura(m, 1)).toBe('opis');
+  });
+
+  it('раждането от въвеждането е третият вид и готовото меню го измества', () => {
+    let m = otbelezhiVavezhdane(model(), 2, 'stopanin');
+    expect(vidNomenklatura(m, 2)).toBe('vavezhdane');
+    m = zadayMenyu(m, 2, ['АП. № 1'], 'stopanin');
+    expect(vidNomenklatura(m, 2)).toBe('opis');
+    expect(m.otVavezhdane).toEqual([]);
+  });
+
+  it('върху готово меню видът не се сменя направо — първо изтриване', () => {
+    const m = zadayMenyu(model(), 1, ['Малинова'], 'stopanin');
+    expect(() => otbelezhiVavezhdane(m, 1, 'stopanin')).toThrow(/първо то се изтрива/);
+  });
+});
+
+describe('изтритото меню заключва името (ред 1994)', () => {
+  it('менюто пада, името се заключва, преименуването отказва', () => {
+    let m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'stopanin');
+    m = iztriyMenyu(m, 1, 'stopanin');
+    expect(vidNomenklatura(m, 1)).toBe('svobodna');
+    expect(m.zaklyucheni).toEqual([1]);
+    expect(() => preimenuvayKolona(m, 1, 'Град', 'stopanin')).toThrow(/заключено/);
+  });
+
+  it('незаключеното име се преименува и това е промяна за белега', () => {
+    const staro = model();
+    const novo = preimenuvayKolona(staro, 3, 'Наем €', 'stopanin');
+    expect(novo.glavi[3]).toBe('Наем €');
+    expect(belegNaModel(novo)).not.toBe(belegNaModel(staro));
+  });
+});
+
+describe('триенето — изключението, не правилото (ред 1572)', () => {
+  it('колона с данни не се трие', () => {
+    const m = dobaviKolona(model(), { ime: 'Бележка', rolya: 'stopanin' });
+    expect(() => premahniKolona(m, 4, { rolya: 'stopanin', imaDanni: true })).toThrow(
+      /не се трият, а само се добавят/,
+    );
+  });
+
+  it('колона, която носи роля, не се трие — редът спира да става запис', () => {
+    expect(() => premahniKolona(model(), 3, { rolya: 'stopanin', imaDanni: false })).toThrow(
+      /ролята „сума"/,
+    );
+  });
+
+  it('празна колона без роля пада и номерата слизат с едно', () => {
+    let m = dobaviKolona(model(), { ime: 'Излишна', rolya: 'stopanin' });
+    m = dobaviKolona(m, { ime: 'Начин', rolya: 'stopanin', menyu: ['Кеш', 'Банка'] });
+    m = premahniKolona(m, 4, { rolya: 'stopanin', imaDanni: false });
+    expect(m.glavi).toEqual(['Дата', 'Място', 'Имот', 'Наем', 'Начин']);
+    expect(m.menyuta[4]).toEqual(['Кеш', 'Банка']);
+    expect(m.menyuta[5]).toBeUndefined();
+  });
+});
+
+describe('семейството и старите файлове', () => {
+  it('старият файл се познава и след като главата порасне', () => {
+    const m = dobaviKolona(model(), { ime: 'Наемател', rolya: 'stopanin' });
+    expect(poznavaLi(m, otCSV(CSV, 'старият износ'))).toBe(true);
+  });
+
+  it('роднина е моделът със СЪЩАТА глава — днешна или предишна', () => {
+    const naemi = model();
+    const banka = napraviModel({
+      klyuch: 'Наеми Банка',
+      tablitsa: otCSV(CSV, 'банка'),
+      redNaGlavata: 0,
+      koloni: { data: 0, suma: 3 },
+    });
+    const chuzhd = napraviModel({
+      klyuch: 'Банка ОББ',
+      tablitsa: otCSV('Дата;Сума\n01.08.2026;10,00', 'обб'),
+      redNaGlavata: 0,
+      koloni: { data: 0, suma: 1 },
+    });
+    expect(semeystvo([naemi, banka, chuzhd], naemi).map((m) => m.klyuch)).toEqual([
+      'Наеми Банка',
+    ]);
+    // Пораслият остава роднина: старата му глава е в историята.
+    const porasnal = dobaviKolona(naemi, { ime: 'Наемател', rolya: 'stopanin' });
+    expect(semeystvo([porasnal, banka, chuzhd], porasnal).map((m) => m.klyuch)).toEqual([
+      'Наеми Банка',
+    ]);
+  });
+});
+
+describe('Описът на Подредба — всичко именувано е ред (ред 1970)', () => {
+  it('хедър, колони и членове на менюта, всяко със своя дом', () => {
+    const m = zadayMenyu(model(), 1, ['Малинова', 'Хисаря'], 'stopanin');
+    const opis = opisNaPodredba([m]);
+    expect(opis.filter((r) => r.vid === 'hedar')).toHaveLength(1);
+    expect(opis.filter((r) => r.vid === 'kolona')).toHaveLength(4);
+    expect(opis.filter((r) => r.vid === 'chlen').map((r) => r.ime)).toEqual([
+      'Малинова',
+      'Хисаря',
+    ]);
+    const mysto = opis.find((r) => r.ime === 'Място');
+    expect(mysto?.dom).toBe('Наеми КЕШ');
+    expect(mysto?.belezhka).toContain('готово меню');
+  });
+});
+
+describe('промяната е ново събитие, не презапис', () => {
+  it('вторият МоделЗаписан със същия ключ надделява в Огледалото', async () => {
+    const { dnevnik, deystviya } = stend();
+    const staro = model();
+    await deystviya.zapishiModel(staro, { opId: 'model:1' });
+    const novo = dobaviKolona(staro, { ime: 'Наемател', rolya: 'stopanin' });
+    await deystviya.zapishiModel(novo, { opId: 'model:2' });
+
+    const og = await deystviya.ogledalo();
+    expect(og.modeli.get('Наеми КЕШ')?.glavi).toContain('Наемател');
+    // Журналът пази и двете — историята не се пипа.
+    const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
+    expect(sabitiya.filter((s) => s.type === 'МоделЗаписан')).toHaveLength(2);
+  });
+});

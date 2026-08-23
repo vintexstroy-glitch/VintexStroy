@@ -560,6 +560,25 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) 130px minmax(0, 1.6fr);
   min-width: 700px;
 }
+/* Редакторът на хедъри · колоната и лицата ѝ */
+.glava.redaktor, .red.redaktor {
+  grid-template-columns: minmax(0, 1.6fr) 130px minmax(0, 1.3fr) minmax(0, 1.6fr) 260px;
+  min-width: 860px;
+}
+.red.redaktor input {
+  width: 100%;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--liniya);
+  border-radius: 4px;
+  background: var(--hartiya);
+  color: inherit;
+}
+.red.redaktor input:disabled { opacity: 0.6; }
+.glava.opis, .red.opis {
+  grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 1.4fr) minmax(0, 1.6fr);
+  min-width: 700px;
+}
 .glava.zapisanasverka, .red.zapisanasverka {
   grid-template-columns: minmax(0, 2fr) 116px 116px 116px 128px;
   min-width: 640px;

@@ -97,6 +97,35 @@ export interface ModelNaTablitsa {
   readonly glavi: readonly string[];
   /** отпечатък на ХЕДЪРА — по него се познава същата таблица втори път */
   readonly otpechatak: string;
+  /**
+   * ГОТОВИТЕ ПАДАЩИ МЕНЮТА · колона → членовете ѝ, по ред на вкарване.
+   *
+   * Вторият от трите вида номенклатура (И58): „колона с готово падащо меню от
+   * Описа". Първият вид — без меню — е ЛИПСАТА на запис тук; третият е в
+   * `otVavezhdane`. Членовете са РЕДОВЕ В ОПИСА НА ПОДРЕДБА („всичко
+   * именувано = ред в Номенклатурите"), затова живеят в модела, а не в кода.
+   */
+  readonly menyuta: Readonly<Record<number, readonly string[]>>;
+  /**
+   * Колоните, чиято номенклатура се РАЖДА ОТ ВЪВЕЖДАНЕТО (третият вид, И58):
+   * „номенклатурите са от въвеждането на делото или имота". Менюто им не се
+   * пише тук — то е списъкът на вече въведеното и расте само.
+   */
+  readonly otVavezhdane: readonly number[];
+  /**
+   * Колоните със ЗАКЛЮЧЕНО ИМЕ. Негово (ред 1994): изтрие ли се падащото
+   * меню, „се активира писане на текст или числа, и СЕ ЗАКЛЮЧВА
+   * наименованието на полето от хедъра". Заключеното име не се преименува.
+   */
+  readonly zaklyucheni: readonly number[];
+  /**
+   * ПРЕДИШНИТЕ ОТПЕЧАТЪЦИ на същата глава — историята ѝ, най-старият пръв.
+   *
+   * Редакторът на хедъри МЕНИ главата (добавя колона, преименува), а файлът,
+   * претворен вчера, носи вчерашната. Без тази следа старият файл спира да се
+   * познава и минава за чужд. Списъкът само расте — както Журналът.
+   */
+  readonly predishni: readonly string[];
 }
 
 export class GreshkaModel extends Error {
@@ -135,10 +164,16 @@ export function otpechatakNaGlavata(t: Tablitsa, redNaGlavata: number): string {
     .join('|');
 }
 
-/** Същата ли е таблицата, за която е правен моделът. */
+/**
+ * Същата ли е таблицата, за която е правен моделът.
+ *
+ * Познава и ПРЕДИШНА глава: файл, претворен преди редакторът да добави
+ * колона, носи стария отпечатък — той е същата таблица, не чужда.
+ */
 export function poznavaLi(m: ModelNaTablitsa, t: Tablitsa): boolean {
   try {
-    return otpechatakNaGlavata(t, m.redNaGlavata) === m.otpechatak;
+    const o = otpechatakNaGlavata(t, m.redNaGlavata);
+    return o === m.otpechatak || m.predishni.includes(o);
   } catch {
     return false;
   }
@@ -210,6 +245,12 @@ export function napraviModel(n: {
     zatvoreni: Object.freeze([...(n.zatvoreni ?? [])].sort((a, b) => a - b)),
     glavi: Object.freeze(glaviNaRed(tablitsa, redNaGlavata)),
     otpechatak: otpechatakNaGlavata(tablitsa, redNaGlavata),
+    // Роденият от файл модел тръгва чист: менютата и заключванията идват
+    // после, от Редактора на хедъри (`src/domein/redaktor.ts`).
+    menyuta: Object.freeze({}),
+    otVavezhdane: Object.freeze([]),
+    zaklyucheni: Object.freeze([]),
+    predishni: Object.freeze([]),
   });
 }
 
@@ -228,9 +269,18 @@ export function belegNaModel(m: ModelNaTablitsa): string {
   const koloni = (Object.keys(IMENA_NA_ROLITE) as Rolya[])
     .map((r) => `${r}=${m.koloni[r] ?? ''}`)
     .join(',');
+  // Менютата влизат по колона и по членове: сменен член е промяна.
+  const menyuta = Object.entries(m.menyuta)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([k, chlenove]) => `${k}:${chlenove.join('~')}`)
+    .join(';');
   return (
     `${m.redNaGlavata}|${koloni}|${m.ddsE ?? ''}|` +
-    `${[...m.izklyucheni].join('.')}|${[...m.zatvoreni].join('.')}`
+    `${[...m.izklyucheni].join('.')}|${[...m.zatvoreni].join('.')}|` +
+    // Главите влизат дословно: преименуваната колона е промяна, която
+    // старият белег (без тях) минаваше за „нищо ново".
+    `${m.glavi.join('¦')}|${menyuta}|` +
+    `${[...m.otVavezhdane].join('.')}|${[...m.zaklyucheni].join('.')}`
   );
 }
 
