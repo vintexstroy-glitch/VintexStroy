@@ -164,6 +164,8 @@ export async function prilozhi(
         nachin: n.nachin,
         data: r.data,
         dokument: r.dokument,
+        // Каже ли таблицата ставката на реда — тя надделява над сектора.
+        ...(r.stavka === undefined ? {} : { stavka: r.stavka }),
         klyuch: r.klyuch,
         izvor,
       },

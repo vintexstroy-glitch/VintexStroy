@@ -8,6 +8,7 @@
  */
 
 import type { Sashtnost } from '../yadro/index.js';
+import type { ModelNaTablitsa } from '../iztochnik/model.js';
 
 export const VID = {
   imot: 'imot',
@@ -16,6 +17,7 @@ export const VID = {
   plashtane: 'plashtane',
   razhod: 'razhod',
   spravka: 'spravka',
+  model: 'model',
 } as const;
 
 export type Vid = (typeof VID)[keyof typeof VID];
@@ -31,6 +33,7 @@ export type TipSabitie =
   | 'ДДСПлатено'
   | 'ИмотПоправен'
   | 'НаемПоправен'
+  | 'МоделЗаписан'
   | 'Сторно';
 
 export interface PayloadImotDobaven {
@@ -129,6 +132,15 @@ export interface PayloadRazhodZapisan {
   /** номер на фактура или документ; празно, ако няма */
   readonly dokument: string;
   /**
+   * СТАВКАТА НА РЕДА, цял процент (0 · 9 · 20).
+   *
+   * Негови думи: „ДДС е избор при въвеждане на всяка фактура и при четене на
+   * таблици." Затова ставката стои ТУК, при реда, а не се вади от сектора при
+   * показване. Липсва ли — важи подсказката на сектора, както беше преди
+   * резен 12, и старите записи не се менят с обратна сила.
+   */
+  readonly stavka?: number;
+  /**
    * СЛЕДАТА от източника. Празни за ръчно въведен разход.
    * `klyuch` е стабилният ключ, по който препрочитането на същата таблица
    * разпознава своя ред; `izvor` казва кой файл и коя негова версия го донесе.
@@ -167,6 +179,19 @@ export interface PayloadDDSPlateno {
   readonly data: string;
   readonly nachin: 'банка' | 'в брой';
 }
+
+/**
+ * МОДЕЛЪТ НА ТАБЛИЦА · картата на хедъра, записана в Журнала.
+ *
+ * Защо е СЪБИТИЕ, а не настройка: моделът решава как се четат пари. Сменѝ го
+ * тихо, и старите четения стават необясними — числата остават, а обяснението
+ * им се губи. Като събитие се сверява, сторнира се и се вижда кой го е сменил.
+ *
+ * Същността е `MODEL:<име>`: поправка на картата е НОВО събитие върху същата
+ * същност, не втори модел. Огледалото налага последното върху предишните —
+ * точно като при `ИмотПоправен`.
+ */
+export type PayloadModelZapisan = ModelNaTablitsa;
 
 export interface PayloadStorno {
   /** seq на събитието, което се погасява */

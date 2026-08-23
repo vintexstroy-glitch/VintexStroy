@@ -13,6 +13,9 @@ import {
   GreshkaDDS,
   SEKTOR_PO_PODRAZBIRANE,
   sektoriNaNaem,
+  stavkaNaReda,
+  pozvolenaStavka,
+  STAVKI,
 } from '../src/domein/dds.js';
 import { kakvoPishe } from '../src/yadro/pari.js';
 
@@ -87,5 +90,33 @@ describe('акумулаторите', () => {
       'naem-zhilishten',
       'naem-targovski',
     ]);
+  });
+});
+
+describe('ставката идва от РЕДА, не от сектора', () => {
+  it('редът, който е казал ставката си, я налага', () => {
+    // Негови думи: „ДДС е избор при въвеждане на всяка фактура."
+    // Нощувка на 9% в сектор с подразбиране 20% — трябва да мине на 9.
+    expect(stavkaNaReda('naem-targovski', 9)).toBe(9);
+    expect(stavkaNaReda('naem-zhilishten', 20)).toBe(20);
+    expect(stavkaNaReda('pokupki-materiali', 0)).toBe(0);
+  });
+
+  it('мълчалив ред взема подсказката на сектора', () => {
+    expect(stavkaNaReda('naem-targovski')).toBe(20);
+    expect(stavkaNaReda('naem-zhilishten')).toBe(0);
+    expect(stavkaNaReda(undefined)).toBe(0); // подразбиращият се сектор
+  });
+
+  it('несъществуваща ставка се отказва С ЧИСЛАТА в думите', () => {
+    // 21% от невнимание не бива да мине тихо в ДДС-справка.
+    expect(() => stavkaNaReda('naem-targovski', 21)).toThrow(GreshkaDDS);
+    expect(() => stavkaNaReda('naem-targovski', 21)).toThrow(/0%, 9%, 20%/);
+    expect(() => stavkaNaReda('naem-targovski', -1)).toThrow(GreshkaDDS);
+  });
+
+  it('9% съществува — тя беше обявена в коментар, но я нямаше никъде', () => {
+    expect(pozvolenaStavka(9)).toBe(true);
+    expect(STAVKI).toEqual([0, 9, 20]);
   });
 });

@@ -835,6 +835,91 @@ async function main() {
       ),
       true,
     );
+
+    // ══ 18 · четецът, който НАУЧАВА модела ═══════════════════════════════
+    razdel = '18 · моделът на таблица';
+    await naEkran(p, 'smetki', '#forma-period');
+    await p.fill('#smetki-period', '2026-04');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+    // Глава на българско банково извлечение. НЯМА колона „Доставчик" — точно
+    // затова старият път по думи не я хваща и приложението трябва да ПИТА.
+    const OBB = 'Дата на вальор;Основание;Наредител;Сума по документа;Реф. номер;ДДС %';
+    const parvoIzvlechenie = join(tmpdir(), 'izvlechenie-april.csv');
+    await writeFile(
+      parvoIzvlechenie,
+      [
+        OBB,
+        '05.04.2026;цимент;Материали ООД;600,00;3001;20',
+        '12.04.2026;нощувки екип;Хотел ЕООД;109,00;3002;9',
+      ].join('\n'),
+    );
+
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', parvoIzvlechenie);
+    await p.waitForSelector('#zapomni-model');
+    proveri('непознат хедър → ПИТА, не гадае', await tekstNa(p, '.karta.izbrana .dyalglava h2'), 'Не познавам тази таблица');
+    proveri('предлага „дата"', await p.$eval('#karta-data', (e) => e.value), '0');
+    proveri('предлага „сума"', await p.$eval('#karta-suma', (e) => e.value), '3');
+    proveri('предлага „ДДС"', await p.$eval('#karta-dds', (e) => e.value), '5');
+    proveri('НЕ гади „Наредител" за контрагент', await p.$eval('#karta-kontragent', (e) => e.value), '');
+
+    await p.fill('#karta-ime', 'Банка ОББ');
+    await p.selectOption('#karta-kontragent', '2');
+    await sSabitiya(p, 1, () => p.click('#zapomni-model'));
+    await p.waitForSelector('#prilozhi');
+    proveri('картата се записва и файлът се чете', (await tekstNa(p, '.karta.izbrana .dyalglava h2')).startsWith('Прочетено'), true);
+    proveri('два реда от извлечението', (await redove(p, '.red.razlika')).length, 2);
+
+    await sSabitiya(p, 2, () => p.click('#prilozhi'));
+    const vhodM = (await redove(p, '.red.dds:not(.sbor)')).filter((x) => x[0] === 'вход');
+    proveri('един сектор, ДВЕ ставки — от колоната, не от сектора', vhodM.length, 2);
+    proveri('входящ ДДС на 20%', vhodM.find((x) => x[2] === '20%')?.[4], '100,00');
+    proveri('входящ ДДС на 9%', vhodM.find((x) => x[2] === '9%')?.[4], '9,00');
+
+    // сверката на ДДС · движение в банката без фактура
+    proveri('две движения без фактура светят', (await redove(p, '.red.nesvarshen')).length, 2);
+    proveri('казва КОЕ липсва, не само колко', (await redove(p, '.red.nesvarshen'))[0]?.[0], 'липсва фактура');
+
+    await zapishiRazhod(p, {
+      potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Материали ООД',
+      opis: 'цимент', suma: '600,00', nachin: 'банка', data: '2026-04-05', dokument: '3001',
+    });
+    const ostanali = await redove(p, '.red.nesvarshen');
+    proveri('въведената фактура затваря своето движение', ostanali.length, 1);
+    proveri('остава точно другото', ostanali[0]?.[1]?.includes('3002'), true);
+
+    // ВТОРИЯТ файл със същата глава — минава без нито един въпрос
+    const vtoroIzvlechenie = join(tmpdir(), 'izvlechenie-april-2.csv');
+    await writeFile(
+      vtoroIzvlechenie,
+      [
+        OBB,
+        '05.04.2026;цимент;Материали ООД;600,00;3001;20',
+        '12.04.2026;нощувки екип;Хотел ЕООД;109,00;3002;9',
+        '20.04.2026;тухли;Тухли АД;240,00;3003;20',
+      ].join('\n'),
+    );
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', vtoroIzvlechenie);
+    await p.waitForSelector('#prilozhi');
+    proveri('вторият файл със същата глава НЕ пита', (await p.$('#zapomni-model')) === null, true);
+    proveri('вижда само новия ред', (await redove(p, '.red.razlika')).length, 1);
+    await sSabitiya(p, 1, () => p.click('#prilozhi'));
+    proveri('новото движение също търси фактурата си', (await redove(p, '.red.nesvarshen')).length, 2);
+
+    // крив ред НЕ се преглъща — влиза в „непрочетени" с думи защо
+    const krivo = join(tmpdir(), 'izvlechenie-april-krivo.csv');
+    await writeFile(krivo, [OBB, '25.04.2026;боя;Бои ООД;150,00;3004;21'].join('\n'));
+    await deystvieSPrerisuvane(p, () => p.click('#vzemi'));
+    await p.click('[data-iztochnik=csv]');
+    await p.setInputFiles('#fayl-iztochnik', krivo);
+    await p.waitForSelector('.red.propusnat');
+    proveri('непозволена ставка не се закръгля — казва се', (await redove(p, '.red.propusnat'))[0]?.[1]?.includes('Ставка 21 не съществува'), true);
+    await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

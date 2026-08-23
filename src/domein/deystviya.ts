@@ -18,6 +18,7 @@ import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
   PayloadImotPopraven,
+  PayloadModelZapisan,
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
@@ -129,6 +130,16 @@ export class Deystviya {
   /** Внесеното ДДС, от платежното. Нарочно НЕ иска отключен период. */
   async platiDDS(id: string, danni: PayloadDDSPlateno, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('ДДСПлатено', VID.spravka, id, danni, z);
+  }
+
+  /**
+   * Записва картата на хедъра — какво коя колона значи в една таблица.
+   *
+   * НЕ иска отключен период: моделът не е запис за месец, а описание на файл.
+   * Записите, които той после ражда, си минават през своите проверки.
+   */
+  async zapishiModel(danni: PayloadModelZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('МоделЗаписан', VID.model, `MODEL:${danni.klyuch}`, danni, z);
   }
 
   /**

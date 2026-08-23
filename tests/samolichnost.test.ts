@@ -16,6 +16,8 @@ import {
   GreshkaVhod,
   imaKlyuch,
   IMENA_NA_DOSTAVCHITSITE,
+  sParola,
+  TEKST_ZA_PAROLATA,
   IMENA_NA_ROLITE,
   mozheDaRedaktira,
   VhodVPametta,
@@ -37,7 +39,33 @@ describe('входът без парола', () => {
     const vhod = new EdinSobstvenik(IVO);
     // `vlez` взима САМО доставчик. Ако някой добави втори довод, това пада.
     expect(vhod.vlez.length).toBe(1);
+    // Самата парола НИКОГА не се пази в самоличността — нито избрана, нито не.
     expect(Object.keys(IVO)).not.toContain('parola');
+  });
+
+  it('парола НЕ се появява без изричен избор', () => {
+    // Правило 13, стеснено: по подразбиране няма парола. Тя е избор, не
+    // подразбиране — и точно това пази този тест.
+    expect(sParola(IVO)).toBe(false);
+    expect(sParola({ ...IVO, nachin: 'klyuch' })).toBe(false);
+    expect(sParola({ ...IVO, nachin: 'parola' })).toBe(true);
+  });
+
+  it('изборът на парола идва с ИНФОРМИРАН текст, не с празно поле', () => {
+    // Човек има право да поеме риска. Да го поеме незнаейки — няма.
+    expect(TEKST_ZA_PAROLATA).toMatch(/не може да ти я върне/);
+    expect(TEKST_ZA_PAROLATA).toMatch(/заключен завинаги/);
+    // И текстът сочи по-добрия път, вместо само да плаши.
+    expect(TEKST_ZA_PAROLATA).toMatch(/Ключът на устройството/);
+  });
+
+  it('имейлът за връзка остава дори в напълно офлайн издание', () => {
+    // Негови думи: остава за комуникация, дори приложението да е свалено офлайн.
+    const oflayn = { ...IVO, nachin: 'klyuch' as const, imeylZaVrazka: 'ivo@example.com' };
+    expect(oflayn.imeylZaVrazka).toBe('ivo@example.com');
+    // Той НЕ е вход — входът си остава `nachin`.
+    expect(sParola(oflayn)).toBe(false);
+    expect(imaKlyuch(oflayn)).toBe(true);
   });
 
   it('влиза през своя доставчик и се помни', async () => {

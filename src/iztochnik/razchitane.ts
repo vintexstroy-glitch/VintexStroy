@@ -12,6 +12,8 @@
 import { GreshkaPari, otLeva } from '../yadro/pari.js';
 import { GreshkaData, otData } from '../yadro/data.js';
 import { nameriGlavata, nameriKolona, type Tablitsa } from './tablitsa.js';
+import { poRolya, redoveSDanni, type ModelNaTablitsa } from './model.js';
+import { pozvolenaStavka, STAVKI } from '../domein/dds.js';
 import type { Izvor, Propusnat, RedOtSnimka, Snimka } from './snimka.js';
 
 export class GreshkaRazchitane extends Error {
@@ -151,4 +153,166 @@ export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
   }
 
   return { vid: 'razhodi', period: n.period, izvor: n.izvor, redove, propusnati };
+}
+
+// ── четенето ПО МОДЕЛ · когато човекът е казал коя колона какво е ──────────
+
+/**
+ * СТАВКАТА ОТ КЛЕТКА · „20", „20%", „20,00%" — все едно и също.
+ *
+ * Приема се само цял процент от `STAVKI`. Чуждото число НЕ се закръгля към
+ * най-близкото позволено: 21% в клетка значи или грешка в източника, или
+ * сменен закон, и двете искат човек, а не мълчаливо приближение.
+ */
+export function stavkaOtKletka(surovo: string): number {
+  const chisto = surovo.trim().replace(/%/g, '').replace(',', '.').trim();
+  if (chisto === '') throw new GreshkaRazchitane('Клетката за ДДС е празна.');
+  const chislo = Number(chisto);
+  if (!Number.isFinite(chislo)) {
+    throw new GreshkaRazchitane(`„${surovo.trim()}" не е ставка.`);
+  }
+  // „0,20" в клетка значи 20%, не 0,2% — Excel пази процентите като дроб.
+  const protsenti = chislo > 0 && chislo < 1 ? chislo * 100 : chislo;
+  const kato = Math.round(protsenti);
+  // Толерансът е заради плаващата запетая в самия Excel (0,2 × 100 не е точно 20).
+  // Това е ПРОЦЕНТ, не пари — правило 3 не се нарушава.
+  if (Math.abs(protsenti - kato) > 1e-9 || !pozvolenaStavka(kato)) {
+    throw new GreshkaRazchitane(
+      `Ставка ${surovo.trim()} не съществува. Позволените са: ${STAVKI.join('%, ')}%.`,
+    );
+  }
+  return kato;
+}
+
+/**
+ * СТАВКАТА ОТ СУМАТА · когато колоната носи левовете на ДДС-то, не процента.
+ *
+ *   ставка = ДДС × 100 / (обща − ДДС)
+ *
+ * Смята се и веднага се СВЕРЯВА: изчислената ставка трябва да е позволена и,
+ * приложена наобратно върху общата сума, да върне същите стотинки. Иначе
+ * таблицата казва нещо, което не се връзва — и това е ред за човек, не за
+ * закръгляне. Толерансът е една стотинка, защото източникът си закръглява сам.
+ */
+export function stavkaOtSuma(obshta_st: number, dds_st: number): number {
+  const osnova = obshta_st - dds_st;
+  if (osnova <= 0) throw new GreshkaRazchitane('ДДС-то не може да е колкото цялата сума.');
+
+  for (const st of STAVKI) {
+    if (st === 0) {
+      if (dds_st === 0) return 0;
+      continue;
+    }
+    const ochakvano = Math.round((obshta_st * st) / (100 + st));
+    if (Math.abs(ochakvano - dds_st) <= 1) return st;
+  }
+  throw new GreshkaRazchitane(
+    'ДДС-то в тази клетка не отговаря на нито една позволена ставка ' +
+      `(${STAVKI.join('%, ')}%).`,
+  );
+}
+
+/** Кой месец е таблицата според МОДЕЛА — пак по най-често срещаната дата. */
+export function periodPoModel(m: ModelNaTablitsa, t: Tablitsa): string {
+  const broy = new Map<string, number>();
+  for (const i of redoveSDanni(m, t)) {
+    const surovo = poRolya(m, t, i, 'data');
+    if (surovo === '') continue;
+    try {
+      const mesets = dataOtKletka(surovo).slice(0, 7);
+      broy.set(mesets, (broy.get(mesets) ?? 0) + 1);
+    } catch {
+      // Неразчетена дата не гласува за период.
+    }
+  }
+  return [...broy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+}
+
+/**
+ * Чете таблицата през картата на хедъра.
+ *
+ * Разликата с `razchetiRazhodi` е една: там колоните се ТЪРСЯТ по думи, тук са
+ * КАЗАНИ. Всичко останало е същото — цели стотинки, ISO дати, и ред, който не
+ * се разчита, влиза в `propusnati` с думи защо.
+ */
+export function razchetiPoModel(n: {
+  model: ModelNaTablitsa;
+  tablitsa: Tablitsa;
+  izvor: Izvor;
+  period: string;
+}): Snimka {
+  const { model: m, tablitsa: t } = n;
+  const redove: RedOtSnimka[] = [];
+  const propusnati: Propusnat[] = [];
+  const vidyani = new Map<string, number>();
+
+  for (const i of redoveSDanni(m, t)) {
+    const nomer = i + 1;
+    const surovaSuma = poRolya(m, t, i, 'suma');
+    const surovaData = poRolya(m, t, i, 'data');
+    const koy = poRolya(m, t, i, 'kontragent');
+    const osnovanie = poRolya(m, t, i, 'osnovanie');
+
+    if (surovaSuma === '' && surovaData === '' && koy === '' && osnovanie === '') continue;
+
+    try {
+      const suma_st = otLeva(surovaSuma.replace(/\s|лв\.?/gi, ''));
+      if (suma_st === 0) throw new GreshkaRazchitane('Сумата е нула.');
+      const data = dataOtKletka(surovaData);
+      if (data.slice(0, 7) !== n.period) {
+        propusnati.push({ red: nomer, zashto: `Датата ${data} е извън ${n.period}.` });
+        continue;
+      }
+
+      // Кой е отсреща: контрагентът, ако таблицата го дава; иначе основанието.
+      // Празно НЕ минава — ред без нито едно от двете не се разпознава после.
+      const shte = koy || osnovanie;
+      if (shte === '') throw new GreshkaRazchitane('Няма нито контрагент, нито основание.');
+
+      const dokument = poRolya(m, t, i, 'dokument');
+      const osnoven = klyuchNaRazhod({ dokument, data, koy: shte, suma_st });
+      const povtoreno = (vidyani.get(osnoven) ?? 0) + 1;
+      vidyani.set(osnoven, povtoreno);
+      const klyuch = povtoreno === 1 ? osnoven : `${osnoven}#${povtoreno}`;
+
+      const stavka = stavkaNaRed(m, t, i, suma_st);
+
+      redove.push({
+        klyuch,
+        koy: shte,
+        suma_st,
+        data,
+        dokument,
+        opis: osnovanie || shte,
+        ...(stavka === undefined ? {} : { stavka }),
+      });
+    } catch (greshka) {
+      propusnati.push({
+        red: nomer,
+        zashto:
+          greshka instanceof GreshkaPari ||
+          greshka instanceof GreshkaData ||
+          greshka instanceof GreshkaRazchitane
+            ? greshka.message
+            : String(greshka),
+      });
+    }
+  }
+
+  return { vid: 'razhodi', period: n.period, izvor: n.izvor, redove, propusnati };
+}
+
+/** Ставката на един ред според модела. `undefined`, ако таблицата мълчи. */
+function stavkaNaRed(
+  m: ModelNaTablitsa,
+  t: Tablitsa,
+  red: number,
+  suma_st: number,
+): number | undefined {
+  if (m.koloni.dds === undefined) return undefined;
+  const surovo = poRolya(m, t, red, 'dds');
+  if (surovo === '') return undefined;
+  return m.ddsE === 'suma'
+    ? stavkaOtSuma(suma_st, otLeva(surovo.replace(/\s|лв\.?/gi, '')))
+    : stavkaOtKletka(surovo);
 }

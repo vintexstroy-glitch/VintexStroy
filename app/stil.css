@@ -544,6 +544,12 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 360px;
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 12.5px; }
+
+/* ── сверката на ДДС · КЪДЕ е разликата, не само колко ───────────────── */
+.glava.nesvarshen, .red.nesvarshen {
+  grid-template-columns: 132px minmax(0, 2.4fr) 108px 120px;
+  min-width: 600px;
+}
 .karta.izbrana .tablitsa { background: #FFFFFF; }
 
 /* ── фините филтри в стил Уиндоус ────────────────────────────────────── */

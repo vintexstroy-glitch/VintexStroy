@@ -13,6 +13,7 @@
 
 import type { Sabitie } from '../yadro/index.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
+import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -22,6 +23,7 @@ import type {
   PayloadPlashtanePrieto,
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
+  PayloadModelZapisan,
   PayloadSpravkaPodadena,
   PayloadStorno,
   PayloadVzemaneNachisleno,
@@ -91,6 +93,11 @@ export interface Razhod {
   readonly nachin: string;
   readonly data: string;
   readonly dokument: string;
+  /**
+   * Ставката, с която ДДС-то се изважда ОТ ТОЗИ РЕД.
+   * Липсва при записите отпреди резен 12 — тогава важи ставката на сектора.
+   */
+  readonly stavka?: number;
   /** ключ от източник; празно за ръчно въведен */
   readonly klyuch: string;
   /** кой файл и коя негова версия го донесе */
@@ -126,6 +133,8 @@ export interface Ogledalo {
   /** период → живата справка; има я = периодът е заключен */
   readonly spravki: ReadonlyMap<string, Spravka>;
   readonly platenoDDS: ReadonlyMap<string, PlashtaneDDS>;
+  /** име на модела → картата на хедъра; вж. `src/iztochnik/model.ts` */
+  readonly modeli: ReadonlyMap<string, ModelNaTablitsa>;
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
   /** seq-овете, които сторно е погасило (и самите сторна) */
@@ -153,6 +162,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const razhodi = new Map<string, Razhod>();
   const spravki = new Map<string, Spravka>();
   const platenoDDS = new Map<string, PlashtaneDDS>();
+  const modeli = new Map<string, ModelNaTablitsa>();
   let prilozheni = 0;
 
   for (const s of sabitiya) {
@@ -204,9 +214,19 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           nachin: p.nachin,
           data: p.data,
           dokument: p.dokument,
+          // `?? {}` не става: `stavka: undefined` не е същото като липсващо
+          // поле при `exactOptionalPropertyTypes`.
+          ...(p.stavka === undefined ? {} : { stavka: p.stavka }),
           klyuch: p.klyuch ?? '',
           izvor: p.izvor ?? '',
         });
+        break;
+      }
+
+      case 'МоделЗаписан': {
+        const p = s.payload as unknown as PayloadModelZapisan;
+        // Последният запис за същото име надделява — поправка, не втори модел.
+        modeli.set(p.klyuch, p);
         break;
       }
 
@@ -320,7 +340,18 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     }
   }
 
-  return { imoti, naemi, vzemaniya, plashtaniya, razhodi, spravki, platenoDDS, prilozheni, pogaseni };
+  return {
+    imoti,
+    naemi,
+    vzemaniya,
+    plashtaniya,
+    razhodi,
+    spravki,
+    platenoDDS,
+    modeli,
+    prilozheni,
+    pogaseni,
+  };
 }
 
 type BezPresmetnato = Omit<Vzemane, 'ostatak_st' | 'sastoyanie'>;

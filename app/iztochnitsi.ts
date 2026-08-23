@@ -17,8 +17,19 @@ import { otCSV } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
 import { otpechatak, type Izvor, type Snimka, type VidIzvor } from '../src/iztochnik/snimka.js';
-import { pogadniPeriod, razchetiRazhodi } from '../src/iztochnik/razchitane.js';
-import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
+import { periodPoModel, pogadniPeriod, razchetiPoModel, razchetiRazhodi } from '../src/iztochnik/razchitane.js';
+import { bezPrazni, kletka, type Tablitsa } from '../src/iztochnik/tablitsa.js';
+import {
+  belegNaModel,
+  GreshkaModel,
+  IMENA_NA_ROLITE,
+  nameriModel,
+  napraviModel,
+  podskazhi,
+  ZADALZHITELNI_ROLI,
+  type ModelNaTablitsa,
+  type Rolya,
+} from '../src/iztochnik/model.js';
 import { sektoriNaRazhod } from '../src/domein/dds.js';
 import { potototsiNaRazhod } from '../src/domein/smetki.js';
 import {
@@ -39,6 +50,20 @@ let filtar: Filtar = 'promenite';
 let greshka = '';
 /** Дръжката към файла живее, докато трае сесията — за „Препрочети". */
 let drazhka: FileSystemFileHandle | null = null;
+
+/**
+ * ПИТАНЕТО · когато никой модел не познава таблицата.
+ *
+ * Дотук непознат файл беше СЛЯПА УЛИЦА: „Не разчитам този файл." Оттук е
+ * въпрос. Държи се таблицата и следата ѝ, за да не се иска файлът пак —
+ * човекът вече го е посочил веднъж.
+ */
+interface Pitane {
+  readonly izvor: Izvor;
+  readonly tablitsa: Tablitsa;
+  redNaGlavata: number;
+}
+let pitane: Pitane | null = null;
 
 const IZTOCHNITSI: readonly { vid: VidIzvor; ime: string; opis: string; vidove: string }[] = [
   { vid: 'raka', ime: 'На ръка, тук в приложението', opis: 'формите долу', vidove: '' },
@@ -70,6 +95,9 @@ export function narisuvayButona(): string {
 }
 
 export function narisuvayPlana(): string {
+  if (pitane) {
+    return `${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}${narisuvayPitaneto(pitane)}`;
+  }
   if (greshka && !plan) {
     return `<div class="vest zle">${ekraniraj(greshka)}</div>`;
   }
@@ -182,6 +210,114 @@ export function narisuvayPlana(): string {
     </section>`;
 }
 
+/**
+ * ЕКРАНЪТ ЗА КАРТАТА НА ХЕДЪРА · питаме ВЕДНЪЖ.
+ *
+ * Показва се само когато нито един записан модел не познава таблицата. Оттук
+ * нататък същият хедър минава сам — затова въпросът не дразни: задава се
+ * веднъж на банка, не веднъж на файл.
+ *
+ * Предложението идва от `podskazhi()`; то е ПРЕДЛОЖЕНИЕ, а не решение. Утре на
+ * това място може да застане ИИ — правило 18 остава спазено, защото записва
+ * човекът, с натискане на бутона.
+ */
+function narisuvayPitaneto(pi: Pitane): string {
+  const glava = pi.tablitsa.redove[pi.redNaGlavata] ?? [];
+  const predlozheno = podskazhi(pi.tablitsa, pi.redNaGlavata);
+  const primer = pi.tablitsa.redove[pi.redNaGlavata + 1] ?? [];
+
+  const kolonaIzbor = (rolya: Rolya): string => {
+    const izbrano = predlozheno[rolya];
+    const zadalzhitelna = ZADALZHITELNI_ROLI.includes(rolya);
+    return `
+      <div class="pole">
+        <label for="karta-${rolya}">${ekraniraj(IMENA_NA_ROLITE[rolya])}${zadalzhitelna ? ' · задължителна' : ''}</label>
+        <select translate="no" id="karta-${rolya}" data-rolya="${rolya}">
+          <option value="">${zadalzhitelna ? '— избери —' : '— няма —'}</option>
+          ${glava
+            .map((zaglavie, i) => {
+              const etiket = zaglavie.trim() === '' ? `колона ${i + 1}` : zaglavie.trim();
+              return `<option value="${i}"${izbrano === i ? ' selected' : ''}>${ekraniraj(etiket)}</option>`;
+            })
+            .join('')}
+        </select>
+      </div>`;
+  };
+
+  return `
+    <section class="karta izbrana">
+      <div class="dyalglava">
+        <h2>Не познавам тази таблица</h2>
+        <span>${ekraniraj(pi.izvor.ime)} · отпечатък ${ekraniraj(pi.izvor.otpechatak.slice(0, 12))}…</span>
+      </div>
+
+      <p class="drebno">Кажи веднъж коя колона какво е. Записва се като <b>МоделЗаписан</b> в Журнала и следващият файл със същата глава минава без питане. Нищо не се гадае — предложеното долу е само предложение.</p>
+
+      <div class="poleta tesni">
+        <div class="pole">
+          <label for="karta-ime">Име на модела</label>
+          <input translate="no" id="karta-ime" placeholder="напр. Банка ОББ" autocomplete="off" value="${ekraniraj(imeOtIzvor(pi.izvor.ime))}">
+        </div>
+        <div class="pole">
+          <label for="karta-glava">Кой ред е главата</label>
+          <select translate="no" id="karta-glava">
+            ${pi.tablitsa.redove
+              .map((red, i) => {
+                const opis = red
+                  .map((k) => k.trim())
+                  .filter((k) => k !== '')
+                  .slice(0, 4)
+                  .join(' · ');
+                return `<option value="${i}"${i === pi.redNaGlavata ? ' selected' : ''}>ред ${i + 1} · ${ekraniraj(opis || 'празен')}</option>`;
+              })
+              .slice(0, 20)
+              .join('')}
+          </select>
+        </div>
+      </div>
+
+      <div class="poleta">
+        ${(Object.keys(IMENA_NA_ROLITE) as Rolya[]).map(kolonaIzbor).join('')}
+        <div class="pole">
+          <label for="karta-dds-e">Колоната за ДДС носи</label>
+          <select translate="no" id="karta-dds-e">
+            <option value="stavka">процент · 0, 9 или 20</option>
+            <option value="suma">сума в левове</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="tablitsa">
+        <div class="glava propusnat"><span>Първи ред с данни</span><span>какво пише в него</span></div>
+        ${
+          primer.length === 0
+            ? '<p class="prazno">Под главата няма редове.</p>'
+            : glava
+                .map((zaglavie, i) => {
+                  const stoynost = kletka(pi.tablitsa, pi.redNaGlavata + 1, i);
+                  if (zaglavie.trim() === '' && stoynost === '') return '';
+                  return `<div class="red propusnat" translate="no"><span>${ekraniraj(zaglavie.trim() || `колона ${i + 1}`)}</span><span>${ekraniraj(stoynost)}</span></div>`;
+                })
+                .join('')
+        }
+      </div>
+
+      <div class="deystviya">
+        <button type="button" class="glaven" id="zapomni-model">Запомни модела и прочети файла</button>
+        <button type="button" class="vtorichen" id="otkazhi-pitane">Откажи</button>
+        <p class="drebno">Задължителни са <b>дата</b> и <b>сума</b> — без тях ред не става запис. Една колона носи една роля; ако дадеш една и съща колона на две роли, записът се отказва на глас.</p>
+      </div>
+    </section>`;
+}
+
+/** Име по подразбиране: файлът без наставка и без брояча „(3)". */
+function imeOtIzvor(ime: string): string {
+  return ime
+    .replace(/\.[^.]+$/, '')
+    .replace(/\s*\(\d+\)\s*$/, '')
+    .trim();
+}
+
 function redNaRazlika(r: Razlika): string {
   const znachki: Record<Razlika['kakvo'], string> = {
     nov: '<span class="znachka dobre">нов</span>',
@@ -227,27 +363,84 @@ async function napraviPlan(fayl: File, vid: VidIzvor, k: Konteks): Promise<void>
   };
 
   const tablitsi = await tablitsiOtFayl(danni, fayl.name, vid);
-  const s = nameriTablitsata(tablitsi, izvor);
-  plan = sravni(await k.deystviya.ogledalo(), s);
+  const o = await k.deystviya.ogledalo();
+  const s = nameriTablitsata(tablitsi, izvor, [...o.modeli.values()]);
+
+  // Никой модел не позна и нито един лист не се разчита сам — питаме.
+  if (!s) {
+    const t = tablitsi.find((x) => x.redove.length > 0) ?? tablitsi[0];
+    if (!t) throw new Error('Файлът няма нито един ред.');
+    pitane = { izvor, tablitsa: t, redNaGlavata: pogadniRedNaGlavata(t) };
+    plan = null;
+    greshka = '';
+    return;
+  }
+
+  pitane = null;
+  plan = sravni(o, s);
   filtar = 'promenite';
   greshka = '';
 }
 
-/** Първият лист, който се разчита. Ако никой — казва се, вместо да се гадае. */
-function nameriTablitsata(tablitsi: readonly Tablitsa[], izvor: Izvor): Snimka {
-  const oplakvaniya: string[] = [];
+/**
+ * Кой лист да се чете и как.
+ *
+ * Редът е нарочен:
+ *   1. ЗАПИСАН МОДЕЛ — човекът вече е казал коя колона какво е. Неговата дума
+ *      бие всяко разпознаване по думи, дори когато и двете биха сработили.
+ *   2. Старият път по думи („Доставчик", „Сума", „Дата") — таблиците, писани
+ *      в самото приложение, минават без да се пита за нищо.
+ *   3. `undefined` — никой не позна. Не се хвърля грешка: горе се пита.
+ */
+function nameriTablitsata(
+  tablitsi: readonly Tablitsa[],
+  izvor: Izvor,
+  modeli: readonly ModelNaTablitsa[],
+): Snimka | undefined {
+  for (const t of tablitsi) {
+    const m = nameriModel(modeli, t);
+    if (!m) continue;
+    const period = periodPoModel(m, t);
+    if (period === '') continue;
+    return razchetiPoModel({ model: m, tablitsa: t, izvor, period });
+  }
+
   for (const t of tablitsi) {
     const period = pogadniPeriod(t);
-    if (period === '') {
-      oplakvaniya.push(`„${t.ime}": не намирам колони „Доставчик", „Сума" и „Дата".`);
-      continue;
-    }
+    if (period === '') continue;
     return razchetiRazhodi({ tablitsa: t, izvor, period });
   }
-  throw new Error(
-    `Не разчитам този файл. ${oplakvaniya.join(' ')} ` +
-      'Ако е банково извлечение в PDF, изнеси CSV от банката — той е точен.',
+
+  return undefined;
+}
+
+/**
+ * Кой ред ПРЕДЛАГАМЕ за глава: първият с поне две пълни клетки.
+ *
+ * Това е подсказка за окото, не решение — човекът вижда падащия списък с
+ * всички редове и може да посочи друг. Затова е позволено да е просто.
+ */
+function pogadniRedNaGlavata(t: Tablitsa): number {
+  const i = t.redove.findIndex((red) => red.filter((klet) => klet.trim() !== '').length >= 2);
+  return i < 0 ? 0 : i;
+}
+
+/** Прочита таблицата на питането през вече записания модел. */
+async function prilozhiModela(m: ModelNaTablitsa, k: Konteks): Promise<void> {
+  const pi = pitane!;
+  const period = periodPoModel(m, pi.tablitsa);
+  if (period === '') {
+    throw new Error(
+      'С тази карта не се разчита нито една дата — провери коя колона си дал за „дата".',
+    );
+  }
+  plan = sravni(
+    await k.deystviya.ogledalo(),
+    razchetiPoModel({ model: m, tablitsa: pi.tablitsa, izvor: pi.izvor, period }),
   );
+  pitane = null;
+  filtar = 'promenite';
+  greshka = '';
 }
 
 export function zakachiIztochnitsi(
@@ -305,6 +498,64 @@ export function zakachiIztochnitsi(
     greshka = '';
     drazhka = null;
     await prerisuvay();
+  });
+
+  // ── картата на хедъра ────────────────────────────────────────────────────
+  koren.querySelector<HTMLSelectElement>('#karta-glava')?.addEventListener('change', async (e) => {
+    if (!pitane) return;
+    pitane.redNaGlavata = Number((e.currentTarget as HTMLSelectElement).value);
+    greshka = '';
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#otkazhi-pitane')?.addEventListener('click', async () => {
+    pitane = null;
+    plan = null;
+    greshka = '';
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#zapomni-model')?.addEventListener('click', async (e) => {
+    if (!pitane) return;
+    const buton = e.currentTarget as HTMLButtonElement;
+    const pi = pitane;
+
+    const koloni: Partial<Record<Rolya, number>> = {};
+    for (const izbor of koren.querySelectorAll<HTMLSelectElement>('[data-rolya]')) {
+      if (izbor.value === '') continue;
+      koloni[izbor.dataset['rolya'] as Rolya] = Number(izbor.value);
+    }
+    const ime = koren.querySelector<HTMLInputElement>('#karta-ime')?.value ?? '';
+    const ddsE = koren.querySelector<HTMLSelectElement>('#karta-dds-e')?.value as
+      | 'stavka'
+      | 'suma';
+
+    buton.disabled = true;
+    try {
+      const model = napraviModel({
+        klyuch: ime,
+        tablitsa: pi.tablitsa,
+        redNaGlavata: pi.redNaGlavata,
+        koloni,
+        ...(koloni.dds === undefined ? {} : { ddsE }),
+      });
+      // Първо в Журнала, после на екрана: моделът трябва да ПРЕЖИВЕЕ прочита.
+      await k.deystviya.zapishiModel(model, {
+        // Белегът е от СЪДЪРЖАНИЕТО: поправена карта е нов запис, не повторение.
+        opId: `model:${model.klyuch}:${belegNaModel(model)}`,
+      });
+      await prilozhiModela(model, k);
+      k.vest(
+        'dobre',
+        `Моделът „${model.klyuch}" е записан. Следващият файл със същата глава минава без питане.`,
+      );
+    } catch (err) {
+      greshka =
+        err instanceof GreshkaModel || err instanceof Error ? err.message : String(err);
+    } finally {
+      buton.disabled = false;
+      await prerisuvay();
+    }
   });
 
   koren.querySelector<HTMLButtonElement>('#prilozhi')?.addEventListener('click', async (e) => {
@@ -378,12 +629,13 @@ async function opitaj(rabota: () => Promise<void>, prerisuvay: () => Promise<voi
     await rabota();
   } catch (err) {
     plan = null;
+    pitane = null;
     greshka = err instanceof Error ? err.message : String(err);
   }
   await prerisuvay();
 }
 
-/** Има ли отворен план — главното го пита, за да покаже панела. */
+/** Има ли какво да се покаже в панела — план, въпрос за картата, или грешка. */
 export function imaPlan(): boolean {
-  return plan !== null || greshka !== '';
+  return plan !== null || pitane !== null || greshka !== '';
 }
