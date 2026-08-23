@@ -13,7 +13,7 @@
  */
 
 import { ekraniraj } from './imoti.js';
-import type { VidStoynost } from '../src/domein/vid-stoynost.js';
+import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
 
 /**
  * Видът на колоната идва от ДОМЕЙНА, не се обявява втори път тук.
@@ -74,7 +74,18 @@ function grupaNa<T>(k: KolonaSFiltar<T>, red: T, dnes: string): string {
 
 const RED_NA_DATITE = ['Днес', 'Вчера', 'Тази седмица'];
 
-function podrediGrupi(vid: VidStoynost, grupi: Map<string, number>): [string, number][] {
+/**
+ * РЕДЪТ НА ГРУПИТЕ във филтъра · изнесена нарочно, за да има тест.
+ *
+ * Тя е чиста функция с истинско правило вътре (числото се подрежда като число),
+ * а единственият ѝ път през екрана минава през състояние, което се пали с клик.
+ * Правило от проекта: „документ, който твърди нещо без тест, е бележка."
+ * Същото важи за код.
+ */
+export function podrediGrupi(
+  vid: VidStoynost,
+  grupi: Map<string, number>,
+): [string, number][] {
   const redove = [...grupi.entries()];
   if (vid === 'evro') {
     const red = GRUPI_SUMA.map((g) => g.ime);
@@ -88,7 +99,39 @@ function podrediGrupi(vid: VidStoynost, grupi: Map<string, number>): [string, nu
       return b[0].localeCompare(a[0]); // месеците — най-новите отгоре
     });
   }
+  /**
+   * ЧИСЛОВАТА КОЛОНА СЕ ПОДРЕЖДА КАТО ЧИСЛО, не като текст.
+   *
+   * Без това „10" идва преди „9", а „100" преди „20" — защото `localeCompare`
+   * сравнява знак по знак. Във филтър на числова колона това не е разкрасяване:
+   * списъкът изглежда разбъркан и човек спира да му вярва.
+   *
+   * `evro` има свои групи (до 100 € и т.н.); `chislo` и `protsent` носят самата
+   * стойност и затова се нуждаят от този ред. Оттук идва `eChislo` — тя пита
+   * „изобщо число ли е", отделно от „пари ли е" (`ePari`).
+   */
+  if (eChislo(vid)) {
+    return redove.sort((a, b) => {
+      const ca = chislo(a[0]);
+      const cb = chislo(b[0]);
+      // „(празно)" и всичко нечислово пада НАКРАЯ, подредено по азбука —
+      // иначе NaN мълчаливо би разбъркал целия списък.
+      if (ca === null && cb === null) return a[0].localeCompare(b[0], 'bg');
+      if (ca === null) return 1;
+      if (cb === null) return -1;
+      return ca - cb;
+    });
+  }
   return redove.sort((a, b) => a[0].localeCompare(b[0], 'bg'));
+}
+
+/** Числото зад текста на групата, или `null`, ако там няма число. */
+function chislo(tekst: string): number | null {
+  // Неразделимият интервал е РАЗДЕЛИТЕЛ НА ХИЛЯДИ в нашия формат, не част от
+  // числото; десетичната запетая е български, не английски знак.
+  const chist = tekst.replace(/[\s\u00a0\u202f]/g, '').replace(',', '.');
+  if (chist === '' || !/^-?\d+(\.\d+)?%?$/.test(chist)) return null;
+  return Number(chist.replace('%', ''));
 }
 
 // ── прилагането ───────────────────────────────────────────────────────────

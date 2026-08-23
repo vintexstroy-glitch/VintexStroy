@@ -1089,9 +1089,11 @@ async function main() {
     await p.waitForSelector('.red.redaktor');
     const koloniPredi = (await redove(p, '.red.redaktor')).length;
     proveri('колоните на хедъра се редят', koloniPredi > 0, true);
+    // Клетките на реда: 0 име · 1 вид на колоната · 2 ВИД НА СТОЙНОСТТА ·
+    // 3 номенклатура · 4 готово меню. Третата е новата (ADR-014).
     proveri(
       'по подразбиране колоната е БЕЗ падащо меню',
-      (await redove(p, '.red.redaktor'))[0]?.[2],
+      (await redove(p, '.red.redaktor'))[0]?.[3],
       'без падащо меню',
     );
 
@@ -1105,7 +1107,7 @@ async function main() {
     const sledDobavyane = await redove(p, '.red.redaktor');
     proveri('колоната е добавена в КРАЯ', sledDobavyane.length, koloniPredi + 1);
     const nova = sledDobavyane[sledDobavyane.length - 1];
-    proveri('и носи готовото меню от Описа', nova?.[2], 'готово меню от Описа');
+    proveri('и носи готовото меню от Описа', nova?.[3], 'готово меню от Описа');
     // Членовете стоят в полето за писане, не в текста на клетката.
     const chlenoveNaEkran = await p.$$eval('[data-menyu-vhod]', (x) => x.map((i) => i.value));
     proveri('членовете са запазени', chlenoveNaEkran.some((v) => v.includes('Кеш · Банка')), true);
@@ -1125,9 +1127,26 @@ async function main() {
     proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
     proveri(
       'и колоната пада на първия вид',
-      (await redove(p, '.red.redaktor')).pop()?.[2],
+      (await redove(p, '.red.redaktor')).pop()?.[3],
       'без падащо меню',
     );
+
+    // ── видът на СТОЙНОСТТА · втората половина на ADR-014 ────────────────
+    // Дотук `podskazhiVid()` гадаеше по заглавието, а собственият ѝ коментар
+    // казваше „човекът потвърждава в Редактора на хедъри" — където нямаше
+    // такъв контрол. Ето го, и проходът го пази.
+    proveri('всяка колона показва вида на стойността си',
+      (await p.$$eval('[data-vid-stoynost]', (e) => e.length)) > 0, true);
+    proveri('и казва дали влиза в двата сбора',
+      (await p.$$eval('.red.redaktor .kletka > span', (e) => e.map((x) => x.textContent)))
+        .some((t) => t === 'влиза в двата сбора' || t === 'не влиза в сбор'), true);
+
+    const parvoto = await p.$eval('[data-vid-stoynost]', (e) => e.value);
+    await p.selectOption('[data-vid-stoynost]', parvoto === 'evro' ? 'protsent' : 'evro');
+    await sSabitie(p, () => p.click('[data-zapishi-kolona="0"]'));
+    proveri('смяната на вида ражда ЕДНО събитие и се задържа',
+      await p.$eval('[data-vid-stoynost]', (e) => e.value),
+      parvoto === 'evro' ? 'protsent' : 'evro');
 
     // Числата в Сметки не мърдат от редакция на глава
     await naEkran(p, 'smetki', '#forma-period');

@@ -33,8 +33,17 @@
  * което тихо е влязло в сбор.
  */
 
-/** Петте вида, изброени поименно. Нов вид се добавя ТУК, където се вижда. */
-export type VidStoynost = 'evro' | 'protsent' | 'chislo' | 'tekst' | 'data';
+/**
+ * Петте вида, изброени поименно. Нов вид се добавя ТУК, където се вижда.
+ *
+ * Списъкът е СТОЙНОСТ, не само тип: съюзът се извежда от него, а не се пише
+ * втори път. Два списъка на едно нещо се разминават — тук се разминаваха
+ * мълчешком, защото `Record<VidStoynost, …>` изисква пълнота само по типа,
+ * а типът и списъкът бяха два отделни реда.
+ */
+export const VIDOVE_STOYNOST = ['evro', 'protsent', 'chislo', 'tekst', 'data'] as const;
+
+export type VidStoynost = (typeof VIDOVE_STOYNOST)[number];
 
 export const IMENA_NA_VIDOVETE_STOYNOST: Readonly<Record<VidStoynost, string>> = Object.freeze({
   evro: 'евро',

@@ -49,6 +49,7 @@ import type { ModelNaTablitsa, Rolya } from '../iztochnik/model.js';
 import { IMENA_NA_ROLITE } from '../iztochnik/model.js';
 import type { Rolya as RolyaNaChovek } from '../yadro/samolichnost.js';
 import { vidNaKolona, IMENA_NA_VIDOVETE } from './kolonno.js';
+import { VIDOVE_STOYNOST, type VidStoynost } from './vid-stoynost.js';
 
 export class GreshkaRedaktor extends Error {
   constructor(message: string) {
@@ -235,6 +236,40 @@ export function zadayMenyu(
     menyuta: Object.freeze({ ...m.menyuta, [kolona]: chisti }),
     // Готовото меню измества раждането от въвеждане — двата вида не се сливат.
     otVavezhdane: Object.freeze(m.otVavezhdane.filter((k) => k !== kolona)),
+  });
+}
+
+/**
+ * СМЕНЯ ВИДА НА СТОЙНОСТТА · евро · процент · число · текст · дата.
+ *
+ * Това е втората половина на ADR-014. Първата беше подсказката: `podskazhiVid()`
+ * гадае по заглавието при внасяне. Но собственият ѝ коментар казва
+ * „**ПРЕДЛОЖЕНИЕ, не решение. Човекът потвърждава в Редактора на хедъри**" —
+ * а такова потвърждение нямаше къде да се даде. Ето го.
+ *
+ * ЗАЩО Е ВАЖНО, а не удобство: **само `evro` влиза в двата сбора** (правило 20
+ * · `ePari`). Колона, която подсказката е сбъркала, тихо влиза или тихо изпада
+ * от Приходи и Разходи. Речникът на подсказката е тесен нарочно — непознатата
+ * колона става `tekst` и чака човек. Дотук чакаше напразно.
+ *
+ * СМЯНАТА НЕ ПИПА ДАННИТЕ. Видът е свойство на КОЛОНАТА, не на клетките в нея
+ * (ADR-014). Смяната мени накъде отива сборът ѝ занапред; вече записаните
+ * потоци си остават — те са отделни събития със свой период.
+ */
+export function smeniVidNaStoynost(
+  m: ModelNaTablitsa,
+  kolona: number,
+  vid: VidStoynost,
+  rolya: RolyaNaChovek,
+): ModelNaTablitsa {
+  samoUpravitel(rolya, 'Смяната на вида на стойността');
+  proveriKolona(m, kolona);
+  if (!(VIDOVE_STOYNOST as readonly string[]).includes(vid)) {
+    throw new GreshkaRedaktor(`Няма такъв вид стойност: „${vid}".`);
+  }
+  return Object.freeze({
+    ...m,
+    vidove: Object.freeze({ ...m.vidove, [kolona]: vid }),
   });
 }
 

@@ -208,11 +208,6 @@ export function kolonaPoNomer(
   return kolonite.find((k) => k.kolona === kolona);
 }
 
-/** Ролята с думи — за менюто, където колоната се разпознава по име и роля. */
-export function sRolya(k: ChislovaKolona, imena: Readonly<Record<Rolya, string>>): string {
-  return k.rolya === undefined ? '' : imena[k.rolya];
-}
-
 /** Първата клетка от колоната — за да се види, че е тя, преди да се махне. */
 export function primer(m: ModelNaTablitsa, t: Tablitsa, kolona: number): string {
   for (const red of redoveSDanni(m, t)) {
@@ -220,11 +215,4 @@ export function primer(m: ModelNaTablitsa, t: Tablitsa, kolona: number): string 
     if (stoynost !== '') return stoynost;
   }
   return '';
-}
-
-/** Заглавието на колоната според модела — за следата в сверката. */
-export function imeNaRolya(m: ModelNaTablitsa, t: Tablitsa, rolya: Rolya): string {
-  const kolona = m.koloni[rolya];
-  if (kolona === undefined) return '';
-  return poRolya(m, t, m.redNaGlavata, rolya) || kletka(t, m.redNaGlavata, kolona);
 }

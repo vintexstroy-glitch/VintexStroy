@@ -37,9 +37,17 @@ import {
   preimenuvayKolona,
   premahniKolona,
   semeystvo,
+  smeniVidNaStoynost,
   vidNomenklatura,
   zadayMenyu,
 } from '../src/domein/redaktor.js';
+import {
+  ePari,
+  IMENA_NA_VIDOVETE_STOYNOST,
+  VIDOVE_STOYNOST,
+  ZNAK_NA_VIDA,
+  type VidStoynost,
+} from '../src/domein/vid-stoynost.js';
 import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
 import {
   IMENA_NA_VIDOVETE,
@@ -328,7 +336,7 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
   return `
     <div class="tablitsa">
       <div class="glava redaktor">
-        <span>Колона</span><span>Вид</span><span>Номенклатура</span><span>Готово меню</span><span></span>
+        <span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
       </div>
       ${m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')}
     </div>
@@ -341,6 +349,10 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
 
 function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
   const vid = vidNaKolona(m, k);
+  // Видът на СТОЙНОСТТА — различен въпрос от вида на КОЛОНАТА. Първият казва
+  // дали сборът ѝ отива в Приходи и Разходи (ADR-014 · правило 20); вторият
+  // казва дали се редактира. Двата не се сливат.
+  const vidNaStoynostta = m.vidove[k] ?? 'tekst';
   const nomenklatura = vidNomenklatura(m, k);
   const zaklyucheno = m.zaklyucheni.includes(k);
   const nosiRolya = Object.values(m.koloni).includes(k);
@@ -351,6 +363,17 @@ function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
         ${zaklyucheno ? '<span>🔒 името е заключено</span>' : ''}
       </span>
       <span>${IMENA_NA_VIDOVETE[vid]}</span>
+      <span class="kletka">
+        <select data-vid-stoynost="${k}" aria-label="вид на стойността">
+          ${VIDOVE_STOYNOST.map(
+            (v) =>
+              `<option value="${v}"${v === vidNaStoynostta ? ' selected' : ''}>${
+                IMENA_NA_VIDOVETE_STOYNOST[v]
+              }${ZNAK_NA_VIDA[v] ? ` ${ZNAK_NA_VIDA[v]}` : ''}</option>`,
+          ).join('')}
+        </select>
+        ${ePari(vidNaStoynostta) ? '<span>влиза в двата сбора</span>' : '<span>не влиза в сбор</span>'}
+      </span>
       <span>${IMENA_NA_NOMENKLATURITE[nomenklatura]}</span>
       <span class="kletka">${
         vid === 'zatvorena'
@@ -820,6 +843,15 @@ export function zakachiNastroyki(
         const stari = nov.menyuta[kolona] ?? [];
         if (chlenove.length > 0 && chlenove.join('¦') !== stari.join('¦')) {
           nov = zadayMenyu(nov, kolona, chlenove, 'stopanin');
+        }
+        // ВИДЪТ НА СТОЙНОСТТА · това е потвърждението, което `podskazhiVid()`
+        // чакаше. Смяната минава само ако наистина се мени — иначе всеки запис
+        // на реда би раждал събитие за нищо.
+        const izbranVid = koren.querySelector<HTMLSelectElement>(
+          `[data-vid-stoynost="${kolona}"]`,
+        )?.value as VidStoynost | undefined;
+        if (izbranVid && izbranVid !== (nov.vidove[kolona] ?? 'tekst')) {
+          nov = smeniVidNaStoynost(nov, kolona, izbranVid, 'stopanin');
         }
         await zapishiHedar(star, nov, `Колоната е записана в „${star.klyuch}".`);
         greshka = '';

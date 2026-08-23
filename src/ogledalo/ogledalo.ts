@@ -469,8 +469,25 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ВалутаИзбрана':
+        // ЗНАЕН тип, НАРОЧНО пренебрегнат — не „непознат".
+        //
+        // Старите Журнали носят това събитие; новите не го пишат (ADR-014:
+        // валутата е ЕДНА, няма курс и живее в КОЛОНАТА, не в цифрата).
+        // Формата му е `PayloadValutaIzbrana` в `sabitiya.ts` — типът стои
+        // нарочно, за да е записано КАКВО има в един стар Журнал, макар нищо
+        // от него да не ни трябва вече.
+        // Затова тук няма какво да се приложи — но случаят стои поименно,
+        // защото знаен тип, паднал в `default`, е неразличим от печатна грешка.
+        break;
+
       default:
-        // Непознат тип не събаря Огледалото — брои се, но не мени нищо.
+        // НЕПОЗНАТ тип не събаря Огледалото — брои се, но не мени нищо.
+        //
+        // Снизходителността тук е нарочна и е обратната страна на строгостта
+        // при входа (`#pusni` иска `TipSabitie`): стар код трябва да може да
+        // прочете по-нов Журнал. Махне ли се това, едно бъдещо събитие ще
+        // събори Огледалото на всеки, който още не се е обновил.
         break;
     }
   }
@@ -520,13 +537,6 @@ export function sabrano(o: Ogledalo): number {
   let sbor = 0;
   for (const p of o.plashtaniya.values()) sbor += p.suma_st;
   return sbor;
-}
-
-/** Вземанията за един наем, подредени по период. */
-export function vzemaniyaZaNaem(o: Ogledalo, naemId: string): Vzemane[] {
-  return [...o.vzemaniya.values()]
-    .filter((v) => v.naemId === naemId)
-    .sort((a, b) => a.period.localeCompare(b.period));
 }
 
 export interface ProsrocheneVzemane extends Vzemane {

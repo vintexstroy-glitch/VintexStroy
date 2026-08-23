@@ -26,10 +26,17 @@ import {
   preimenuvayKolona,
   premahniKolona,
   semeystvo,
+  smeniVidNaStoynost,
   vidNomenklatura,
   zadayMenyu,
 } from '../src/domein/redaktor.js';
 import { vidNaKolona } from '../src/domein/kolonno.js';
+import {
+  ePari,
+  IMENA_NA_VIDOVETE_STOYNOST,
+  VIDOVE_STOYNOST,
+  ZNAK_NA_VIDA,
+} from '../src/domein/vid-stoynost.js';
 import { SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -225,5 +232,54 @@ describe('промяната е ново събитие, не презапис',
     // Журналът пази и двете — историята не се пипа.
     const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
     expect(sabitiya.filter((s) => s.type === 'МоделЗаписан')).toHaveLength(2);
+  });
+});
+
+describe('видът на СТОЙНОСТТА · втората половина на ADR-014', () => {
+  it('подсказката е ПРЕДЛОЖЕНИЕ — човекът я сменя, и това мени накъде отива сборът', () => {
+    // ИСТИНСКИЯТ случай, а не измислен: речникът на подсказката е тесен
+    // нарочно. „Неустойка" е пари, но не е в него — колоната се ражда „текст"
+    // и сборът ѝ ТИХО не влиза в Приходи. Дотук нямаше къде да се поправи.
+    const s = dobaviKolona(model(), { ime: 'Неустойка', rolya: 'stopanin' });
+    const k = s.glavi.indexOf('Неустойка');
+    expect(k).toBeGreaterThan(-1);
+    expect(ePari(s.vidove[k] ?? 'tekst')).toBe(false);
+
+    const sled = smeniVidNaStoynost(s, k, 'evro', 'stopanin');
+    expect(sled.vidove[k]).toBe('evro');
+    expect(ePari(sled.vidove[k]!)).toBe(true);
+  });
+
+  it('НЕ пипа данните — видът е свойство на КОЛОНАТА, не на клетките', () => {
+    const m = model();
+    const sled = smeniVidNaStoynost(m, 0, 'protsent', 'stopanin');
+    expect(sled.glavi).toEqual(m.glavi);
+    expect(sled.menyuta).toEqual(m.menyuta);
+    expect(sled.zaklyucheni).toEqual(m.zaklyucheni);
+  });
+
+  it('отказва непознат вид, вместо да го запише', () => {
+    expect(() => smeniVidNaStoynost(model(), 0, 'левче' as never, 'stopanin')).toThrow(
+      GreshkaRedaktor,
+    );
+  });
+
+  it('отказва колона, която я няма', () => {
+    expect(() => smeniVidNaStoynost(model(), 999, 'evro', 'stopanin')).toThrow(GreshkaRedaktor);
+  });
+
+  it('иска УПРАВИТЕЛ — редактор не мени накъде отиват парите', () => {
+    expect(() => smeniVidNaStoynost(model(), 0, 'evro', 'redaktor')).toThrow(GreshkaRedaktor);
+    expect(() => smeniVidNaStoynost(model(), 0, 'evro', 'nablyudatel')).toThrow(GreshkaRedaktor);
+  });
+
+  it('петте вида са пет, и списъкът ражда типа — не два отделни реда', () => {
+    expect([...VIDOVE_STOYNOST]).toEqual(['evro', 'protsent', 'chislo', 'tekst', 'data']);
+    for (const v of VIDOVE_STOYNOST) {
+      expect(IMENA_NA_VIDOVETE_STOYNOST[v], v).toBeTruthy();
+      expect(typeof ZNAK_NA_VIDA[v], v).toBe('string');
+    }
+    // Само еврото влиза в двата сбора — това е правило 20, не подробност.
+    expect(VIDOVE_STOYNOST.filter(ePari)).toEqual(['evro']);
   });
 });

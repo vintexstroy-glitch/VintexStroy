@@ -75,7 +75,3 @@ export function paket(klyuch: string | null | undefined): Paket {
   return PO_KLYUCH.get(klyuch ?? '') ?? PO_KLYUCH.get(PAKET_PO_PODRAZBIRANE)!;
 }
 
-/** Носи ли пакетът тази азбука в джоба си. */
-export function nosi(p: Paket, podmn: Podmnozhestvo): boolean {
-  return p.podmnozhestva.includes(podmn);
-}

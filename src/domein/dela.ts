@@ -163,10 +163,6 @@ export function imaPoddela(dela: readonly Delo[], id: string): boolean {
   return dela.some((d) => d.nadDelo === id);
 }
 
-export function poddelaNa(dela: readonly Delo[], id: string): Delo[] {
-  return dela.filter((d) => d.nadDelo === id);
-}
-
 /**
  * Кои дела се ВИЖДАТ при дадено множество сгънати.
  *

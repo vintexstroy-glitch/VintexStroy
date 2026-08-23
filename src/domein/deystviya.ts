@@ -35,6 +35,7 @@ import type {
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
+  TipSabitie,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -296,8 +297,20 @@ export class Deystviya {
     return this.#dnevnik.chetiVsichki(this.#naematel);
   }
 
+  /**
+   * ПИШЕЩИЯТ Е СТРОГ, ЧЕТЯЩИЯТ Е СНИЗХОДИТЕЛЕН.
+   *
+   * `type` е `TipSabitie`, не `string`. Разликата не е козметична: с `string`
+   * едно сгрешено име — например с латинско „o" в кирилска дума (правило 11) —
+   * минава компилацията, влиза в Журнала и после пада в `default` на `fold()`,
+   * където се брои, но не мени нищо. Тих загубен запис в система, чието първо
+   * правило е нула загуба на данни.
+   *
+   * `default` в `fold()` ОСТАВА снизходителен нарочно: стар код трябва да може
+   * да чете по-нов Журнал, без да се събаря. Строгостта е при ВХОДА.
+   */
   async #pusni(
-    type: string,
+    type: TipSabitie,
     vid: Vid,
     id: string,
     payload: Readonly<object>,

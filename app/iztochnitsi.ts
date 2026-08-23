@@ -1004,8 +1004,3 @@ async function opitaj(rabota: () => Promise<void>, prerisuvay: () => Promise<voi
   }
   await prerisuvay();
 }
-
-/** Има ли какво да се покаже в панела — план, въпрос за картата, или грешка. */
-export function imaPlan(): boolean {
-  return plan !== null || pitane !== null || greshka !== '';
-}

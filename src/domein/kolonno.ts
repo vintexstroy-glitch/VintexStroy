@@ -61,11 +61,6 @@ export const IMENA_NA_VIDOVETE: Readonly<Record<VidKolona, string>> = Object.fre
 /** Какво може ЕДИН СЛУЖИТЕЛ да прави с една колона. Две, не три — вж. шапката. */
 export type PravoNaKolona = 'vizhda' | 'skrito';
 
-export const IMENA_NA_PRAVATA: Readonly<Record<PravoNaKolona, string>> = Object.freeze({
-  vizhda: 'вижда',
-  skrito: 'скрито',
-});
-
 export class GreshkaPravo extends Error {
   constructor(message: string) {
     super(message);
