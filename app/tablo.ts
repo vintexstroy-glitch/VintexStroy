@@ -110,24 +110,24 @@ function kartaKoySam(koj: Samolichnost): string {
       <div class="plochki">
         <div class="plochka">
           <div class="etiket">Влязъл като</div>
-          <div class="chislo malak">${ekraniraj(koj.ime)}</div>
+          <div class="chislo malak" translate="no">${ekraniraj(koj.ime)}</div>
           <div class="pod">${ekraniraj(koj.imeyl)}</div>
         </div>
         <div class="plochka">
           <div class="etiket">През</div>
-          <div class="chislo malak">${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}</div>
           <div class="pod">${
             koj.nachin === 'klyuch' ? 'с ключ на тази машина' : 'през доставчика'
           }</div>
         </div>
         <div class="plochka">
           <div class="etiket">Хранилище</div>
-          <div class="chislo malak">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
+          <div class="chislo malak" translate="no">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
           <div class="pod">при ${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}, не при нас</div>
         </div>
         <div class="plochka">
           <div class="etiket">Роля</div>
-          <div class="chislo malak">${IMENA_NA_ROLITE[koj.rolya]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[koj.rolya]}</div>
           <div class="pod">вързани акаунти: ${ekraniraj(vrazki)}</div>
         </div>
       </div>

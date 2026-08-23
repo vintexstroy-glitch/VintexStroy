@@ -287,7 +287,7 @@ async function trugvay(): Promise<void> {
                 ? '<button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>'
                 : ''
             }
-            <input type="file" id="fayl" accept="application/json,.json" hidden>
+            <input translate="no" type="file" id="fayl" accept="application/json,.json" hidden>
           </div>
         </header>
         <div class="telo">

@@ -66,7 +66,7 @@ export function narisuvayButona(): string {
           : ''
       }
     </div>
-    <input type="file" id="fayl-iztochnik" hidden>`;
+    <input translate="no" type="file" id="fayl-iztochnik" hidden>`;
 }
 
 export function narisuvayPlana(): string {
@@ -92,22 +92,22 @@ export function narisuvayPlana(): string {
       <div class="plochki">
         <div class="plochka">
           <span class="etiket">Сега в Журнала</span>
-          <span class="chislo">${kakvoPishe(p.sega_st as never)}</span>
+          <span class="chislo" translate="no">${kakvoPishe(p.sega_st as never)}</span>
           <span class="pod">${p.rachni ? `${p.rachni} ръчни не се пипат` : 'от източник'}</span>
         </div>
         <div class="plochka">
           <span class="etiket">Според файла</span>
-          <span class="chislo">${kakvoPishe(p.sled_st as never)}</span>
+          <span class="chislo" translate="no">${kakvoPishe(p.sled_st as never)}</span>
           <span class="pod">${p.snimka.redove.length} ${p.snimka.redove.length === 1 ? 'ред' : 'реда'}</span>
         </div>
         <div class="plochka${p.sled_st !== p.sega_st ? ' trevoga' : ''}">
           <span class="etiket">Разлика</span>
-          <span class="chislo">${kakvoPishe((p.sled_st - p.sega_st) as never)}</span>
+          <span class="chislo" translate="no">${kakvoPishe((p.sled_st - p.sega_st) as never)}</span>
           <span class="pod">${broy('nov')} нови · ${broy('promenen')} поправени · ${broy('izchezval')} махнати</span>
         </div>
         <div class="plochka${p.snimka.propusnati.length ? ' trevoga' : ''}">
           <span class="etiket">Непрочетени редове</span>
-          <span class="chislo">${p.snimka.propusnati.length}</span>
+          <span class="chislo" translate="no">${p.snimka.propusnati.length}</span>
           <span class="pod">${p.snimka.propusnati.length ? 'виж долу' : 'нищо не е пропуснато'}</span>
         </div>
       </div>
@@ -115,7 +115,7 @@ export function narisuvayPlana(): string {
       <div class="poleta">
         <div class="pole">
           <label for="plan-potok">Поток</label>
-          <select id="plan-potok">
+          <select translate="no" id="plan-potok">
             ${potototsiNaRazhod()
               .map((x) => `<option value="${ekraniraj(x.klyuch)}"${x.klyuch === 'fakturi' ? ' selected' : ''}>${ekraniraj(x.ime)}</option>`)
               .join('')}
@@ -123,7 +123,7 @@ export function narisuvayPlana(): string {
         </div>
         <div class="pole">
           <label for="plan-sektor">Сектор</label>
-          <select id="plan-sektor">
+          <select translate="no" id="plan-sektor">
             ${sektoriNaRazhod()
               .map((a) => `<option value="${ekraniraj(a.klyuch)}"${a.klyuch === 'pokupki-materiali' ? ' selected' : ''}>${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
               .join('')}
@@ -131,7 +131,7 @@ export function narisuvayPlana(): string {
         </div>
         <div class="pole">
           <label for="plan-nachin">Платено</label>
-          <select id="plan-nachin">
+          <select translate="no" id="plan-nachin">
             <option value="банка">по банка</option>
             <option value="в брой">в брой</option>
           </select>
@@ -165,7 +165,7 @@ export function narisuvayPlana(): string {
         <div class="glava propusnat"><span>Ред</span><span>Защо не е прочетен</span></div>
         ${p.snimka.propusnati
           .map(
-            (x) => `<div class="red propusnat"><span>ред ${x.red}</span><span>${ekraniraj(x.zashto)}</span></div>`,
+            (x) => `<div class="red propusnat" translate="no"><span>ред ${x.red}</span><span>${ekraniraj(x.zashto)}</span></div>`,
           )
           .join('')}
       </div>`
@@ -193,7 +193,7 @@ function redNaRazlika(r: Razlika): string {
   const opis = r.nov?.opis ?? r.star?.opis ?? '';
   const dokument = r.nov?.dokument ?? r.star?.dokument ?? '';
   return `
-    <div class="red razlika">
+    <div class="red razlika" translate="no">
       <span>${znachki[r.kakvo]}</span>
       <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(opis)}${dokument ? ` · док. ${ekraniraj(dokument)}` : ''}</span></span>
       <span>${ekraniraj(r.nov?.data ?? r.star?.data ?? '')}</span>

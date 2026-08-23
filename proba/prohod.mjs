@@ -786,6 +786,55 @@ async function main() {
 
     await p.context().setOffline(false);
     ochakvanaTishina = false;
+
+    // ══ 17 · ДАННИТЕ НЕ СЕ ПРЕВЕЖДАТ ══════════════════════════════════════
+    razdel = '17 · защита от автоматичен превод';
+
+    // Браузърният превод не различава етикет от съдържание. Пуснат върху
+    // счетоводна книга, той би преформулирал имена на фирми, бележки към
+    // сторно и документи. Затова редовете с данни и полетата са защитени,
+    // а колонните ГЛАВИ остават преводими — те са етикети и помагат.
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    proveri(
+      'всеки ред с данни е защитен',
+      await p.evaluate(() => {
+        const redove = [...document.querySelectorAll('.red')];
+        // Редът на плановете в Таблото е етикет, не данни — той се превежда.
+        const sDanni = redove.filter((r) => !r.classList.contains('planred'));
+        const nezashtiteni = sDanni.filter((r) => r.getAttribute('translate') !== 'no');
+        return sDanni.length > 0 && nezashtiteni.length === 0
+          ? 'всички'
+          : `незащитени: ${nezashtiteni.length} от ${sDanni.length}`;
+      }),
+      'всички',
+    );
+
+    proveri(
+      'колонните глави ОСТАВАТ преводими',
+      await p.evaluate(() =>
+        [...document.querySelectorAll('.glava')].every((g) => g.getAttribute('translate') !== 'no'),
+      ),
+      true,
+    );
+
+    proveri(
+      'полетата за въвеждане са защитени',
+      await p.evaluate(() => {
+        const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+        const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+        return poleta.length > 0 && goli.length === 0 ? 'всички' : `голи: ${goli.length}`;
+      }),
+      'всички',
+    );
+
+    proveri(
+      'числата в блоковете са защитени — те са суми',
+      await p.evaluate(() =>
+        [...document.querySelectorAll('.chislo')].every((c) => c.getAttribute('translate') === 'no'),
+      ),
+      true,
+    );
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});

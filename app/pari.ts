@@ -51,22 +51,22 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Дължимо общо</span>
-        <span class="chislo">${kakvoPishe(duljimo(o) as never)}</span>
+        <span class="chislo" translate="no">${kakvoPishe(duljimo(o) as never)}</span>
         <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · лв.</span>
       </div>
       <div class="plochka${prosrocheno_st > 0 ? ' trevoga' : ''}">
         <span class="etiket">Просрочено</span>
-        <span class="chislo">${kakvoPishe(prosrocheno_st as never)}</span>
+        <span class="chislo" translate="no">${kakvoPishe(prosrocheno_st as never)}</span>
         <span class="pod">${zakasneli.length} ${zakasneli.length === 1 ? 'вземане' : 'вземания'}</span>
       </div>
       <div class="plochka">
         <span class="etiket">Събрано през ${mesets}</span>
-        <span class="chislo">${kakvoPishe(sabranoMesets as never)}</span>
+        <span class="chislo" translate="no">${kakvoPishe(sabranoMesets as never)}</span>
         <span class="pod">по дата на плащане</span>
       </div>
       <div class="plochka">
         <span class="etiket">Отворени, в срок</span>
-        <span class="chislo">${otvoreni.length}</span>
+        <span class="chislo" translate="no">${otvoreni.length}</span>
         <span class="pod">още не са закъснели</span>
       </div>
     </div>
@@ -80,7 +80,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         <div class="poleta tesni">
           <div class="pole">
             <label for="period">Месец</label>
-            <input id="period" name="period" type="month" value="${mesets}" required>
+            <input translate="no" id="period" name="period" type="month" value="${mesets}" required>
           </div>
         </div>
         <p class="greshka" id="greshka-nachisli"></p>
@@ -161,7 +161,7 @@ function opisiVzemane(o: Ogledalo, v: Vzemane): { koy: string; kade: string } {
 function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
   const { koy, kade } = opisiVzemane(o, v);
   return `
-    <div class="red vzemane">
+    <div class="red vzemane" translate="no">
       <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(kade)}</span></span>
       <span class="kletka"><span>${v.period}</span></span>
       <span class="kletka">
@@ -182,7 +182,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
   const v = o.vzemaniya.get(p.vzemaneId);
   const opis = v ? opisiVzemane(o, v) : { koy: '—', kade: p.vzemaneId };
   return `
-    <div class="red plashtane">
+    <div class="red plashtane" translate="no">
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
@@ -207,19 +207,19 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
         <div class="poleta">
           <div class="pole">
             <label for="pl-suma">Сума, лв.</label>
-            <input id="pl-suma" name="suma" inputmode="decimal" required
+            <input translate="no" id="pl-suma" name="suma" inputmode="decimal" required
                    value="${kakvoPishe(v.ostatak_st as never)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="pl-nachin">Начин</label>
-            <select id="pl-nachin" name="nachin">
+            <select translate="no" id="pl-nachin" name="nachin">
               <option value="банка">банка</option>
               <option value="в брой">в брой</option>
             </select>
           </div>
           <div class="pole">
             <label for="pl-data">Дата</label>
-            <input id="pl-data" name="data" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
+            <input translate="no" id="pl-data" name="data" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
           </div>
         </div>
         <p class="greshka" id="greshka-plashtane"></p>
