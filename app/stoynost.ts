@@ -253,7 +253,7 @@ export function zakachiStoynost(
     const fayl = (e.target as HTMLInputElement).files?.[0];
     if (!fayl) return;
     try {
-      const t = await tablitsiOtFayl(fayl, eListSPloshti);
+      const t = await tablitsiSasSito(fayl, eListSPloshti);
       const vsichki: ProchetenObekt[] = [];
       let propusnati = 0;
       for (const tablitsa of t) {
@@ -280,7 +280,7 @@ export function zakachiStoynost(
     const fayl = (e.target as HTMLInputElement).files?.[0];
     if (!fayl) return;
     try {
-      const t = await tablitsiOtFayl(fayl, () => true);
+      const t = await tablitsiSasSito(fayl, () => true);
       const slyato = new Map<string, OtTsenovaLista>();
       for (const tablitsa of t) {
         for (const [ime, danni] of prochetiTsenovaLista(tablitsa)) slyato.set(ime, danni);
@@ -330,7 +330,14 @@ export function zakachiStoynost(
  * Полето за файл живее В РАЗМЕТКАТА, а не се прави в движение: така работи и
  * в браузър без модерния избирач, и машина може да го напълни (проходът).
  */
-async function tablitsiOtFayl(
+/**
+ * Чете таблиците от ЕДИН файл и ги пресява по име на лист.
+ *
+ * НЕ се казва `tablitsiOtFayl` — това име значи друго в `iztochnitsi.ts`: там
+ * то взима байтове и вид (включително ПДФ) и не пресява нищо. Едно име за две
+ * различни неща е капан за онзи, който чете кода по-късно.
+ */
+async function tablitsiSasSito(
   fayl: File,
   sito: (ime: string) => boolean,
 ): Promise<Tablitsa[]> {

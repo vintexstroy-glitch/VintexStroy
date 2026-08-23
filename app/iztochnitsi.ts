@@ -512,8 +512,14 @@ async function tablitsiOtFayl(
   return [bezPrazni(otCSV(tekstOtBaytove(danni), ime))];
 }
 
-/** Видът на файла се вади от името, защото един бутон приема всички. */
-function vidPoIme(ime: string): VidIzvor {
+/**
+ * Видът на ФАЙЛА се вади от името, защото един бутон приема всички.
+ *
+ * НЕ `vidPoIme` — така се казва въпросът за вида на ОБЕКТА в
+ * `kalkulator/chetene.ts` (апартамент · гараж · паркомясто). Два различни
+ * въпроса с едно име се бъркат точно когато не бива.
+ */
+function vidIzvorPoIme(ime: string): VidIzvor {
   const dolu = ime.toLowerCase();
   if (dolu.endsWith('.xlsx')) return 'xlsx';
   if (dolu.endsWith('.pdf')) return 'pdf';
@@ -522,7 +528,7 @@ function vidPoIme(ime: string): VidIzvor {
 
 /** Един файл, прочетен ВЕДНЪЖ: същите байтове дават и отпечатъка, и листовете. */
 async function prochetiFayla(fayl: File): Promise<PodadenFayl> {
-  const vid = vidPoIme(fayl.name);
+  const vid = vidIzvorPoIme(fayl.name);
   const danni = new Uint8Array(await fayl.arrayBuffer());
   return {
     izvor: {

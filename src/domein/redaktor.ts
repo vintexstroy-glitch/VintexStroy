@@ -49,6 +49,7 @@ import type { ModelNaTablitsa, Rolya } from '../iztochnik/model.js';
 import { IMENA_NA_ROLITE } from '../iztochnik/model.js';
 import type { Rolya as RolyaNaChovek } from '../yadro/samolichnost.js';
 import { vidNaKolona, IMENA_NA_VIDOVETE } from './kolonno.js';
+import { svedenaGlava } from '../iztochnik/tablitsa.js';
 import { VIDOVE_STOYNOST, type VidStoynost } from './vid-stoynost.js';
 
 export class GreshkaRedaktor extends Error {
@@ -75,13 +76,9 @@ export function vidNomenklatura(m: ModelNaTablitsa, kolona: number): VidNomenkla
 }
 
 /** Сведеното име — както отпечатъкът свежда главата, за да се сравнява. */
-function svedeno(ime: string): string {
-  return ime.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 /** Отпечатъкът, пресметнат от главите — редакторът няма таблица под ръка. */
 function otpechatakOtGlavi(glavi: readonly string[]): string {
-  return glavi.map(svedeno).join('|');
+  return glavi.map(svedenaGlava).join('|');
 }
 
 /** Старият отпечатък влиза в историята веднъж — списъкът расте, не се дублира. */
@@ -96,7 +93,7 @@ function sPredishen(m: ModelNaTablitsa, novi: readonly string[]): readonly strin
 function proveriIme(m: ModelNaTablitsa, ime: string, osven?: number): string {
   const chisto = ime.trim().replace(/\s+/g, ' ');
   if (chisto === '') throw new GreshkaRedaktor('Колоната иска име — по него се разпознава.');
-  const zaeto = m.glavi.findIndex((g, i) => i !== osven && svedeno(g) === svedeno(chisto));
+  const zaeto = m.glavi.findIndex((g, i) => i !== osven && svedenaGlava(g) === svedenaGlava(chisto));
   if (zaeto >= 0) {
     throw new GreshkaRedaktor(
       `Име „${chisto}" вече носи колона ${zaeto}. Две колони с едно име се разменят при четене.`,
@@ -123,7 +120,7 @@ function chistiChlenove(chlenove: readonly string[]): readonly string[] {
   const chisti = chlenove.map((c) => c.trim().replace(/\s+/g, ' ')).filter((c) => c !== '');
   const videni = new Set<string>();
   for (const c of chisti) {
-    const s = svedeno(c);
+    const s = svedenaGlava(c);
     if (videni.has(s)) throw new GreshkaRedaktor(`Член „${c}" се повтаря в менюто.`);
     videni.add(s);
   }

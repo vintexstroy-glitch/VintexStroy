@@ -28,7 +28,7 @@
  */
 
 import type { Tablitsa } from '../iztochnik/tablitsa.js';
-import { kletka } from '../iztochnik/tablitsa.js';
+import { kletka, svedenaGlava } from '../iztochnik/tablitsa.js';
 
 export class GreshkaChetene extends Error {
   constructor(message: string) {
@@ -125,14 +125,10 @@ const TARSENI = Object.freeze({
   kota: 'кота',
 });
 
-function svedeno(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 /** Намира реда на главата и номерата на петте колони. */
 function nameriGlavata(t: Tablitsa): { red: number; koloni: Record<string, number> } {
   for (let red = 0; red < Math.min(t.redove.length, 12); red += 1) {
-    const glava = (t.redove[red] ?? []).map(svedeno);
+    const glava = (t.redove[red] ?? []).map(svedenaGlava);
     const koloni: Record<string, number> = {};
     for (const [klyuch, duma] of Object.entries(TARSENI)) {
       const i = glava.findIndex((g) => g === duma);
@@ -205,5 +201,5 @@ export function prochetiPloshti(t: Tablitsa): {
 export const LISTOVE_S_PLOSHTI: readonly string[] = Object.freeze(['площо', 'земя']);
 
 export function eListSPloshti(ime: string): boolean {
-  return LISTOVE_S_PLOSHTI.includes(svedeno(ime));
+  return LISTOVE_S_PLOSHTI.includes(svedenaGlava(ime));
 }

@@ -99,7 +99,15 @@ function naData(ms: number): string {
   return new Date(ms).toISOString().slice(0, 10);
 }
 
-function otData(d: string): number {
+/**
+ * Денят в милисекунди · за смятане на разстояния по решетката.
+ *
+ * НЕ се казва `otData` нарочно: това име вече значи друго в `yadro/data.ts` —
+ * там то ПРОВЕРЯВА, че текстът е ден от календара, и хвърля, ако не е. Две
+ * функции с едно име и различно поведение са капан: викащият чете „otData" и
+ * очаква проверка, а получава мълчалив NaN.
+ */
+function vMilisekundi(d: string): number {
   return Date.parse(`${d}T00:00:00Z`);
 }
 
@@ -130,7 +138,7 @@ export function koloni(takt: Takt, dnes: string): KolonaNaGanta[] {
     return spisak;
   }
 
-  const nula = otData(dnes);
+  const nula = vMilisekundi(dnes);
   for (let i = -nazad; i < obshto; i++) {
     const ot = nula + i * DEN;
     spisak.push({

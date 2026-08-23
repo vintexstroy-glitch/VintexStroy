@@ -25,7 +25,7 @@
  * начин и се чете както е. Продаденото не влиза в стойността на състоянието.
  */
 
-import { kletka, type Tablitsa } from '../iztochnik/tablitsa.js';
+import { kletka, svedenaGlava, type Tablitsa } from '../iztochnik/tablitsa.js';
 import { kakvoPishe } from '../yadro/pari.js';
 import { kvSmVM2, ploshtVKvSm } from './chetene.js';
 import type { OtTsenovaLista, RedNaStoynost } from './stoynost.js';
@@ -49,10 +49,6 @@ export const GLAVA_NA_TSENITE: readonly string[] = Object.freeze([
   'Евро / кв.м.',
 ]);
 
-function svedeno(s: string): string {
-  return s.trim().toLowerCase().replace(/\s+/g, ' ');
-}
-
 /**
  * ЧЕТЕ каквото само ценовата листа знае: изложение, стаи, тераси, продаден ли е.
  *
@@ -68,7 +64,7 @@ export function prochetiTsenovaLista(t: Tablitsa): ReadonlyMap<string, OtTsenova
   let red = -1;
   let koloni: Record<string, number> = {};
   for (let r = 0; r < Math.min(t.redove.length, 12); r += 1) {
-    const glava = (t.redove[r] ?? []).map(svedeno);
+    const glava = (t.redove[r] ?? []).map(svedenaGlava);
     const i = glava.indexOf('изложение');
     if (i < 0) continue;
     red = r;
@@ -91,7 +87,7 @@ export function prochetiTsenovaLista(t: Tablitsa): ReadonlyMap<string, OtTsenova
       izlozhenie: koloni['izlozhenie']! >= 0 ? kletka(t, r, koloni['izlozhenie']!).trim() : '',
       stai: broyOt(koloni['stai']! >= 0 ? kletka(t, r, koloni['stai']!) : ''),
       terasi_kvsm: koloni['terasi']! >= 0 ? bezopasnaPlosht(kletka(t, r, koloni['terasi']!)) : 0,
-      prodaden: svedeno(tsena) === svedeno(PRODADEN),
+      prodaden: svedenaGlava(tsena) === svedenaGlava(PRODADEN),
     });
   }
   return izhod;
