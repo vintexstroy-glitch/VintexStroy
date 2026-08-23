@@ -100,6 +100,15 @@ async function plochka(p, etiket) {
   return namerena ? namerena[1] : `НЯМА ПЛОЧКА „${etiket}"`;
 }
 
+/** Долният ред на плочка — обяснението под числото. */
+async function plochkaPod(p, etiket) {
+  const vsichki = await p.$$eval('.plochka', (r) =>
+    r.map((x) => [...x.children].map((c) => c.innerText.replace(/\s+/g, ' ').trim())),
+  );
+  const namerena = vsichki.find((x) => x[0]?.toUpperCase().includes(etiket.toUpperCase()));
+  return namerena ? (namerena[2] ?? '') : `НЯМА ПЛОЧКА „${etiket}"`;
+}
+
 async function broySabitiya(p) {
   return Number(await p.$eval('[data-broi]', (e) => e.dataset.broi));
 }
@@ -1123,6 +1132,61 @@ async function main() {
     // Числата в Сметки не мърдат от редакция на глава
     await naEkran(p, 'smetki', '#forma-period');
     proveri('РЕДАКЦИЯТА НА ГЛАВА НЕ ПИПА ЧИСЛАТА', await plochka(p, 'Разход'), razhodPredi);
+
+
+    // ══ 22 · Стойност на Състояние (Калкулатор) ═════════════════════════
+    razdel = '22 · Стойност на Състояние';
+    // Данните са от НЕГОВИТЕ два файла в Драйва, свити до пет обекта.
+    const ploshtiCSV = join(tmpdir(), 'ploshto.csv');
+    await writeFile(
+      ploshtiCSV,
+      [
+        'кота;етаж;№;обект;застроена площ, F1;общи части F2;F2;Общо F1+F2;прилежащ (придаден) двор',
+        'кота -2,88;подземен;1;Гараж 1;16,00;0,99;2,09;18,09;',
+        ';;3;Гараж 3 и склад;19,50;1,21;2,54;22,04;',
+        'кота ±0,00;първи;18;Апартамент 1;40,00;2,48;5,22;45,22;22,00',
+        ';;19;Апартамент 2;57,00;3,53;7,44;64,44;22,90',
+        'кота +2,85;втори;22;Апартамент 5;54,80;3,39;7,15;61,95;',
+        ';;;;1614,59;100,00;210,64;1825,23;',
+      ].join('\n'),
+    );
+    const tseniCSV = join(tmpdir(), 'tseni.csv');
+    await writeFile(
+      tseniCSV,
+      [
+        'Имоти;Етаж Кота;Стаи;Чиста площ;Общи части;;Обща площ;Изложение;Тераси;Цена с ДДС;Евро / кв.м.',
+        'Апартамент 1;етаж 1;2;40;2,48;5,22;45,22;СИ;22;ПРОДАДЕН;',
+        'Апартамент 2;;2;57;3,53;7,44;64,44;И;22,9;215400;3342',
+        'Апартамент 5;етаж 2;2;54,8;3,39;7,15;61,95;СИ;4,5;ПРОДАДЕН;',
+        'Гараж 1;сутерен;;16;0,99;2,09;18,09;;;38700;2139',
+        'Гараж 3 и склад;;;19,5;1,21;2,54;22,04;;;ПРОДАДЕН;',
+      ].join('\n'),
+    );
+
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+    proveri('шестият екран го има', (await tekstNa(p, '.shapka h1')).includes('Стойност на Състояние'), true);
+    proveri('сборът мълчи, докато няма данни', (await plochka(p, 'Стойност на Състояние')), '—');
+    proveri('и трите пътя са налице', (await p.$$('#cheti-ploshti, #cheti-tseni, #pishi-tseni')).length, 3);
+
+    await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-ploshti', ploshtiCSV));
+    await p.waitForSelector('.red.stoynost');
+    const obekti = await redove(p, '.red.stoynost:not(.sbor)');
+    proveri('прочете петте обекта, а контролният ред не влиза', obekti.length, 5);
+    proveri('и казва СВЕРКАТА вход↔изход', (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
+    proveri('общите части се смятат — чиста 40,00 и обща 45,22', obekti[2]?.[3], '40,00');
+    proveri('видът се познава по името', obekti[0]?.[2], 'гараж');
+
+    const bezLista = await plochka(p, 'Стойност на Състояние');
+    proveri('сборът вече говори', bezLista !== '—', true);
+    proveri('нищо не е продадено, докато листата мълчи', (await p.$$('.red.stoynost.mahnata')).length, 0);
+
+    await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-tseni', tseniCSV));
+    await p.waitForSelector('.red.stoynost.mahnata');
+    proveri('ценовата листа каза кое е ПРОДАДЕН', (await p.$$('.red.stoynost.mahnata')).length, 3);
+    const sIzlozhenie = await redove(p, '.red.stoynost:not(.sbor)');
+    proveri('и даде изложението', sIzlozhenie[3]?.[5], 'И');
+    proveri('продаденото НЕ влиза в стойността', (await plochka(p, 'Стойност на Състояние')) !== bezLista, true);
+    proveri('закръглянето се ВИЖДА, не се преглъща', (await plochkaPod(p, 'Точно, преди закръгляне')).includes('закръглено'), true);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

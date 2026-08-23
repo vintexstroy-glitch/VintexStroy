@@ -21,6 +21,9 @@
  */
 
 import { kletka, type Tablitsa } from './tablitsa.js';
+import { podskazhiVid, type VidStoynost } from '../domein/vid-stoynost.js';
+
+export type { VidStoynost };
 
 /**
  * Какво може да бъде една колона. Изброени са ПОИМЕННО — непозната роля не се
@@ -126,6 +129,19 @@ export interface ModelNaTablitsa {
    * познава и минава за чужд. Списъкът само расте — както Журналът.
    */
   readonly predishni: readonly string[];
+  /**
+   * ВИДЪТ НА СТОЙНОСТТА · колона → евро · процент · число · текст · дата.
+   *
+   * Негово (23.08): „Има колони, които са проценти, други с цифри, трети защо
+   * да не са с евро… **трябва да се съдържа в самата колона, а не в цифрата**."
+   *
+   * Оттук се решава кои колони изобщо са ПАРИ, а с това и кои влизат в двата
+   * сбора („сумата от колоните С ВАЛУТА"). Липсващ запис пада към `tekst`:
+   * колона, за която никой не е казал какво е, не е пари.
+   *
+   * Вж. `src/domein/vid-stoynost.ts`.
+   */
+  readonly vidove: Readonly<Record<number, VidStoynost>>;
 }
 
 export class GreshkaModel extends Error {
@@ -201,6 +217,8 @@ export function napraviModel(n: {
   ddsE?: 'stavka' | 'suma';
   izklyucheni?: readonly number[];
   zatvoreni?: readonly number[];
+  /** видът на стойността по колона — каквото човекът е потвърдил */
+  vidove?: Readonly<Record<number, VidStoynost>>;
 }): ModelNaTablitsa {
   const { klyuch, tablitsa, redNaGlavata, koloni } = n;
 
@@ -251,7 +269,19 @@ export function napraviModel(n: {
     otVavezhdane: Object.freeze([]),
     zaklyucheni: Object.freeze([]),
     predishni: Object.freeze([]),
+    // Видовете са ПРЕДЛОЖЕНИЕ по заглавието; човекът ги потвърждава в
+    // Редактора. Подаденото отвън бие подсказката — то е вече негово решение.
+    vidove: Object.freeze({ ...podskazaniVidove(tablitsa, redNaGlavata), ...(n.vidove ?? {}) }),
   });
+}
+
+/** Първото предположение за всяка колона — по заглавието ѝ. */
+function podskazaniVidove(t: Tablitsa, redNaGlavata: number): Record<number, VidStoynost> {
+  const izhod: Record<number, VidStoynost> = {};
+  glaviNaRed(t, redNaGlavata).forEach((zaglavie, k) => {
+    izhod[k] = podskazhiVid(zaglavie);
+  });
+  return izhod;
 }
 
 /**
@@ -280,8 +310,19 @@ export function belegNaModel(m: ModelNaTablitsa): string {
     // Главите влизат дословно: преименуваната колона е промяна, която
     // старият белег (без тях) минаваше за „нищо ново".
     `${m.glavi.join('¦')}|${menyuta}|` +
-    `${[...m.otVavezhdane].join('.')}|${[...m.zaklyucheni].join('.')}`
+    `${[...m.otVavezhdane].join('.')}|${[...m.zaklyucheni].join('.')}|` +
+    // Видът решава дали колоната е пари — смяната му мени сборовете и
+    // затова е промяна, а не украса.
+    `${vidovePoRed(m)}`
   );
+}
+
+/** Видовете, подредени по колона — за белега. */
+function vidovePoRed(m: ModelNaTablitsa): string {
+  return Object.entries(m.vidove)
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([k, v]) => `${k}:${v}`)
+    .join(';');
 }
 
 /** Клетката за тази роля в този ред. Празен низ, ако ролята я няма в модела. */

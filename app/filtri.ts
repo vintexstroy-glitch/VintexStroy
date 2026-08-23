@@ -13,13 +13,23 @@
  */
 
 import { ekraniraj } from './imoti.js';
+import type { VidStoynost } from '../src/domein/vid-stoynost.js';
 
-export type VidKolona = 'tekst' | 'data' | 'suma';
+/**
+ * Видът на колоната идва от ДОМЕЙНА, не се обявява втори път тук.
+ *
+ * Дотук този файл носеше свой `VidKolona = 'tekst' | 'data' | 'suma'`, а
+ * `src/domein/kolonno.ts` носеше друг `VidKolona = 'promenlyva' | 'zatvorena'`
+ * — две различни неща с едно име. Негова поправка (23.08) даде третото и
+ * истинското: видът на СТОЙНОСТТА живее в колоната. Един факт, един дом
+ * (правило 17).
+ */
+export type { VidStoynost };
 
 export interface KolonaSFiltar<T> {
   readonly klyuch: string;
   readonly ime: string;
-  readonly vid: VidKolona;
+  readonly vid: VidStoynost;
   readonly vzemi: (red: T) => string | number;
 }
 
@@ -56,7 +66,7 @@ function grupaNaData(iso: string, dnes: string): string {
 
 function grupaNa<T>(k: KolonaSFiltar<T>, red: T, dnes: string): string {
   const v = k.vzemi(red);
-  if (k.vid === 'suma') return grupaNaSuma(Number(v));
+  if (k.vid === 'evro') return grupaNaSuma(Number(v));
   if (k.vid === 'data') return grupaNaData(String(v), dnes);
   const tekst = String(v).trim();
   return tekst === '' ? '(празно)' : tekst;
@@ -64,9 +74,9 @@ function grupaNa<T>(k: KolonaSFiltar<T>, red: T, dnes: string): string {
 
 const RED_NA_DATITE = ['Днес', 'Вчера', 'Тази седмица'];
 
-function podrediGrupi(vid: VidKolona, grupi: Map<string, number>): [string, number][] {
+function podrediGrupi(vid: VidStoynost, grupi: Map<string, number>): [string, number][] {
   const redove = [...grupi.entries()];
-  if (vid === 'suma') {
+  if (vid === 'evro') {
     const red = GRUPI_SUMA.map((g) => g.ime);
     return redove.sort((a, b) => red.indexOf(a[0]) - red.indexOf(b[0]));
   }

@@ -15,6 +15,12 @@ import { kakvoPishe } from '../src/yadro/pari.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
+import {
+  belegNaPartida,
+  sboroveNaPartida,
+  sDumiNaPartida,
+  zaIzprashtane,
+} from '../src/domein/potok.js';
 import { otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
 import { otpechatak, type Izvor, type Snimka, type VidIzvor } from '../src/iztochnik/snimka.js';
 import { periodPoModel, pogadniPeriod, razchetiPoModel, razchetiRazhodi } from '../src/iztochnik/razchitane.js';
@@ -47,6 +53,7 @@ import {
   sDumi,
   sPrevklyuchena,
   vDvataSbora,
+  znak,
   ZNAK,
   type ChislovaKolona,
   type DvataSbora,
@@ -396,12 +403,18 @@ function narisuvayPitaneto(pi: Pitane): string {
  *    възможни С ЦИФРИ, сумарно от цялата колона… и има възможност просто да се
  *    изключи там и да не стигне в Сметки и в Управление."
  *
- * Затова тук нищо не се избира и нищо не се добавя: всяка числова колона се
- * ПОЯВЯВА сама, от страната, която сборът ѝ ѝ дава. Човекът само маха.
+ * И неговата поправка (23.08), която казва кое мърда и кое не:
  *
- * ЧЕСТНО ЗА ДНЕШНИЯ ОБХВАТ: в Журнала днес влиза колоната с роля „сума".
- * Останалите числови колони се виждат, носят знак и се помнят изключени —
- * пътят им до Сметки е следващият резен, и това е казано и на екрана.
+ *   „КОЛОНАТА НЕ ОТИВА КЪДЕТО СИ РЕШИ, А КЪДЕТО Я ПОСТАВИШ. Не си избира —
+ *    както СУМАТА от колоните с валута се изпраща директно автоматично към
+ *    Приходи, ако е с +, и в Разходи, ако е с −."
+ *
+ * Затова колоните тук стоят В РЕДА НА ХЕДЪРА, а знакът е ЗНАЧКА на реда.
+ * Дотук този блок ги изсипваше групирани — първо приходните, после разходните
+ * — и с това колоната наистина „отиваше където си реши".
+ *
+ * КОИ КОЛОНИ СЕ ПОЯВЯВАТ: само обявените за ЕВРО (`vid-stoynost.ts`). Процент
+ * и брой не са пари, колкото и числови да изглеждат.
  */
 function blokNaSborovete(): string {
   if (!sborove) return '';
@@ -439,9 +452,10 @@ function blokNaSborovete(): string {
           <span>Знак</span><span>Колона</span><span>Пример</span>
           <span class="suma">Сбор</span><span></span>
         </div>
-        ${dvata.prihod.map((k) => red(k, 'prihod')).join('')}
-        ${dvata.razhod.map((k) => red(k, 'razhod')).join('')}
-        ${dvata.izklyucheni.map((k) => red(k, null)).join('')}
+        ${[...dvata.prihod, ...dvata.razhod, ...dvata.izklyucheni]
+          .sort((a, b) => a.kolona - b.kolona)
+          .map((k) => red(k, k.izklyuchena ? null : znak(k.sbor_st)))
+          .join('')}
         <div class="red znak sbor" translate="no">
           <span></span>
           <span class="kletka"><b>${IMENA_NA_SBOROVETE.prihod} ${ZNAK.prihod} · ${IMENA_NA_SBOROVETE.razhod} ${ZNAK.razhod}</b><span>двата сбора не се махат — само се скриват</span></span>
@@ -450,7 +464,11 @@ function blokNaSborovete(): string {
           <span class="suma duljimo">${kakvoPishe(dvata.razhod_st as never)}</span>
         </div>
       </div>
-      <p class="drebno">Знакът се <b>смята</b> от сбора, не се записва — затова следващия месец колоната сменя мястото си сама. Записва се само <b>махането</b>: то е решение и иска следа. Днес в Журнала влиза колоната с роля „сума"; пътят на останалите до Сметки е следващият резен.</p>`;
+      <div class="deystviya">
+        <button type="button" class="glaven" id="izprati-sborove">Изпрати сборовете</button>
+        <span class="drebno" translate="no">${ekraniraj(sDumiNaPartida(zaIzprashtane(sborove.model, sborove.tablitsa)))}</span>
+      </div>
+      <p class="drebno"><b>Колоната стои където я поставиш</b> — тук тя е в реда на хедъра. Отива <b>сборът ѝ</b>: при /+/ в Приходи, при /−/ в Разходи. Знакът се <b>смята</b> и не се записва; записва се само <b>махането</b>, защото то е решение и иска следа.</p>`;
 }
 
 /** Име по подразбиране: файлът без наставка и без брояча „(3)". */
@@ -747,12 +765,12 @@ export function zakachiIztochnitsi(
       b.disabled = true;
       try {
         // Махането е РЕШЕНИЕ — записва се в модела, за да важи и утре.
-        const nov = napraviModel({
-          klyuch: stariyat.klyuch,
-          tablitsa: sborove.tablitsa,
-          redNaGlavata: stariyat.redNaGlavata,
-          koloni: stariyat.koloni,
-          ...(stariyat.ddsE ? { ddsE: stariyat.ddsE } : {}),
+        //
+        // Пипа се САМО `izklyucheni`. Дотук тук се строеше нов модел от нулата
+        // и с това се губеха менютата, заключените имена, видовете на колоните
+        // и предишните отпечатъци — всичко, което Редакторът е записал.
+        const nov: ModelNaTablitsa = Object.freeze({
+          ...stariyat,
           izklyucheni: sPrevklyuchena(stariyat, kolona),
         });
         // `opId` носи ДЕЙСТВИЕТО, не съдържанието: махнеш ли колона и я върнеш,
@@ -770,6 +788,54 @@ export function zakachiIztochnitsi(
       await prerisuvay();
     });
   }
+
+  // ── сборовете тръгват към Приходи и Разходи ──────────────────────────────
+  koren.querySelector<HTMLButtonElement>('#izprati-sborove')?.addEventListener('click', async () => {
+    if (!sborove) return;
+    const redove = zaIzprashtane(sborove.model, sborove.tablitsa);
+    if (redove.length === 0) {
+      k.vest('zle', 'Няма колона, обявена за евро — нищо не тръгва.');
+      return;
+    }
+    const period = new Date().toISOString().slice(0, 7);
+    const beleg = belegNaPartida(sborove.model.klyuch, period, redove);
+    const og = await k.deystviya.ogledalo();
+    // Повторното изпращане на СЪЩОТО не удвоява: белегът казва дали изобщо
+    // се е сменило нещо. `opId` носи ДЕЙСТВИЕТО, не съдържанието (правило 20).
+    const veche = redove.every(
+      (r) => og.pototsi.get(`${sborove!.model.klyuch}|${r.kolona}|${period}`)?.beleg === beleg,
+    );
+    if (veche) {
+      k.vest('dobre', 'Същите сборове вече са изпратени — в Журнала не влиза нищо.');
+      return;
+    }
+    try {
+      for (const r of redove) {
+        await k.deystviya.zapishiPotok(
+          {
+            model: sborove.model.klyuch,
+            kolona: r.kolona,
+            ime: r.ime,
+            kam: r.kam,
+            suma_st: r.suma_st,
+            broy: r.broy,
+            period,
+            beleg,
+          },
+          { opId: `potok:${crypto.randomUUID()}` },
+        );
+      }
+      const { prihod_st, razhod_st } = sboroveNaPartida(redove);
+      k.vest(
+        'dobre',
+        `Изпратено: ${kakvoPishe(prihod_st as never)} в Приходи · ${kakvoPishe(razhod_st as never)} в Разходи.`,
+      );
+      greshka = '';
+    } catch (err) {
+      greshka = err instanceof Error ? err.message : String(err);
+    }
+    await prerisuvay();
+  });
 
   // ── картата на хедъра ────────────────────────────────────────────────────
   koren.querySelector<HTMLSelectElement>('#karta-glava')?.addEventListener('change', async (e) => {

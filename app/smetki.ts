@@ -56,7 +56,7 @@ const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
   { klyuch: 'koy', ime: 'Доставчик и описание', vid: 'tekst', vzemi: (r) => r.dostavchik },
   { klyuch: 'potok', ime: 'Поток', vid: 'tekst', vzemi: (r) => potok(r.potok)?.ime ?? r.potok },
   { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (r) => akumulator(r.sektor).sektor },
-  { klyuch: 'suma', ime: 'Обща сума', vid: 'suma', vzemi: (r) => r.suma_st },
+  { klyuch: 'suma', ime: 'Обща сума', vid: 'evro', vzemi: (r) => r.suma_st },
   { klyuch: 'data', ime: 'ДДС', vid: 'data', vzemi: (r) => r.data },
 ];
 

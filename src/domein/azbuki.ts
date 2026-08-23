@@ -16,6 +16,10 @@
  *
  * Всички азбуки стоят в хранилището при всеки пакет. Липсваща азбука се тегли
  * при нужда, ако има мрежа; офлайн пада на резервния стек. Никога празно място.
+ *
+ * ВАЛУТА ТУК НЯМА. Тя е ЕДНА (евро) и не се избира с пакета — негова поправка
+ * от 23.08: „защо се изгражда валута, ако тя е само една и няма смяна с курс“.
+ * Какво е една КОЛОНА — евро, процент или число — казва `vid-stoynost.ts`.
  */
 
 /** Подмножествата, както Google ги дели — имената са техните, за да се сверяват. */
@@ -34,13 +38,6 @@ export interface Paket {
   /** кои страни и езици покрива — това е рекламният му смисъл */
   readonly zaKogo: string;
   readonly podmnozhestva: readonly Podmnozhestvo[];
-  /**
-   * Кои валути предлага регионът. Негова дума (23.08): „При създаване се
-   * избира азбука с ЕЗИК И ВАЛУТА, която се използва в сметките." Избира се
-   * ЕДНА; смяна значи ново сваляне — както при азбуките. Кодовете са ISO,
-   * самите валути живеят в `src/yadro/valuta.ts`.
-   */
-  readonly valuti: readonly string[];
 }
 
 /**
@@ -53,21 +50,18 @@ export const PAKETI: readonly Paket[] = Object.freeze([
     ime: 'България',
     zaKogo: 'българска кирилица и цялата латиница',
     podmnozhestva: ['latin', 'cyrillic'],
-    valuti: ['EUR'],
   },
   {
     klyuch: 'evropa',
     ime: 'Европа',
     zaKogo: 'плюс полски, чешки, турски, украински, сръбски',
     podmnozhestva: ['latin', 'cyrillic', 'latin-ext', 'cyrillic-ext'],
-    valuti: ['EUR', 'PLN', 'CZK', 'RON', 'TRY', 'UAH'],
   },
   {
     klyuch: 'plus',
     ime: 'Разширен',
     zaKogo: 'плюс гръцки и виетнамски',
     podmnozhestva: ['latin', 'cyrillic', 'latin-ext', 'cyrillic-ext', 'greek', 'greek-ext', 'vietnamese'],
-    valuti: ['EUR', 'PLN', 'CZK', 'RON', 'TRY', 'UAH', 'GBP', 'CHF'],
   },
 ]);
 

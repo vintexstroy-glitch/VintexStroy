@@ -1,24 +1,18 @@
 /**
- * ВАЛУТАТА И ЗАКРЪГЛЯНЕТО · неговите три решения, пазени от машина.
+ * ВАЛУТАТА И ЗАКРЪГЛЯНЕТО · двете му решения, пазени от машина.
  *
  *   1. „Лев няма" — всичко се показва в евро, с думата и знака.
  *   2. „Цените НАГОРЕ, сметките към най-близкото" — и никога в сбор.
- *   3. „Сумата носи валутата си" — Журналът я избира веднъж и не я сменя.
+ *
+ * ТРЕТОТО ОТПАДНА, по негова поправка (23.08): „защо се изгражда валута, ако
+ * тя е само една и няма смяна с курс… трябва да се съдържа в самата КОЛОНА".
+ * Изборът на валута, осемте валути и `Paket.valuti` бяха машина без употреба —
+ * какво е една колона казва `vid-stoynost.ts`, и това се пази там.
  */
 
 import { describe, expect, it } from 'vitest';
-import {
-  EVRO,
-  razlikaOtZakraglyane,
-  valuta,
-  VALUTI,
-  zakragli,
-} from '../src/yadro/valuta.js';
+import { EVRO, razlikaOtZakraglyane, tsenaNagore, zakragli } from '../src/yadro/valuta.js';
 import { kakvoPishe, otSuma, sabiri, stotinki } from '../src/yadro/pari.js';
-import { PAKETI } from '../src/domein/azbuki.js';
-import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
-import { Deystviya } from '../src/domein/deystviya.js';
-import { SHA } from './pomoshtni.js';
 
 describe('лев няма', () => {
   it('показаното носи знака на еврото', () => {
@@ -33,18 +27,10 @@ describe('лев няма', () => {
     expect(() => otSuma('сто евро')).toThrow(/Не е сума/);
   });
 
-  it('непознат код пада към еврото — моделът на Винтекс', () => {
-    expect(valuta('XXX')).toBe(EVRO);
-    expect(valuta(undefined)).toBe(EVRO);
-    expect(valuta('GBP').znak).toBe('£');
-  });
-
-  it('всеки пакет предлага валути и еврото е първо навсякъде', () => {
-    for (const p of PAKETI) {
-      expect(p.valuti.length).toBeGreaterThan(0);
-      expect(p.valuti[0]).toBe('EUR');
-      for (const kod of p.valuti) expect(VALUTI.some((v) => v.kod === kod)).toBe(true);
-    }
+  it('валутата е ЕДНА — няма списък, няма избор, няма курс', () => {
+    expect(EVRO.kod).toBe('EUR');
+    expect(EVRO.znak).toBe('€');
+    expect(EVRO.drobni).toBe(100);
   });
 });
 
@@ -102,34 +88,25 @@ describe('закръглянето · цените НАГОРЕ, сметкит�
   });
 });
 
-describe('Журналът избира валутата си веднъж', () => {
-  function stend() {
-    const dnevnik = new DnevnikVPametta();
-    const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
-    let tik = 0;
-    return new Deystviya({
-      vrata,
-      dnevnik,
-      naematel: 'vintexstroy',
-      actor: 'vintexstroy@gmail.com',
-      chasovnik: () => new Date(Date.UTC(2026, 7, 23, 12, 0, tik++)).toISOString(),
-    });
-  }
-
-  it('избраната валута се чете от Огледалото', async () => {
-    const d = stend();
-    expect((await d.ogledalo()).valuta).toBeUndefined();
-    await d.izberiValuta({ kod: 'EUR' }, { opId: 'valuta:1' });
-    expect((await d.ogledalo()).valuta).toBe('EUR');
+describe('цената на Калкулатора · НАГОРЕ до стотица', () => {
+  it('214 350 € става 214 400 € — цената не пада от закръгляне', () => {
+    expect(tsenaNagore(21_435_000)).toBe(21_440_000);
+    expect(tsenaNagore(21_440_000)).toBe(21_440_000); // кръглото си остава
+    expect(tsenaNagore(1)).toBe(10_000); // един цент пак ражда стотица
   });
 
-  it('втора РАЗЛИЧНА валута се отказва — историята не се преоценява', async () => {
-    const d = stend();
-    await d.izberiValuta({ kod: 'EUR' }, { opId: 'valuta:1' });
-    await expect(d.izberiValuta({ kod: 'PLN' }, { opId: 'valuta:2' })).rejects.toThrow(
-      /вече е в EUR/,
-    );
-    // същата валута повторно е безвредно ехо
-    await expect(d.izberiValuta({ kod: 'EUR' }, { opId: 'valuta:3' })).resolves.toBeDefined();
+  it('неговата собствена ценова листа: всяка цена завършва на две нули', () => {
+    // от „ЦЕНИ МД нова.xlsx" — Ап. 2, Ап. 6, Гараж 1, Двоен гараж 7 и 8
+    for (const evro of [215_400, 224_800, 38_700, 72_500]) {
+      expect(tsenaNagore(evro * 100)).toBe(evro * 100);
+    }
+  });
+
+  it('разход не „порасва" — знакът се пази и тук', () => {
+    expect(tsenaNagore(-21_435_000)).toBe(-21_440_000);
+  });
+
+  it('дробното се отказва на глас', () => {
+    expect(() => tsenaNagore(0.5)).toThrow(RangeError);
   });
 });

@@ -55,7 +55,7 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
       },
     },
     { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
-    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'suma', vzemi: (n) => n.naem_st },
+    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (n) => n.naem_st },
     {
       klyuch: 'sastoyanie',
       ime: 'Състояние',
@@ -261,7 +261,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="glava naem">
           ${koloniNaNaemite(ogledalo)
             .map((kol) =>
-              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'suma'),
+              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'evro'),
             )
             .join('')}<span></span>
         </div>

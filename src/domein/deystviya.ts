@@ -32,7 +32,7 @@ import type {
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
   PayloadPravoZapisano,
-  PayloadValutaIzbrana,
+  PayloadPotokZapisan,
 } from './sabitiya.js';
 
 export interface NastroykiDeystviya {
@@ -107,6 +107,31 @@ export class Deystviya {
   ): Promise<Rezultat> {
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
+  }
+
+  /**
+   * ИЗПРАЩА СБОРА НА ЕДНА КОЛОНА към Приходи или Разходи.
+   *
+   * Негово (23.08): „сумата от колоните с валута се изпраща ДИРЕКТНО
+   * АВТОМАТИЧНО към Приходи, ако е с +, и в Разходи, ако е с −."
+   *
+   * ИСКА ОТКЛЮЧЕН ПЕРИОД — за разлика от модела и бутона. Този запис е ЧИСЛО
+   * ЗА МЕСЕЦ: влезе ли в замразен период, подадената справка спира да отговаря
+   * на данните под нея (правило 9). Поправка в заключен месец минава само по
+   * неговия път: сверена промяна от таблица.
+   *
+   * Същността е ДВОЙКА модел·колона за периода — така повторното изпращане
+   * поправя реда, вместо да ражда втори.
+   */
+  async zapishiPotok(danni: PayloadPotokZapisan, z: Zayavka): Promise<Rezultat> {
+    proveriZamrazen(await this.ogledalo(), danni.period, z.svereno);
+    return this.#pusni(
+      'ПотокЗаписан',
+      VID.potok,
+      `POTOK:${danni.model}:${danni.kolona}:${danni.period}`,
+      danni,
+      z,
+    );
   }
 
   async zapishiRazhod(
@@ -202,22 +227,6 @@ export class Deystviya {
     );
   }
 
-  /**
-   * Записва валутата на Журнала — ВЕДНЪЖ, при създаване.
-   *
-   * НЕ иска отключен период. Втори запис с РАЗЛИЧНА валута се отказва още в
-   * Огледалото — смяната би преоценила цялата история.
-   */
-  async izberiValuta(danni: PayloadValutaIzbrana, z: Zayavka): Promise<Rezultat> {
-    const veche = (await this.ogledalo()).valuta;
-    if (veche !== undefined && veche !== danni.kod) {
-      throw new GreshkaZamrazen(
-        `Журналът вече е в ${veche}. Валутата не се сменя — смяната би ` +
-          'преоценила всяко записано число. Друга валута значи нов Журнал.',
-      );
-    }
-    return this.#pusni('ВалутаИзбрана', VID.valuta, 'VALUTA', danni, z);
-  }
 
   /**
    * Поправка = НОВО събитие. Журналът не се пипа.

@@ -25,6 +25,7 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
+import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
@@ -58,7 +59,7 @@ const vhod = new EdinSobstvenik(SOBSTVENIKAT);
 let kojSam: Samolichnost = SOBSTVENIKAT;
 let izbor: Izbor = chetiIzbor();
 
-export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'nastroyki' | 'tablo';
+export type KoyEkran = 'imoti' | 'pari' | 'stoynost' | 'smetki' | 'nastroyki' | 'tablo';
 
 /**
  * Кой екран от коя възможност зависи. Таблото го няма тук нарочно: то е
@@ -197,6 +198,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     podnaslov: 'бутоните са модели на пътища · нищо не е константа',
     ikona: '<circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"></path>',
   },
+  stoynost: {
+    ime: 'Стойност на Състояние',
+    podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
+    ikona: '<path d="M4 20V9"></path><path d="M9.5 20V4"></path><path d="M15 20v-7"></path><path d="M20.5 20V7"></path><path d="M2.5 20h19"></path>',
+  },
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
@@ -306,6 +312,8 @@ async function trugvay(): Promise<void> {
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
               : ekran === 'pari'
                 ? narisuvayPari(ogledalo, dnes)
+                : ekran === 'stoynost'
+                ? narisuvayStoynost()
                 : ekran === 'smetki'
                   ? narisuvaySmetki(ogledalo, dnes)
                   : ekran === 'nastroyki'
@@ -318,6 +326,7 @@ async function trugvay(): Promise<void> {
     poslednaVest = null;
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
+    else if (ekran === 'stoynost') zakachiStoynost(koren, k, prerisuvay);
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
     else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
     else {

@@ -16,7 +16,7 @@ import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
-import type { PayloadSluzhitelZapisan, PayloadValutaIzbrana } from '../domein/sabitiya.js';
+import type { PayloadSluzhitelZapisan, PayloadPotokZapisan } from '../domein/sabitiya.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -165,10 +165,12 @@ export interface Ogledalo {
    */
   readonly prava: ReadonlyMap<string, PravaZaModel>;
   /**
-   * ISO кодът на валутата на този Журнал, ако е избрана. Първата печели;
-   * различна втора се отказва във Вратата — историята не се преоценява.
+   * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
+   *
+   * Ключът е ТРОЕН, защото редът е един за двойка колона·месец: повторното
+   * изпращане ПОПРАВЯ същия ред, вместо да ражда втори. Вж. `src/domein/potok.ts`.
    */
-  readonly valuta: string | undefined;
+  readonly pototsi: ReadonlyMap<string, PayloadPotokZapisan>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -202,7 +204,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const butoni = new Map<string, Buton>();
   const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
   const prava = new Map<string, PravaZaModel>();
-  let valuta: string | undefined;
+  const pototsi = new Map<string, PayloadPotokZapisan>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -297,18 +299,20 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ПотокЗаписан': {
+        const p = s.payload as unknown as PayloadPotokZapisan;
+        // Последният запис за същата колона в същия месец надделява —
+        // поправка, не втори ред.
+        pototsi.set(`${p.model}|${p.kolona}|${p.period}`, p);
+        break;
+      }
+
       case 'ПравоЗаписано': {
         const p = s.payload as unknown as PravaZaModel;
         prava.set(`${p.imeyl}|${p.model}`, p);
         break;
       }
 
-      case 'ВалутаИзбрана': {
-        const p = s.payload as unknown as PayloadValutaIzbrana;
-        // Първата печели. Повторение със същия код е безвредно ехо.
-        valuta = valuta ?? p.kod;
-        break;
-      }
 
       case 'СверкаЗаписана': {
         const p = s.payload as unknown as PayloadSverkaZapisana;
@@ -438,7 +442,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     butoni,
     sluzhiteli,
     prava,
-    valuta,
+    pototsi,
     sverki,
     prilozheni,
     pogaseni,
