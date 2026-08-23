@@ -33,6 +33,7 @@ import {
   OPISANIE,
   OSHTE_NE_E_ZAPOCHNATO,
   plan,
+  PLAN_PO_PODRAZBIRANE,
   PLANOVE,
   stigaLiHranilishteto,
   type Vazmozhnost,
@@ -205,7 +206,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
         <div class="kletka">
           <b>${broi} ${broi === 1 ? 'възможност' : 'възможности'}</b>
           <span>${
-            p.klyuch === 'standarten' ? 'ЦЯЛАТА функционалност' : 'от таблицата на плана'
+            p.klyuch === PLAN_PO_PODRAZBIRANE ? 'ЦЯЛАТА функционалност' : 'от таблицата на плана'
           }</span>
         </div>
         <div class="kletka">
@@ -241,10 +242,10 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
         ${redove}
       </div>
       <p class="drebno">
-        Мащабът се плаща на доставчика на хранилището, не на нас. Стандартният е
-        стартъпът и носи цялата функционалност; над него се купуват място и
-        сигурност от Google, Microsoft или Apple, а при Холдинг — и поръчкова
-        работа по договор. ИИ ще е добавка с цена, която се СВЪРЗВА — не вградена;
+        Мащабът се плаща на доставчика на хранилището, не на нас. Стартъпът е
+        <b>Професионален · онлайн</b> и носи цялата функционалност; място и
+        сигурност се купуват от Google, Microsoft или Apple, а поръчковата работа
+        е по договор. ИИ ще е добавка с цена, която се СВЪРЗВА — не вградена;
         това е отделен проект и още не е започнал.
       </p>
     </section>`;
