@@ -22,7 +22,11 @@ import {
   plan,
   PLAN_PO_PODRAZBIRANE,
   PLANOVE,
-  oblachni,
+  poNositel,
+  rabotiOflayn,
+  vKletka,
+  type Akaunti,
+  type Nositel,
   prevklyuchi,
   smeniPlan,
   stigaLiHranilishteto,
@@ -30,81 +34,87 @@ import {
   type Vazmozhnost,
 } from '../src/domein/planove.js';
 
-describe('стълбата на плановете', () => {
-  it('всеки по-голям ОБЛАЧЕН план носи всичко от по-малкия', () => {
-    // Офлайн планът НЕ участва: той е друг клон, не по-долно стъпало.
-    const stalba = oblachni();
-    for (let i = 1; i < stalba.length; i += 1) {
-      const malak = stalba[i - 1]!;
-      const golyam = stalba[i]!;
-      for (const v of malak.vazmozhnosti) {
-        expect(golyam.vazmozhnosti.has(v), `${golyam.ime} губи „${v}" спрямо ${malak.ime}`).toBe(
-          true,
-        );
+describe('матрицата · двата критерия', () => {
+  it('всяка клетка има ТОЧНО един план', () => {
+    const kletki: [Nositel, Akaunti][] = [
+      ['lokalno', 'edin'],
+      ['lokalno', 'poveche'],
+      ['oblak', 'edin'],
+      ['oblak', 'poveche'],
+    ];
+    expect(PLANOVE).toHaveLength(kletki.length);
+    for (const [n, a] of kletki) {
+      const namereni = PLANOVE.filter((p) => p.nositel === n && p.akaunti === a);
+      expect(namereni, `клетка ${n}×${a}`).toHaveLength(1);
+      expect(vKletka(n, a)).toBe(namereni[0]);
+    }
+  });
+
+  it('ВСЯКО издание работи офлайн — това е обещание, не свойство на план', () => {
+    // Служителят без обхват пише и се сверява, щом обхватът се върне.
+    // Падне ли това, значи някой е счупил обещанието към онзи на строежа.
+    for (const p of PLANOVE) expect(rabotiOflayn(p), p.ime).toBe(true);
+  });
+
+  it('стълбата се мери ПО ЛИНИЯ: Личен ⊂ Професионален при еднакъв носител', () => {
+    for (const nositel of ['lokalno', 'oblak'] as const) {
+      const edin = vKletka(nositel, 'edin');
+      const poveche = vKletka(nositel, 'poveche');
+      for (const v of edin.vazmozhnosti) {
+        expect(poveche.vazmozhnosti.has(v), `${poveche.ime} губи „${v}"`).toBe(true);
       }
     }
   });
 
-  it('Стандартният Е стартъпът и носи ЦЯЛАТА функционалност', () => {
+  it('локалният няма ИЗТОЧНИЦИ — няма драйв, от който да чете', () => {
+    for (const p of poNositel('lokalno')) {
+      expect(p.vazmozhnosti.has('iztochnitsi'), p.ime).toBe(false);
+    }
+    for (const p of poNositel('oblak')) {
+      expect(p.vazmozhnosti.has('iztochnitsi'), p.ime).toBe(true);
+    }
+  });
+
+  it('колонното право съществува само при ПОВЕЧЕ акаунти', () => {
+    for (const p of PLANOVE) {
+      expect(p.vazmozhnosti.has('kolonno-pravo'), p.ime).toBe(p.akaunti === 'poveche');
+    }
+  });
+
+  it('другите имейли искат ОБЛАК — локално няма кого да пуснеш', () => {
+    // В локалния Професионален колонното право върви с АГЕНТА, не с втори имейл.
+    expect(vKletka('lokalno', 'poveche').vazmozhnosti.has('drugi-imeyli')).toBe(false);
+    expect(vKletka('oblak', 'poveche').vazmozhnosti.has('drugi-imeyli')).toBe(true);
+  });
+
+  it('стартъпът е Професионалният в облака', () => {
     const startap = plan(PLAN_PO_PODRAZBIRANE);
-    expect(startap.klyuch).toBe('standarten');
-    expect(startap.iskaPlatenOblak).toBe(false);
-
-    // Нагоре се добавя само КАПАЦИТЕТ и поръчкова работа — нищо друго.
-    const kapatsitet: readonly Vazmozhnost[] = ['poveche-hranilishte', 'individualni-razrabotki'];
-    for (const p of oblachni()) {
-      for (const v of p.vazmozhnosti) {
-        if (kapatsitet.includes(v)) continue;
-        expect(startap.vazmozhnosti.has(v), `Стандартният няма „${v}", а ${p.ime} я има`).toBe(true);
-      }
-    }
-  });
-
-  it('Личният е САМО един акаунт: без други имейли, без роли, без колонно право', () => {
-    const lichen = plan('lichen');
-    for (const v of ['drugi-imeyli', 'roli-za-dostap', 'kolonno-pravo'] as const) {
-      expect(lichen.vazmozhnosti.has(v), `Личният не бива да носи „${v}"`).toBe(false);
-    }
-    // Но работата на самия човек е цяла — нищо от двигателя не му е взето.
-    for (const v of ['zapis', 'smetki-dds', 'iztochnitsi', 'arhiv-eksel', 'fini-filtri'] as const) {
-      expect(lichen.vazmozhnosti.has(v)).toBe(true);
-    }
-  });
-
-  it('платеният облак се иска само отгоре, и хранилището се проверява', () => {
-    expect(plan('lichen').iskaPlatenOblak).toBe(false);
-    expect(plan('standarten').iskaPlatenOblak).toBe(false);
-    expect(plan('razshiren').iskaPlatenOblak).toBe(true);
-    expect(plan('holding').iskaPlatenOblak).toBe(true);
-
-    expect(stigaLiHranilishteto(plan('standarten'), 'безплатно')).toBe(true);
-    expect(stigaLiHranilishteto(plan('razshiren'), 'безплатно')).toBe(false);
-    expect(stigaLiHranilishteto(plan('razshiren'), 'платено')).toBe(true);
+    expect(startap.klyuch).toBe('profesionalen');
+    expect(startap.nositel).toBe('oblak');
+    expect(startap.akaunti).toBe('poveche');
   });
 
   it('непознат план пада към стартъпа, не към празно', () => {
-    expect(plan('няма такъв').klyuch).toBe('standarten');
-    expect(plan(undefined).klyuch).toBe('standarten');
-    expect(plan('').klyuch).toBe('standarten');
+    expect(plan('няма такъв').klyuch).toBe('profesionalen');
+    expect(plan(undefined).klyuch).toBe('profesionalen');
+    expect(plan('').klyuch).toBe('profesionalen');
   });
 
   it('всяка възможност си има изречение за таблото', () => {
     for (const p of PLANOVE) {
-      for (const v of p.vazmozhnosti) {
-        expect(OPISANIE[v], `„${v}" е без описание`).toBeTruthy();
-      }
+      for (const v of p.vazmozhnosti) expect(OPISANIE[v], `„${v}" е без описание`).toBeTruthy();
     }
   });
 });
 
 describe('отметките · вторият слой', () => {
   it('нов избор включва всичко, което планът позволява', () => {
-    const izbor = izborPoPodrazbirane('standarten');
+    const izbor = izborPoPodrazbirane('profesionalen');
     for (const v of izbor.plan.vazmozhnosti) expect(mozhe(izbor, v)).toBe(true);
   });
 
   it('изключеното НЕ е същото като липсващото', () => {
-    const izbor = prevklyuchi(izborPoPodrazbirane('standarten'), 'arhiv-eksel', false);
+    const izbor = prevklyuchi(izborPoPodrazbirane('profesionalen'), 'arhiv-eksel', false);
 
     expect(mozhe(izbor, 'arhiv-eksel')).toBe(false);
     expect(eIzklyuchena(izbor, 'arhiv-eksel')).toBe(true); // планът я дава, аз я скрих
@@ -115,7 +125,7 @@ describe('отметките · вторият слой', () => {
   });
 
   it('задължителната отметка не се маха', () => {
-    const izbor = prevklyuchi(izborPoPodrazbirane('standarten'), 'zapis', false);
+    const izbor = prevklyuchi(izborPoPodrazbirane('profesionalen'), 'zapis', false);
     expect(mozhe(izbor, 'zapis')).toBe(true);
     for (const v of ZADALZHITELNI) expect(mozhe(izbor, v)).toBe(true);
   });
@@ -127,7 +137,7 @@ describe('отметките · вторият слой', () => {
 
   it('смяна на плана пази отметките, а новото идва включено', () => {
     const bez = prevklyuchi(izborPoPodrazbirane('lichen'), 'arhiv-eksel', false);
-    const golyam = smeniPlan(bez, 'holding');
+    const golyam = smeniPlan(bez, 'profesionalen');
 
     expect(mozhe(golyam, 'arhiv-eksel')).toBe(false); // изборът му се уважава
     expect(mozhe(golyam, 'drugi-imeyli')).toBe(true); // новото не се крие
@@ -142,35 +152,6 @@ describe('отметките · вторият слой', () => {
   it('ИИ е обявен, но не построен — и таблото трябва да го знае', () => {
     expect(OSHTE_NE_E_ZAPOCHNATO.has('svarzhi-ii')).toBe(true);
     // Стандартният го ПОЗВОЛЯВА; етикетът „скоро" идва от списъка, не от плана.
-    expect(plan('standarten').vazmozhnosti.has('svarzhi-ii')).toBe(true);
-  });
-});
-
-describe('офлайн планът · другият клон', () => {
-  it('работи БЕЗ облак, и това е свойство, не отметка', () => {
-    const oflayn = plan('lichen-oflayn');
-    expect(oflayn.bezOblak).toBe(true);
-    // Никой друг не е офлайн — иначе „без облак" губи смисъл.
-    expect(PLANOVE.filter((p) => p.bezOblak)).toHaveLength(1);
-    for (const p of oblachni()) expect(p.bezOblak).toBe(false);
-  });
-
-  it('няма източници — няма драйв, от който да чете', () => {
-    expect(plan('lichen-oflayn').vazmozhnosti.has('iztochnitsi')).toBe(false);
-    // Точно затова НЕ е подмножество на Личния: другият клон, не по-долно стъпало.
-    expect(plan('lichen').vazmozhnosti.has('iztochnitsi')).toBe(true);
-  });
-
-  it('носи целия двигател — Журнал, Сметки, филтри, износ', () => {
-    const oflayn = plan('lichen-oflayn');
-    for (const v of ['zapis', 'smetki-dds', 'arhiv-eksel', 'iznos-vnos', 'fini-filtri', 'ogledala'] as const) {
-      expect(oflayn.vazmozhnosti.has(v), `офлайн планът губи „${v}"`).toBe(true);
-    }
-  });
-
-  it('износът му е спасението: без облак няма кой друг да пази копие', () => {
-    // Ако някога това падне, значи някой е махнал единственото копие
-    // на офлайн собственика. Тогава „нула загуба на данни" става лъжа.
-    expect(plan('lichen-oflayn').vazmozhnosti.has('iznos-vnos')).toBe(true);
+    expect(plan('profesionalen').vazmozhnosti.has('svarzhi-ii')).toBe(true);
   });
 });

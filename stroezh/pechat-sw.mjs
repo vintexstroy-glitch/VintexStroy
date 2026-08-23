@@ -13,6 +13,7 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { PAKETI } from '../src/domein/azbuki.ts';
 
 const DIST = new URL('../dist/', import.meta.url).pathname;
 
@@ -27,23 +28,56 @@ function vsichkiFaylove(papka = DIST) {
   return namereni;
 }
 
-const faylove = vsichkiFaylove().sort();
-const cherupka = faylove.map((f) => `./${relative(DIST, f)}`);
+const vsichki = vsichkiFaylove().sort();
+const adres = (f) => `./${relative(DIST, f)}`;
+
+// Шрифтовете НЕ влизат в черупката — те се пазят по пакет (виж долу).
+const eShrift = (f) => f.endsWith('.woff2');
+const cherupka = vsichki.filter((f) => !eShrift(f)).map(adres);
+
+/**
+ * Кой файл на коя азбука е. Vite хешира имената (`literata-greek-BxK2.woff2`),
+ * затова се разпознава по НАЧАЛОТО на името — подмножеството е в него.
+ *
+ * Редът е важен: `latin-ext` съдържа `latin` като подниз, затова по-дългите
+ * имена се пробват първи. Иначе цялата европейска азбука би влязла в пакета
+ * за България — тихо и незабелязано.
+ */
+const PODMNOZHESTVA = ['cyrillic-ext', 'latin-ext', 'greek-ext', 'cyrillic', 'latin', 'greek', 'vietnamese'];
+function koyaAzbuka(pat) {
+  const ime = relative(DIST, pat);
+  return PODMNOZHESTVA.find((p) => new RegExp(`-${p}-[^/]*\\.woff2$`).test(ime));
+}
+
+const shrifty = vsichki.filter(eShrift);
+const azbuki = {};
+for (const p of PAKETI) {
+  azbuki[p.klyuch] = shrifty.filter((f) => p.podmnozhestva.includes(koyaAzbuka(f))).map(adres);
+}
+
+// Никой шрифт не бива да остане без азбука — иначе тихо изпада от всеки пакет.
+const bezdomni = shrifty.filter((f) => !koyaAzbuka(f)).map(adres);
+if (bezdomni.length) {
+  throw new Error(`Шрифтове без разпозната азбука: ${bezdomni.join(', ')}`);
+}
 
 // Версията идва от СЪДЪРЖАНИЕТО, не от часовника — иначе всяко построяване
 // би пратило телефона да тегли същите байтове наново.
 const otpechatak = createHash('sha256');
-for (const f of faylove) otpechatak.update(readFileSync(f));
+for (const f of vsichki) otpechatak.update(readFileSync(f));
 const versiya = otpechatak.digest('hex').slice(0, 12);
 
 const pat = join(DIST, 'sw.js');
 const izhod = readFileSync(pat, 'utf8')
   .replace('__VERSIYA__', versiya)
-  .replace('__CHERUPKA__', JSON.stringify(['./', ...cherupka], null, 2));
+  .replace('__CHERUPKA__', JSON.stringify(['./', ...cherupka], null, 2))
+  .replace('__AZBUKI__', JSON.stringify(azbuki, null, 2));
 
 writeFileSync(pat, izhod);
 
-const bajtove = faylove.reduce((s, f) => s + statSync(f).size, 0);
-console.log(
-  `  джобът: ${cherupka.length} файла · ${(bajtove / 1024).toFixed(1)} KB · версия ${versiya}`,
-);
+const kb = (fs) => (fs.reduce((s, f) => s + statSync(f).size, 0) / 1024).toFixed(1);
+console.log(`  джобът: ${cherupka.length} файла · ${kb(vsichki.filter((f) => !eShrift(f)))} KB · версия ${versiya}`);
+for (const p of PAKETI) {
+  const negovi = shrifty.filter((f) => p.podmnozhestva.includes(koyaAzbuka(f)));
+  console.log(`    азбуки „${p.klyuch}": ${negovi.length} файла · ${kb(negovi)} KB`);
+}

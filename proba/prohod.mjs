@@ -629,8 +629,8 @@ async function main() {
 
     // Планът по подразбиране е СТАРТЪПЪТ и носи цялата функционалност.
     proveri(
-      'стартъпът е избраният план',
-      (await tekstNa(p, '.red.planred.tuk')).includes('Стандартен'),
+      'стартъпът е Професионалният в облака',
+      (await tekstNa(p, '.red.planred.tuk')).includes('Професионален'),
       true,
     );
     proveri(
@@ -676,7 +676,11 @@ async function main() {
 
     // Личен план: ролите не са изключени — тях просто ги НЯМА там.
     await deystvieSPrerisuvane(p, () => p.click('[data-plan="lichen"]'));
-    proveri('планът се смени', (await tekstNa(p, '.red.planred.tuk')).includes('Личен'), true);
+    proveri(
+      'планът се смени на Личен',
+      (await tekstNa(p, '.red.planred.tuk')).includes('Личен'),
+      true,
+    );
     proveri(
       'ролите не се предлагат в Личния',
       await p.$eval('.vazm input[data-vazmozhnost="roli-za-dostap"]', (i) => i.disabled),
@@ -697,7 +701,7 @@ async function main() {
       (await tekstNa(p, '.red.planred.tuk')).includes('Личен'),
       true,
     );
-    await deystvieSPrerisuvane(p, () => p.click('[data-plan="standarten"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-plan="profesionalen"]'));
 
     // ══ 16 · ДЖОБЪТ · отваря ли се БЕЗ мрежа ═══════════════════════════════
     razdel = '16 · офлайн джобът';
@@ -721,6 +725,19 @@ async function main() {
     proveri('служебният работник е активен', rabotnikGotov, 'готов');
 
     proveri(
+      'джобът пази СВОЯ азбучен пакет, не всички',
+      await p.evaluate(async () => {
+        const imena = (await caches.keys()).filter((i) => i.startsWith('masterbook-'));
+        const kesh = await caches.open(imena[0]);
+        const adresi = (await kesh.keys()).map((z) => z.url);
+        const ima = (a) => adresi.some((u) => u.includes(`-${a}-`));
+        // Пакетът по подразбиране е „bg": латиница и кирилица, нищо друго.
+        return `latin:${ima('latin')} cyrillic:${ima('cyrillic')} greek:${ima('greek')}`;
+      }),
+      'latin:true cyrillic:true greek:false',
+    );
+
+    proveri(
       'черупката е в джоба',
       await p.evaluate(async () => {
         const imena = await caches.keys();
@@ -742,6 +759,17 @@ async function main() {
 
     proveri('приложението се отвори БЕЗ мрежа', await p.$$eval('.nav', (n) => n.length), 1);
     proveri('Журналът е непокътнат офлайн', await broySabitiya(p), predi);
+    proveri(
+      'буква ИЗВЪН старите 187 знака се показва с нашия шрифт',
+      await p.evaluate(async () => {
+        await document.fonts.ready;
+        // „Ѝ" и „Ђ" ги нямаше в подрязания вариант. Сега азбуките са ЦЕЛИ.
+        // Две азбуки, но ДВЕ ДУМИ — правило 11 важи и за пробите.
+        return document.fonts.check('400 16px "IBM Plex Sans"', 'ЍЂ QW');
+      }),
+      true,
+    );
+
     proveri(
       'и шрифтовете пак са наши',
       await p.evaluate(async () => {

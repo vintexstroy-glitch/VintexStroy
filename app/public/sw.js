@@ -20,16 +20,29 @@
  *   3. СТАРИТЕ КЕШОВЕ СЕ ТРИЯТ при активиране. Два кеша значи две версии на
  *      черупката — и после въпрос коя е вярната.
  *
- * Списъкът с файлове се ВПИСВА след `vite build` от `stroezh/pechat-sw.mjs`,
- * защото Vite слага хеш в имената. Долният е за `npm run dev`.
+ *   4. АЗБУКИТЕ СЕ ПАЗЯТ ПО ПАКЕТ. Всички стоят в пакета, но джобът пази
+ *      предварително само онези от избрания при сваляне регион
+ *      (`?azbuki=evropa`). Останалите се теглят при нужда, ако има мрежа.
+ *      Иначе телефонът би дърпал 441 KB букви, от които ползва 204.
+ *
+ * Списъците се ВПИСВАТ след `vite build` от `stroezh/pechat-sw.mjs`, защото
+ * Vite слага хеш в имената.
  */
 
 const VERSIYA = '__VERSIYA__';
-const KESH = `masterbook-${VERSIYA}`;
 const CHERUPKA = __CHERUPKA__;
+/** пакет → неговите шрифтови файлове */
+const AZBUKI = __AZBUKI__;
+
+/** Пакетът идва от адреса, с който работникът е регистриран. */
+const PAKET = new URL(self.location.href).searchParams.get('azbuki') ?? 'bg';
+const KESH = `masterbook-${VERSIYA}-${PAKET}`;
 
 self.addEventListener('install', (sabitie) => {
-  sabitie.waitUntil(caches.open(KESH).then((kesh) => kesh.addAll(CHERUPKA)));
+  const shrifty = AZBUKI[PAKET] ?? AZBUKI['bg'] ?? [];
+  sabitie.waitUntil(
+    caches.open(KESH).then((kesh) => kesh.addAll([...CHERUPKA, ...shrifty])),
+  );
   // Нарочно БЕЗ skipWaiting() — виж правило 2 горе.
 });
 

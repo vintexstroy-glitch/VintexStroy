@@ -33,6 +33,7 @@ import { zakachiFiltri } from './filtri.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
+import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 
 const NAEMATEL = 'vintexstroy';
 
@@ -124,10 +125,36 @@ let ekran: KoyEkran = 'imoti';
  */
 let imaNova = false;
 
+/**
+ * АЗБУЧНИЯТ ПАКЕТ · решава се ВЕДНЪЖ, при сваляне.
+ *
+ * Негови думи: „Искам да е опция при сваляне само." Затова адресът го носи
+ * (`?azbuki=evropa`) — рекламата по региони дава различен адрес — и оттам
+ * нататък се помни. В приложението няма бутон за него: смяната на азбуките
+ * значи ново сваляне, не отметка.
+ */
+const KLYUCH_AZBUKI = 'masterbook:azbuki';
+
+function koyPaket(): string {
+  try {
+    const otAdresa = new URLSearchParams(location.search).get('azbuki');
+    if (otAdresa) {
+      const izbran = paket(otAdresa).klyuch;
+      localStorage.setItem(KLYUCH_AZBUKI, izbran);
+      return izbran;
+    }
+    return paket(localStorage.getItem(KLYUCH_AZBUKI)).klyuch;
+  } catch {
+    // Частен прозорец: пакетът важи за тази сесия.
+    return PAKET_PO_PODRAZBIRANE;
+  }
+}
+
 async function zakachiDzhoba(prerisuvay: () => Promise<void>): Promise<void> {
   if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
   try {
-    const zapis = await navigator.serviceWorker.register('./sw.js');
+    // Пакетът пътува с адреса на работника — той го чете от `location.search`.
+    const zapis = await navigator.serviceWorker.register(`./sw.js?azbuki=${koyPaket()}`);
     // Нова версия, която чака реда си да влезе.
     if (zapis.waiting) imaNova = true;
     zapis.addEventListener('updatefound', () => {
