@@ -53,7 +53,14 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
 
 // ── сторно на избраните · груповото минава през СЪЩАТА врата ──────────────
 
-/** Кой вид същност носи белегът на бутона „Сторно" във всеки ред. */
+/**
+ * Кой вид същност носи белегът на бутона „Сторно" във всеки ред.
+ *
+ * ЕДИНСТВЕНИЯТ дом на този факт (правило 17): и екраните при закачането на
+ * единичното сторно, и груповото четат ОТТУК. Втори списък другаде би се
+ * разминал тихо — ред с непознат белег просто изпада от „Сторно на
+ * избраните", без грешка.
+ */
 const VID_OT_BELEGA: Readonly<Record<string, Vid>> = {
   stornoImot: VID.imot,
   stornoNaem: VID.naem,
@@ -61,6 +68,14 @@ const VID_OT_BELEGA: Readonly<Record<string, Vid>> = {
   storno: VID.plashtane,
   stornoRazhod: VID.razhod,
 };
+
+/** Видът по HTML-атрибута („data-storno-naem" → наем) — или null за чужд белег. */
+export function vidOtAtribut(atribut: string): Vid | null {
+  const beleg = atribut
+    .replace(/^data-/, '')
+    .replace(/-([a-z])/g, (_, bukva: string) => bukva.toUpperCase());
+  return VID_OT_BELEGA[beleg] ?? null;
+}
 
 export interface ZaStorno {
   readonly seq: number;

@@ -40,7 +40,7 @@ import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
-import { opitajStorno } from './storno.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
 import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -955,7 +955,8 @@ export function zakachiSmetki(
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-storno-razhod]')) {
     b.addEventListener('click', async () => {
       b.disabled = true;
-      const izhod = await opitajStorno(k, Number(b.dataset['stornoRazhod']), VID.razhod, 'разходът');
+      // Видът — от единствения дом на „белег → вид" (правило 17 · storno.ts).
+      const izhod = await opitajStorno(k, Number(b.dataset['stornoRazhod']), vidOtAtribut('data-storno-razhod')!, 'разходът');
       if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
       await prerisuvay();
     });

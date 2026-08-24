@@ -22,8 +22,9 @@ import {
 } from '../app/filtri.js';
 import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran.js';
 import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
-import { umryalaLi } from '../app/chernova.js';
-import { sDumiZaStornoto } from '../app/storno.js';
+import { klyuchNaChernova, umryalaLi } from '../app/chernova.js';
+import { sDumiZaStornoto, vidOtAtribut } from '../app/storno.js';
+import { readdirSync, readFileSync } from 'node:fs';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
 describe('сравнителят по вид (ADR-014)', () => {
@@ -190,6 +191,35 @@ describe('черновата · кога е умряла', () => {
 
   it('поле, което формата ВЕЧЕ НЯМА, не я убива — сменен е режимът, не текстът', () => {
     expect(umryalaLi({ prichina: 'сбъркан номер' }, { adres: 'Витоша 12' })).toBe(false);
+  });
+});
+
+describe('ключът на черновата · формата ПЛЮС същността', () => {
+  it('същият id с друга същност дава ДРУГ ключ — чернова за А не ляга у Б', () => {
+    const a = klyuchNaChernova('forma-plashtane', { vzemane: 'VZ:2026-01:naem-1' });
+    const b = klyuchNaChernova('forma-plashtane', { vzemane: 'VZ:2026-01:naem-2' });
+    expect(a).not.toBe(b);
+  });
+
+  it('редът на атрибутите не сменя ключа', () => {
+    expect(klyuchNaChernova('f', { b: '2', a: '1' })).toBe(klyuchNaChernova('f', { a: '1', b: '2' }));
+  });
+});
+
+describe('белег → вид · единственият дом (правило 17)', () => {
+  it('всеки data-storno* белег в екраните има вид — непознат белег изпада ТИХО', () => {
+    const belezi = new Set<string>();
+    for (const ime of readdirSync('app')) {
+      if (!ime.endsWith('.ts')) continue;
+      const kod = readFileSync(`app/${ime}`, 'utf-8');
+      for (const m of kod.matchAll(/data-storno[a-z-]*/g)) belezi.add(m[0]);
+    }
+    expect(belezi.size).toBeGreaterThanOrEqual(5);
+    for (const beleg of belezi) {
+      // „сторно на избраните" е бутонът на действието, не белег на ред
+      if (beleg === 'data-storno-izbrani') continue;
+      expect(vidOtAtribut(beleg), `${beleg} няма вид в storno.ts`).not.toBeNull();
+    }
   });
 });
 

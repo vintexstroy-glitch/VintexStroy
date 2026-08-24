@@ -1778,6 +1778,15 @@ async function main() {
       await p.$eval('#imot-adres', (e) => e.value), 'Черновата живее');
     proveri('и НЕ пише в Журнала — границата е Вратата',
       await broySabitiya(p), predaSborove + 2);
+
+    // ЗАПИСАНОТО не се възкресява: изпращането ИЗЯЖДА черновата. Ctrl+Z
+    // след „Запиши" вади предишната чернова, не току-що записаните данни —
+    // иначе второ „Запиши" прави дубликат в Журнала.
+    await dobaviImot(p, 'Записаният имот', 'ап. 9');
+    await p.keyboard.press('Control+z');
+    const sledZapis = await p.$eval('#imot-adres', (e) => e.value);
+    proveri('Ctrl+Z след Запиши НЕ връща записаното',
+      sledZapis === 'Записаният имот', false);
     // подредбата се прибира на изходния ред — два клика довършват цикъла
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
@@ -1801,6 +1810,7 @@ async function main() {
     await p.keyboard.press('Escape');
 
     // НАВЪТРЕ: TSV от „Excel" → Ctrl+V → същият път като файл, до разликите
+    const predKlipborda = await broySabitiya(p);
     const dnesKlip = new Date().toISOString().slice(0, 10);
     await p.evaluate((dnes) => {
       const dt = new DataTransfer();
@@ -1816,7 +1826,7 @@ async function main() {
     proveri('редът от клипборда стои в разликите като нов',
       await p.evaluate(() => document.body.textContent.includes('Пробен клипборд ЕООД')), true);
     proveri('и нищо още не е записано — Вратата чака човека',
-      await broySabitiya(p), predaSborove + 2);
+      await broySabitiya(p), predKlipborda);
     await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
     proveri('отказът прибира предложението', await p.$('#otkazhi-plan'), null);
 

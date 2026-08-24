@@ -12,9 +12,8 @@
 import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
-import { VID } from '../src/domein/sabitiya.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { opitajStorno } from './storno.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
 import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
@@ -598,10 +597,12 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     });
   }
 
-  for (const [znak, vid, kakvo] of [
-    ['data-storno-imot', VID.imot, 'имотът'],
-    ['data-storno-naem', VID.naem, 'наемът'],
+  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
+  for (const [znak, kakvo] of [
+    ['data-storno-imot', 'имотът'],
+    ['data-storno-naem', 'наемът'],
   ] as const) {
+    const vid = vidOtAtribut(znak)!;
     for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
       b.addEventListener('click', async () => {
         b.disabled = true;

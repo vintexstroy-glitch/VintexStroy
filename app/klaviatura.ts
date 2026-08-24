@@ -123,14 +123,19 @@ function lentata(): HTMLElement {
 }
 
 function skriyLentata(): void {
-  if (lenta) lenta.hidden = true;
+  if (lenta) {
+    lenta.hidden = true;
+    // скритата лента се и ИЗПРАЗВА — иначе следващото показване (напр.
+    // „Копирано" при една клетка) би съживило сметка за отишла си селекция
+    lenta.innerHTML = '';
+  }
 }
 
 /** Лентата се показва при обхват от 2+ клетки — една клетка не е сметка. */
 function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora, zaStorno: readonly ZaStorno[]): void {
   const l = lentata();
   if (obshtoKletki < 2) {
-    l.hidden = true;
+    skriyLentata();
     return;
   }
   const chasti = [`Брой: ${s.broy}`];
@@ -174,12 +179,16 @@ function izbranitePoRedove(): HTMLElement[][] {
   for (let r = Math.min(izbrana.red, izbrana.krayRed); r <= doRed; r += 1) nomera.add(r);
   for (const r of izbrana.oshte) if (r <= posleden) nomera.add(r);
 
+  // Смесен избор (правоъгълник + Ctrl-редове) би дал редове с РАЗЛИЧЕН брой
+  // клетки — а в Excel това размества колоните: сумата на единия ред ляга в
+  // колона A, на другия в колона D. Щом има цели редове, всички тръгват цели.
+  const vsichkiTseli = izbrana.oshte.size > 0;
+
   const rezultat: HTMLElement[][] = [];
   for (const r of [...nomera].sort((a, b) => a - b)) {
     const kletki = kletkiNa(redove[r]!);
-    const tsyalRed = izbrana.oshte.has(r);
-    const ot = tsyalRed ? 0 : Math.min(otKolona, kletki.length - 1);
-    const doo = tsyalRed ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
+    const ot = vsichkiTseli ? 0 : Math.min(otKolona, kletki.length - 1);
+    const doo = vsichkiTseli ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
     rezultat.push(kletki.slice(ot, doo + 1).filter((kl) => !kl.querySelector('button')));
   }
   return rezultat.filter((red) => red.length > 0);
@@ -234,9 +243,12 @@ async function kopirayIzbora(): Promise<void> {
         }),
       ]);
     }
-    // потвърждението свети в лентата до следващото движение на селекцията
+    // потвърждението свети в лентата до следващото движение на селекцията;
+    // предишното „Копирано" пада — две потвърждения едно до друго са шум
     const l = lentata();
+    l.querySelector('.kopirano')?.remove();
     const s = document.createElement('span');
+    s.className = 'kopirano';
     s.textContent = `Копирано · ${redove.length} ${redove.length === 1 ? 'ред' : 'реда'}`;
     l.append(s);
     l.hidden = false;
@@ -387,8 +399,12 @@ export function zakachiKlaviatura(
     // Ctrl+стрелка скача до ръба — движението на Excel през блока данни.
     const doRaba = e.ctrlKey || e.metaKey;
 
-    // Ctrl+C · избраното тръгва към клипборда — и към Excel.
+    // Ctrl+C · избраното тръгва към клипборда — и към Excel. Но маркиран
+    // ТЕКСТ другаде на екрана има предимство: неговото копиране е на
+    // браузъра, както и Excel отстъпва пред жива текстова селекция.
     if (doRaba && e.code === 'KeyC') {
+      const tekstova = document.getSelection();
+      if (tekstova && !tekstova.isCollapsed) return;
       void kopirayIzbora();
       e.preventDefault();
       return;

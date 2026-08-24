@@ -19,11 +19,10 @@ import {
   nachisliZaPeriod,
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
-import { VID } from '../src/domein/sabitiya.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { butonIstoriya } from './istoriya.js';
-import { opitajStorno } from './storno.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
 import type { Konteks } from './main.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
@@ -372,10 +371,12 @@ export function zakachiPari(
   });
 
   // ── сторно · и на плащане, и на начисление, винаги през вратаря ─────────
-  for (const [znak, vid, kakvo] of [
-    ['data-storno', VID.plashtane, 'плащането'],
-    ['data-storno-vzemane', VID.vzemane, 'начислението'],
+  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
+  for (const [znak, kakvo] of [
+    ['data-storno', 'плащането'],
+    ['data-storno-vzemane', 'начислението'],
   ] as const) {
+    const vid = vidOtAtribut(znak)!;
     for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
       b.addEventListener('click', async () => {
         b.disabled = true;
