@@ -15,7 +15,8 @@ import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno } from './storno.js';
-import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { butonIstoriya } from './istoriya.js';
 import type { Konteks } from './main.js';
 
 export interface SastoyanieNaEkrana {
@@ -269,6 +270,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           naemi.length - zhivi.length ? ` · ${naemi.length - zhivi.length} прекратени` : ''
         }</span>
       </div>
+      ${poleZaTarsene('naemi')}
       <div class="tablitsa">
         <div class="glava naem">
           ${koloniNaNaemite(ogledalo)
@@ -352,6 +354,7 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-popravi-imot="${ekraniraj(imot.id)}">Поправи</button>
         <button type="button" class="vtorichen malak" data-storno-imot="${imot.seq}">Сторно</button>
+        ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;
 }
@@ -376,6 +379,7 @@ function redNaem(naem: Naem, o: Ogledalo): string {
         ${naem.prekraten ? '' : `<button type="button" class="vtorichen malak" data-prekrati="${ekraniraj(naem.id)}">Прекрати</button>`}
         <button type="button" class="vtorichen malak" data-popravi-naem="${ekraniraj(naem.id)}">Поправи</button>
         <button type="button" class="vtorichen malak" data-storno-naem="${naem.seq}">Сторно</button>
+        ${butonIstoriya('naem', naem.id)}
       </span>
     </div>`;
 }

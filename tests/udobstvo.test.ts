@@ -1,0 +1,168 @@
+/**
+ * УДОБСТВОТО · сортиране, търсене и паметта на екрана (ADR-022).
+ *
+ * Три неща, които изглеждат дребни и се чупят тихо:
+ *
+ *   1. Сравнителят по вид: „10" след „9" в числова колона, „я" след „б" в
+ *      текстова. Сгрешеният ред не гърми — изглежда развален и човек спира
+ *      да вярва на таблицата.
+ *   2. Търсенето реже по всички колони, без регистър, и цикълът на подредбата
+ *      се прибира на изходния ред — не на „някакъв".
+ *   3. Паметта на екрана НИКОГА не гърми: счупен JSON, липсващо хранилище,
+ *      препълнено хранилище — всичко пада мълчаливо към подразбраното.
+ */
+
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  filtriray,
+  smeniPodredba,
+  sravnitel,
+  tarsi,
+  type KolonaSFiltar,
+} from '../app/filtri.js';
+import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran.js';
+
+// ── сравнителят по вид ─────────────────────────────────────────────────────
+describe('сравнителят по вид (ADR-014)', () => {
+  it('числата се подреждат като числа · 9 преди 10, 20 преди 100', () => {
+    const s = sravnitel('chislo');
+    expect([10, 9, 100, 20].sort(s)).toEqual([9, 10, 20, 100]);
+  });
+
+  it('евро — по стотинки, с отрицателните най-отпред', () => {
+    const s = sravnitel('evro');
+    expect([500_00, -120_00, 0, 1200_50].sort(s)).toEqual([-120_00, 0, 500_00, 1200_50]);
+  });
+
+  it('нечислото в числова колона пада НАКРАЯ, не разбърква средата', () => {
+    const s = sravnitel('chislo');
+    expect(['10', 'абв', '9'].sort(s)).toEqual(['9', '10', 'абв']);
+  });
+
+  it('текстът върви по българската азбука · „я" след „б"', () => {
+    const s = sravnitel('tekst');
+    expect(['Ябълка', 'Банка', 'ябълка', 'банка'].map(String).sort(s).map((x) => x.toLowerCase()))
+      .toEqual(['банка', 'банка', 'ябълка', 'ябълка']);
+  });
+
+  it('датите са хронология · ISO текстът я носи сам', () => {
+    const s = sravnitel('data');
+    expect(['2026-03-01', '2025-12-31', '2026-01-15'].sort(s)).toEqual([
+      '2025-12-31',
+      '2026-01-15',
+      '2026-03-01',
+    ]);
+  });
+});
+
+// ── търсенето и подредбата през filtriray ──────────────────────────────────
+interface Red {
+  koy: string;
+  suma_st: number;
+}
+
+const KOLONI: KolonaSFiltar<Red>[] = [
+  { klyuch: 'koy', ime: 'Кой', vid: 'tekst', vzemi: (r) => r.koy },
+  { klyuch: 'suma', ime: 'Сума', vid: 'evro', vzemi: (r) => r.suma_st },
+];
+
+const REDOVE: Red[] = [
+  { koy: 'СТРОЙПЛАСТ ЕООД', suma_st: 1200_00 },
+  { koy: 'Домакинство', suma_st: 500_00 },
+  { koy: 'Ток ЕАД', suma_st: 120_00 },
+];
+
+describe('търсенето в цялата таблица', () => {
+  afterEach(() => tarsi('proba-t', ''));
+
+  it('реже по всички колони, без регистър · „строй" намира „СТРОЙПЛАСТ"', () => {
+    tarsi('proba-t', 'строй');
+    const f = filtriray('proba-t', REDOVE, KOLONI, '2026-08-24');
+    expect(f.redove.map((r) => r.koy)).toEqual(['СТРОЙПЛАСТ ЕООД']);
+    expect(f.skriti).toBe(2); // скритото СЕ КАЗВА, не се премълчава
+  });
+
+  it('празното търсене връща всичко', () => {
+    tarsi('proba-t', '  ');
+    expect(filtriray('proba-t', REDOVE, KOLONI, '2026-08-24').skriti).toBe(0);
+  });
+});
+
+describe('цикълът на подредбата', () => {
+  it('нагоре → надолу → ИЗХОДНИЯТ ред, не някакъв', () => {
+    const izhoden = REDOVE.map((r) => r.koy);
+
+    smeniPodredba('proba-p', 'suma');
+    let f = filtriray('proba-p', REDOVE, KOLONI, '2026-08-24');
+    expect(f.redove.map((r) => r.suma_st)).toEqual([120_00, 500_00, 1200_00]);
+
+    smeniPodredba('proba-p', 'suma');
+    f = filtriray('proba-p', REDOVE, KOLONI, '2026-08-24');
+    expect(f.redove.map((r) => r.suma_st)).toEqual([1200_00, 500_00, 120_00]);
+
+    smeniPodredba('proba-p', 'suma');
+    f = filtriray('proba-p', REDOVE, KOLONI, '2026-08-24');
+    expect(f.redove.map((r) => r.koy)).toEqual(izhoden);
+  });
+
+  it('смяната на колоната почва отначало, нагоре', () => {
+    smeniPodredba('proba-p2', 'suma');
+    smeniPodredba('proba-p2', 'koy'); // друга колона → пак „нагоре"
+    const f = filtriray('proba-p2', REDOVE, KOLONI, '2026-08-24');
+    expect(f.redove[0]!.koy).toBe('Домакинство');
+    smeniPodredba('proba-p2', 'koy');
+    smeniPodredba('proba-p2', 'koy'); // прибиране
+  });
+});
+
+// ── паметта на екрана · никога не гърми ────────────────────────────────────
+describe('паметта на екрана', () => {
+  const zapisi = new Map<string, string>();
+
+  beforeEach(() => {
+    zapisi.clear();
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => zapisi.get(k) ?? null,
+      setItem: (k: string, v: string) => void zapisi.set(k, v),
+      removeItem: (k: string) => void zapisi.delete(k),
+    };
+  });
+  afterEach(() => {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it('запомня и чете, с версиониран ключ', () => {
+    zapomniEkranno('proba', { takt: 'mesets', broy: 3 });
+    expect(zapisi.has('ui.v1.proba')).toBe(true);
+    expect(chetiEkranno('proba', null)).toEqual({ takt: 'mesets', broy: 3 });
+  });
+
+  it('СЧУПЕН запис пада към подразбраното, не гърми', () => {
+    zapisi.set('ui.v1.schupen', '{това не е JSON');
+    expect(chetiEkranno('schupen', 'inache')).toBe('inache');
+  });
+
+  it('липсата е подразбраното, забравянето трие', () => {
+    expect(chetiEkranno('nyama-go', 42)).toBe(42);
+    zapomniEkranno('shte-padne', 1);
+    zabraviEkranno('shte-padne');
+    expect(chetiEkranno('shte-padne', 'prazno')).toBe('prazno');
+  });
+
+  it('хранилище, което ХВЪРЛЯ, не спира екрана', () => {
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: () => {
+        throw new Error('заключено');
+      },
+      setItem: () => {
+        throw new Error('пълно');
+      },
+      removeItem: () => {
+        throw new Error('заключено');
+      },
+    };
+    expect(() => zapomniEkranno('x', 1)).not.toThrow();
+    expect(chetiEkranno('x', 'zhivo')).toBe('zhivo');
+    expect(() => zabraviEkranno('x')).not.toThrow();
+  });
+});

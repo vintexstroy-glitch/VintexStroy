@@ -42,7 +42,9 @@ import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
 import { opitajStorno } from './storno.js';
-import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { butonIstoriya } from './istoriya.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
@@ -61,8 +63,8 @@ let opIdSaldo = crypto.randomUUID();
 let opIdSpravka = crypto.randomUUID();
 let greshkaSaldo = '';
 
-/** Кой месец се гледа. Живее, докато екранът стои отворен. */
-let period: string | null = null;
+/** Кой месец се гледа · помни се (ADR-022): счетоводителят живее в един месец. */
+let period: string | null = chetiEkranno<string | null>('smetki.period', null);
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -207,6 +209,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ? ''
         : `<section>
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
+      ${poleZaTarsene('razhodi')}
       <div class="tablitsa">
         <div class="glava razhod">
           ${KOLONI_RAZHODI.map((kol) =>
@@ -435,6 +438,7 @@ function redNaRazhod(r: Razhod): string {
       <span class="suma">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno-razhod="${r.seq}">Сторно</button>
+        ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;
 }
@@ -745,6 +749,7 @@ export function zakachiSmetki(
   formaPeriod?.addEventListener('submit', async (e) => {
     e.preventDefault();
     period = String(new FormData(formaPeriod).get('period'));
+    zapomniEkranno('smetki.period', period);
     await prerisuvay();
   });
 

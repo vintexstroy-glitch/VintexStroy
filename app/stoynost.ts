@@ -23,6 +23,7 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -56,8 +57,8 @@ let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
-/** Коя цена се пуска при износ. Негов отговор: „и двете". */
-let koyaTsena: KoyaTsena = 'dvete';
+/** Коя цена се пуска при износ. Негов отговор: „и двете" · изборът се помни. */
+let koyaTsena: KoyaTsena = chetiEkranno<KoyaTsena>('stoynost.koyaTsena', 'dvete');
 let vest = '';
 let greshka = '';
 
@@ -306,6 +307,7 @@ export function zakachiStoynost(
 
   koren.querySelector<HTMLSelectElement>('#koya-tsena')?.addEventListener('change', async (e) => {
     koyaTsena = (e.target as HTMLSelectElement).value as KoyaTsena;
+    zapomniEkranno('stoynost.koyaTsena', koyaTsena);
     await prerisuvay();
   });
 

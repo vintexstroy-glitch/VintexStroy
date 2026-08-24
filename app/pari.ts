@@ -22,6 +22,7 @@ import {
 import { VID } from '../src/domein/sabitiya.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { ekraniraj } from './imoti.js';
+import { butonIstoriya } from './istoriya.js';
 import { opitajStorno } from './storno.js';
 import type { Konteks } from './main.js';
 
@@ -211,6 +212,7 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>
         <button type="button" class="vtorichen malak" data-storno-vzemane="${v.seq}">Сторно</button>
+        ${butonIstoriya('vzemane', v.id)}
       </span>
     </div>`;
 }
@@ -226,6 +228,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="suma plateno">${pishi(p.suma_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
+        ${butonIstoriya('plashtane', p.id)}
       </span>
     </div>`;
 }

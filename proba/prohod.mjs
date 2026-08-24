@@ -449,7 +449,10 @@ async function main() {
     // ══ 8 · презареждане — Журналът живее в браузъра ═════════════════════
     razdel = '8 · презареждане';
     await p.reload();
-    await p.waitForSelector('#forma-imot');
+    // Паметта на екрана (ADR-022) връща ПОСЛЕДНИЯ гледан екран, не Имоти —
+    // проходът се прибира там изрично, както би направил и човек.
+    await p.waitForSelector('.nav');
+    await naEkran(p, 'imoti', '#forma-imot');
     proveri('събитията оцеляха', await broySabitiya(p), 12);
     proveri('месечният наем оцеля', await plochka(p, 'Месечен наем'), '2 000,00 €');
     await naEkran(p, 'smetki', '#forma-period');
@@ -1586,6 +1589,65 @@ async function main() {
     // БЕЗ ИМЕЙЛ НЯМА БУТОН · „Домакинство" е записан преди двете полета.
     proveri('наем без поща не показва празен бутон',
       await p.$$eval('.red.vzemane:has-text("Домакинство") [data-pismo]', (e) => e.length), 0);
+
+    // ══ 27 · удобството · сортиране, търсене, памет, история, меню ═══════
+    razdel = '27 · удобството';
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    // СОРТИРАНЕТО · клик по „Наем €" → нагоре · още един → надолу · трети → изходно.
+    const sumiNaEkrana = () =>
+      p.$$eval('.red.naem .suma:first-of-type', (r) =>
+        r.map((x) => Number(x.textContent.replace(/[^\d,-]/g, '').replace(',', '.'))));
+    const izhodni = await sumiNaEkrana();
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+    const nagore = await sumiNaEkrana();
+    proveri('сортирането подрежда наемите нагоре',
+      JSON.stringify(nagore), JSON.stringify([...izhodni].sort((a, b) => a - b)));
+    proveri('главата показва посоката', (await tekstNa(p, '[data-podredi="naemi:naem"]')).includes('↑'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+    proveri('второто щракване обръща надолу',
+      JSON.stringify(await sumiNaEkrana()), JSON.stringify([...izhodni].sort((a, b) => b - a)));
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+    proveri('третото връща ИЗХОДНИЯ ред', JSON.stringify(await sumiNaEkrana()), JSON.stringify(izhodni));
+
+    // ТЪРСЕНЕТО в цялата таблица · реже и КАЗВА колко крие.
+    await p.fill('[data-tarsi-tablitsa="naemi"]', 'контактен');
+    await p.waitForFunction(() => document.querySelectorAll('.red.naem').length === 1);
+    proveri('търсенето остави един ред', await p.$$eval('.red.naem', (r) => r.length), 1);
+    proveri('и казва колко крие', (await tekstNa(p, '.filtar-skrito')).includes('крие'), true);
+    proveri('фокусът оцелява прерисуването',
+      await p.evaluate(() => document.activeElement?.matches('[data-tarsi-tablitsa]') ?? false), true);
+
+    // ПАМЕТТА · презареждане пази търсенето; „покажи всичко" го маха.
+    await p.reload();
+    await p.waitForSelector('#forma-imot');
+    proveri('след презареждане търсенето стои',
+      await p.$$eval('.red.naem', (r) => r.length), 1);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="naemi"]'));
+    proveri('„покажи всичко" маха и търсенето',
+      (await p.$$eval('.red.naem', (r) => r.length)) > 1, true);
+
+    // ЗАМРАЗЕНИЯТ ХЕДЪР · свойство на стила, проверено като стил.
+    proveri('главата е замразена (sticky)',
+      await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'sticky');
+
+    // ИСТОРИЯТА НА РЕДА · кой · какво · кога, от Журнала.
+    await p.click('.red.naem:has-text("Домакинство") [data-istoriya]');
+    await p.waitForSelector('.istoriya-karta');
+    const istoriyata = await tekstNa(p, '.istoriya-karta');
+    proveri('историята казва типа събитие', istoriyata.includes('НаемДобавен'), true);
+    proveri('и кой го е писал', istoriyata.includes('vintexstroy@gmail.com'), true);
+    await p.click('.istoriya-zatvori');
+    proveri('панелът се затваря', await p.$('.istoriya-karta'), null);
+
+    // КОНТЕКСТНОТО МЕНЮ · десният бутон върху ред.
+    await p.click('.red.naem:has-text("Домакинство") .kletka', { button: 'right' });
+    await p.waitForSelector('.kontekstno-menyu');
+    const menyuto = await tekstNa(p, '.kontekstno-menyu');
+    proveri('менюто носи „Копирай реда"', menyuto.includes('Копирай реда'), true);
+    proveri('и действията на реда', menyuto.includes('Сторно'), true);
+    await p.keyboard.press('Escape');
+    proveri('Escape го затваря', await p.$('.kontekstno-menyu'), null);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

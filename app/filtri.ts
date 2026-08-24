@@ -14,6 +14,7 @@
 
 import { ekraniraj } from './imoti.js';
 import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
 /**
  * Видът на колоната идва от ДОМЕЙНА, не се обявява втори път тук.
@@ -33,9 +34,68 @@ export interface KolonaSFiltar<T> {
   readonly vzemi: (red: T) => string | number;
 }
 
-/** Изборът живее, докато екранът се прерисува — по таблица и колона. */
+/**
+ * Изборът, подредбата и търсенето ЖИВЕЯТ И СЛЕД ПРЕЗАРЕЖДАНЕ.
+ *
+ * Прозорецът се отваря както е оставен (ADR-022): филтърът от сутринта стои
+ * и следобед. Това е ЕКРАННО огледало — какво се гледа, не какво е вярно —
+ * затова домът му е паметта на екрана, не Журналът.
+ */
 const izbrano = new Map<string, Set<string>>();
+
+/** Подредбата на една таблица · една колона, една посока. */
+interface Podredba {
+  readonly kolona: string;
+  readonly nadolu: boolean;
+}
+const podredbi = new Map<string, Podredba>();
+
+/** Търсеното в цялата таблица · по таблица. */
+const tarseno = new Map<string, string>();
+
+/** Отвореното меню е моментно — то нарочно НЕ се помни. */
 let otvoreno: string | null = null;
+
+/** Коя търсачка да си върне фокуса след прерисуване — иначе всяка буква го губи. */
+let fokusVTarsachka: string | null = null;
+
+// Събуждането: каквото е било запомнено, се чете веднъж при зареждане.
+for (const [k, v] of Object.entries(chetiEkranno<Record<string, string[]>>('filtri.izbrano', {}))) {
+  izbrano.set(k, new Set(v));
+}
+for (const [k, v] of Object.entries(chetiEkranno<Record<string, Podredba>>('filtri.podredbi', {}))) {
+  podredbi.set(k, v);
+}
+for (const [k, v] of Object.entries(chetiEkranno<Record<string, string>>('filtri.tarseno', {}))) {
+  tarseno.set(k, v);
+}
+
+/**
+ * ЦИКЪЛЪТ НА ПОДРЕДБАТА · име → нагоре → надолу → изходен ред.
+ *
+ * Третото щракване ВРЪЩА изходния ред, не оставя някакъв: човекът трябва да
+ * може да се прибере там, откъдето е тръгнал — както в Explorer.
+ */
+export function smeniPodredba(tablitsa: string, kolona: string): void {
+  const sega = podredbi.get(tablitsa);
+  if (sega?.kolona !== kolona) podredbi.set(tablitsa, { kolona, nadolu: false });
+  else if (!sega.nadolu) podredbi.set(tablitsa, { kolona, nadolu: true });
+  else podredbi.delete(tablitsa);
+  zapomniFiltrite();
+}
+
+/** Търсенето на една таблица · празното го маха. */
+export function tarsi(tablitsa: string, tekst: string): void {
+  if (tekst.trim() === '') tarseno.delete(tablitsa);
+  else tarseno.set(tablitsa, tekst);
+  zapomniFiltrite();
+}
+
+function zapomniFiltrite(): void {
+  zapomniEkranno('filtri.izbrano', Object.fromEntries([...izbrano].map(([k, v]) => [k, [...v]])));
+  zapomniEkranno('filtri.podredbi', Object.fromEntries(podredbi));
+  zapomniEkranno('filtri.tarseno', Object.fromEntries(tarseno));
+}
 
 function klyuchNa(tablitsa: string, kolona: string): string {
   return `${tablitsa}:${kolona}`;
@@ -134,11 +194,44 @@ function chislo(tekst: string): number | null {
   return Number(chist.replace('%', ''));
 }
 
+// ── подредбата ────────────────────────────────────────────────────────────
+const AZBUKA = new Intl.Collator('bg');
+
+/**
+ * СРАВНИТЕЛЯТ ПО ВИД · колоната казва как се подрежда (ADR-014).
+ *
+ * Евро, число и процент се сравняват като ЧИСЛА — иначе „10" идва преди „9".
+ * Датата е ISO текст и се сравнява като текст (това Е хронологията ѝ).
+ * Текстът минава през българската азбука: „я" след „б", не по кодови точки.
+ * Нечисло в числова колона пада НАКРАЯ, не разбърква средата.
+ */
+export function sravnitel(vid: VidStoynost): (a: string | number, b: string | number) => number {
+  if (vid === 'evro' || eChislo(vid)) {
+    return (a, b) => {
+      const ca = Number(a);
+      const cb = Number(b);
+      const na = Number.isNaN(ca);
+      const nb = Number.isNaN(cb);
+      if (na && nb) return AZBUKA.compare(String(a), String(b));
+      if (na) return 1;
+      if (nb) return -1;
+      return ca - cb;
+    };
+  }
+  if (vid === 'data') return (a, b) => String(a).localeCompare(String(b));
+  return (a, b) => AZBUKA.compare(String(a), String(b));
+}
+
 // ── прилагането ───────────────────────────────────────────────────────────
 export interface Filtrirano<T> {
   readonly redove: T[];
-  /** колко скри филтърът — казва се, не се премълчава */
+  /** колко скриха филтърът и търсенето — казва се, не се премълчава */
   readonly skriti: number;
+}
+
+/** Търсеното и стойността, сведени еднакво — за да се намира „Строй" в „СТРОЙПЛАСТ". */
+function svedeno(tekst: string): string {
+  return tekst.normalize('NFC').toLowerCase();
 }
 
 export function filtriray<T>(
@@ -148,11 +241,32 @@ export function filtriray<T>(
   dnes: string,
 ): Filtrirano<T> {
   const aktivni = koloni.filter((k) => (izbrano.get(klyuchNa(tablitsa, k.klyuch))?.size ?? 0) > 0);
-  if (aktivni.length === 0) return { redove: [...redove], skriti: 0 };
 
-  const ostanali = redove.filter((red) =>
-    aktivni.every((k) => izbrano.get(klyuchNa(tablitsa, k.klyuch))!.has(grupaNa(k, red, dnes))),
-  );
+  let ostanali =
+    aktivni.length === 0
+      ? [...redove]
+      : redove.filter((red) =>
+          aktivni.every((k) => izbrano.get(klyuchNa(tablitsa, k.klyuch))!.has(grupaNa(k, red, dnes))),
+        );
+
+  // ТЪРСЕНЕТО реже след филтрите · по всички описани колони, без регистър.
+  const iskano = svedeno(tarseno.get(tablitsa) ?? '').trim();
+  if (iskano !== '') {
+    ostanali = ostanali.filter((red) =>
+      koloni.some((k) => svedeno(String(k.vzemi(red))).includes(iskano)),
+    );
+  }
+
+  // ПОДРЕДБАТА е последна — тя не крие, само нарежда. Изходният ред се пази:
+  // третото щракване връща точно него, не някакво „приблизително старо".
+  const p = podredbi.get(tablitsa);
+  const kolona = p && koloni.find((k) => k.klyuch === p.kolona);
+  if (p && kolona) {
+    const sravni = sravnitel(kolona.vid);
+    ostanali = [...ostanali].sort((a, b) => sravni(kolona.vzemi(a), kolona.vzemi(b)));
+    if (p.nadolu) ostanali.reverse();
+  }
+
   return { redove: ostanali, skriti: redove.length - ostanali.length };
 }
 
@@ -167,8 +281,16 @@ export function glavaSFiltar<T>(
 ): string {
   const pald = klyuchNa(tablitsa, k.klyuch);
   const broy = izbrano.get(pald)?.size ?? 0;
+  const podredba = podredbi.get(tablitsa);
+  const aktivnaPodredba = podredba?.kolona === k.klyuch;
+  // Името на колоната Е бутонът за подредба — както в Explorer и Excel:
+  // клик подрежда нагоре, втори клик надолу, трети връща изходния ред.
   return `<span class="glavicha${suma ? ' suma' : ''}">
-    ${ekraniraj(k.ime)}
+    <button type="button" class="ime-kolona${aktivnaPodredba ? ' podredena' : ''}"
+      data-podredi="${ekraniraj(pald)}"
+      aria-label="Подреди по ${ekraniraj(k.ime)}">${ekraniraj(k.ime)}${
+        aktivnaPodredba ? (podredba!.nadolu ? ' ↓' : ' ↑') : ''
+      }</button>
     <button type="button" class="strelka${broy ? ' aktivna' : ''}" data-filtar-glava="${ekraniraj(pald)}"
       aria-label="Филтър по ${ekraniraj(k.ime)}">${broy ? '▼' : '▾'}</button>
     ${otvoreno === pald ? menyu(tablitsa, k, redove, dnes) : ''}
@@ -190,7 +312,11 @@ function menyu<T>(
     grupi.set(g, (grupi.get(g) ?? 0) + 1);
   }
 
+  // Търсачката стеснява СПИСЪКА С ОТМЕТКИ на живо, без прерисуване — точно
+  // както във филтъра на Explorer. Показва се, щом групите станат много.
+  const sTarsachka = grupi.size > 8;
   return `<span class="filtar-menyu" data-menyu>
+    ${sTarsachka ? '<input translate="no" type="text" class="filtar-tarsi" data-filtar-tarsi placeholder="търси…" autocomplete="off">' : ''}
     ${podrediGrupi(k.vid, grupi)
       .map(
         ([grupa, broy]) => `<label class="otmetka">
@@ -208,6 +334,21 @@ function menyu<T>(
   </span>`;
 }
 
+/**
+ * ТЪРСЕНЕ В ЦЯЛАТА ТАБЛИЦА · реже по всички описани колони, без регистър.
+ *
+ * „Намери фактурата на Стройпласт от март" дотук минаваше през износ в Excel.
+ * Скритото от търсенето се брои в същия ред „Филтърът крие N реда" — търсенето
+ * Е филтър и спазва същото правило: пипа екрана, нищо друго (правило 23).
+ */
+export function poleZaTarsene(tablitsa: string): string {
+  const stoynost = tarseno.get(tablitsa) ?? '';
+  return `<label class="tarsene-v-tablitsa">
+    <input translate="no" type="search" data-tarsi-tablitsa="${ekraniraj(tablitsa)}" value="${ekraniraj(stoynost)}"
+      placeholder="Търси в таблицата…" autocomplete="off" aria-label="Търси в таблицата">
+  </label>`;
+}
+
 /** Ред с думи под таблицата, когато филтърът крие нещо. */
 export function redZaSkritoto(f: Filtrirano<unknown>, tablitsa: string): string {
   if (f.skriti === 0) return '';
@@ -218,6 +359,42 @@ export function redZaSkritoto(f: Filtrirano<unknown>, tablitsa: string): string 
 
 /** Закача се веднъж на екран — обслужва всички таблици в него. */
 export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void>): void {
+  // ── подредбата: име → нагоре → надолу → изходен ред ──
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-podredi]')) {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const pald = b.dataset['podredi']!;
+      const dvoetochie = pald.indexOf(':');
+      smeniPodredba(pald.slice(0, dvoetochie), pald.slice(dvoetochie + 1));
+      await prerisuvay();
+    });
+  }
+
+  // ── търсенето в цялата таблица · фокусът се пази през прерисуването ──
+  for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-tarsi-tablitsa]')) {
+    pole.addEventListener('input', async () => {
+      const tablitsa = pole.dataset['tarsiTablitsa']!;
+      tarsi(tablitsa, pole.value);
+      fokusVTarsachka = tablitsa;
+      await prerisuvay();
+    });
+  }
+
+  // ── търсачката ВЪТРЕ в менюто · чисто DOM, без прерисуване ──
+  for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-filtar-tarsi]')) {
+    pole.addEventListener('click', (e) => e.stopPropagation());
+    pole.addEventListener('input', () => {
+      const iskano = pole.value.normalize('NFC').toLowerCase().trim();
+      const menyuto = pole.closest('[data-menyu]')!;
+      for (const otmetka of menyuto.querySelectorAll<HTMLElement>('.otmetka')) {
+        const tekst = otmetka.textContent!.normalize('NFC').toLowerCase();
+        otmetka.hidden = iskano !== '' && !tekst.includes(iskano);
+      }
+    });
+    // Менюто току-що се е отворило — търсачката е първото, което човек иска.
+    pole.focus();
+  }
+
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar-glava]')) {
     b.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -234,6 +411,7 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
       if (kutiyka.checked) izbor.add(kutiyka.value);
       else izbor.delete(kutiyka.value);
       izbrano.set(pald, izbor);
+      zapomniFiltrite();
       await prerisuvay();
     });
   }
@@ -241,6 +419,7 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar-izchisti]')) {
     b.addEventListener('click', async () => {
       izbrano.delete(b.dataset['filtarIzchisti']!);
+      zapomniFiltrite();
       await prerisuvay();
     });
   }
@@ -251,7 +430,11 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
       for (const pald of [...izbrano.keys()]) {
         if (pald.startsWith(`${tablitsa}:`)) izbrano.delete(pald);
       }
+      // „Покажи всичко" маха и търсенето — то също крие редове. Подредбата
+      // остава: тя нарежда, не крие.
+      tarseno.delete(tablitsa);
       otvoreno = null;
+      zapomniFiltrite();
       await prerisuvay();
     });
   }
@@ -264,4 +447,17 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
     otvoreno = null;
     await prerisuvay();
   });
+
+  // Прерисуването строи нов DOM и убива фокуса — а човекът е насред дума.
+  // Тук търсачката си го връща, с курсора В КРАЯ, не в началото.
+  if (fokusVTarsachka !== null) {
+    const pole = koren.querySelector<HTMLInputElement>(
+      `[data-tarsi-tablitsa="${fokusVTarsachka}"]`,
+    );
+    fokusVTarsachka = null;
+    if (pole) {
+      pole.focus();
+      pole.setSelectionRange(pole.value.length, pole.value.length);
+    }
+  }
 }

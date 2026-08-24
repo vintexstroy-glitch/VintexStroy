@@ -48,21 +48,35 @@ import {
 import { sumiZaDen } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import type { Konteks } from './main.js';
 
-/** Кой такт се гледа. Живее, докато екранът стои отворен. */
-let takt: Takt = 'mesets';
+/**
+ * Погледът на Ганта СЕ ПОМНИ (ADR-022): тактът, трите филтъра, сгънатите дела
+ * и изборът таблица/диаграма се отварят както са оставени. Екранно огледало —
+ * какво се гледа, не какво е вярно; делата са си в Журнала.
+ */
+let takt: Takt = chetiEkranno<Takt>('gant.takt', 'mesets');
 /** Кои дела са сгънати · само дела и поддела се сгъват (И88). */
-const sgunati = new Set<string>();
+const sgunati = new Set<string>(chetiEkranno<string[]>('gant.sgunati', []));
 /** Показва ли се диаграмата вместо таблицата с оцветени полета. */
-let diagrama = false;
+let diagrama = chetiEkranno('gant.diagrama', false);
 let opIdDelo = crypto.randomUUID();
 let greshkaDelo = '';
 /** Трите филтъра на трите колони (И82) — плоско, не дърво. */
-let filtarMyasto = '';
-let filtarObekt = '';
-let filtarOtsenka = '';
+let filtarMyasto = chetiEkranno('gant.myasto', '');
+let filtarObekt = chetiEkranno('gant.obekt', '');
+let filtarOtsenka = chetiEkranno('gant.otsenka', '');
+
+function zapomniPogleda(): void {
+  zapomniEkranno('gant.takt', takt);
+  zapomniEkranno('gant.sgunati', [...sgunati]);
+  zapomniEkranno('gant.diagrama', diagrama);
+  zapomniEkranno('gant.myasto', filtarMyasto);
+  zapomniEkranno('gant.obekt', filtarObekt);
+  zapomniEkranno('gant.otsenka', filtarOtsenka);
+}
 
 export function narisuvayGant(o: Ogledalo, dnes: string): string {
   const vsichki = [...o.dela.values()];
@@ -388,6 +402,7 @@ export function zakachiGant(
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {
       takt = b.dataset.takt as Takt;
+      zapomniPogleda();
       await prerisuvay();
     });
   }
@@ -397,6 +412,7 @@ export function zakachiGant(
       const id = b.dataset.sgavi!;
       if (sgunati.has(id)) sgunati.delete(id);
       else sgunati.add(id);
+      zapomniPogleda();
       await prerisuvay();
     });
   }
@@ -413,6 +429,7 @@ export function zakachiGant(
     filtarObekt = '';
     filtarOtsenka = 'спешно-важно';
     sgunati.clear();
+    zapomniPogleda();
     await prerisuvay();
     koren.querySelector<HTMLElement>('#gant-vreme .dnes')?.scrollIntoView({
       inline: 'start',
@@ -422,6 +439,7 @@ export function zakachiGant(
 
   koren.querySelector<HTMLButtonElement>('#kam-diagrama')?.addEventListener('click', async () => {
     diagrama = !diagrama;
+    zapomniPogleda();
     await prerisuvay();
   });
 
@@ -431,9 +449,18 @@ export function zakachiGant(
       await prerisuvay();
     });
   };
-  vrazhi('#f-myasto', (v) => (filtarMyasto = v));
-  vrazhi('#f-obekt', (v) => (filtarObekt = v));
-  vrazhi('#f-otsenka', (v) => (filtarOtsenka = v));
+  vrazhi('#f-myasto', (v) => {
+    filtarMyasto = v;
+    zapomniPogleda();
+  });
+  vrazhi('#f-obekt', (v) => {
+    filtarObekt = v;
+    zapomniPogleda();
+  });
+  vrazhi('#f-otsenka', (v) => {
+    filtarOtsenka = v;
+    zapomniPogleda();
+  });
 
   const forma = koren.querySelector<HTMLFormElement>('#forma-delo');
   forma?.addEventListener('submit', async (e) => {

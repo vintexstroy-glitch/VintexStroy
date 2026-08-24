@@ -32,6 +32,9 @@ import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { zakachiFiltri } from './filtri.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { zakachiIstoriya } from './istoriya.js';
+import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
@@ -94,6 +97,8 @@ export interface Konteks {
   readonly dnevnik: DnevnikVIndexedDB;
   readonly vrata: Vrata;
   readonly pravata: Pravata;
+  /** под кой ключ е отвореният Журнал (ADR-020) — историята на реда чете по него */
+  readonly akaunt: string;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
 }
 
@@ -134,7 +139,9 @@ let hranilishte: SastoyanieNaHranilishteto = {
   zaeto: -1,
   pozvoleno: -1,
 };
-let ekran: KoyEkran = 'imoti';
+// Отваря се екранът, на който човек е спрял (ADR-022). Непознат запис (от
+// стара версия) пада към Имоти — паметта никога не чупи тръгването.
+let ekran: KoyEkran = chetiEkranno<KoyEkran>('ekran', 'imoti');
 
 /**
  * ДЖОБЪТ · служебният работник.
@@ -335,6 +342,7 @@ async function trugvay(): Promise<void> {
     dnevnik,
     vrata,
     pravata,
+    akaunt,
     vest: (vid, tekst) => {
       poslednaVest = { vid, tekst };
     },
@@ -426,6 +434,8 @@ async function trugvay(): Promise<void> {
     }
     if (mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
+    zakachiIstoriya(koren, k);
+    zakachiKontekstnoMenyu(koren, k);
     zakachiGlavnite(k, prerisuvay);
   }
 
@@ -517,6 +527,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-ekran]')) {
     b.addEventListener('click', async () => {
       ekran = b.dataset['ekran'] as KoyEkran;
+      zapomniEkranno('ekran', ekran);
       await prerisuvay();
     });
   }
