@@ -35,6 +35,7 @@ import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
+import { zakachiKlaviatura } from './klaviatura.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
@@ -436,6 +437,7 @@ async function trugvay(): Promise<void> {
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
     zakachiIstoriya(koren, k);
     zakachiKontekstnoMenyu(koren, k);
+    zakachiKlaviatura(koren);
     zakachiGlavnite(k, prerisuvay);
   }
 

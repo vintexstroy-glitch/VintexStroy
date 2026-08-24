@@ -1654,6 +1654,45 @@ async function main() {
     await p.keyboard.press('Escape');
     proveri('Escape го затваря', await p.$('.kontekstno-menyu'), null);
 
+    // ══ 28 · клавиатурната карта · движението на Excel ══════════════════
+    razdel = '28 · клавиатурата';
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    const izbranaKletka = () =>
+      p.evaluate(() => {
+        const k = document.querySelector('.kletka-izbrana');
+        if (!k) return null;
+        const red = k.parentElement;
+        const tablitsa = red.closest('.tablitsa');
+        const redove = [...tablitsa.querySelectorAll('.red')];
+        return { red: redove.indexOf(red), kolona: [...red.children].indexOf(k) };
+      });
+
+    // кликът избира; стрелката слиза; Tab отива надясно; Ctrl+стрелка до ръба
+    await p.click('.red.naem .kletka');
+    proveri('кликът избира клетка', (await izbranaKletka())?.red, 0);
+    await p.keyboard.press('ArrowDown');
+    proveri('стрелката слиза един ред', (await izbranaKletka())?.red, 1);
+    await p.keyboard.press('Tab');
+    proveri('Tab отива надясно', (await izbranaKletka())?.kolona, 1);
+    await p.keyboard.press('Shift+Tab');
+    proveri('Shift+Tab се връща', (await izbranaKletka())?.kolona, 0);
+    await p.keyboard.press('Control+ArrowDown');
+    const dolu = await izbranaKletka();
+    proveri('Ctrl+стрелка скача до последния ред',
+      dolu?.red, (await p.$$eval('.red.naem', (r) => r.length)) - 1);
+    await p.keyboard.press('Enter');
+    proveri('Enter на последния ред стои, не пада', (await izbranaKletka())?.red, dolu?.red);
+    await p.keyboard.press('Escape');
+    proveri('Escape маха селекцията', await izbranaKletka(), null);
+
+    // а във ФОРМА картата мълчи: стрелката в поле не мести клетки
+    await p.click('.red.naem .kletka');
+    await p.click('#imot-adres');
+    await p.keyboard.press('ArrowDown');
+    proveri('в поле картата мълчи',
+      await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-adres');
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
