@@ -2028,6 +2028,56 @@ async function main() {
       await p.$$eval('.red.naem [data-redakt]', (r) =>
         r.slice(0, 2).every((x) => x.textContent.includes('444,44'))), true);
 
+    // ══ 37 · скоростта под договор · бюджет 100 ms на действие ══════════
+    razdel = '37 · скоростта';
+    // Журналът натежава: шест месеца начисления — така мярката мери
+    // истинска работа, не празен екран.
+    await naEkran(p, 'pari', '#forma-nachisli');
+    for (const m of ['2026-09', '2026-10', '2026-11', '2026-12', '2027-01', '2027-02']) {
+      await p.fill('#period', m);
+      await deystvieSPrerisuvane(p, () => p.click('#forma-nachisli button[type=submit]'));
+    }
+
+    // Мери се ВЪТРЕ в страницата — от жеста до новия DOM, без шума на
+    // управляващия процес. Наблюдателят пуска, щом прерисуването свърши
+    // (белегът на шапката пада с новия DOM).
+    const izmeri = (vid, selektor) => p.evaluate(async (zhest) => {
+      document.querySelector('.shapka').dataset['beleg'] = 'staro';
+      const t0 = performance.now();
+      const el = document.querySelector(zhest.selektor);
+      if (zhest.vid === 'tarsi') {
+        el.value = 'с';
+        el.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        el.click();
+      }
+      await new Promise((gotovo) => {
+        const nablyudatel = new MutationObserver(() => {
+          const shapka = document.querySelector('.shapka');
+          if (shapka && !shapka.dataset['beleg']) {
+            nablyudatel.disconnect();
+            gotovo();
+          }
+        });
+        nablyudatel.observe(document.body, { childList: true, subtree: true });
+      });
+      return Math.round(performance.now() - t0);
+    }, { vid, selektor });
+
+    const vremeSort = await izmeri('klik', '[data-podredi="vsrok:ostatak"]');
+    const vremeTarsene = await izmeri('tarsi', '[data-tarsi-tablitsa="vsrok"]');
+    const vremeEkran = await izmeri('klik', '[data-ekran="imoti"]');
+    console.log(`\n  СКОРОСТТА: сортиране ${vremeSort} ms · търсене ${vremeTarsene} ms · смяна на екран ${vremeEkran} ms · бюджет 100 ms\n`);
+    proveri('сортирането е под договора (100 ms)', vremeSort < 100, true);
+    proveri('търсенето е под договора (100 ms)', vremeTarsene < 100, true);
+    proveri('смяната на екран е под договора (100 ms)', vremeEkran < 100, true);
+
+    // прибиране: търсенето пада, подредбата се връща на изходния ред
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await p.fill('[data-tarsi-tablitsa="vsrok"]', '');
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="vsrok:ostatak"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="vsrok:ostatak"]'));
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
