@@ -14,7 +14,6 @@ import { MERKA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
 import {
-  AKUMULATORI,
   akumulator,
   ddsOtObshta,
   sektoriNaRazhod,
@@ -40,9 +39,11 @@ import {
 import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
-import { ekraniraj } from './imoti.js';
-import { opitajStorno } from './storno.js';
-import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
+import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { butonIstoriya } from './istoriya.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
@@ -61,8 +62,8 @@ let opIdSaldo = crypto.randomUUID();
 let opIdSpravka = crypto.randomUUID();
 let greshkaSaldo = '';
 
-/** Кой месец се гледа. Живее, докато екранът стои отворен. */
-let period: string | null = null;
+/** Кой месец се гледа · помни се (ADR-022): счетоводителят живее в един месец. */
+let period: string | null = chetiEkranno<string | null>('smetki.period', null);
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -74,11 +75,20 @@ let smyatane: RedNaSmyatane[] = [];
 
 /** Колоните на списъка „Разходи" — фините филтри в стил Уиндоус. */
 const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
+  // Петата глава пише „ДДС" и колоната Е ДДС (правило 20 · ADR-014): дотук
+  // беше описана като ДАТА и филтърът под „ДДС" предлагаше „Днес · Вчера ·
+  // Тази седмица" — глава, която лъже какво стои под нея. Дата-филтърът пада
+  // с лъжата; датата се търси свободно през „Търси в таблицата".
   { klyuch: 'koy', ime: 'Доставчик и описание', vid: 'tekst', vzemi: (r) => r.dostavchik },
   { klyuch: 'potok', ime: 'Поток', vid: 'tekst', vzemi: (r) => potok(r.potok)?.ime ?? r.potok },
   { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (r) => akumulator(r.sektor).sektor },
   { klyuch: 'suma', ime: 'Обща сума', vid: 'evro', vzemi: (r) => r.suma_st },
-  { klyuch: 'data', ime: 'ДДС', vid: 'data', vzemi: (r) => r.data },
+  {
+    klyuch: 'dds',
+    ime: 'ДДС',
+    vid: 'evro',
+    vzemi: (r) => ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st,
+  },
 ];
 
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
@@ -163,7 +173,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
           <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span></span>
           <span></span>
           <span class="suma"></span>
-          <span class="suma duljimo">${pishi(s.zaVnasyane_st)}</span>
+          <span class="suma duljimo" data-st="${s.zaVnasyane_st}">${pishi(s.zaVnasyane_st)}</span>
         </div>
       </div>
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
@@ -187,9 +197,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
             (x) => `
           <div class="red sverka" translate="no">
             <span class="kletka"><b>${ekraniraj(x.kakvo)}</b></span>
-            <span class="suma">${merka(x.belezhka, x.vhod)}</span>
-            <span class="suma">${merka(x.belezhka, x.izhod)}</span>
-            <span class="suma${x.nared ? '' : ' duljimo'}">${merka(x.belezhka, x.razlika)}</span>
+            <span class="suma"${vStotinki(x.belezhka, x.vhod)}>${merka(x.belezhka, x.vhod)}</span>
+            <span class="suma"${vStotinki(x.belezhka, x.izhod)}>${merka(x.belezhka, x.izhod)}</span>
+            <span class="suma${x.nared ? '' : ' duljimo'}"${vStotinki(x.belezhka, x.razlika)}>${merka(x.belezhka, x.razlika)}</span>
             <span><span class="znachka ${x.nared ? 'dobre' : 'trevoga'}">${
               x.nared ? 'затваря' : 'НЕ затваря'
             }</span></span>
@@ -207,16 +217,15 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ? ''
         : `<section>
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
-      <div class="tablitsa">
+      ${poleZaTarsene('razhodi')}
+      <div class="tablitsa" data-tablitsa="razhodi">
         <div class="glava razhod">
-          ${KOLONI_RAZHODI.map((kol) =>
-            glavaSFiltar('razhodi', kol, razhodi, dnes, kol.vid !== 'tekst'),
-          ).join('')}<span></span>
+          ${glaviNaTablitsata('razhodi', KOLONI_RAZHODI, razhodi, dnes)}<span></span>
         </div>
         ${
           filtriraniRazhodi.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : filtriraniRazhodi.redove.map(redNaRazhod).join('')
+            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, redNaRazhod)
         }
       </div>
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
@@ -310,9 +319,9 @@ function blokNaOtchetite(o: Ogledalo, mesets: string): string {
         </div>
         <div class="red sverka otchet-sverka" translate="no">
           <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
-          <span class="suma">${pishi(r.sverka.ot_sastavki_st)}</span>
-          <span class="suma">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
-          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${pishi(r.sverka.razlika_st)}</span>
+          <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
+          <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
           <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
             r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
           }</span></span>
@@ -431,17 +440,24 @@ function redNaRazhod(r: Razhod): string {
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${stavka}%${
         r.stavka === undefined ? '' : ' · от реда'
       }</span></span>
-      <span class="suma duljimo">${kakvoPishe(razbivka.obshta_st)}</span>
-      <span class="suma">${kakvoPishe(razbivka.dds_st)}</span>
+      <span class="suma duljimo" data-st="${razbivka.obshta_st}">${kakvoPishe(razbivka.obshta_st)}</span>
+      <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno-razhod="${r.seq}">Сторно</button>
+        ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;
 }
 
-/** Стотинките се показват в левове; бройките — както са. */
+/** Стотинките се показват в евро; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
   return belezhka === MERKA.pari ? pishi(chislo) : String(chislo);
+}
+
+/** `data-st` за статус-лентата — само когато мярката наистина е пари.
+ *  Бройка без белега не влиза в сбор: евро и бройки не се смесват. */
+function vStotinki(belezhka: string | undefined, chislo: number): string {
+  return belezhka === MERKA.pari ? ` data-st="${chislo}"` : '';
 }
 
 /**
@@ -629,7 +645,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
                 : 'БЕЗ номер на документ — затова не се сдвоява'
             }</span></span>
             <span>${ekraniraj(n.dvizhenie.data)}</span>
-            <span class="suma duljimo">${kakvoPishe(n.dvizhenie.suma_st)}</span>
+            <span class="suma duljimo" data-st="${n.dvizhenie.suma_st}">${kakvoPishe(n.dvizhenie.suma_st)}</span>
           </div>`,
           )
           .join('')}
@@ -645,7 +661,7 @@ function redNaSmetka(r: RedSmetka): string {
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>
-      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${pishi(r.suma_st)}</span>
+      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}" data-st="${r.suma_st}">${pishi(r.suma_st)}</span>
     </div>`;
 }
 
@@ -663,8 +679,8 @@ function redNaDDS(r: RedDDS): string {
             : 'разхода'
       } · ${pishi(r.obshta_st)} с ДДС</span></span>
       <span>${r.stavka}%</span>
-      <span class="suma">${pishi(r.osnova_st)}</span>
-      <span class="suma">${pishi(r.dds_st)}</span>
+      <span class="suma" data-st="${r.osnova_st}">${pishi(r.osnova_st)}</span>
+      <span class="suma" data-st="${r.dds_st}">${pishi(r.dds_st)}</span>
     </div>`;
 }
 
@@ -690,9 +706,7 @@ function kalkulator(): string {
           <div class="pole">
             <label for="smyatane-stavka">Ставка</label>
             <select translate="no" id="smyatane-stavka" name="stavka" required>
-              ${[...new Set(AKUMULATORI.map((a) => a.stavka))]
-                .sort((a, b) => a - b)
-                .map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
+              ${STAVKI.map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
                 .join('')}
             </select>
           </div>
@@ -719,17 +733,17 @@ function kalkulator(): string {
           <div class="red smyatane" translate="no">
             <span class="kletka"><b>${ekraniraj(r.opis || `ред ${i + 1}`)}</b></span>
             <span>${r.stavka}%</span>
-            <span class="suma">${kakvoPishe(r.razbivka.osnova_st)}</span>
-            <span class="suma">${kakvoPishe(r.razbivka.dds_st)}</span>
-            <span class="suma">${kakvoPishe(r.razbivka.obshta_st)}</span>
+            <span class="suma" data-st="${r.razbivka.osnova_st}">${kakvoPishe(r.razbivka.osnova_st)}</span>
+            <span class="suma" data-st="${r.razbivka.dds_st}">${kakvoPishe(r.razbivka.dds_st)}</span>
+            <span class="suma" data-st="${r.razbivka.obshta_st}">${kakvoPishe(r.razbivka.obshta_st)}</span>
           </div>`,
           )
           .join('')}
         <div class="red smyatane sbor" translate="no">
           <span><b>Сбор</b></span><span></span>
-          <span class="suma">${pishi(sborOsnova)}</span>
-          <span class="suma">${pishi(sborDDS)}</span>
-          <span class="suma">${pishi(sborObshta)}</span>
+          <span class="suma" data-st="${sborOsnova}">${pishi(sborOsnova)}</span>
+          <span class="suma" data-st="${sborDDS}">${pishi(sborDDS)}</span>
+          <span class="suma" data-st="${sborObshta}">${pishi(sborObshta)}</span>
         </div>
       </div>`
       }
@@ -745,6 +759,7 @@ export function zakachiSmetki(
   formaPeriod?.addEventListener('submit', async (e) => {
     e.preventDefault();
     period = String(new FormData(formaPeriod).get('period'));
+    zapomniEkranno('smetki.period', period);
     await prerisuvay();
   });
 
@@ -812,7 +827,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Салдото е записано.');
       await prerisuvay();
     } catch (err) {
-      izhod.textContent = err instanceof Error ? err.message : String(err);
+      izhod.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -869,7 +884,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Разходът е записан. Входящият ДДС влезе в акумулатора си.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -898,7 +913,7 @@ export function zakachiSmetki(
       k.vest('dobre', `Справката е записана. ${mesets} е заключен — поправка само през сверена промяна.`);
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -923,7 +938,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Внесеното е записано. Разликата с декларираното се вижда горе.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -938,7 +953,8 @@ export function zakachiSmetki(
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-storno-razhod]')) {
     b.addEventListener('click', async () => {
       b.disabled = true;
-      const izhod = await opitajStorno(k, Number(b.dataset['stornoRazhod']), VID.razhod, 'разходът');
+      // Видът — от единствения дом на „белег → вид" (правило 17 · storno.ts).
+      const izhod = await opitajStorno(k, Number(b.dataset['stornoRazhod']), vidOtAtribut('data-storno-razhod')!, 'разходът');
       if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
       await prerisuvay();
     });

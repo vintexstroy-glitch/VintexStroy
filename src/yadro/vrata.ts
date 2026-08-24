@@ -161,6 +161,19 @@ export class Vrata {
           `Редицата прескача: на място ${i + 1} стои seq ${s.seq}.`,
         );
       }
+      // Същите проверки като при ЗАПИС (находка на сверката): дотук пипнат
+      // файл с половин стотинка или NFD-текст влизаше, стига хешовете му да са
+      // преизчислени. Байтовете НЕ се нормализират — това би счупило веригата;
+      // каквото не е NFC, се ОТКАЗВА с думи (правило 12), не се поправя тихо.
+      try {
+        proveriValidnost(s);
+        proveriNFC(s.payload, `събитие ${s.seq}`);
+      } catch (e) {
+        throw new GreshkaVrata(
+          'NEVALIDNO',
+          `Възстановяването е отказано на seq ${s.seq}: ${e instanceof Error ? e.message : String(e)}`,
+        );
+      }
     }
 
     if (!(await this.#pravata.mozheDaPishe(actor, naematel, { vid: 'zhurnal', id: naematel }))) {
@@ -339,6 +352,32 @@ export function normalizirayNFC(v: unknown): unknown {
     return izhod;
   }
   return v;
+}
+
+/**
+ * Всичко текстово трябва ВЕЧЕ да е NFC · за възстановяването.
+ *
+ * При запис Вратата НОРМАЛИЗИРА (`normalizirayNFC`); при възстановяване не
+ * може — нормализираният байт мени хеша и къса веригата. Затова тук се пита,
+ * не се поправя: едно „й" в NFD значи файл, който не е излизал оттук.
+ */
+export function proveriNFC(v: unknown, pat: string): void {
+  if (typeof v === 'string') {
+    if (v !== v.normalize('NFC')) {
+      throw new Error(`${pat} носи текст извън NFC — файлът не е износ на Вратата.`);
+    }
+    return;
+  }
+  if (Array.isArray(v)) {
+    for (const [i, el] of v.entries()) proveriNFC(el, `${pat}[${i}]`);
+    return;
+  }
+  if (typeof v === 'object' && v !== null) {
+    for (const [klyuch, stoynost] of Object.entries(v)) {
+      proveriNFC(klyuch, pat);
+      proveriNFC(stoynost, `${pat}.${klyuch}`);
+    }
+  }
 }
 
 /** Полетата за пари завършват на `_st` и са ЦЕЛИ СТОТИНКИ. */

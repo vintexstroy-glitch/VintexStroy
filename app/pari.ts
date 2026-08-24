@@ -19,10 +19,18 @@ import {
   nachisliZaPeriod,
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
-import { VID } from '../src/domein/sabitiya.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
-import { ekraniraj } from './imoti.js';
-import { opitajStorno } from './storno.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
+import { butonIstoriya } from './istoriya.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  grupiranaTablitsa,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
@@ -33,11 +41,52 @@ function novOpId(): string {
   return crypto.randomUUID();
 }
 
+/** Колоните на вземанията — фините филтри важат и тук (ADR-022 · вълна 2). */
+function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
+  return [
+    {
+      klyuch: 'koy',
+      ime: 'Наемател и имот',
+      vid: 'tekst',
+      vzemi: (v) => {
+        const opis = opisiVzemane(o, v);
+        return `${opis.koy} · ${opis.kade}`;
+      },
+    },
+    { klyuch: 'period', ime: 'Период', vid: 'tekst', vzemi: (v) => v.period },
+    { klyuch: 'padezh', ime: 'Падеж', vid: 'data', vzemi: (v) => v.padezh },
+    { klyuch: 'ostatak', ime: 'Остатък', vid: 'evro', vzemi: (v) => v.ostatak_st },
+  ];
+}
+
+/** Колоните на приетите плащания. */
+function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
+  return [
+    { klyuch: 'data', ime: 'Дата', vid: 'data', vzemi: (p) => p.data },
+    {
+      klyuch: 'sreshtu',
+      ime: 'Срещу',
+      vid: 'tekst',
+      vzemi: (p) => {
+        const v = o.vzemaniya.get(p.vzemaneId);
+        if (!v) return p.vzemaneId;
+        const opis = opisiVzemane(o, v);
+        return `${opis.koy} · ${opis.kade}`;
+      },
+    },
+    { klyuch: 'nachin', ime: 'Начин', vid: 'tekst', vzemi: (p) => p.nachin },
+    { klyuch: 'suma', ime: 'Сума', vid: 'evro', vzemi: (p) => p.suma_st },
+  ];
+}
+
 export function narisuvayPari(o: Ogledalo, dnes: string): string {
   const zakasneli = prosrocheni(o, dnes);
   const otvoreni = [...o.vzemaniya.values()]
     .filter((v) => v.ostatak_st > 0 && !zakasneli.some((z) => z.id === v.id))
     .sort((a, b) => a.padezh.localeCompare(b.padezh));
+  const koloniVz = koloniNaVzemaniyata(o);
+  const fZakasneli = filtriray('prosrocheni', zakasneli, koloniVz, dnes);
+  const fOtvoreni = filtriray('vsrok', otvoreni, koloniVz, dnes);
 
   const mesets = dnes.slice(0, 7);
   const sabranoMesets = [...o.plashtaniya.values()]
@@ -99,17 +148,20 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         <h2>Просрочени</h2>
         <span>${zakasneli.length ? 'най-закъснелите отгоре' : 'няма'}</span>
       </div>
-      <div class="tablitsa">
+      ${zakasneli.length ? poleZaTarsene('prosrocheni') : ''}
+      <div class="tablitsa" data-tablitsa="prosrocheni">
         <div class="glava vzemane">
-          <span>Наемател и имот</span><span>Период</span><span>Падеж</span>
-          <span class="suma">Остатък</span><span></span>
+          ${glaviNaTablitsata('prosrocheni', koloniVz, zakasneli, dnes)}<span></span>
         </div>
         ${
           zakasneli.length === 0
             ? '<p class="prazno">Нищо не е просрочено.</p>'
-            : zakasneli.map((v) => redVzemane(o, v, v.dniZakasnenie)).join('')
+            : fZakasneli.redove.length === 0
+              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              : grupiranaTablitsa('prosrocheni', fZakasneli.redove, koloniVz, dnes, (v) => redVzemane(o, v, v.dniZakasnenie))
         }
       </div>
+      ${redZaSkritoto(fZakasneli, 'prosrocheni')}
     </section>
 
     ${
@@ -117,35 +169,49 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         ? ''
         : `<section>
       <div class="dyalglava"><h2>В срок</h2><span>${otvoreni.length}</span></div>
-      <div class="tablitsa">
+      ${poleZaTarsene('vsrok')}
+      <div class="tablitsa" data-tablitsa="vsrok">
         <div class="glava vzemane">
-          <span>Наемател и имот</span><span>Период</span><span>Падеж</span>
-          <span class="suma">Остатък</span><span></span>
+          ${glaviNaTablitsata('vsrok', koloniVz, otvoreni, dnes)}<span></span>
         </div>
-        ${otvoreni.map((v) => redVzemane(o, v, 0)).join('')}
+        ${
+          fOtvoreni.redove.length === 0
+            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            : grupiranaTablitsa('vsrok', fOtvoreni.redove, koloniVz, dnes, (v) => redVzemane(o, v, 0))
+        }
       </div>
+      ${redZaSkritoto(fOtvoreni, 'vsrok')}
     </section>`
     }
 
+    ${narisuvayPlashtaniyata(o, dnes)}
+  `;
+}
+
+function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {
+  const koloni = koloniNaPlashtaniyata(o);
+  const vsichki = [...o.plashtaniya.values()].sort((a, b) => b.seq - a.seq);
+  const f = filtriray('plashtaniya', vsichki, koloni, dnes);
+  return `
     <section>
       <div class="dyalglava">
         <h2>Приети плащания</h2>
         <span>${o.plashtaniya.size} · поправка = сторно, не триене</span>
       </div>
-      <div class="tablitsa">
+      ${vsichki.length ? poleZaTarsene('plashtaniya') : ''}
+      <div class="tablitsa" data-tablitsa="plashtaniya">
         <div class="glava plashtane">
-          <span>Дата</span><span>Срещу</span><span>Начин</span>
-          <span class="suma">Сума</span><span></span>
+          ${glaviNaTablitsata('plashtaniya', koloni, vsichki, dnes)}<span></span>
         </div>
         ${
-          o.plashtaniya.size === 0
+          vsichki.length === 0
             ? '<p class="prazno">Още няма прието плащане.</p>'
-            : [...o.plashtaniya.values()]
-                .sort((a, b) => b.seq - a.seq)
-                .map((p) => redPlashtane(o, p))
-                .join('')
+            : f.redove.length === 0
+              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              : grupiranaTablitsa('plashtaniya', f.redove, koloni, dnes, (p) => redPlashtane(o, p))
         }
       </div>
+      ${redZaSkritoto(f, 'plashtaniya')}
     </section>
   `;
 }
@@ -204,13 +270,14 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
         <span>${v.padezh}</span>
         ${dni > 0 ? `<span class="zakasnenie">закъснял ${dni} ${dni === 1 ? 'ден' : 'дни'}</span>` : ''}
       </span>
-      <span class="suma${dni > 0 ? ' duljimo' : ''}">${pishi(v.ostatak_st)}</span>
+      <span class="suma${dni > 0 ? ' duljimo' : ''}" data-st="${v.ostatak_st}">${pishi(v.ostatak_st)}</span>
       <span class="butoni">
         ${dni > 0 ? butonPismo(o, v, dni) : ''}
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>
         <button type="button" class="vtorichen malak" data-storno-vzemane="${v.seq}">Сторно</button>
+        ${butonIstoriya('vzemane', v.id)}
       </span>
     </div>`;
 }
@@ -223,9 +290,10 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
-      <span class="suma plateno">${pishi(p.suma_st)}</span>
+      <span class="suma plateno" data-st="${p.suma_st}">${pishi(p.suma_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
+        ${butonIstoriya('plashtane', p.id)}
       </span>
     </div>`;
 }
@@ -300,9 +368,7 @@ export function zakachiPari(
       await prerisuvay();
     } catch (err) {
       greshka.textContent =
-        err instanceof GreshkaNachislyavane || err instanceof Error
-          ? err.message
-          : String(err);
+        dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -364,17 +430,19 @@ export function zakachiPari(
       k.vest('dobre', 'Плащането е прието и разнесено срещу вземането.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
   });
 
   // ── сторно · и на плащане, и на начисление, винаги през вратаря ─────────
-  for (const [znak, vid, kakvo] of [
-    ['data-storno', VID.plashtane, 'плащането'],
-    ['data-storno-vzemane', VID.vzemane, 'начислението'],
+  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
+  for (const [znak, kakvo] of [
+    ['data-storno', 'плащането'],
+    ['data-storno-vzemane', 'начислението'],
   ] as const) {
+    const vid = vidOtAtribut(znak)!;
     for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
       b.addEventListener('click', async () => {
         b.disabled = true;

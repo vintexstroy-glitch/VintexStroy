@@ -49,7 +49,7 @@ import {
   type VidStoynost,
 } from '../src/domein/vid-stoynost.js';
 import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
-import {
+import { klyuchNaPravo,
   IMENA_NA_VIDOVETE,
   napraviPrava,
   pravoNaKolona,
@@ -60,7 +60,7 @@ import {
 import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
@@ -517,7 +517,7 @@ function hedariteNa(
     return '<p class="prazno">Още няма нито един хедър — правото важи за модел, не за екран.</p>';
   }
   return modeli
-    .map((m) => hedaraNa(chovek, o.prava.get(`${chovek.imeyl}|${m.klyuch}`), m))
+    .map((m) => hedaraNa(chovek, o.prava.get(klyuchNaPravo(chovek.imeyl, m.klyuch)), m))
     .join('');
 }
 
@@ -586,9 +586,9 @@ function redNaSverka(s: ZapisanaSverka): string {
       <span class="kletka"><b>${ekraniraj(s.buton)}</b><span>${ekraniraj(s.period)} · ${s.izvori.length} ${
         s.izvori.length === 1 ? 'файл' : 'файла'
       }${s.propusnati ? ` · ${s.propusnati} непрочетени` : ''}</span></span>
-      <span class="suma">${pishi(s.vhod_st)}</span>
-      <span class="suma">${pishi(s.izhod_st)}</span>
-      <span class="suma${s.razlika_st === 0 ? '' : ' duljimo'}">${pishi(s.razlika_st)}</span>
+      <span class="suma" data-st="${s.vhod_st}">${pishi(s.vhod_st)}</span>
+      <span class="suma" data-st="${s.izhod_st}">${pishi(s.izhod_st)}</span>
+      <span class="suma${s.razlika_st === 0 ? '' : ' duljimo'}" data-st="${s.razlika_st}">${pishi(s.razlika_st)}</span>
       <span><span class="znachka ${s.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
         s.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
       }</span></span>
@@ -675,7 +675,7 @@ export function zakachiNastroyki(
       k.vest('dobre', `Бутонът „${buton.klyuch}" е записан в папка „${buton.papka}".`);
       await prerisuvay();
     } catch (err) {
-      kazhi.textContent = err instanceof Error ? err.message : String(err);
+      kazhi.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -696,7 +696,7 @@ export function zakachiNastroyki(
       k.vest('dobre', `${chovek.ime} е записан · ${ROLI_NA_HORATA[chovek.rolya]}.`);
       await prerisuvay();
     } catch (err) {
-      kazhi.textContent = err instanceof Error ? err.message : String(err);
+      kazhi.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -715,7 +715,7 @@ export function zakachiNastroyki(
       otmetka.disabled = true;
       try {
         const og = await k.deystviya.ogledalo();
-        const sega = og.prava.get(`${imeyl}|${model}`) ?? napraviPrava({ imeyl, model });
+        const sega = og.prava.get(klyuchNaPravo(imeyl, model)) ?? napraviPrava({ imeyl, model });
         const prava = napraviPrava({
           imeyl,
           model,
@@ -730,7 +730,7 @@ export function zakachiNastroyki(
             : `Колоната е върната за ${imeyl}.`,
         );
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -822,7 +822,7 @@ export function zakachiNastroyki(
       );
       await prerisuvay();
     } catch (err) {
-      kazhi.textContent = err instanceof Error ? err.message : String(err);
+      kazhi.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -856,7 +856,7 @@ export function zakachiNastroyki(
         await zapishiHedar(star, nov, `Колоната е записана в „${star.klyuch}".`);
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -874,7 +874,7 @@ export function zakachiNastroyki(
         await zapishiHedar(star, nov, 'Менюто е изтрито — името на полето е заключено.');
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -890,7 +890,7 @@ export function zakachiNastroyki(
         await zapishiHedar(star, nov, 'Номенклатурата ще се ражда от въвеждането.');
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -914,7 +914,7 @@ export function zakachiNastroyki(
         await zapishiHedar(star, nov, `Колоната е премахната от „${star.klyuch}".`);
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -931,7 +931,7 @@ export function zakachiNastroyki(
         await k.deystviya.zapishiButon(nov, { opId: `buton:${crypto.randomUUID()}` });
         k.vest('dobre', `„${ime}" вече приема кой да е познат хедър.`);
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });

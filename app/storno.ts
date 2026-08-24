@@ -6,7 +6,8 @@
  */
 
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
-import type { Vid } from '../src/domein/sabitiya.js';
+import { dumiZaGreshka } from './imoti.js';
+import { VID, type Vid } from '../src/domein/sabitiya.js';
 import type { Konteks } from './main.js';
 
 export interface Izhod {
@@ -28,6 +29,70 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
   );
   if (prichina === null) return { stana: false, kazano: '', vid: 'dobre' };
 
+  const otkaz = await stornirajSled(k, seq, vid, prichina);
+  if (otkaz !== null) return { stana: false, kazano: otkaz, vid: 'zle' };
+
+  return {
+    stana: true,
+    kazano: `Сторнирано seq ${seq}. И двете събития остават в Журнала.`,
+    vid: 'dobre',
+  };
+}
+
+// ── сторно на избраните · груповото минава през СЪЩАТА врата ──────────────
+
+/**
+ * Кой вид същност носи белегът на бутона „Сторно" във всеки ред.
+ *
+ * ЕДИНСТВЕНИЯТ дом на този факт (правило 17): и екраните при закачането на
+ * единичното сторно, и груповото четат ОТТУК. Втори списък другаде би се
+ * разминал тихо — ред с непознат белег просто изпада от „Сторно на
+ * избраните", без грешка. Ключът е самият HTML-атрибут — без преводач
+ * kebab↔camel по средата.
+ */
+const VID_OT_BELEGA: Readonly<Record<string, Vid>> = {
+  'data-storno-imot': VID.imot,
+  'data-storno-naem': VID.naem,
+  'data-storno-vzemane': VID.vzemane,
+  'data-storno': VID.plashtane,
+  'data-storno-razhod': VID.razhod,
+};
+const BELEZITE = Object.entries(VID_OT_BELEGA);
+
+/** Видът по HTML-атрибута („data-storno-naem" → наем) — или null за чужд белег. */
+export function vidOtAtribut(atribut: string): Vid | null {
+  return VID_OT_BELEGA[atribut] ?? null;
+}
+
+export interface ZaStorno {
+  readonly seq: number;
+  readonly vid: Vid;
+}
+
+/** Чете от бутон на ред кое сторно носи — или null, ако не е сторно-бутон. */
+export function stornoOtButona(b: HTMLButtonElement): ZaStorno | null {
+  for (const [atribut, vid] of BELEZITE) {
+    const seq = b.getAttribute(atribut);
+    if (seq !== null) return { seq: Number(seq), vid };
+  }
+  return null;
+}
+
+/**
+ * Сторнира един seq с ГОТОВА причина — ядрото, през което минават и
+ * единичното, и груповото: една врата, един запис, едни думи на отказа.
+ * Връща null при успех, иначе отказа с думи. Чете живото наново — при
+ * партида предишният запис променя какво е позволено.
+ */
+async function stornirajSled(
+  k: Konteks,
+  seq: number,
+  vid: Vid,
+  prichina: string,
+): Promise<string | null> {
+  const [sabitiya, ogledalo] = await Promise.all([k.deystviya.sabitiya(), k.deystviya.ogledalo()]);
+  const otgovor = mozheLiDaSeStornira(sabitiya, ogledalo, seq);
+  if (!otgovor.mozhe) return otgovor.prichina;
   try {
     await k.deystviya.storniraj(
       `S:${crypto.randomUUID()}`,
@@ -35,17 +100,61 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
       { opId: `storno:${crypto.randomUUID()}` },
       vid,
     );
+    return null;
   } catch (greshka) {
-    return {
-      stana: false,
-      kazano: greshka instanceof Error ? greshka.message : String(greshka),
-      vid: 'zle',
-    };
+    return dumiZaGreshka(greshka);
   }
+}
 
+/**
+ * Думите на груповия изход — чиста функция, за да има тест.
+ *
+ * Отказаното се КАЗВА поименно, не се преглъща в брояча: „Сторнирани 2 от 3"
+ * без причината за третия е точно тихият инцидент, който правило 7 забранява.
+ */
+export function sDumiZaStornoto(
+  obshto: number,
+  stanali: number,
+  otkazani: readonly string[],
+): string {
+  const glava =
+    stanali === obshto
+      ? `Сторнирани ${stanali} от ${obshto}. Всички събития остават в Журнала.`
+      : `Сторнирани ${stanali} от ${obshto}.`;
+  return otkazani.length === 0 ? glava : `${glava} Отказани — ${otkazani.join(' · ')}`;
+}
+
+/**
+ * Сторно на много редове наведнъж: ЕДНА причина, по един opId на ред.
+ *
+ * Питането е едно, защото решението е едно; записите са отделни, защото
+ * Журналът пази събития, не партиди. Всеки ред минава през същата проверка
+ * като единичното сторно — и то върху ЖИВОТО след предишния запис, затова
+ * събитията се четат наново на всяка стъпка, не веднъж отгоре.
+ */
+export async function opitajStornoNaMnogo(
+  k: Konteks,
+  spisak: readonly ZaStorno[],
+): Promise<Izhod> {
+  if (spisak.length === 0) {
+    return { stana: false, kazano: 'В избора няма ред със Сторно.', vid: 'zle' };
+  }
+  const prichina = prompt(
+    `Защо се сторнират ${spisak.length} реда?\nЕдна причина за всичките; тя остава в Журнала завинаги.`,
+    '',
+  );
+  if (prichina === null) return { stana: false, kazano: '', vid: 'dobre' };
+
+  const otkazani: string[] = [];
+  let stanali = 0;
+  for (const { seq, vid } of spisak) {
+    const otkaz = await stornirajSled(k, seq, vid, prichina);
+    if (otkaz !== null) otkazani.push(`seq ${seq}: ${otkaz}`);
+    else stanali += 1;
+  }
   return {
-    stana: true,
-    kazano: `Сторнирано seq ${seq}. И двете събития остават в Журнала.`,
-    vid: 'dobre',
+    stana: stanali > 0,
+    kazano: sDumiZaStornoto(spisak.length, stanali, otkazani),
+    vid: otkazani.length === 0 ? 'dobre' : 'zle',
   };
 }

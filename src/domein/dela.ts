@@ -140,9 +140,13 @@ export function svetofar(d: Delo, dnes: string): Svetofar {
  */
 export function podredi(dela: readonly Delo[], dnes: string): Delo[] {
   const gori = (d: Delo) => (svetofar(d, dnes) === 'prosrocheno' ? 0 : 1);
+  // Непозната оценка (стар Журнал, чужд внос) пада НАКРАЯ, при завършените.
+  // Без предпазителя изваждането даваше NaN, NaN е лъжливо за ||, и
+  // сравнителят ставаше непоследователен — подредбата се обръщаше мълчешком.
+  const tezhest = (d: Delo) => TEZHEST[d.otsenka] ?? 9;
   return [...dela].sort(
     (a, b) =>
-      TEZHEST[a.otsenka] - TEZHEST[b.otsenka] ||
+      tezhest(a) - tezhest(b) ||
       gori(a) - gori(b) ||
       a.do.localeCompare(b.do) ||
       a.ime.localeCompare(b.ime),

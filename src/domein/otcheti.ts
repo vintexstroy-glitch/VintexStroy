@@ -340,6 +340,41 @@ export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
     .sort((a, b) => a.data.localeCompare(b.data));
 }
 
+/**
+ * СЪЩОТО, НО ЗА ОБХВАТ ОТ ДНИ · за решетката на Ганта.
+ *
+ * Решетката покрива месеци напред и назад (петкратният обхват, И-числото на
+ * собственика), а `sumiZaDen` реже по ЕДИН календарен месец. Хранена с него,
+ * всяка колона извън месеца показваше нула — а нулата на екран за пари
+ * изглежда като „няма движение", не като „не е питано" (находка на сверката).
+ *
+ * Границите са включителни, ISO текст — както говорят колоните на решетката.
+ */
+export function sumiZaObhvat(o: Ogledalo, ot: string, doo: string): readonly DenSPari[] {
+  const po = new Map<string, { prihod_st: number; razhod_st: number }>();
+  const vzemi = (data: string) => {
+    let v = po.get(data);
+    if (!v) {
+      v = { prihod_st: 0, razhod_st: 0 };
+      po.set(data, v);
+    }
+    return v;
+  };
+
+  for (const p of o.plashtaniya.values()) {
+    if (p.data < ot || p.data > doo) continue;
+    vzemi(p.data).prihod_st += p.suma_st;
+  }
+  for (const r of o.razhodi.values()) {
+    if (r.data < ot || r.data > doo) continue;
+    vzemi(r.data).razhod_st += r.suma_st;
+  }
+
+  return [...po.entries()]
+    .map(([data, v]) => ({ data, ...v }))
+    .sort((a, b) => a.data.localeCompare(b.data));
+}
+
 /** Сборът на съставките. Знакът е в самата съставка, не в сбирача. */
 function sbor(sastavki: readonly Sastavka[]): number {
   let s = 0;

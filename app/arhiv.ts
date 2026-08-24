@@ -5,19 +5,21 @@
  * и удобни за търсене филтри". Затова всеки лист излиза с AutoFilter и
  * замразен заглавен ред — отваряш го и стрелките за филтриране са там.
  *
- * Сумите са в ЛЕВОВЕ като числа — Excel да смята и филтрира по тях.
- * Това е ИЗГЛЕД за четене; истината си остават стотинките в Журнала,
- * а точният архив е JSON-износът с хешовете.
+ * Сумите са в ЕВРО като числа — Excel да смята и филтрира по тях („Лев
+ * няма", правило 3; колоните са озаглавени „…, €"). Това е ИЗГЛЕД за четене;
+ * истината си остават стотинките в Журнала, а точният архив е JSON-износът
+ * с хешовете.
  */
 
 import { rabotnaKniga, type List } from '../src/iznos/excel.js';
-import { akumulator } from '../src/domein/dds.js';
+import { akumulator, ddsOtObshta, stavkaNaReda } from '../src/domein/dds.js';
 import { potok } from '../src/domein/smetki.js';
 import { smetki } from '../src/domein/smetki.js';
 import { platenoDDSZaPerioda, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Sabitie } from '../src/yadro/index.js';
 
-function leva(st: number): number {
+/** Стотинки → евро като число за клетка на Excel. Само за този изглед. */
+function evro(st: number): number {
   return st / 100;
 }
 
@@ -25,7 +27,7 @@ function sumaOtPayload(s: Sabitie): number | '' {
   const p = s.payload as Record<string, unknown>;
   for (const klyuch of ['suma_st', 'naem_st', 'dds_deklarirano_st']) {
     const v = p[klyuch];
-    if (typeof v === 'number') return leva(v);
+    if (typeof v === 'number') return evro(v);
   }
   return '';
 }
@@ -91,9 +93,9 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
         v.period,
         o.naemi.get(v.naemId)?.naemetel ?? v.naemId,
         v.padezh,
-        leva(v.nachisleno_st),
-        leva(v.pogaseno_st),
-        leva(v.ostatak_st),
+        evro(v.nachisleno_st),
+        evro(v.pogaseno_st),
+        evro(v.ostatak_st),
         v.sastoyanie,
       ]),
   };
@@ -116,7 +118,7 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
           v ? (o.naemi.get(v.naemId)?.naemetel ?? v.naemId) : p.vzemaneId,
           v?.period ?? '',
           p.nachin,
-          leva(p.suma_st),
+          evro(p.suma_st),
         ];
       }),
   };
@@ -138,6 +140,9 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
       .sort((a, b) => a.data.localeCompare(b.data))
       .map((r) => {
         const a = akumulator(r.sektor);
+        // ДДС-то се смята на ЕДНО място (правило 17) и със ставката на РЕДА:
+        // собствената формула тук ползваше ставката на СЕКТОРА, тоест нощувка
+        // на 9% във „Фактури" излизаше в архива с 20% — разминато със Сметки.
         return [
           r.data,
           r.dostavchik,
@@ -145,8 +150,8 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
           potok(r.potok)?.ime ?? r.potok,
           a.sektor,
           r.dokument,
-          leva(r.suma_st),
-          leva(Math.round((r.suma_st * a.stavka) / (100 + a.stavka))),
+          evro(r.suma_st),
+          evro(ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st),
           r.izvor,
         ];
       }),
@@ -170,13 +175,13 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
       const spravka = o.spravki.get(period);
       return [
         period,
-        leva(s.prihod_st),
-        leva(s.razhod_st),
-        leva(s.dds_izhod_st),
-        leva(s.dds_vhod_st),
-        leva(s.zaVnasyane_st),
-        spravka ? leva(spravka.deklarirano_st) : '',
-        leva(platenoDDSZaPerioda(o, period)),
+        evro(s.prihod_st),
+        evro(s.razhod_st),
+        evro(s.dds_izhod_st),
+        evro(s.dds_vhod_st),
+        evro(s.zaVnasyane_st),
+        spravka ? evro(spravka.deklarirano_st) : '',
+        evro(platenoDDSZaPerioda(o, period)),
         spravka ? 'да' : '',
       ];
     }),

@@ -43,13 +43,14 @@ export const IMENA_NA_TAKTOVETE: Readonly<Record<Takt, string>> = Object.freeze(
  *
  * „1 месец с стъпка 31" значи месец, показан по ДНИ — 31 колони. Не 31 месеца.
  */
-export const RESHETKA: Readonly<Record<Takt, { vidimi: number; dniVKolona: number }>> =
-  Object.freeze({
-    den: { vidimi: 1, dniVKolona: 1 },
-    sedmitsa: { vidimi: 7, dniVKolona: 1 },
-    mesets: { vidimi: 31, dniVKolona: 1 },
-    godina: { vidimi: 12, dniVKolona: 0 }, // 0 = календарен месец, не фиксирани дни
-  });
+export const RESHETKA: Readonly<Record<Takt, { vidimi: number }>> = Object.freeze({
+  den: { vidimi: 1 },
+  sedmitsa: { vidimi: 7 },
+  mesets: { vidimi: 31 },
+  // При „година" колоната е календарен месец; при другите три — ден.
+  // Кой такт колко дни носи, решава `koloni()` — не таблица, която никой не чете.
+  godina: { vidimi: 12 },
+});
 
 /**
  * ОБХВАТЪТ Е ПЕТ ПЪТИ ВИДИМОТО · негово число *(р51·[141]·07.08)*:

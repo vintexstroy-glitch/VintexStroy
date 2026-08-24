@@ -24,7 +24,7 @@ import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
-import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
+import { dumiZaGreshka, ekraniraj, narisuvayImoti, svaliFayl, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
@@ -32,9 +32,17 @@ import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { zakachiFiltri } from './filtri.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { zakachiIstoriya } from './istoriya.js';
+import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
+import { zakachiKlaviatura } from './klaviatura.js';
+import { zakachiChernovata } from './chernova.js';
+import { prilozhiSkritite } from './skriti-koloni.js';
+import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
-import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
+import { type Samolichnost } from '../src/yadro/samolichnost.js';
+import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
@@ -53,22 +61,21 @@ import { KLYUCH_OT_ALFA, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt
 let akaunt = KLYUCH_OT_ALFA;
 
 /**
- * КОЙ Е ВЛЯЗЪЛ. Днес — един собственик, вече влязъл; истинският OAuth иска
- * регистрация при тримата доставчици и негово решение с кого се почва.
- * Портът обаче стои отсега, за да не се появи после втори вход отстрани.
+ * КОЙ Е ВЛЯЗЪЛ · вече истински.
+ *
+ * Дотук тук стоеше ЗАКОВАНА самоличност, която пазеше мястото на входа. Сега
+ * влизането минава през Google и `actor` в Журнала е имейл, който доставчикът
+ * е потвърдил (ADR-021). Ключът на акаунта идва от същия имейл (ADR-020) —
+ * затова истинският вход е и онова, което прави втория акаунт истински.
+ *
+ * `kojSam` няма начална стойност: празната самоличност е по-честна от
+ * измислената. Който чете преди влизането, гърми — вместо да получи име, което
+ * никой не е дал.
  */
-const SOBSTVENIKAT: Samolichnost = {
-  dostavchik: 'google',
-  imeyl: 'vintexstroy@gmail.com',
-  ime: 'VintexStroy',
-  hranilishte: 'безплатно',
-  nachin: 'dostavchik',
-  rolya: 'sobstvenik',
-  svarzani: [],
-};
-
-const vhod = new EdinSobstvenik(SOBSTVENIKAT);
-let kojSam: Samolichnost = SOBSTVENIKAT;
+const vhod = new VhodSGoogle({
+  kade: () => document.getElementById('butonat-na-google'),
+});
+let kojSam: Samolichnost;
 let izbor: Izbor = chetiIzbor();
 
 export type KoyEkran =
@@ -94,6 +101,8 @@ export interface Konteks {
   readonly dnevnik: DnevnikVIndexedDB;
   readonly vrata: Vrata;
   readonly pravata: Pravata;
+  /** под кой ключ е отвореният Журнал (ADR-020) — историята на реда чете по него */
+  readonly akaunt: string;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
 }
 
@@ -134,7 +143,9 @@ let hranilishte: SastoyanieNaHranilishteto = {
   zaeto: -1,
   pozvoleno: -1,
 };
-let ekran: KoyEkran = 'imoti';
+// Отваря се екранът, на който човек е спрял (ADR-022). Непознат запис (от
+// стара версия) пада към Имоти — паметта никога не чупи тръгването.
+let ekran: KoyEkran = chetiEkranno<KoyEkran>('ekran', 'imoti');
 
 /**
  * ДЖОБЪТ · служебният работник.
@@ -234,10 +245,56 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
   },
 };
 
+/**
+ * ЕКРАНЪТ „ВЛЕЗ" · когато няма нито обхват, нито запомнен вход.
+ *
+ * НЕ се пада тихо към измислена самоличност. Това би отворило Журнал под име,
+ * което никой не е дал — и всяко събитие оттам нататък носи грешен `actor`.
+ * По-добре празен екран с обяснение, отколкото история, на която не се вярва.
+ */
+function ekranatVlez(kazano = ''): string {
+  return `
+    <div class="telo">
+      <section class="karta izbrana vhod">
+        <div class="dyalglava">
+          <h2>Влез</h2>
+          <span>без парола · самоличността идва от доставчика</span>
+        </div>
+        ${kazano ? `<p class="greshka">${ekraniraj(kazano)}</p>` : ''}
+        <div id="butonat-na-google"></div>
+        <p class="drebno">
+          Приложението никога не вижда парола — няма своя, няма възстановяване,
+          няма какво да изтече. Записва се имейлът, който Google потвърждава, и
+          той става <b>actor</b> в Журнала.
+        </p>
+      </section>
+    </div>`;
+}
+
+/**
+ * ВЛИЗАНЕТО · три пътя, в този ред, и нито един от тях не е измислена самоличност.
+ *
+ *   1. запомнен вход — тръгване без обхват отваря същия Журнал;
+ *   2. бутонът на Google — истинският вход;
+ *   3. екранът „Влез" с думи защо — когато няма нито едно от двете.
+ */
+async function vlizane(): Promise<Samolichnost> {
+  const zapomnen = zapomneniyat();
+  if (zapomnen) return zapomnen;
+
+  koren.innerHTML = ekranatVlez();
+  try {
+    return await vhod.vlez('google');
+  } catch (greshka) {
+    koren.innerHTML = ekranatVlez(dumiZaGreshka(greshka));
+    throw greshka;
+  }
+}
+
 async function trugvay(): Promise<void> {
   // Влизането е първото нещо: `actor` в Журнала е имейл от доставчика,
   // а не низ по подразбиране — историята трябва да знае КОЙ е писал.
-  kojSam = await vhod.vlez(SOBSTVENIKAT.dostavchik);
+  kojSam = await vlizane();
 
   const dnevnik = await otvoriDnevnik('masterbook');
   const kotva = new KotvaVLocalStorage();
@@ -289,6 +346,7 @@ async function trugvay(): Promise<void> {
     dnevnik,
     vrata,
     pravata,
+    akaunt,
     vest: (vid, tekst) => {
       poslednaVest = { vid, tekst };
     },
@@ -338,7 +396,7 @@ async function trugvay(): Promise<void> {
           ${mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
           ${
             ekran === 'imoti'
-              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
+              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length })
               : ekran === 'pari'
                 ? narisuvayPari(ogledalo, dnes)
                 : ekran === 'stoynost'
@@ -370,9 +428,22 @@ async function trugvay(): Promise<void> {
         },
         prerisuvay,
       );
+      koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
+        await vhod.izlez();
+        // Презареждането е нарочно: следващото тръгване минава по целия път на
+        // влизането. Опит да се „смени самоличността в движение" би оставил
+        // отворено Огледало на един акаунт под името на друг.
+        location.reload();
+      });
     }
     if (mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
+    zakachiIstoriya(koren, k);
+    zakachiKontekstnoMenyu(koren, k);
+    zakachiKlaviatura(koren, k, prerisuvay);
+    zakachiChernovata(koren);
+    zakachiRedaktsiya(koren, k, prerisuvay);
+    prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }
 
@@ -433,7 +504,7 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
               : hranilishte.postoyanstvo === 'изтриваемо'
                 ? 'Хранилището е ИЗТРИВАЕМО — изнасяй често'
                 : 'Постоянството е неизвестно'
-          }${hranilishte.zaeto >= 0 ? ` · ${kolkoMyasto(hranilishte.zaeto)}` : ''}
+          }${hranilishte.zaeto >= 0 ? ` · ${kolkoMyasto(hranilishte.zaeto)}${hranilishte.pozvoleno > 0 ? ` от ${kolkoMyasto(hranilishte.pozvoleno)}` : ''}` : ''}
         </div>
       </div>
     </aside>`;
@@ -464,6 +535,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-ekran]')) {
     b.addEventListener('click', async () => {
       ekran = b.dataset['ekran'] as KoyEkran;
+      zapomniEkranno('ekran', ekran);
       await prerisuvay();
     });
   }
@@ -502,12 +574,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
-    const adres = URL.createObjectURL(fayl);
-    const vruzka = document.createElement('a');
-    vruzka.href = adres;
-    vruzka.download = `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`;
-    vruzka.click();
-    URL.revokeObjectURL(adres);
+    svaliFayl(fayl, `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`);
 
     const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
     zapishiBeleg({
@@ -536,12 +603,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([bajtove.slice().buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    const adres = URL.createObjectURL(fayl);
-    const vruzka = document.createElement('a');
-    vruzka.href = adres;
-    vruzka.download = `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    vruzka.click();
-    URL.revokeObjectURL(adres);
+    svaliFayl(fayl, `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`);
     k.vest(
       'dobre',
       `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +
@@ -602,6 +664,6 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
 trugvay().catch((greshka: unknown) => {
   koren.innerHTML = `<div class="telo"><div class="vest zle">Приложението не тръгна: ${
-    ekraniraj(greshka instanceof Error ? greshka.message : String(greshka))
+    ekraniraj(dumiZaGreshka(greshka))
   }</div></div>`;
 });

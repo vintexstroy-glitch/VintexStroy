@@ -54,7 +54,13 @@ export function dataOtKletka(surovo: string): string {
   return otData(chisto, 'Датата');
 }
 
-/** Ключът се вади от съдържанието, не от мястото — редът може да се размести. */
+/**
+ * Ключът се вади от съдържанието, не от мястото — редът може да се размести.
+ *
+ * И в NFC (правило 12): в Журнала същият текст е нормализиран от Вратата, а
+ * ключът, граден от суровия файл, се разминаваше при NFD-клавиатура — редът
+ * минаваше за НОВ и се раждаше дубъл вместо съвпадение.
+ */
 export function klyuchNaRazhod(r: {
   dokument: string;
   data: string;
@@ -62,8 +68,8 @@ export function klyuchNaRazhod(r: {
   suma_st: number;
 }): string {
   return r.dokument.trim() !== ''
-    ? `dok:${r.dokument.trim().toLowerCase()}`
-    : `red:${r.data}|${r.koy.trim().toLowerCase()}|${r.suma_st}`;
+    ? `dok:${r.dokument.trim().toLowerCase().normalize('NFC')}`
+    : `red:${r.data}|${r.koy.trim().toLowerCase().normalize('NFC')}|${r.suma_st}`;
 }
 
 /**

@@ -61,6 +61,16 @@ self.addEventListener('fetch', (sabitie) => {
   const iskane = sabitie.request;
   if (iskane.method !== 'GET') return;
 
+  // ЧУЖДОТО НЕ МИНАВА ПРЕЗ ДЖОБА · нито се пази, нито се подменя.
+  //
+  // Джобът е за НАШИТЕ файлове. Входът с Google (скриптът, самото влизане и
+  // публичните ключове за подписа) е чужд адрес: минеше ли оттук, при липса на
+  // мрежа щеше да получи нашия отговор „Офлайн, и това го няма в джоба" —
+  // тоест влизането щеше да пада с НАША грешка вместо с истинската причина.
+  //
+  // Излизането рано връща заявката на браузъра непокътната.
+  if (new URL(iskane.url).origin !== self.location.origin) return;
+
   sabitie.respondWith(
     (async () => {
       const otKesha = await caches.match(iskane, { ignoreSearch: true });
@@ -68,7 +78,8 @@ self.addEventListener('fetch', (sabitie) => {
 
       try {
         const otvod = await fetch(iskane);
-        // Пази само своето; чуждо няма, но правилото стои и без него.
+        // Дотук стигат само свои заявки (чуждото излезе горе), но проверката
+        // остава: тя пази правилото, а не случая.
         if (otvod.ok && new URL(iskane.url).origin === self.location.origin) {
           const kesh = await caches.open(KESH);
           await kesh.put(iskane, otvod.clone());

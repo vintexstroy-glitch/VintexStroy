@@ -23,6 +23,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { dnesKato, dumiZaGreshka, svaliFayl } from './imoti.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -49,6 +51,14 @@ import {
 } from '../src/kalkulator/tsenova-lista.js';
 import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { ekraniraj } from './imoti.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  grupiranaTablitsa,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -56,8 +66,8 @@ let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
-/** Коя цена се пуска при износ. Негов отговор: „и двете". */
-let koyaTsena: KoyaTsena = 'dvete';
+/** Коя цена се пуска при износ. Негов отговор: „и двете" · изборът се помни. */
+let koyaTsena: KoyaTsena = chetiEkranno<KoyaTsena>('stoynost.koyaTsena', 'dvete');
 let vest = '';
 let greshka = '';
 
@@ -148,31 +158,56 @@ export function narisuvayStoynost(): string {
     ${smetnato ? tablitsaNaStoynostta(smetnato) : ''}`;
 }
 
+/** Колоните на обектите — фините филтри важат и тук (ADR-022 · вълна 2). */
+function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
+  return [
+    { klyuch: 'obekt', ime: 'Обект', vid: 'tekst', vzemi: (r) => r.obekt },
+    {
+      klyuch: 'etazh',
+      ime: 'Етаж · вид',
+      vid: 'tekst',
+      vzemi: (r) => `${r.etazh || '—'} · ${IMENA_NA_VIDOVETE_OBEKT[r.vid]}`,
+    },
+    { klyuch: 'chista', ime: 'Чиста', vid: 'chislo', vzemi: (r) => kvSmVM2(r.chista_kvsm) },
+    { klyuch: 'obshta', ime: 'Обща', vid: 'chislo', vzemi: (r) => kvSmVM2(r.obshta_kvsm) },
+    { klyuch: 'izlozhenie', ime: 'Изложение', vid: 'tekst', vzemi: (r) => r.izlozhenie },
+    { klyuch: 'naem', ime: 'Наем', vid: 'evro', vzemi: (r) => r.naem_mesechen_st },
+    { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
+    { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
+    { klyuch: 'delta', ime: 'Δ', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+  ];
+}
+
 function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
+  const dnes = dnesKato();
+  const koloni = koloniNaObektite();
+  const f = filtriray('stoynost', s.redove, koloni, dnes);
   return `
     <section>
       <div class="dyalglava">
         <h2>Обектите</h2>
         <span>${s.redove.length} реда · сборът отгоре е стойността на състоянието</span>
       </div>
-      <div class="tablitsa">
+      ${poleZaTarsene('stoynost')}
+      <div class="tablitsa" data-tablitsa="stoynost">
         <div class="glava stoynost">
-          <span>Обект</span><span>Етаж · вид</span>
-          <span class="suma">Чиста</span><span class="suma">Обща</span>
-          <span>Изложение</span><span>Наем</span>
-          <span class="suma">А · по площ</span><span class="suma">Б · по състояние</span>
-          <span class="suma">Δ</span>
+          ${glaviNaTablitsata('stoynost', koloni, s.redove, dnes)}
         </div>
-        ${s.redove.map(redNaObekt).join('')}
+        ${
+          f.redove.length === 0
+            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            : grupiranaTablitsa('stoynost', f.redove, koloni, dnes, redNaObekt)
+        }
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>
           <span></span><span></span><span></span><span></span><span></span>
-          <span class="suma plateno">${pishi(s.obshto_st)}</span>
-          <span class="suma plateno">${pishi(s.sastoyanie_st)}</span>
+          <span class="suma plateno" data-st="${s.obshto_st}">${pishi(s.obshto_st)}</span>
+          <span class="suma plateno" data-st="${s.sastoyanie_st}">${pishi(s.sastoyanie_st)}</span>
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
         </div>
       </div>
-      <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор.</p>
+      ${redZaSkritoto(f, 'stoynost')}
+      <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор. Скритото от филтъра ПАК влиза в сбора отгоре — той е стойността на състоянието, не на екрана (правило 23).</p>
     </section>`;
 }
 
@@ -188,13 +223,13 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
       <span class="suma">${kvSmVM2(r.chista_kvsm)}</span>
       <span class="suma">${kvSmVM2(r.obshta_kvsm)}</span>
       <span>${ekraniraj(r.izlozhenie) || '—'}</span>
-      <span class="kletka"><span>${pishi(r.naem_mesechen_st)}</span><span class="znachka ${
+      <span class="kletka" data-st="${r.naem_mesechen_st}"><span>${pishi(r.naem_mesechen_st)}</span><span class="znachka ${
         r.naemOt === 'zhurnal' ? 'dobre' : 'tiha'
       }">${r.naemOt === 'zhurnal' ? 'от Журнала' : 'очакван'}</span></span>
-      <span class="suma${r.prodaden ? '' : ' plateno'}">${
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.tsena_st}"`}>${
         r.prodaden ? '<span class="znachka tiha">ПРОДАДЕН</span>' : pishi(r.tsena_st)
       }</span>
-      <span class="suma${r.prodaden ? '' : ' plateno'}">${
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.sastoyanie_st}"`}>${
         r.prodaden ? '' : pishi(r.sastoyanie_st)
       }</span>
       <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>
@@ -216,8 +251,10 @@ function sZnak(razlika_st: number): string {
 /** Базисни точки → четимо: −2 543 б.т. става „−25,4 %". */
 function vBT(bt: number): string {
   const znak = bt > 0 ? '+' : bt < 0 ? '−' : '';
-  const a = Math.abs(bt);
-  return `${znak}${Math.floor(a / 100)},${String(Math.round((a % 100) / 10))} %`;
+  // Първо се закръгля до десети, ПОСЛЕ се дели: закръглянето по остатъка
+  // губеше преноса — 2 599 б.т. излизаше „25,10 %" вместо „26,0 %".
+  const desetinki = Math.round(Math.abs(bt) / 10);
+  return `${znak}${Math.floor(desetinki / 10)},${desetinki % 10} %`;
 }
 
 /** Базисни точки като процент: 320 → „3,20 %". */
@@ -280,7 +317,7 @@ export function zakachiStoynost(
         (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '');
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
@@ -299,13 +336,14 @@ export function zakachiStoynost(
       vest = `Ценовата листа даде изложение и състояние за ${slyato.size} обекта.`;
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
 
   koren.querySelector<HTMLSelectElement>('#koya-tsena')?.addEventListener('change', async (e) => {
     koyaTsena = (e.target as HTMLSelectElement).value as KoyaTsena;
+    zapomniEkranno('stoynost.koyaTsena', koyaTsena);
     await prerisuvay();
   });
 
@@ -316,18 +354,13 @@ export function zakachiStoynost(
       const fayl = new Blob([bajtove.slice().buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      const adres = URL.createObjectURL(fayl);
-      const vruzka = document.createElement('a');
-      vruzka.href = adres;
-      vruzka.download = `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      vruzka.click();
-      URL.revokeObjectURL(adres);
+      svaliFayl(fayl, `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`);
       k.vest(
         'dobre',
         `Ценовата листа е записана: ${smetnato.redove.length} реда · ${IMENA_NA_IZBORA[koyaTsena]}.`,
       );
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
       await prerisuvay();
     }
   });

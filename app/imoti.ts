@@ -12,10 +12,11 @@
 import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
-import { VID } from '../src/domein/sabitiya.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { opitajStorno } from './storno.js';
-import { filtriray, glavaSFiltar, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { opitajStorno, vidOtAtribut } from './storno.js';
+import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { butonIstoriya } from './istoriya.js';
+import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
 
 export interface SastoyanieNaEkrana {
@@ -41,6 +42,34 @@ function novOpId(): string {
   return crypto.randomUUID();
 }
 
+/** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2).
+ *  Картата е с ЖИВИТЕ наеми, сметната веднъж — `vzemi` се вика от търсене,
+ *  подредба и групиране, и филтриране на всяко повикване би било разточително. */
+function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
+  const zhiviNa = (i: Imot) => zhiviPoImot.get(i.id) ?? [];
+  return [
+    { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
+    {
+      klyuch: 'naematel',
+      ime: 'Наемател',
+      vid: 'tekst',
+      vzemi: (i) => zhiviNa(i).map((n) => n.naemetel).join(', '),
+    },
+    // площта пътува като „72,4" — сравнителят чете българския запис
+    { klyuch: 'ploshtad', ime: 'Площ', vid: 'chislo', vzemi: (i) => (i.ploshtad_kvsm > 0 ? kvSmVM2(i.ploshtad_kvsm) : '') },
+    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (i) => zhiviNa(i).reduce((s, n) => s + n.naem_st, 0) },
+    {
+      klyuch: 'sastoyanie',
+      ime: 'Състояние',
+      vid: 'tekst',
+      vzemi: (i) => {
+        const broy = zhiviNa(i).length;
+        return broy > 1 ? `${broy} наема` : broy === 1 ? 'отдаден' : 'свободен';
+      },
+    },
+  ];
+}
+
 /** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
 function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   return [
@@ -54,8 +83,9 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
         return i ? `${i.adres} · ${i.edinitsa}` : n.imotId;
       },
     },
-    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon },
-    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl },
+    // в клетката на името са, не в своя колона — търсят се, не се рисуват
+    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon, samoZaTarsene: true },
+    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl, samoZaTarsene: true },
     { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
     { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (n) => n.naem_st },
     {
@@ -67,7 +97,28 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   ];
 }
 
-export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): string {
+/**
+ * СВАЛЯНЕ НА ФАЙЛ · единственият дом на танца Blob → адрес → връзка → клик.
+ * Беше преписан три пъти (в main два, в Стойност един) — три места за един теч.
+ */
+/**
+ * ДУМИТЕ НА ЕДНА ГРЕШКА · един дом за израза, преписан 28 пъти.
+ * Грешка с име носи message; всичко друго се казва както е.
+ */
+export function dumiZaGreshka(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export function svaliFayl(fayl: Blob, ime: string): void {
+  const adres = URL.createObjectURL(fayl);
+  const vruzka = document.createElement('a');
+  vruzka.href = adres;
+  vruzka.download = ime;
+  vruzka.click();
+  URL.revokeObjectURL(adres);
+}
+
+export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const { ogledalo } = sastoyanie;
   const imoti = [...ogledalo.imoti.values()];
   const naemi = [...ogledalo.naemi.values()].sort(
@@ -84,7 +135,16 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
   const mesechno = zhivi.reduce((sbor, n) => sbor + n.naem_st, 0);
   const zaeti = new Set(zhivi.map((n) => n.imotId));
 
-  const filtriraniNaemi = filtriray('naemi', naemi, koloniNaNaemite(ogledalo), dnesKato());
+  // веднъж на рисуване — не по три пъти по-надолу в шаблона
+  const dnes = dnesKato();
+  const koloniNaemi = koloniNaNaemite(ogledalo);
+  const zhiviPoImot = new Map<string, Naem[]>();
+  for (const [id, spisak] of naemiPoImot) {
+    zhiviPoImot.set(id, spisak.filter((n) => !n.prekraten));
+  }
+  const koloniImoti = koloniNaImotite(zhiviPoImot);
+  const filtriraniNaemi = filtriray('naemi', naemi, koloniNaemi, dnes);
+  const filtriraniImoti = filtriray('imoti', imoti, koloniImoti, dnes);
 
   const popravyanImot = rezhim.kakvo === 'popravi-imot' ? ogledalo.imoti.get(rezhim.id) : undefined;
   const popravyanNaem = rezhim.kakvo === 'popravi-naem' ? ogledalo.naemi.get(rezhim.id) : undefined;
@@ -140,7 +200,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
-                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? pishiVPole(popravyanImot.ploshtad_kvsm / 100) : ''}">
+                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kvSmVM2(popravyanImot.ploshtad_kvsm) : ''}">
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -163,7 +223,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <span>${
           popravyanNaem
             ? 'новата сума важи за БЪДЕЩИТЕ начисления — вече начисленото не мърда'
-            : 'парите се въвеждат в левове и се пазят в цели стотинки'
+            : 'парите се въвеждат в евро и се пазят в цели най-малки единици'
         }</span>
       </div>
       ${
@@ -230,7 +290,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="naem-ot">Договор от</label>
             <input translate="no" id="naem-ot" name="ot" type="date" required
-                   value="${popravyanNaem ? ekraniraj(popravyanNaem.ot.slice(0, 10)) : dnes()}">
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.ot.slice(0, 10)) : dnes}">
           </div>
           ${popravyanNaem ? polePrichina('naem') : ''}
         </div>
@@ -246,17 +306,20 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
 
     <section>
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
-      <div class="tablitsa">
+      ${imoti.length ? poleZaTarsene('imoti') : ''}
+      <div class="tablitsa" data-tablitsa="imoti">
         <div class="glava imot">
-          <span>Място и единица</span><span>Наемател</span><span>Площ</span>
-          <span class="suma">Наем / мес.</span><span>Състояние</span><span></span>
+          ${glaviNaTablitsata('imoti', koloniImoti, imoti, dnes)}<span></span>
         </div>
         ${
           imoti.length === 0
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
-            : imoti.map((i) => redImot(i, naemiPoImot.get(i.id) ?? [])).join('')
+            : filtriraniImoti.redove.length === 0
+              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
         }
       </div>
+      ${redZaSkritoto(filtriraniImoti, 'imoti')}
     </section>
 
     ${
@@ -269,18 +332,15 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           naemi.length - zhivi.length ? ` · ${naemi.length - zhivi.length} прекратени` : ''
         }</span>
       </div>
-      <div class="tablitsa">
+      ${poleZaTarsene('naemi')}
+      <div class="tablitsa" data-tablitsa="naemi">
         <div class="glava naem">
-          ${koloniNaNaemite(ogledalo)
-            .map((kol) =>
-              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'evro'),
-            )
-            .join('')}<span></span>
+          ${glaviNaTablitsata('naemi', koloniNaemi, naemi, dnes)}<span></span>
         </div>
         ${
           filtriraniNaemi.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : filtriraniNaemi.redove.map((n) => redNaem(n, ogledalo)).join('')
+            : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaemi, dnes, (n) => redNaem(n, ogledalo))
         }
       </div>
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
@@ -340,8 +400,8 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
     <div class="red imot" translate="no">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
-      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${pishi(imot.ploshtad_kvsm / 100)} м²` : '—'}</span></span>
-      <span class="suma">${zhivi.length ? pishi(sbor) : '—'}</span>
+      <span class="kletka" data-redakt="imot-ploshtad·${ekraniraj(imot.id)}" data-surovo="${imot.ploshtad_kvsm}" title="Двоен клик или F2 — поправка на място"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>
+      <span class="suma"${zhivi.length ? ` data-st="${sbor}"` : ''}>${zhivi.length ? pishi(sbor) : '—'}</span>
       <span>${
         zhivi.length > 1
           ? `<span class="znachka trevoga">${zhivi.length} наема</span>`
@@ -352,6 +412,7 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-popravi-imot="${ekraniraj(imot.id)}">Поправи</button>
         <button type="button" class="vtorichen malak" data-storno-imot="${imot.seq}">Сторно</button>
+        ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;
 }
@@ -366,7 +427,7 @@ function redNaem(naem: Naem, o: Ogledalo): string {
       }${naem.imeyl ? ` · ${ekraniraj(naem.imeyl)}` : ''}</span></span>
       <span class="kletka"><span>${imot ? ekraniraj(opisi(imot)) : ekraniraj(naem.imotId)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
-      <span class="suma">${pishi(naem.naem_st)}</span>
+      <span class="suma" data-st="${naem.naem_st}" data-redakt="naem-suma·${ekraniraj(naem.id)}" data-surovo="${naem.naem_st}" title="Двоен клик или F2 — поправка на място">${pishi(naem.naem_st)}</span>
       <span>${
         naem.prekraten
           ? `<span class="znachka tiha">прекратен${naem.kraj ? ` ${ekraniraj(naem.kraj.slice(0, 10))}` : ''}</span>`
@@ -376,6 +437,7 @@ function redNaem(naem: Naem, o: Ogledalo): string {
         ${naem.prekraten ? '' : `<button type="button" class="vtorichen malak" data-prekrati="${ekraniraj(naem.id)}">Прекрати</button>`}
         <button type="button" class="vtorichen malak" data-popravi-naem="${ekraniraj(naem.id)}">Поправи</button>
         <button type="button" class="vtorichen malak" data-storno-naem="${naem.seq}">Сторно</button>
+        ${butonIstoriya('naem', naem.id)}
       </span>
     </div>`;
 }
@@ -398,9 +460,11 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     const surovaPloshtad = String(danni.get('ploshtad') ?? '').trim();
     if (surovaPloshtad !== '') {
       try {
-        ploshtad_kvsm = otLeva(surovaPloshtad) * 100;
+        // Площта си има СВОЙ четец (правило 3 · ADR-014): паричният приемаше
+        // „72,40 €" за площ и залепваше знака на валутата при показване.
+        ploshtad_kvsm = ploshtVKvSm(surovaPloshtad);
       } catch (e) {
-        greshka.textContent = e instanceof GreshkaPari ? e.message : String(e);
+        greshka.textContent = dumiZaGreshka(e);
         return;
       }
     }
@@ -429,7 +493,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       }
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }
@@ -504,7 +568,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       }
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }
@@ -542,7 +606,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       k.vest('dobre', 'Наемът е прекратен. Начисленото досега си остава дължимо.');
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }
@@ -570,10 +634,12 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     });
   }
 
-  for (const [znak, vid, kakvo] of [
-    ['data-storno-imot', VID.imot, 'имотът'],
-    ['data-storno-naem', VID.naem, 'наемът'],
+  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
+  for (const [znak, kakvo] of [
+    ['data-storno-imot', 'имотът'],
+    ['data-storno-naem', 'наемът'],
   ] as const) {
+    const vid = vidOtAtribut(znak)!;
     for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
       b.addEventListener('click', async () => {
         b.disabled = true;
@@ -590,8 +656,8 @@ function dnes(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Днешният ден — за групите на филтъра по дата. */
-function dnesKato(): string {
+/** Днешният ден — за групите на филтъра по дата. Общ дом; Стойност също го ползва. */
+export function dnesKato(): string {
   return dnes();
 }
 

@@ -65,7 +65,8 @@ import {
   zapishiSverkata,
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
+import { fokusVPole } from './klaviatura.js';
 import type { Konteks } from './main.js';
 
 type Filtar = 'promenite' | 'vsichko';
@@ -96,6 +97,8 @@ let pitane: Pitane | null = null;
  * ръчният път остава като бутон без папка, за да няма два механизма.
  */
 let natisnat: Buton | null = null;
+/** Пействането се закача ВЕДНЪЖ на document — иначе всяко прерисуване трупа слушател. */
+let posteZakachen = false;
 /** Листове, които никой позволен модел не позна — броят се, не се преглъщат. */
 let nepoznati: string[] = [];
 /** Отпечатъците на всички файлове от партидата — влизат в записаната сверка. */
@@ -431,7 +434,7 @@ function blokNaSborovete(): string {
         k.broy === 1 ? 'число' : 'числа'
       }${k.rolya ? ` · роля „${ekraniraj(IMENA_NA_ROLITE[k.rolya])}"` : ''}</span></span>
       <span class="kletka"><span>напр. ${ekraniraj(primer(sborove!.model, sborove!.tablitsa, k.kolona))}</span></span>
-      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}">${pishi(Math.abs(k.sbor_st))}</span>
+      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}" data-st="${Math.abs(k.sbor_st)}">${pishi(Math.abs(k.sbor_st))}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-znak="${k.kolona}">${
           k.izklyuchena ? 'Върни' : 'Махни'
@@ -457,8 +460,8 @@ function blokNaSborovete(): string {
           <span></span>
           <span class="kletka"><b>${IMENA_NA_SBOROVETE.prihod} ${ZNAK.prihod} · ${IMENA_NA_SBOROVETE.razhod} ${ZNAK.razhod}</b><span>двата сбора не се махат — само се скриват</span></span>
           <span></span>
-          <span class="suma plateno">${pishi(dvata.prihod_st)}</span>
-          <span class="suma duljimo">${pishi(dvata.razhod_st)}</span>
+          <span class="suma plateno" data-st="${dvata.prihod_st}">${pishi(dvata.prihod_st)}</span>
+          <span class="suma duljimo" data-st="${dvata.razhod_st}">${pishi(dvata.razhod_st)}</span>
         </div>
       </div>
       <div class="deystviya">
@@ -491,8 +494,8 @@ function redNaRazlika(r: Razlika): string {
       <span>${znachki[r.kakvo]}</span>
       <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(opis)}${dokument ? ` · док. ${ekraniraj(dokument)}` : ''}</span></span>
       <span>${ekraniraj(r.nov?.data ?? r.star?.data ?? '')}</span>
-      <span class="suma">${r.star ? pishi(r.star.suma_st) : '—'}</span>
-      <span class="suma${r.kakvo === 'izchezval' ? ' duljimo' : ''}">${
+      <span class="suma"${r.star ? ` data-st="${r.star.suma_st}"` : ''}>${r.star ? pishi(r.star.suma_st) : '—'}</span>
+      <span class="suma${r.kakvo === 'izchezval' ? ' duljimo' : ''}"${r.nov ? ` data-st="${r.nov.suma_st}"` : ''}>${
         r.nov ? pishi(r.nov.suma_st) : '—'
       }</span>
     </div>`;
@@ -714,6 +717,31 @@ export function zakachiIztochnitsi(
     await prerisuvay();
   });
 
+  // ── клипбордният мост НАВЪТРЕ · Ctrl+V от Excel, същият път като файл ────
+  //
+  // Маркираш в старата таблица, Ctrl+C, Ctrl+V тук — и редовете минават по
+  // ЦЕЛИЯ съществуващ път: File → отпечатък → таблица → модел → разлики →
+  // Вратата. Нищо ново не се строи за поставянето: Excel слага в клипборда
+  // TSV, а `otCSV` познава таба като разделител. Следата в Журнала казва
+  // „Клипборд.csv" — вижда се откъде е дошло.
+  if (!posteZakachen) {
+    posteZakachen = true;
+    document.addEventListener('paste', async (e) => {
+      // в поле пействането е на полето — мостът не се меси
+      if (fokusVPole()) return;
+      // входът съществува само където съществува и бутонът (правило 15)
+      if (!document.getElementById('vzemi')) return;
+      const tekst = e.clipboardData?.getData('text/plain') ?? '';
+      // без таб не е таблица от Excel — обикновен текст не се граби
+      if (!tekst.includes('\t')) return;
+      e.preventDefault();
+      drazhka = null;
+      const buton = natisnat ?? PARVIYAT;
+      const fayl = new File([tekst], 'Клипборд.csv', { type: 'text/csv' });
+      await opitaj(() => napraviPartida([fayl], buton, k), prerisuvay);
+    });
+  }
+
   const fayl = koren.querySelector<HTMLInputElement>('#fayl-iztochnik');
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-buton]')) {
@@ -786,7 +814,7 @@ export function zakachiIztochnitsi(
         };
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -829,13 +857,39 @@ export function zakachiIztochnitsi(
         );
       }
       const { prihod_st, razhod_st } = sboroveNaPartida(redove);
+
+      // ПАРТИДАТА ЗАВЪРШВА СЪС СВЕРКА (правило 7) — и тя се ЗАПИСВА. Входът е
+      // сборът от редовете на екрана; изходът — същите потоци, прочетени
+      // обратно от Огледалото СЛЕД записа. Разликата влиза и когато е нула.
+      const sled = await k.deystviya.ogledalo();
+      let izhod_st = 0;
+      for (const r of redove) {
+        const zapisan = sled.pototsi.get(`${sborove!.model.klyuch}|${r.kolona}|${period}`);
+        if (zapisan) izhod_st += zapisan.suma_st;
+      }
+      const vhod_st = redove.reduce((sbor, r) => sbor + r.suma_st, 0);
+      await k.deystviya.zapishiSverka(
+        `SV:potok:${beleg}`,
+        {
+          buton: 'сборове към Приходи/Разходи',
+          period,
+          vhod_st,
+          izhod_st,
+          razlika_st: izhod_st - vhod_st,
+          izvori: [beleg],
+          propusnati: 0,
+        },
+        { opId: `sverka-potok:${crypto.randomUUID()}` },
+      );
+
       k.vest(
-        'dobre',
-        `Изпратено: ${pishi(prihod_st)} в Приходи · ${pishi(razhod_st)} в Разходи.`,
+        izhod_st === vhod_st ? 'dobre' : 'zle',
+        `Изпратено: ${pishi(prihod_st)} в Приходи · ${pishi(razhod_st)} в Разходи. ` +
+          `Сверката е записана · разлика ${pishi(izhod_st - vhod_st)}.`,
       );
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
@@ -897,7 +951,7 @@ export function zakachiIztochnitsi(
       );
     } catch (err) {
       greshka =
-        err instanceof GreshkaModel || err instanceof Error ? err.message : String(err);
+        dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
       await prerisuvay();
@@ -965,7 +1019,7 @@ export function zakachiIztochnitsi(
       nepoznati = [];
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
       if (err instanceof GreshkaAktualizatsiya) {
         // Числата на партидата ги няма — изключението ги отнесе. Сверката обаче
         // не ги пита: тя чете снимката и Журнала наново.
@@ -974,7 +1028,7 @@ export function zakachiIztochnitsi(
           greshka += ` Сверката Е ЗАПИСАНА въпреки това · разлика ${pishi(svereno.razlika_st)}.`;
         } catch (vtora) {
           greshka += ` И сверката не можа да се запише: ${
-            vtora instanceof Error ? vtora.message : String(vtora)
+            dumiZaGreshka(vtora)
           }`;
         }
       }
@@ -1029,7 +1083,7 @@ async function opitaj(rabota: () => Promise<void>, prerisuvay: () => Promise<voi
   } catch (err) {
     plan = null;
     pitane = null;
-    greshka = err instanceof Error ? err.message : String(err);
+    greshka = dumiZaGreshka(err);
   }
   await prerisuvay();
 }
