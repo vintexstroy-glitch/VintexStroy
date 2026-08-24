@@ -21,6 +21,7 @@ import { klyuchNaPravo } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
+import type { Zadacha } from '../domein/zadachi.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -205,6 +206,13 @@ export interface Ogledalo {
    * носител на истина. Тук е Огледало на събитията, както навсякъде.
    */
   readonly predlozheniya: ReadonlyMap<string, Predlozhenie>;
+  /**
+   * id → задачата с разписанието ѝ (И94 т.1).
+   *
+   * Отделна от агента нарочно: протоколът е непроменим след създаване
+   * (И94 т.6), а задачите се възлагат и превключват всеки ден.
+   */
+  readonly zadachi: ReadonlyMap<string, Zadacha>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -244,6 +252,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const tabove = new Map<string, Tab>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
+  const zadachi = new Map<string, Zadacha>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -350,6 +359,13 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Присъдата е СЪЩОТО събитие с ново съдържание: „чака" → „прието".
         const p = s.payload as unknown as Predlozhenie;
         predlozheniya.set(p.id, p);
+        break;
+      }
+
+      case 'ЗадачаЗаписана': {
+        // Потвърждаване и превключване са СЪЩОТО събитие с ново съдържание.
+        const p = s.payload as unknown as Zadacha;
+        zadachi.set(p.id, p);
         break;
       }
 
@@ -564,6 +580,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     tabove,
     agenti,
     predlozheniya,
+    zadachi,
     sverki,
     prilozheni,
     pogaseni,

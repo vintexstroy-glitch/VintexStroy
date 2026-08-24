@@ -36,6 +36,7 @@ import {
   type Agent,
   type Predlozhenie,
 } from '../src/domein/agenti.js';
+import { napraviZadacha, potvardiZadacha } from '../src/domein/zadachi.js';
 import { SHA } from './pomoshtni.js';
 
 const ACTOR = 'vintexstroy@gmail.com';
@@ -230,6 +231,43 @@ describe('непроменимият протокол (И94 т.6)', () => {
     ).rejects.toThrow(/Закрий агента/);
     // и нищо не е влязло втори път
     expect((await deystviya.sabitiya()).length).toBe(1);
+  });
+
+  it('ЗАКРИТИЯТ не приема задачи — и това е при Вратата, не на екрана', async () => {
+    const { deystviya } = stend();
+    const a = schetovoditelyat();
+    await deystviya.zapishiAgent(a, { opId: 'op-1' });
+    await deystviya.zapishiAgent(zakriy(a), { opId: 'op-2' });
+    const z = napraviZadacha(a, {
+      id: 'z1',
+      kakvo: 'сверѝ ДДС за август',
+      razpisanie: 'vsekidnevna',
+      umeniya: ['matematika', 'masterbook-data', 'refresh'],
+      kogato: '2026-08-24T09:00:00.000Z',
+    });
+    await expect(deystviya.zapishiZadacha(z, { opId: 'op-3' })).rejects.toThrow(/ЗАКРИТ/);
+    expect((await deystviya.sabitiya()).length).toBe(2);
+  });
+
+  it('задачата ВЛИЗА в Журнала и се чете от Огледалото · последната бие', async () => {
+    const { deystviya } = stend();
+    const a = schetovoditelyat();
+    await deystviya.zapishiAgent(a, { opId: 'op-1' });
+    const z = napraviZadacha(a, {
+      id: 'z1',
+      kakvo: 'сверѝ ДДС за август',
+      razpisanie: 'postoyanna',
+      umeniya: ['matematika', 'masterbook-data', 'refresh'],
+      kogato: '2026-08-24T09:00:00.000Z',
+    });
+    await deystviya.zapishiZadacha(z, { opId: 'op-2' });
+    expect((await deystviya.ogledalo()).zadachi.get('z1')?.potvardena).toBe(false);
+
+    // Потвърждаването е СЪЩОТО събитие с ново съдържание — не втора задача.
+    await deystviya.zapishiZadacha(potvardiZadacha(z), { opId: 'op-3' });
+    const o = await deystviya.ogledalo();
+    expect(o.zadachi.size).toBe(1);
+    expect(o.zadachi.get('z1')?.potvardena).toBe(true);
   });
 });
 

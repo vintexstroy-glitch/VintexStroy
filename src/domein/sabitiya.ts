@@ -10,6 +10,7 @@
 import type { Sashtnost } from '../yadro/index.js';
 import type { Agent, Predlozhenie } from './agenti.js';
 import type { Tab } from './tabove.js';
+import type { Zadacha } from './zadachi.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
 import type { PravaZaModel } from './kolonno.js';
@@ -33,6 +34,7 @@ export const VID = {
   agent: 'agent',
   tab: 'tab',
   predlozhenie: 'predlozhenie',
+  zadacha: 'zadacha',
   /**
    * НЕ СЕ ПИШЕ ПОВЕЧЕ · и НЕ СЕ ЧЕТЕ.
    *
@@ -71,6 +73,7 @@ export type TipSabitie =
   | 'ТабЗаписан'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
+  | 'ЗадачаЗаписана'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -444,6 +447,20 @@ export type PayloadAgentZapisan = Agent;
  * `actor` на записа е ЧОВЕКЪТ — агентът няма път към Вратата (правило 18).
  */
 export type PayloadPredlozhenieZapisano = Predlozhenie;
+
+/**
+ * ЗАДАЧАТА на агента · разписанието, уменията и потвърждението (И94 т.1).
+ *
+ * Защо е събитие, а не поле на агента: задачата се възлага, потвърждава,
+ * включва и изключва по СВОЙ ред — а протоколът на агента е непроменим след
+ * създаване (И94 т.6). Стояла вътре в агента, всяка нова задача щеше да иска
+ * нов запис на агента и да бута Вратата на промяната без причина.
+ *
+ * Тук влиза и следата от потвърждението — какво, до кой имейл, кога. КОДЪТ
+ * НЕ ВЛИЗА: тайна в дневник само за добавяне е тайна, изгубена завинаги
+ * (`potvarzhdenie.ts`).
+ */
+export type PayloadZadachaZapisana = Zadacha;
 
 export function sashtnost(vid: Vid, id: string): Sashtnost {
   return { vid, id };

@@ -626,6 +626,12 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 440px;
 }
 
+/* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
+.glava.zadacha, .red.zadacha {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 124px 72px 232px;
+  min-width: 900px;
+}
+
 /* ── двата задължителни сбора · Приход /+/ и Разход /−/ ──────────────── */
 .glava.znak, .red.znak {
   grid-template-columns: 64px minmax(0, 2fr) minmax(0, 1.2fr) 130px 132px;

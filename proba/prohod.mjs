@@ -2274,7 +2274,8 @@ async function main() {
     for (let i = 0; i < zaDobavyane.length; i += 1) {
       await p.fill('#umenie-ime', zaDobavyane[i][0]);
       await p.fill('#umenie-tekst', zaDobavyane[i][1]);
-      await sSabitie(p, () => p.click('#forma-umenie button[type=submit]'));
+      // Уменията вече минават през КОД ОТ ПИСМО (И94 т.1) — и тук, и навсякъде.
+      await sKod(p, () => p.click('#forma-umenie button[type=submit]'));
       await p.waitForFunction((n) => document.querySelectorAll('.red.umenie').length === n, i + 2);
     }
     proveri('добавените умения се редят', (await redove(p, '.red.umenie')).length, 4);
@@ -2287,12 +2288,12 @@ async function main() {
     // то е празен низ, в който всяка проверка „не съдържа" минава сама.
     // Затова тук се чете `textContent`: то вижда и скритото.
     const promptat = () => p.$eval('#promptat', (e) => e.textContent);
-    await sSabitie(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
+    await sKod(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
     await p.waitForFunction(() =>
       [...document.querySelectorAll('.red.umenie')].some((r) => r.textContent.includes('изключено')));
     proveri('изключеното умение изчезва от промпта',
       (await promptat()).includes('matematika'), false);
-    await sSabitie(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
+    await sKod(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
     await p.waitForFunction(() =>
       document.getElementById('promptat')?.textContent.includes('matematika') === true);
     proveri('и се връща със същото действие',
@@ -2529,6 +2530,168 @@ async function main() {
     proveri('и формата за нов се отваря веднага — това е пътят',
       Boolean(await p.$('#forma-agent')), true);
 
+    // ══ 45 · задачите, потвърждението с имейл и пускането (И94 т.1) ══════════
+    razdel = '45 · задачите и потвърждението';
+
+    // Агентът от §44 е ЗАКРИТ; задача се възлага на ЖИВ. Прави се нов.
+    await p.fill('#agent-ime', 'Задачарят');
+    await p.fill('#agent-otgovornik', 'ivaylo85petkov@gmail.com');
+    await p.fill('#agent-rabota', 'Чете Пари, следи разминаванията и предлага.');
+    await p.check('[data-obhvat="pari"]');
+    await p.fill('#agent-zabrani', 'не пише в Журнала');
+    await sSabitie(p, () => p.click('#forma-agent button[type=submit]'));
+    await p.waitForSelector('#forma-nova-zadacha');
+
+    // УМЕНИЯТА · и те минават през код от писмо (негови думи, И94 т.1)
+    razdel = '45а · кодът пази уменията';
+    const predUmenie = await broySabitiya(p);
+    await p.fill('#umenie-ime', 'matematika');
+    await p.fill('#umenie-tekst', 'матрици, данни и проверки');
+    await p.click('#forma-umenie button[type=submit]');
+    await p.waitForSelector('#potvarzhdenieto');
+    proveri('умението чака КОД, преди да влезе', await broySabitiya(p), predUmenie);
+    proveri('кодът НЕ е изписан на екрана',
+      /\b\d{6}\b/.test(await p.$eval('#potvarzhdenieto', (e) => e.innerText)), false);
+
+    const pismoto1 = await adresNaPismoto(p);
+    proveri('писмото тръгва към отговорника',
+      pismoto1.startsWith('mailto:ivaylo85petkov%40gmail.com'), true);
+
+    // СГРЕШЕНИЯТ код се отказва С ДУМИ и не пуска нищо
+    await p.fill('#kod', '000000');
+    await p.click('#potvardi-koda');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-kod')?.textContent ?? '').trim().length > 0);
+    proveri('сгрешеният код казва „не съвпада"',
+      (await tekstNa(p, '#greshka-kod')).includes('не съвпада'), true);
+    proveri('и нищо не е влязло в Журнала', await broySabitiya(p), predUmenie);
+
+    // ВЕРНИЯТ код пуска действието — и то влиза като ЕДНО събитие
+    await p.fill('#kod', kodOtPismoto(pismoto1));
+    await sSabitie(p, () => p.click('#potvardi-koda'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.umenie')].some((r) => r.textContent.includes('matematika')));
+    proveri('верният код записва умението', await broySabitiya(p), predUmenie + 1);
+
+    for (const ime of ['masterbook-data', 'doklad']) {
+      await p.fill('#umenie-ime', ime);
+      await sKod(p, () => p.click('#forma-umenie button[type=submit]'));
+      await p.waitForFunction((n) =>
+        [...document.querySelectorAll('.red.umenie')].some((r) => r.textContent.includes(n)), ime);
+    }
+
+    // ЗАДАЧАТА · разписание и ТРИ умения (правило 25)
+    razdel = '45б · задачата и разписанието';
+    const predZadacha = await broySabitiya(p);
+    await p.fill('#nova-zadacha-kakvo', 'сверѝ ДДС за август по акумулатори');
+    await p.selectOption('#nova-zadacha-razpisanie', 'sedmichna');
+    await p.selectOption('#nova-zadacha-den', '1');
+    await p.selectOption('#nova-zadacha-umenie1', 'matematika');
+    await p.selectOption('#nova-zadacha-umenie2', 'masterbook-data');
+    await p.selectOption('#nova-zadacha-umenie3', 'doklad');
+    await sSabitie(p, () => p.click('#forma-nova-zadacha button[type=submit]'));
+    await p.waitForSelector('.red.zadacha');
+    proveri('задачата влиза в Журнала', await broySabitiya(p), predZadacha + 1);
+    proveri('и се ражда НЕПОТВЪРДЕНА',
+      (await p.$eval('.red.zadacha', (e) => e.innerText)).includes('чака код'), true);
+
+    // ДВЕ УМЕНИЯ вместо три · правило 25 отказва С ДУМИ
+    await p.fill('#nova-zadacha-kakvo', 'непълна задача');
+    await p.selectOption('#nova-zadacha-umenie1', 'matematika');
+    await p.selectOption('#nova-zadacha-umenie2', 'doklad');
+    const predNepalna = await broySabitiya(p);
+    await p.click('#forma-nova-zadacha button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-nova-zadacha')?.textContent ?? '').includes('ТРИ умения'));
+    proveri('две умения не правят задача', await broySabitiya(p), predNepalna);
+
+    // ПОТВЪРЖДАВАНЕТО на задачата · пак код от писмо
+    razdel = '45в · потвърждаването на задачата';
+    await p.click('[data-potvardi-zadacha]');
+    await p.waitForSelector('#otvori-pismoto');
+    const pismoto2 = await adresNaPismoto(p);
+    proveri('писмото казва КАКВО се потвърждава',
+      decodeURIComponent(pismoto2).includes('сверѝ ДДС за август'), true);
+    await p.fill('#kod', kodOtPismoto(pismoto2));
+    await sSabitie(p, () => p.click('#potvardi-koda'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.zadacha')].some((r) => r.innerText.includes('потвърдена')));
+    proveri('потвърдената задача показва бутона „Пусни с Клод"',
+      Boolean(await p.$('[data-pusni-zadacha]')), true);
+    proveri('и седмичната се изключва',
+      Boolean(await p.$('[data-prevklyuchi-zadacha]')), true);
+
+    // ПОСТОЯННАТА е НОРМА · бутонът „Изключи" ЛИПСВА, не отказва
+    razdel = '45г · постоянната е норма';
+    await p.fill('#nova-zadacha-kakvo', 'дневната норма на агента');
+    await p.selectOption('#nova-zadacha-razpisanie', 'postoyanna');
+    await p.selectOption('#nova-zadacha-umenie1', 'matematika');
+    await p.selectOption('#nova-zadacha-umenie2', 'masterbook-data');
+    await p.selectOption('#nova-zadacha-umenie3', 'doklad');
+    await sSabitie(p, () => p.click('#forma-nova-zadacha button[type=submit]'));
+    await p.waitForFunction(() => document.querySelectorAll('.red.zadacha').length === 2);
+    const redNorma = '.red.zadacha:has-text("дневната норма")';
+    await sKod(p, () => p.click(`${redNorma} [data-potvardi-zadacha]`));
+    await p.waitForFunction(() =>
+      ([...document.querySelectorAll('.red.zadacha')]
+        .find((r) => r.innerText.includes('дневната норма'))?.innerText ?? '').includes('потвърдена'));
+    proveri('постоянната НЯМА бутон за изключване — той липсва, не отказва',
+      await p.$(`${redNorma} [data-prevklyuchi-zadacha]`), null);
+    proveri('и се пада ДНЕС, каквото и да е днес',
+      (await p.$eval(redNorma, (e) => e.innerText)).includes('норма'), true);
+
+    // СРОКЪТ иска и двата си края
+    razdel = '45д · срокът иска два края';
+    await p.fill('#nova-zadacha-kakvo', 'срок без край');
+    await p.selectOption('#nova-zadacha-razpisanie', 'srok');
+    await p.fill('#nova-zadacha-ot', '2026-09-01');
+    await p.selectOption('#nova-zadacha-umenie1', 'matematika');
+    await p.selectOption('#nova-zadacha-umenie2', 'masterbook-data');
+    await p.selectOption('#nova-zadacha-umenie3', 'doklad');
+    const predSrok = await broySabitiya(p);
+    await p.click('#forma-nova-zadacha button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-nova-zadacha')?.textContent ?? '').includes('и начало, и край'));
+    proveri('срок без край не става задача', await broySabitiya(p), predSrok);
+
+    // ПУСКАНЕТО С КЛОД · и то иска свой код, защото харчи и излиза НАВЪН
+    razdel = '45е · пускането и ключът';
+    await p.click('[data-pusni-zadacha]');
+    await p.waitForSelector('#potvarzhdenieto');
+    proveri('пускането с Клод също иска код',
+      Boolean(await p.$('#potvarzhdenieto')), true);
+    proveri('и писмото го казва',
+      decodeURIComponent(await adresNaPismoto(p)).includes('пускане на агент'), true);
+    await deystvieSPrerisuvane(p, () => p.click('#otkazhi-koda'));
+    proveri('отказът маха искането', await p.$('#potvarzhdenieto'), null);
+
+    // КЛЮЧЪТ ЗА КЛОД · местен и казан честно
+    await p.waitForFunction(() =>
+      (document.querySelector('#klod-sastoyanie')?.textContent ?? '').includes('ключ'));
+    proveri('без ключ екранът го КАЗВА',
+      (await tekstNa(p, '#klod-sastoyanie')).includes('няма ключ'), true);
+    const predKlyuchKlod = await broySabitiya(p);
+    await p.fill('#klod-klyuch', 'sk-ant-proba-1234');
+    await p.click('#zapishi-klyuch-klod');
+    await p.waitForFunction(() =>
+      (document.querySelector('#klod-sastoyanie')?.textContent ?? '').includes('стои'));
+    proveri('ключът се вижда само с опашката си',
+      (await tekstNa(p, '#klod-sastoyanie')).includes('…1234'), true);
+    proveri('и в Журнала НЕ влиза нищо', await broySabitiya(p), predKlyuchKlod);
+    // Обхожда се ЦЯЛОТО хранилище: изтичане в паметта на екрана или в печата
+    // на износа щеше да мине незабелязано.
+    proveri('ключът не е изтекъл в друго гнездо на хранилището',
+      await p.evaluate(() =>
+        Object.keys(localStorage)
+          .filter((k) => k !== 'masterbook:klod-klyuch')
+          .some((k) => (localStorage.getItem(k) ?? '').includes('sk-ant-proba'))), false);
+    await p.click('#zabravi-klyuch-klod');
+    await p.waitForFunction(() =>
+      (document.querySelector('#klod-sastoyanie')?.textContent ?? '').includes('няма ключ'));
+    proveri('и „забрави го" го маха', await p.evaluate(() =>
+      localStorage.getItem('masterbook:klod-klyuch')), null);
+
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
@@ -2635,6 +2798,29 @@ async function sSabitie(p, deystvie) {
   await p.waitForFunction((n) => {
     return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
+}
+
+/**
+ * ПОТВЪРЖДАВА едно действие с код от писмото (И94 т.1).
+ *
+ * Кодът НИКОГА не е изписан на екрана — затова проходът го вади оттам,
+ * откъдето го вади и човекът: от черновата на писмото. Така се минава по
+ * НЕГОВИЯ път, без нито един подставен обект.
+ */
+async function sKod(p, deystvie) {
+  await deystvie();
+  await p.waitForSelector('#otvori-pismoto');
+  await p.fill('#kod', kodOtPismoto(await adresNaPismoto(p)));
+  await sSabitie(p, () => p.click('#potvardi-koda'));
+}
+
+/** Черновата, каквато човекът я вижда — оттам чете кода. */
+async function adresNaPismoto(p) {
+  return p.$eval('#otvori-pismoto', (e) => e.getAttribute('href'));
+}
+
+function kodOtPismoto(adres) {
+  return decodeURIComponent(adres).match(/КОД:\s*(\d{6})/)[1];
 }
 
 async function ostatak(p, koy) {

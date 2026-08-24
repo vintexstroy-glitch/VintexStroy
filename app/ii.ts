@@ -46,6 +46,30 @@ import {
   type Predlozhenie,
   type TroyniyatKontrol,
 } from '../src/domein/agenti.js';
+import {
+  IMENA_NA_RAZPISANIYATA,
+  RAZPISANIYA,
+  ePostoyanna,
+  napraviZadacha,
+  pokazateliNaZadachite,
+  potvardiZadacha,
+  prevklyuchiZadacha,
+  sDumiRazpisanie,
+  sePadaDnes,
+  type Razpisanie,
+  type Zadacha,
+} from '../src/domein/zadachi.js';
+import {
+  IMENA_ZA_KAKVO,
+  ZHIVOT_V_MINUTI,
+  napraviKod,
+  pismoto,
+  poiskay,
+  proveri,
+  type Iskane,
+  type ZaKakvo,
+} from '../src/domein/potvarzhdenie.js';
+import { sha256Web } from '../src/nositel/hash-web.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
@@ -61,6 +85,32 @@ let dobavyam = false;
 let pitamZaSaglasie = false;
 let greshka = '';
 
+/**
+ * ЧАКАЩОТО ИСКАНЕ за потвърждение · живее САМО в паметта на екрана.
+ *
+ * Не в Журнала (тайна там е тайна, изгубена завинаги) и не в хранилището
+ * (презареждане на страницата трябва да го прекъсва — така изтеклото
+ * потвърждение не оживява утре).
+ */
+let iskane: Iskane | undefined;
+
+/**
+ * Готовата чернова на писмото (`mailto:`) · прави се заедно с искането.
+ *
+ * ВРЪЗКА, не програмна навигация. Три причини, и третата е най-важната:
+ * браузърите все по-често спират сама навигация към чужд протокол; човекът
+ * вижда КЪДЕ отива, преди да натисне; и проходът минава по същия път като
+ * него, без нито един подставен обект.
+ */
+let pismotoAdres = '';
+
+/**
+ * Какво да стане, ако кодът съвпадне. Действието се държи ТУК, а не се
+ * повтаря при потвърждаването: така има един-единствен път към записа и
+ * няма как да се пусне, без да мине през кода.
+ */
+let sledPotvarzhdenie: (() => Promise<void>) | undefined;
+
 /** Ключът на агента се прави от името — един агент, един ред. */
 function klyuchOtIme(ime: string): string {
   return ime.trim().replace(/\s+/g, ' ');
@@ -73,9 +123,12 @@ export function narisuvayII(o: Ogledalo, kontrol: TroyniyatKontrol, dnes: string
     (p) => !izbran || p.agent === izbran.klyuch,
   );
 
+  const zadachi = [...o.zadachi.values()].filter((z) => !izbran || z.agent === izbran.klyuch);
+
   return (
     kartaKontrol(kontrol, izbran) +
     (greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : '') +
+    kartaPotvarzhdenie() +
     kartaAgentite(agenti, izbran) +
     (dobavyam ? formaNaAgent() : '') +
     (izbran ? kartaProtokol(izbran, kontrol, dnes) : '') +
@@ -83,9 +136,49 @@ export function narisuvayII(o: Ogledalo, kontrol: TroyniyatKontrol, dnes: string
     (izbran ? kartaUmeniya(izbran) : '') +
     (izbran && pitamZaSaglasie ? kartaSaglasie(izbran) : '') +
     kartaZakonite() +
-    (izbran ? kartaZadachi(izbran) : '') +
+    (izbran ? kartaZadachi(izbran, zadachi, dnes) : '') +
+    (izbran ? kartaKlod(izbran) : '') +
+    (izbran ? kartaRachnoPredlozhenie(izbran) : '') +
     kartaZhurnal(predlozheniya)
   );
+}
+
+/**
+ * ПОТВЪРЖДЕНИЕТО С ИМЕЙЛ · честна спирачка, показана честно (И94 т.1).
+ *
+ * Екранът КАЗВА какво доказва кодът и какво не доказва. Интерфейс, който
+ * представя спирачката за ключалка, е по-опасен от липсваща спирачка:
+ * човек почва да разчита на нея там, където тя не държи.
+ */
+function kartaPotvarzhdenie(): string {
+  if (!iskane) return '';
+  return `
+    <section class="karta izbrana" id="potvarzhdenieto">
+      <div class="dyalglava">
+        <h2>Потвърждение с имейл</h2>
+        <span>${IMENA_ZA_KAKVO[iskane.zaKakvo]} · „${ekraniraj(iskane.kakvo)}"</span>
+      </div>
+      <p>Отвори писмото до <b translate="no">${ekraniraj(iskane.doImeyl)}</b>, изпрати го и препиши
+      кода оттам. <b>Кодът НЕ е изписан на този екран</b> — той пътува само в писмото.
+      Живее ${ZHIVOT_V_MINUTI} минути.</p>
+      <p><a class="glaven kato-buton" id="otvori-pismoto" href="${ekraniraj(pismotoAdres)}">Отвори писмото</a></p>
+      <div class="poleta tesni">
+        <div class="pole">
+          <label for="kod">Кодът от писмото</label>
+          <input translate="no" id="kod" inputmode="numeric" autocomplete="one-time-code"
+            placeholder="шест цифри" maxlength="9">
+        </div>
+      </div>
+      <p class="greshka" id="greshka-kod"></p>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="potvardi-koda">Потвърди</button>
+        <button type="button" class="vtorichen" id="otkazhi-koda">Откажи</button>
+        <p class="drebno">Това е ЧЕСТНА СПИРАЧКА, не ключалка. Доказва достъп до пощата и лови
+        НЕВОЛНАТА грешка — чужд агент, пуснат по невнимание; задача, потвърдена, без да се погледне.
+        Онзи, който държи отключеното устройство, стига и до черновата на писмото: тук спирачката
+        не държи и не се прави, че държи. Нарочна измама иска сървър.</p>
+      </div>
+    </section>`;
 }
 
 /** ТРОЙНИЯТ КОНТРОЛ · три плочки, не една — правило 15. */
@@ -432,14 +525,185 @@ function kartaZakonite(): string {
     </section>`;
 }
 
-/** ЗАДАЧИТЕ · възлагането е действие на ЧОВЕК и оставя следа. */
-function kartaZadachi(a: Agent): string {
+/** Падащото поле с трите умения · един вид на две места (правило 17). */
+function poletaZaTriUmeniya(a: Agent, prefiks: string): string {
+  return `
+    <div class="poleta tesni">
+      ${[1, 2, 3]
+        .map(
+          (nomer) => `<div class="pole">
+        <label for="${prefiks}-umenie${nomer}">${nomer === 1 ? `Три умения за ТАЗИ задача (правило 25)` : '&nbsp;'}</label>
+        <select translate="no" id="${prefiks}-umenie${nomer}" name="umenie${nomer}">
+          <option value="">— избери —</option>
+          ${vklyuchenite(a)
+            .map((u) => `<option value="${ekraniraj(u.klyuch)}">${ekraniraj(u.ime)}</option>`)
+            .join('')}
+        </select>
+      </div>`,
+        )
+        .join('')}
+    </div>`;
+}
+
+/**
+ * ЗАДАЧИТЕ · разписанието, уменията и потвърждението (И94 т.1).
+ *
+ * Негови думи: „Всяка задача се прикачат умения и задачата може да е
+ * ВСЕКИДНЕВНА, СДМИЧНА, ЗА ОПРЕДЕЛЕН СРОК. Има и ПОСТОЯННИ задачи с умения
+ * като длъжностната характеристика, която не може да се изключи и включи и е
+ * НОРМА."
+ *
+ * Затова постоянната няма бутон „Изключи" — не е скрит, ЛИПСВА. Бутон, който
+ * винаги отказва, учи човека да не вярва на бутоните.
+ */
+function kartaZadachi(a: Agent, zadachi: readonly Zadacha[], dnes: string): string {
+  const p = pokazateliNaZadachite(zadachi, dnes);
+  const podredeni = [...zadachi].sort((x, y) => y.kogato.localeCompare(x.kogato));
   return `
     <section class="karta">
-      <div class="dyalglava"><h2>Задача на „${ekraniraj(a.ime)}"</h2><span>възлагането е мое действие и оставя следа</span></div>
+      <div class="dyalglava">
+        <h2>Задачите на „${ekraniraj(a.ime)}"</h2>
+        <span>възлагането е мое действие · нищо не тръгва без потвърждение по имейл</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka"><span class="etiket">Задачи</span><span class="chislo" data-broi-zadachi translate="no">${p.vsichki}</span><span class="pod">всички</span></div>
+        <div class="plochka${p.potvardeni === p.vsichki ? '' : ' trevoga'}"><span class="etiket">Потвърдени</span><span class="chislo" translate="no">${p.potvardeni}</span><span class="pod">с код от писмо</span></div>
+        <div class="plochka"><span class="etiket">Днес</span><span class="chislo" translate="no">${p.dnes}</span><span class="pod">падат се на ${ekraniraj(dnes)}</span></div>
+        <div class="plochka"><span class="etiket">Постоянни</span><span class="chislo" translate="no">${p.postoyanni}</span><span class="pod">норма · не се изключват</span></div>
+      </div>
+      ${
+        podredeni.length === 0
+          ? '<p class="prazno">Още няма задачи.<br>Възложи една отдолу — с разписание и три умения.</p>'
+          : `<div class="tablitsa" data-tablitsa="zadachi">
+        <div class="glava zadacha">
+          <span>Задача и умения</span><span>Разписание</span><span>Потвърдена</span><span>Днес</span><span></span>
+        </div>
+        ${podredeni.map((z) => redNaZadacha(z, dnes)).join('')}
+      </div>`
+      }
+      <form id="forma-nova-zadacha">
+        <div class="pole">
+          <label for="nova-zadacha-kakvo">Какво да провери или сметне</label>
+          <input translate="no" id="nova-zadacha-kakvo" name="kakvo" required
+            placeholder="напр. сверѝ ДДС за август по акумулатори" autocomplete="off">
+        </div>
+        <div class="poleta tesni">
+          <div class="pole">
+            <label for="nova-zadacha-razpisanie">Разписание</label>
+            <select translate="no" id="nova-zadacha-razpisanie" name="razpisanie">
+              ${RAZPISANIYA.map(
+                (r) => `<option value="${r}">${ekraniraj(IMENA_NA_RAZPISANIYATA[r])}</option>`,
+              ).join('')}
+            </select>
+          </div>
+          <div class="pole">
+            <label for="nova-zadacha-den">Ден · при седмичната</label>
+            <select translate="no" id="nova-zadacha-den" name="den">
+              ${['понеделник', 'вторник', 'сряда', 'четвъртък', 'петък', 'събота', 'неделя']
+                .map((ime, i) => `<option value="${i + 1}">${ime}</option>`)
+                .join('')}
+            </select>
+          </div>
+          <div class="pole">
+            <label for="nova-zadacha-ot">От · при срок</label>
+            <input translate="no" id="nova-zadacha-ot" name="ot" type="date">
+          </div>
+          <div class="pole">
+            <label for="nova-zadacha-do">До · при срок</label>
+            <input translate="no" id="nova-zadacha-do" name="do" type="date">
+          </div>
+        </div>
+        ${poletaZaTriUmeniya(a, 'nova-zadacha')}
+        <p class="greshka" id="greshka-nova-zadacha"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Възложи задачата</button>
+          <p class="drebno">Задачата се ражда НЕПОТВЪРДЕНА и не се пада на никой ден, докато не мине кодът от писмото.
+          ПОСТОЯННАТА е норма — тя се ражда включена и такава остава; маха се със сторно, не с бутон.</p>
+        </div>
+      </form>
+    </section>`;
+}
+
+function redNaZadacha(z: Zadacha, dnes: string): string {
+  const dnes_li = sePadaDnes(z, dnes);
+  return `
+    <div class="red zadacha" data-zadacha="${ekraniraj(z.id)}" translate="no">
+      <span class="kletka"><b>${ekraniraj(z.kakvo)}</b><span>${ekraniraj(z.umeniya.join(' · '))}</span></span>
+      <span>${ekraniraj(sDumiRazpisanie(z))}</span>
+      <span><span class="znachka ${z.potvardena ? 'dobre' : 'trevoga'}">${z.potvardena ? 'потвърдена' : 'чака код'}</span></span>
+      <span><span class="znachka ${dnes_li ? 'dobre' : 'tiha'}">${dnes_li ? 'да' : 'не'}</span></span>
+      <span class="butoni">${
+        z.potvardena
+          ? `<button type="button" class="vtorichen malak" data-pusni-zadacha="${ekraniraj(z.id)}">Пусни с Клод</button>${
+              ePostoyanna(z.razpisanie)
+                ? ''
+                : `<button type="button" class="vtorichen malak" data-prevklyuchi-zadacha="${ekraniraj(z.id)}">${
+                    z.vklyuchena ? 'Изключи' : 'Включи'
+                  }</button>`
+            }`
+          : `<button type="button" class="vtorichen malak" data-potvardi-zadacha="${ekraniraj(z.id)}">Потвърди с имейл</button>`
+      }</span>
+    </div>`;
+}
+
+/**
+ * СВЪРЗВАНЕТО С КЛОД · ключът и какво струва (И94 т.1).
+ *
+ * ТАЗИ ЧАСТ ЛИПСВА В ОФЛАЙН ИЗДАНИЕТО. Затова `app/klod.ts` се тегли с
+ * ДИНАМИЧЕН внос, а не статично като входа: при входа липсващият файл значи
+ * друг вход (`EdinSobstvenik`), тук значи ЕДИН БУТОН по-малко — останалият
+ * екран (задачи, умения, ръчни предложения) трябва да работи и без него.
+ *
+ * Ключът се показва само с опашката си. Екранът КАЗВА, че ключ в браузър се
+ * вижда от всеки с достъп до устройството — преди да го поиска, не след това.
+ */
+function kartaKlod(a: Agent): string {
+  return `
+    <section class="karta">
+      <div class="dyalglava">
+        <h2>Свързването с Клод</h2>
+        <span>свързваща част · офлайн изданието изобщо няма този файл</span>
+      </div>
+      <div class="poleta tesni">
+        <div class="pole">
+          <label for="klod-klyuch">Ключ за Клод</label>
+          <input translate="no" id="klod-klyuch" type="password" autocomplete="off"
+            placeholder="sk-ant-…">
+        </div>
+        <div class="pole">
+          <label>Сега</label>
+          <p class="drebno" id="klod-sastoyanie" translate="no">проверявам…</p>
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="zapishi-klyuch-klod">Запиши ключа</button>
+        <button type="button" class="vtorichen" id="zabravi-klyuch-klod">Забрави го</button>
+        <p class="drebno">Ключът живее САМО на това устройство и НИКОГА в Журнала — тайна в дневник
+        само за добавяне е тайна, изгубена завинаги. Всеки, който отвори инструментите на разработчика
+        тук, ще го види: това е цената на приложение без сървър, и тя се казва, а не се крие.
+        „Пусни с Клод" при задача праща протокола на „${ekraniraj(a.ime)}" и данните от обхвата му —
+        нищо друго не излиза навън.</p>
+      </div>
+    </section>`;
+}
+
+/**
+ * РЪЧНОТО ПРЕДЛОЖЕНИЕ · пътят, който остава и БЕЗ свързваща част.
+ *
+ * Офлайн изданието няма Клод; там човекът разговаря с агента другаде и вписва
+ * заключението тук. Затова формата не пада, когато свързването се построи —
+ * тя е единственият път в изданието без мрежа.
+ */
+function kartaRachnoPredlozhenie(a: Agent): string {
+  return `
+    <section class="karta">
+      <div class="dyalglava">
+        <h2>Ръчно предложение</h2>
+        <span>пътят без мрежа · вписвам заключението сам</span>
+      </div>
       <form id="forma-zadacha">
         <div class="pole">
-          <label for="zadacha-tekst">Какво да провери или сметне</label>
+          <label for="zadacha-tekst">По коя задача</label>
           <input translate="no" id="zadacha-tekst" name="zadacha" required
             placeholder="напр. сверѝ ДДС за август по акумулатори" autocomplete="off">
         </div>
@@ -448,21 +712,7 @@ function kartaZadachi(a: Agent): string {
           <input translate="no" id="zadacha-kakvo" name="kakvo" required
             placeholder="предложението, с думи" autocomplete="off">
         </div>
-        <div class="poleta tesni">
-          ${[1, 2, 3]
-            .map(
-              (nomer) => `<div class="pole">
-            <label for="zadacha-umenie${nomer}">${nomer === 1 ? 'Три умения за ТАЗИ задача' : '&nbsp;'}</label>
-            <select translate="no" id="zadacha-umenie${nomer}" name="umenie${nomer}">
-              <option value="">— избери —</option>
-              ${vklyuchenite(a)
-                .map((u) => `<option value="${ekraniraj(u.klyuch)}">${ekraniraj(u.ime)}</option>`)
-                .join('')}
-            </select>
-          </div>`,
-            )
-            .join('')}
-        </div>
+        ${poletaZaTriUmeniya(a, 'zadacha')}
         <div class="poleta tesni">
           <div class="pole">
             <label for="zadacha-vhod">Сверка · вход</label>
@@ -477,8 +727,7 @@ function kartaZadachi(a: Agent): string {
         <div class="deystviya">
           <button type="submit" class="glaven">Запиши предложението</button>
           <p class="drebno">Записвам АЗ — <code>actor</code> е моят имейл, а бележката носи „предложено от агент: ${ekraniraj(a.ime)}".
-          Задачата назовава ТРИ умения от включените (правило 25). Днес се вписва на ръка; щом свързването се построи,
-          същото поле ще се пълни и след разговор с агента.</p>
+          Задачата назовава ТРИ умения от включените (правило 25).</p>
         </div>
       </form>
     </section>`;
@@ -535,6 +784,50 @@ function redNaPredlozhenie(p: Predlozhenie): string {
     </div>`;
 }
 
+/**
+ * ДАННИТЕ, КОИТО ИЗЛИЗАТ НАВЪН · точно колкото обхватът позволява.
+ *
+ * Обхватът е ЕДИНСТВЕНОТО, което решава какво тръгва към Клод. Затова тук
+ * няма нито един ред извън `switch`-а по обхвата: добавен екран без свой
+ * `case` не изтича мълчаливо — той просто не се появява.
+ *
+ * И се пращат СБОРОВЕ и БРОЙКИ, не редовете. Агентът предлага посока, човекът
+ * гледа числата; за да прецени посоката, обобщението стига, а имената на
+ * наематели и доставчици нямат работа на чужд сървър.
+ */
+export function dannitezaAgenta(o: Ogledalo, a: Agent): string {
+  const redove: string[] = [];
+  for (const obhvat of a.obhvat) {
+    switch (obhvat) {
+      case 'imoti':
+        redove.push(`Имоти: ${o.imoti.size} · договори за наем: ${o.naemi.size}`);
+        break;
+      case 'pari': {
+        const prihod = [...o.plashtaniya.values()].reduce((s, p) => s + p.suma_st, 0);
+        const razhod = [...o.razhodi.values()].reduce((s, r) => s + r.suma_st, 0);
+        redove.push(
+          `Приходи: ${pishi(prihod)} € (${o.plashtaniya.size} плащания) · ` +
+            `Разходи: ${pishi(razhod)} € (${o.razhodi.size} разхода)`,
+        );
+        break;
+      }
+      case 'smetki':
+        redove.push(
+          `Подадени ДДС-справки: ${o.spravki.size} · платени: ${o.platenoDDS.size} · ` +
+            `начислени вземания: ${o.vzemaniya.size}`,
+        );
+        break;
+      case 'stoynost':
+        redove.push(`Таблици с модел: ${o.modeli.size} · записани сверки: ${o.sverki.length}`);
+        break;
+      case 'gant':
+        redove.push(`Дела в Управление: ${o.dela.size}`);
+        break;
+    }
+  }
+  return redove.length === 0 ? 'Обхватът му е празен — няма какво да прочете.' : redove.join('\n');
+}
+
 export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-izbran-agent]')) {
     b.addEventListener('click', async () => {
@@ -562,6 +855,33 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
 
   const agentSega = async (): Promise<Agent | undefined> =>
     (await k.deystviya.ogledalo()).agenti.get(izbranAgent);
+
+  /**
+   * ПОИСКВА ПОТВЪРЖДЕНИЕ · прави кода, отваря писмото, запомня действието.
+   *
+   * Кодът се прави ТУК и се дава САМО на писмото. Отпечатъкът му остава в
+   * `iskane`; самият код не се пази никъде — затова и не може да изтече.
+   */
+  const poiskayPotvarzhdenie = async (
+    zaKakvo: ZaKakvo,
+    kakvo: string,
+    doImeyl: string,
+    deystvie: () => Promise<void>,
+  ): Promise<void> => {
+    const kod = napraviKod((n) => crypto.getRandomValues(new Uint32Array(n)));
+    iskane = await poiskay(
+      { zaKakvo, kakvo, doImeyl, kod, kogato: new Date().toISOString() },
+      sha256Web,
+    );
+    sledPotvarzhdenie = deystvie;
+    const p = pismoto(iskane, kod);
+    // Кодът пътува САМО в тази чернова — на екрана го няма и в Журнала няма да влезе.
+    pismotoAdres = `mailto:${encodeURIComponent(doImeyl)}?subject=${encodeURIComponent(
+      p.zaglavie,
+    )}&body=${encodeURIComponent(p.tyalo)}`;
+    greshka = '';
+    await prerisuvay();
+  };
 
   const formaAgent = koren.querySelector<HTMLFormElement>('#forma-agent');
   formaAgent?.addEventListener('submit', async (e) => {
@@ -597,12 +917,26 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
     }
   });
 
-  /** Всяка промяна по уменията е НОВ запис на агента (правило 1). */
-  const zapishiAgenta = async (nov: Awaited<ReturnType<typeof agentSega>>, vest: string) => {
+  /**
+   * Всяка промяна по уменията е НОВ запис на агента (правило 1) и минава
+   * през КОД ОТ ПИСМО (И94 т.1: „С имейл се потвърждават и Уменията").
+   *
+   * Спирачката стои на ЕДНО място — тук — за всичките три действия по
+   * уменията. Сложена поотделно на трите бутона, четвъртият бутон утре ще я
+   * пропусне, без някой да забележи.
+   */
+  const zapishiAgenta = async (
+    nov: Awaited<ReturnType<typeof agentSega>>,
+    kakvo: string,
+    vest: string,
+  ) => {
     if (!nov) return;
-    await k.deystviya.zapishiAgent(nov, { opId: `agent:${crypto.randomUUID()}` });
-    k.vest('dobre', vest);
-    await prerisuvay();
+    await poiskayPotvarzhdenie('umenie', kakvo, nov.otgovornik, async () => {
+      await k.deystviya.zapishiAgent(nov, { opId: `agent:${crypto.randomUUID()}` });
+      greshka = '';
+      k.vest('dobre', vest);
+      await prerisuvay();
+    });
   };
 
   const formaUmenie = koren.querySelector<HTMLFormElement>('#forma-umenie');
@@ -617,6 +951,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
       const ime = String(d.get('ime') ?? '');
       await zapishiAgenta(
         dobaviUmenie(star, { ime, tekst: String(d.get('tekst') ?? '') }),
+        `добавяне на „${ime.trim()}"`,
         `Умението „${ime.trim()}" е добавено и е ВКЛЮЧЕНО.`,
       );
     } catch (err) {
@@ -633,6 +968,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
         const sega = star.umeniya.find((u) => u.klyuch === klyuch);
         await zapishiAgenta(
           prevklyuchiUmenie(star, klyuch, !sega?.vklyucheno),
+          `${sega?.vklyucheno ? 'изключване' : 'включване'} на „${sega?.ime ?? klyuch}"`,
           `Умението „${sega?.ime ?? klyuch}" е ${sega?.vklyucheno ? 'ИЗКЛЮЧЕНО' : 'ВКЛЮЧЕНО'}.`,
         );
       } catch (err) {
@@ -651,6 +987,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
         const sega = star.umeniya.find((u) => u.klyuch === klyuch);
         await zapishiAgenta(
           premahniUmenie(star, klyuch),
+          `махане на „${sega?.ime ?? klyuch}"`,
           `Умението „${sega?.ime ?? klyuch}" е махнато. Записът за него остава в Журнала.`,
         );
       } catch (err) {
@@ -728,6 +1065,206 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
       await prerisuvay();
     }
   });
+
+  koren.querySelector<HTMLButtonElement>('#otkazhi-koda')?.addEventListener('click', async () => {
+    iskane = undefined;
+    sledPotvarzhdenie = undefined;
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#potvardi-koda')?.addEventListener('click', async () => {
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-kod')!;
+    kazhi.textContent = '';
+    const vaveden = koren.querySelector<HTMLInputElement>('#kod')?.value ?? '';
+    try {
+      if (!iskane || !sledPotvarzhdenie) return;
+      await proveri(iskane, vaveden, new Date().toISOString(), sha256Web);
+      const deystvie = sledPotvarzhdenie;
+      // Изчиства се ПРЕДИ действието: втори натиснат бутон да не го пусне пак.
+      iskane = undefined;
+      sledPotvarzhdenie = undefined;
+      await deystvie();
+    } catch (err) {
+      kazhi.textContent = dumiZaGreshka(err);
+    }
+  });
+
+  // НОВА ЗАДАЧА · разписание + три умения (И94 т.1).
+  const formaNovaZadacha = koren.querySelector<HTMLFormElement>('#forma-nova-zadacha');
+  formaNovaZadacha?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-nova-zadacha')!;
+    kazhi.textContent = '';
+    const d = new FormData(formaNovaZadacha);
+    try {
+      const agent = await agentSega();
+      if (!agent) throw new Error('Няма избран агент.');
+      const z = napraviZadacha(agent, {
+        id: crypto.randomUUID(),
+        kakvo: String(d.get('kakvo') ?? ''),
+        razpisanie: String(d.get('razpisanie') ?? 'vsekidnevna') as Razpisanie,
+        umeniya: [
+          String(d.get('umenie1') ?? ''),
+          String(d.get('umenie2') ?? ''),
+          String(d.get('umenie3') ?? ''),
+        ],
+        denOtSedmitsata: Number(d.get('den') ?? 1),
+        ot: String(d.get('ot') ?? ''),
+        do: String(d.get('do') ?? ''),
+        kogato: new Date().toISOString(),
+      });
+      await k.deystviya.zapishiZadacha(z, { opId: `zadacha:${crypto.randomUUID()}` });
+      greshka = '';
+      k.vest(
+        'dobre',
+        `Задачата е възложена — НЕПОТВЪРДЕНА. Потвърди я с имейл, за да почне да се пада.`,
+      );
+      await prerisuvay();
+    } catch (err) {
+      kazhi.textContent = dumiZaGreshka(err);
+    }
+  });
+
+  const zadachaSega = async (id: string): Promise<Zadacha | undefined> =>
+    (await k.deystviya.ogledalo()).zadachi.get(id);
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-potvardi-zadacha]')) {
+    b.addEventListener('click', async () => {
+      try {
+        const z = await zadachaSega(b.dataset['potvardiZadacha']!);
+        const agent = await agentSega();
+        if (!z || !agent) return;
+        await poiskayPotvarzhdenie('zadacha', z.kakvo, agent.otgovornik, async () => {
+          await k.deystviya.zapishiZadacha(potvardiZadacha(z), {
+            opId: `zadacha:${crypto.randomUUID()}`,
+          });
+          k.vest('dobre', `„${z.kakvo}" е потвърдена с код от писмото.`);
+          await prerisuvay();
+        });
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+  }
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-prevklyuchi-zadacha]')) {
+    b.addEventListener('click', async () => {
+      try {
+        const z = await zadachaSega(b.dataset['prevklyuchiZadacha']!);
+        if (!z) return;
+        await k.deystviya.zapishiZadacha(prevklyuchiZadacha(z, !z.vklyuchena), {
+          opId: `zadacha:${crypto.randomUUID()}`,
+        });
+        greshka = '';
+        k.vest('dobre', `„${z.kakvo}" е ${z.vklyuchena ? 'ИЗКЛЮЧЕНА' : 'ВКЛЮЧЕНА'}.`);
+        await prerisuvay();
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+  }
+
+  // ПУСКАНЕТО С КЛОД · бутонът от И94 т.1. Всяко пускане иска свой код:
+  // то харчи пари и излиза НАВЪН от устройството — двете причини стоят на
+  // екрана, не в коментар.
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-pusni-zadacha]')) {
+    b.addEventListener('click', async () => {
+      try {
+        const z = await zadachaSega(b.dataset['pusniZadacha']!);
+        const agent = await agentSega();
+        if (!z || !agent) return;
+        await poiskayPotvarzhdenie('pusnati-agent', z.kakvo, agent.otgovornik, async () => {
+          b.disabled = true;
+          try {
+            const { pusniSKlod } = await import('./klod.js');
+            const o = await k.deystviya.ogledalo();
+            const otgovor = await pusniSKlod({
+              agent,
+              zadacha: z.kakvo,
+              danni: dannitezaAgenta(o, agent),
+            });
+            await k.deystviya.zapishiPredlozhenie(
+              {
+                id: crypto.randomUUID(),
+                agent: agent.klyuch,
+                zadacha: z.kakvo,
+                kakvo: otgovor.kakvo,
+                umeniya: z.umeniya,
+                // Сверката СТОИ на нула и чака човека: Клод връща думи, не
+                // числа за Вратата. Нулата тук е „още непроверено", и точно
+                // затова колоната „Разлика" се показва дори нулева.
+                sverka: { vhod: 0, izhod: 0 },
+                prisada: 'chaka',
+                prichina: '',
+                otsadil: '',
+                kogato: new Date().toISOString(),
+              },
+              { opId: `predlozhenie:${crypto.randomUUID()}` },
+            );
+            greshka = '';
+            k.vest(
+              'dobre',
+              `Клод предложи по „${z.kakvo}" (${otgovor.vhodni}+${otgovor.izhodni} жетона). Предложението чака моята дума.`,
+            );
+          } finally {
+            b.disabled = false;
+          }
+          await prerisuvay();
+        });
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+  }
+
+  // КЛЮЧЪТ ЗА КЛОД · динамичен внос, защото офлайн изданието няма файла.
+  const klodBlok = koren.querySelector<HTMLElement>('#klod-sastoyanie');
+  if (klodBlok) {
+    void (async () => {
+      try {
+        const { imaKlyuch, opashkataNaKlyucha } = await import('./klod.js');
+        klodBlok.textContent = imaKlyuch()
+          ? `ключът стои ${opashkataNaKlyucha()}`
+          : 'няма ключ — „Пусни с Клод" ще откаже с думи';
+      } catch {
+        klodBlok.textContent = 'свързващата част я няма в това издание';
+      }
+    })();
+  }
+
+  koren
+    .querySelector<HTMLButtonElement>('#zapishi-klyuch-klod')
+    ?.addEventListener('click', async () => {
+      const pole = koren.querySelector<HTMLInputElement>('#klod-klyuch');
+      try {
+        const { zapishiKlyuch } = await import('./klod.js');
+        zapishiKlyuch(pole?.value ?? '');
+        if (pole) pole.value = '';
+        greshka = '';
+        k.vest('dobre', 'Ключът е записан МЕСТНО. В Журнала не влиза нищо.');
+        await prerisuvay();
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+
+  koren
+    .querySelector<HTMLButtonElement>('#zabravi-klyuch-klod')
+    ?.addEventListener('click', async () => {
+      try {
+        const { zabraviKlyucha } = await import('./klod.js');
+        zabraviKlyucha();
+        k.vest('dobre', 'Ключът е забравен от това устройство.');
+        await prerisuvay();
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
 
   const formaZadacha = koren.querySelector<HTMLFormElement>('#forma-zadacha');
   formaZadacha?.addEventListener('submit', async (e) => {
