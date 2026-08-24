@@ -209,12 +209,16 @@ function opciiOtsenki(izbrano: string): string {
  *
  * Скролът е ХОРИЗОНТАЛЕН във времето *(р52·[221])*: „да не се скролва по
  * вертикла, а по хоризонтал в времето".
+ *
+ * Изнесена е, защото Сметки я рисува като КОПИЕ (И92 т.4) — същата таблица,
+ * без сгъвачите: там се ЧЕТЕ за сверка, пише се в Управление.
  */
-function tablitsataSOcveteniPoleta(
+export function tablitsataSOcveteniPoleta(
   dela: readonly Delo[],
   r: ReturnType<typeof reshetka>,
   sumi: readonly { prihod_st: number; razhod_st: number }[],
   dnes: string,
+  sasSgavachi = true,
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -237,7 +241,7 @@ function tablitsataSOcveteniPoleta(
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi)).join('')}`,
             )
             .join('')}
           <div class="gant-sbor">Приход · Разход</div>
@@ -298,8 +302,9 @@ function kletka(dnes: boolean): string {
   return `<span class="gant-kletka${dnes ? ' dnes' : ''}"></span>`;
 }
 
-function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string): string {
-  const sgavaemo = imaPoddela(vsichki, d.id);
+function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string, sasSgavachi = true): string {
+  // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
+  const sgavaemo = sasSgavachi && imaPoddela(vsichki, d.id);
   return `<div class="gant-delo ${svetofar(d, dnes)}${d.nadDelo ? ' poddelo' : ''}" data-ime="${ekraniraj(d.id)}">
     ${
       sgavaemo
@@ -384,10 +389,11 @@ function formaDelo(o: Ogledalo, dnes: string): string {
  *
  * Затова решетката носи `data-koloni` и `data-ot`/`data-broy`, а тук те стават
  * истински CSS свойства. Политиката не се отслабва заради удобство.
+ *
+ * Изнесена е: копието в Сметки носи същата решетка и иска същите ширини.
  */
-function slozhiShirinite(koren: HTMLElement): void {
-  const gant = koren.querySelector<HTMLElement>('.gant');
-  if (gant) {
+export function slozhiShirinite(koren: HTMLElement): void {
+  for (const gant of koren.querySelectorAll<HTMLElement>('.gant')) {
     const broy = Number(gant.dataset.koloni ?? 0);
     gant.style.setProperty('--vreme', `repeat(${broy}, minmax(34px, 1fr))`);
   }

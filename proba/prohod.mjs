@@ -2121,6 +2121,39 @@ async function main() {
     proveri('Гант носи Акт 16', gantTekst.includes('Акт 16'), true);
     proveri('и огледите за продажба или наем', gantTekst.includes('Оглед за продажба или Наем'), true);
 
+    // ══ 39 · диаграмите в Сметки (И92 т.4) ══════════════════════════════════
+    razdel = '39 · диаграмите в Сметки';
+    await naEkran(p, 'smetki', '#forma-period');
+    const smetkiTekst = await p.evaluate(() => document.body.textContent);
+    proveri('Сметки носи копието от Управление',
+      smetkiTekst.includes('Делата · копието от Управление'), true);
+    proveri('и таблицата с оцветени полета е там',
+      smetkiTekst.includes('Управление на Времевия Ред в Делата'), true);
+    proveri('диаграмата на Ганта стои до копието',
+      await p.$$eval('svg.diagrama:not(.stalbove)', (r) => r.length), 1);
+    proveri('копието се ЧЕТЕ — няма нито един сгъвач',
+      await p.$$eval('#ekran button.sgavach', (r) => r.length), 0);
+    proveri('и няма форма за дело — пише се в Управление',
+      await p.$('#forma-delo'), null);
+
+    // диаграмата в Отчетите: 12 месеца, стълбовете носят числата си
+    proveri('Отчетите носят стълбовете на месеците',
+      await p.$$eval('svg.stalbove .stalbove-mesets', (r) => r.length), 12);
+
+    // СВЕРКА ВХОД↔ИЗХОД НА САМИЯ СТЪЛБ: разход с ДНЕШНА дата → стълбът на
+    // текущия месец расте ТОЧНО с него. Не се стъпва на закованите стари
+    // дати — те излизат от 12-месечния прозорец с времето (урокът от §24).
+    const stalbPredi = await p.$eval('svg.stalbove .stalbove-mesets:last-of-type',
+      (g) => Number(g.dataset.razhodSt));
+    await zapishiRazhod(p, {
+      potok: 'fakturi', sektor: 'pokupki-uslugi', dostavchik: 'проба',
+      opis: 'проба на стълба', suma: '33,00', nachin: 'банка',
+      data: denOtDnes(0), dokument: '9001',
+    });
+    proveri('стълбът на текущия месец расте точно с новия разход',
+      await p.$eval('svg.stalbove .stalbove-mesets:last-of-type', (g) => Number(g.dataset.razhodSt)),
+      stalbPredi + 3300);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

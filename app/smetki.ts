@@ -38,6 +38,13 @@ import {
 } from '../src/domein/otcheti.js';
 import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
+import { podredi } from '../src/domein/dela.js';
+import { obobshtenRed, reshetka } from '../src/domein/gant.js';
+import { sumiZaObhvat } from '../src/domein/otcheti.js';
+import { mesechnitePari } from '../src/domein/diagrami.js';
+import { stalboveNaMesetsite } from './diagrami.js';
+import { narisuvayDiagrama } from './gant-diagrama.js';
+import { slozhiShirinite, tablitsataSOcveteniPoleta } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
@@ -179,7 +186,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>
 
-    ${blokNaOtchetite(o, mesets)}
+    ${blokNaOtchetite(o, mesets, dnes)}
+
+    ${blokDelata(o, dnes)}
 
     ${blokNaSverkataDDS(s.ddsSverka)}
 
@@ -293,7 +302,7 @@ function formaSalda(o: Ogledalo): string {
  * Затова тук няма голо число: под всяко стои от какво е съставено и откъде се
  * чете. Число, което никой не може да разглоби, е усещане с цифра пред себе си.
  */
-function blokNaOtchetite(o: Ogledalo, mesets: string): string {
+function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
   // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
   // може да различи „нула" от „още не е смятано" (правило 15).
   const stoynost_st = sboratZaKapitala();
@@ -312,6 +321,7 @@ function blokNaOtchetite(o: Ogledalo, mesets: string): string {
       <div class="otcheti">
         ${r.poleta.map(poleNaOtcheta).join('')}
       </div>
+      ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
       <div class="tablitsa">
         <div class="glava sverka">
           <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
@@ -329,6 +339,35 @@ function blokNaOtchetite(o: Ogledalo, mesets: string): string {
       </div>
       <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
     </section>`;
+}
+
+/**
+ * ДЕЛАТА В СМЕТКИ · копието от Управление, с диаграмата до него (И92 т.4).
+ *
+ * „Прави диаграмите — има ги в Сметки, до таблицата, която е копие на тази
+ * от Управление… Давай ги всички сега." И92 стъпва на И91: „ще се работи с
+ * тази информация за сверка само от Сметки, където са и Отчетите."
+ *
+ * Копието се ЧЕТЕ: без форма, без филтри, без сгъвачи — посоката е една
+ * (правило 20), пише се в Управление. Тактът е закован на месец: сверката
+ * гледа месеци, не дни.
+ */
+function blokDelata(o: Ogledalo, dnes: string): string {
+  const dela = podredi([...o.dela.values()], dnes);
+  if (dela.length === 0) return '';
+  const r = reshetka(dela, 'mesets', dnes);
+  const parvata = r.koloni[0]!;
+  const poslednata = r.koloni[r.koloni.length - 1]!;
+  const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Делата · копието от Управление</h2>
+        <span>чете се за сверка — пише се в Управление, посоката е една</span>
+      </div>
+    </section>
+    ${narisuvayDiagrama(dela, r, dnes)}
+    ${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false)}`;
 }
 
 function poleNaOtcheta(p: Pole): string {
@@ -755,6 +794,9 @@ export function zakachiSmetki(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  // Копието на решетката носи същите data-ширини като в Управление.
+  slozhiShirinite(koren);
+
   const formaPeriod = koren.querySelector<HTMLFormElement>('#forma-period');
   formaPeriod?.addEventListener('submit', async (e) => {
     e.preventDefault();

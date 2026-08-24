@@ -954,6 +954,14 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   stroke: #FBF8F3; stroke-width: 1; stroke-dasharray: 2 3;
 }
 
+/* ── стълбовете на месеците · диаграмата в Отчетите (И92 т.4) ────────────────
+   Зеленото и теракотата са ЦВЕТОВЕТЕ НА ПАРИТЕ от обобщения ред на Ганта —
+   един език за приход и разход на всеки екран. */
+.stalbove { margin-top: 6px; }
+.stalb-prihod { fill: var(--zeleno); }
+.stalb-razhod { fill: var(--aktsent); }
+.stalbove-nadpis { fill: var(--mastilo2); font-size: 10px; font-variant-numeric: tabular-nums; }
+
 
 /* ── контекстното меню · десният бутон, както в Уиндоус ─────────────────── */
 .kontekstno-menyu {
