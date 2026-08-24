@@ -288,3 +288,24 @@ describe('обобщеният ред · „в зависимост от вре�
     expect(obobshtenRed(k, []).length).toBe(k.length);
   });
 });
+
+/**
+ * НЕПОЗНАТАТА ОЦЕНКА · находка на сверката: `TEZHEST[непозната]` даваше NaN,
+ * NaN е лъжливо за ||, и сравнителят ставаше непоследователен — подредбата
+ * по спешност се обръщаше мълчешком при стар Журнал или чужд внос.
+ */
+describe('подредбата при непозната оценка', () => {
+  it('непознатото пада НАКРАЯ, а спешното остава първо', () => {
+    const delo = (id: string, otsenka: string): Delo => ({
+      id, seq: 1, myasto: 'Малинова', obekt: '', ime: id, otgovornik: '',
+      ot: '2026-08-20', do: '2026-09-20',
+      otsenka: otsenka as Delo['otsenka'], sastoyanie: 'чака', nadDelo: '', dokument: '',
+    });
+    const podredeni = podredi(
+      [delo('чуждо', 'измислена-оценка'), delo('спешното', 'спешно-важно'), delo('обикновено', 'нито-едно')],
+      '2026-08-24',
+    );
+    expect(podredeni[0]!.ime).toBe('спешното');
+    expect(podredeni[podredeni.length - 1]!.ime).toBe('чуждо');
+  });
+});

@@ -21,6 +21,7 @@ import {
   saldoNa,
   sredstva,
   sumiZaDen,
+  sumiZaObhvat,
   vzemaniya,
   type Pole,
 } from '../src/domein/otcheti.js';
@@ -453,5 +454,39 @@ describe('вторият път брои САМ', () => {
     const kriv = kapital(o, { stoynostNaSastoyanie_st: 100_00 });
     const razlika = kriv.sbor_st + 7_00 - (chesten.sverka.aktivi_st - chesten.sverka.zadalzheniya_st);
     expect(razlika).toBe(7_00); // разминаването СВЕТИ, вместо да се преглътне
+  });
+});
+
+/**
+ * СУМИТЕ ЗА ОБХВАТ · находка на сверката: решетката на Ганта покрива месеци
+ * напред и назад, а се хранеше със `sumiZaDen` — един календарен месец.
+ * Колона извън месеца показваше нула, която изглежда като „няма движение".
+ */
+describe('сумите за обхват от дни', () => {
+  it('виждат и съседния месец, който sumiZaDen реже', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await deystviya.zapishiRazhod(
+      'R-yuli',
+      {
+        potok: 'stroitelstvo', dostavchik: 'Материали ООД', opis: 'цимент',
+        suma_st: stotinki(600_00), sektor: 'razhod-materiali',
+        nachin: 'банка', data: '2026-07-15', dokument: '',
+      },
+      { opId: 'op-r-yuli' },
+    );
+    const o = await deystviya.ogledalo();
+
+    // Старият път: юлският разход е невидим за августовския месец.
+    expect(sumiZaDen(o, '2026-08').some((d) => d.data === '2026-07-15')).toBe(false);
+
+    // Новият: обхватът го носи, с двете суми поотделно.
+    const obhvat = sumiZaObhvat(o, '2026-07-01', '2026-08-31');
+    const yuli = obhvat.find((d) => d.data === '2026-07-15');
+    expect(yuli?.razhod_st).toBe(600_00);
+
+    // Границите са включителни, и извън тях не изтича нищо.
+    expect(sumiZaObhvat(o, '2026-07-15', '2026-07-15')).toHaveLength(1);
+    expect(sumiZaObhvat(o, '2026-07-16', '2026-07-31')).toHaveLength(0);
   });
 });

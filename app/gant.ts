@@ -45,7 +45,7 @@ import {
   TAKTOVE,
   type Takt,
 } from '../src/domein/gant.js';
-import { sumiZaDen } from '../src/domein/otcheti.js';
+import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -89,7 +89,12 @@ export function narisuvayGant(o: Ogledalo, dnes: string): string {
   );
   const naEkrana = vidimi(filtrirani, sgunati);
   const r = reshetka(naEkrana, takt, dnes);
-  const sumi = obobshtenRed(r.koloni, sumiZaDen(o, dnes.slice(0, 7)));
+  // Сумите покриват ЦЕЛИЯ обхват на решетката — от първата до последната
+  // колона — не един месец: колона извън месеца показваше нула, която
+  // изглеждаше като „няма движение".
+  const parvata = r.koloni[0]!;
+  const poslednata = r.koloni[r.koloni.length - 1]!;
+  const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
 
   const mesta = [...new Set(vsichki.map((d) => d.myasto))].sort();
   const obekti = [...new Set(vsichki.map((d) => d.obekt).filter(Boolean))].sort();

@@ -17,6 +17,7 @@ import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno } from './storno.js';
 import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
 
 export interface SastoyanieNaEkrana {
@@ -141,7 +142,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           <div class="pole">
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
-                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? pishiVPole(popravyanImot.ploshtad_kvsm / 100) : ''}">
+                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kvSmVM2(popravyanImot.ploshtad_kvsm) : ''}">
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -342,7 +343,7 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
     <div class="red imot" translate="no">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
-      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${pishi(imot.ploshtad_kvsm / 100)} м²` : '—'}</span></span>
+      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>
       <span class="suma">${zhivi.length ? pishi(sbor) : '—'}</span>
       <span>${
         zhivi.length > 1
@@ -402,9 +403,11 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     const surovaPloshtad = String(danni.get('ploshtad') ?? '').trim();
     if (surovaPloshtad !== '') {
       try {
-        ploshtad_kvsm = otLeva(surovaPloshtad) * 100;
+        // Площта си има СВОЙ четец (правило 3 · ADR-014): паричният приемаше
+        // „72,40 €" за площ и залепваше знака на валутата при показване.
+        ploshtad_kvsm = ploshtVKvSm(surovaPloshtad);
       } catch (e) {
-        greshka.textContent = e instanceof GreshkaPari ? e.message : String(e);
+        greshka.textContent = e instanceof Error ? e.message : String(e);
         return;
       }
     }

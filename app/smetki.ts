@@ -14,7 +14,6 @@ import { MERKA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
 import {
-  AKUMULATORI,
   akumulator,
   ddsOtObshta,
   sektoriNaRazhod,
@@ -76,11 +75,20 @@ let smyatane: RedNaSmyatane[] = [];
 
 /** Колоните на списъка „Разходи" — фините филтри в стил Уиндоус. */
 const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
+  // Петата глава пише „ДДС" и колоната Е ДДС (правило 20 · ADR-014): дотук
+  // беше описана като ДАТА и филтърът под „ДДС" предлагаше „Днес · Вчера ·
+  // Тази седмица" — глава, която лъже какво стои под нея. Дата-филтърът пада
+  // с лъжата; датата се търси свободно през „Търси в таблицата".
   { klyuch: 'koy', ime: 'Доставчик и описание', vid: 'tekst', vzemi: (r) => r.dostavchik },
   { klyuch: 'potok', ime: 'Поток', vid: 'tekst', vzemi: (r) => potok(r.potok)?.ime ?? r.potok },
   { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (r) => akumulator(r.sektor).sektor },
   { klyuch: 'suma', ime: 'Обща сума', vid: 'evro', vzemi: (r) => r.suma_st },
-  { klyuch: 'data', ime: 'ДДС', vid: 'data', vzemi: (r) => r.data },
+  {
+    klyuch: 'dds',
+    ime: 'ДДС',
+    vid: 'evro',
+    vzemi: (r) => ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st,
+  },
 ];
 
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
@@ -694,9 +702,7 @@ function kalkulator(): string {
           <div class="pole">
             <label for="smyatane-stavka">Ставка</label>
             <select translate="no" id="smyatane-stavka" name="stavka" required>
-              ${[...new Set(AKUMULATORI.map((a) => a.stavka))]
-                .sort((a, b) => a - b)
-                .map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
+              ${STAVKI.map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
                 .join('')}
             </select>
           </div>
