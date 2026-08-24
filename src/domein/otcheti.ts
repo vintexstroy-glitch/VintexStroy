@@ -316,6 +316,19 @@ export interface DenSPari {
  * календарът е за дни, а начислението няма ден — то има падеж.
  */
 export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
+  return poDni(o, (data) => data.slice(0, 7) === period);
+}
+
+/**
+ * ЕДНА обиколка по дните · двата викащи се различават САМО по това КОИ дни
+ * влизат.
+ *
+ * Написана два пъти, тя се разминава при първата поправка в едната: например
+ * при решението приходът тук да е СЪБРАНОТО, не начисленото. Тогава единият
+ * календар щеше да казва едно, а решетката на Ганта — друго, за едни и същи
+ * пари. Затова сметката е ЕДНА, а разликата е предикат.
+ */
+function poDni(o: Ogledalo, vlizaLi: (data: string) => boolean): readonly DenSPari[] {
   const po = new Map<string, { prihod_st: number; razhod_st: number }>();
   const vzemi = (data: string) => {
     let v = po.get(data);
@@ -327,12 +340,10 @@ export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
   };
 
   for (const p of o.plashtaniya.values()) {
-    if (p.data.slice(0, 7) !== period) continue;
-    vzemi(p.data).prihod_st += p.suma_st;
+    if (vlizaLi(p.data)) vzemi(p.data).prihod_st += p.suma_st;
   }
   for (const r of o.razhodi.values()) {
-    if (r.data.slice(0, 7) !== period) continue;
-    vzemi(r.data).razhod_st += r.suma_st;
+    if (vlizaLi(r.data)) vzemi(r.data).razhod_st += r.suma_st;
   }
 
   return [...po.entries()]
@@ -351,28 +362,7 @@ export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
  * Границите са включителни, ISO текст — както говорят колоните на решетката.
  */
 export function sumiZaObhvat(o: Ogledalo, ot: string, doo: string): readonly DenSPari[] {
-  const po = new Map<string, { prihod_st: number; razhod_st: number }>();
-  const vzemi = (data: string) => {
-    let v = po.get(data);
-    if (!v) {
-      v = { prihod_st: 0, razhod_st: 0 };
-      po.set(data, v);
-    }
-    return v;
-  };
-
-  for (const p of o.plashtaniya.values()) {
-    if (p.data < ot || p.data > doo) continue;
-    vzemi(p.data).prihod_st += p.suma_st;
-  }
-  for (const r of o.razhodi.values()) {
-    if (r.data < ot || r.data > doo) continue;
-    vzemi(r.data).razhod_st += r.suma_st;
-  }
-
-  return [...po.entries()]
-    .map(([data, v]) => ({ data, ...v }))
-    .sort((a, b) => a.data.localeCompare(b.data));
+  return poDni(o, (data) => data >= ot && data <= doo);
 }
 
 /** Сборът на съставките. Знакът е в самата съставка, не в сбирача. */

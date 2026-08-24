@@ -49,7 +49,7 @@ import {
   type Delo,
 } from '../src/domein/dela.js';
 import type { Reshetka } from '../src/domein/gant.js';
-import { ekraniraj } from './imoti.js';
+import { ekraniraj } from './obshto.js';
 
 /** Височина на един ред · подделото е по-тънко и това се вижда. */
 const RED = 26;

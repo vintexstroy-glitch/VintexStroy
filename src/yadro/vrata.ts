@@ -119,6 +119,23 @@ export class Vrata {
   }
 
   /**
+   * СПИРАТЕЛНИЯТ КРАН · проверява се на ВСЕКИ вход към записа.
+   *
+   * Двата входа — една операция и възстановяване на цял журнал — питаха
+   * поотделно. Трети вход, писан утре, щеше да пропусне въпроса, без някой да
+   * забележи: кранът е дръпнат при ИНЦИДЕНТ (правило 8), а точно тогава никой
+   * не чете кода, за да види кой го пита и кой не.
+   */
+  #akoEDrapnatKranat(): void {
+    if (this.#zatvorena) {
+      throw new GreshkaVrata(
+        'SPRYAN',
+        `Вратата е спряна: ${this.#prichinaZaZatvaryane || 'без посочена причина'}`,
+      );
+    }
+  }
+
+  /**
    * ВЪЗСТАНОВЯВАНЕ от износ — втората врата в същата стена, не дупка до нея.
    *
    * Внасяните събития вече са минали веднъж през Вратата; хешовете им го
@@ -138,12 +155,7 @@ export class Vrata {
     actor: string,
     sabitiya: readonly Sabitie[],
   ): Promise<RezultatVazstanovyavane> {
-    if (this.#zatvorena) {
-      throw new GreshkaVrata(
-        'SPRYAN',
-        `Вратата е спряна: ${this.#prichinaZaZatvaryane || 'без посочена причина'}`,
-      );
-    }
+    this.#akoEDrapnatKranat();
     if (sabitiya.length === 0) {
       throw new GreshkaVrata('NEVALIDNO', 'Няма нито едно събитие за възстановяване.');
     }
@@ -229,12 +241,7 @@ export class Vrata {
   }
 
   async dobavi(op: Operatsiya): Promise<Rezultat> {
-    if (this.#zatvorena) {
-      throw new GreshkaVrata(
-        'SPRYAN',
-        `Вратата е спряна: ${this.#prichinaZaZatvaryane || 'без посочена причина'}`,
-      );
-    }
+    this.#akoEDrapnatKranat();
 
     // Уникод-двойникът: „й" се пише по два начина (NFC/NFD), изглеждат
     // еднакво, но са различни низове — различни хешове, различни ключове,

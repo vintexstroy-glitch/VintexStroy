@@ -41,8 +41,8 @@ import {
   prevklyuchi,
   smeniPlan,
 } from '../src/domein/planove.js';
-import { ekraniraj } from './imoti.js';
 import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
+import { ekraniraj } from './obshto.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -162,7 +162,7 @@ function redNaOtmetka(izbor: Izbor, v: Vazmozhnost): string {
   const znachka = !ima
     ? '<span class="znachka tiha">няма я в този план</span>'
     : skoro
-      ? '<span class="znachka tiha">скоро · отделен проект</span>'
+      ? '<span class="znachka tiha">скоро · още не е построено</span>'
       : zadalzhitelna
         ? '<span class="znachka tiha">основата</span>'
         : vklyuchena
@@ -258,8 +258,9 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
         Мащабът се плаща на доставчика на хранилището, не на нас. Стартъпът е
         <b>Професионален · онлайн</b> и носи цялата функционалност; място и
         сигурност се купуват от Google, Microsoft или Apple, а поръчковата работа
-        е по договор. ИИ ще е добавка с цена, която се СВЪРЗВА — не вградена;
-        това е отделен проект и още не е започнал.
+        е по договор. ИИ е добавка с цена, която се СВЪРЗВА — не вградена:
+        ключът за модела е твой и стои на устройството, а сметката за него идва
+        от доставчика му, не от нас.
       </p>
     </section>`;
 }

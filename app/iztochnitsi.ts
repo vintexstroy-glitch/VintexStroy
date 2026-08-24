@@ -12,6 +12,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
@@ -65,9 +67,9 @@ import {
   zapishiSverkata,
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { fokusVPole } from './klaviatura.js';
 import type { Konteks } from './main.js';
+import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
 type Filtar = 'promenite' | 'vsichko';
 
@@ -231,8 +233,7 @@ export function narisuvayPlana(): string {
         <div class="pole">
           <label for="plan-nachin">Платено</label>
           <select translate="no" id="plan-nachin">
-            <option value="банка">по банка</option>
-            <option value="в брой">в брой</option>
+            ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
           </select>
         </div>
       </div>
@@ -1000,7 +1001,7 @@ export function zakachiIztochnitsi(
         {
           potok: vzemi('#plan-potok'),
           sektor: vzemi('#plan-sektor'),
-          nachin: vzemi('#plan-nachin') as 'банка' | 'в брой',
+          nachin: vzemi('#plan-nachin') as NachinNaPlashtane,
         },
         kogato,
         klyuchNaPartidata,

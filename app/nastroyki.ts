@@ -16,6 +16,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import {
   belegNaButon,
   DEYSTVIYA,
@@ -36,11 +38,20 @@ import {
   otbelezhiVavezhdane,
   preimenuvayKolona,
   premahniKolona,
+  dobaviFormulnaKolona,
   semeystvo,
+  smeniFormula,
   smeniVidNaStoynost,
   vidNomenklatura,
   zadayMenyu,
 } from '../src/domein/redaktor.js';
+import {
+  DEYSTVIYA_NA_FORMULA,
+  IMENA_NA_DEYSTVIYATA,
+  sDumiFormula,
+  type DeystvieNaFormula,
+  type Formula,
+} from '../src/domein/formuli.js';
 import {
   ePari,
   IMENA_NA_VIDOVETE_STOYNOST,
@@ -60,8 +71,8 @@ import { klyuchNaPravo,
 import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
+import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -85,6 +96,8 @@ let litseNaRedaktora: 'hedari' | 'opis' = 'hedari';
 let izbranHedar = '';
 /** Отворена ли е формата за нова колона. */
 let dobavyamKolona = false;
+/** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
+let smenyamFormula: number | null = null;
 
 export function narisuvayNastroyki(o: Ogledalo): string {
   const butoni = [...o.butoni.values()];
@@ -356,6 +369,8 @@ function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
   const nomenklatura = vidNomenklatura(m, k);
   const zaklyucheno = m.zaklyucheni.includes(k);
   const nosiRolya = Object.values(m.koloni).includes(k);
+  // Формулната колона не се пише и не се маха оттук: тя е сметка (правило 23).
+  const formula = m.formuli[k];
   return `
     <div class="red redaktor" translate="no">
       <span class="kletka">
@@ -374,19 +389,73 @@ function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
         </select>
         ${ePari(vidNaStoynostta) ? '<span>влиза в двата сбора</span>' : '<span>не влиза в сбор</span>'}
       </span>
-      <span>${IMENA_NA_NOMENKLATURITE[nomenklatura]}</span>
+      <span>${
+        formula ? `формула · ${ekraniraj(sDumiFormula(m, formula))}` : IMENA_NA_NOMENKLATURITE[nomenklatura]
+      }</span>
       <span class="kletka">${
         vid === 'zatvorena'
           ? '<span>—</span>'
           : `<input data-menyu-vhod="${k}" value="${ekraniraj((m.menyuta[k] ?? []).join(' · '))}" placeholder="членове през ·" aria-label="готово меню">`
       }</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-zapishi-kolona="${k}">Запиши</button>
+        ${formula ? '' : `<button type="button" class="vtorichen malak" data-zapishi-kolona="${k}">Запиши</button>`}
+        ${formula ? `<button type="button" class="vtorichen malak" data-smeni-formula="${k}">Смени формулата</button>` : ''}
         ${nomenklatura === 'opis' ? `<button type="button" class="vtorichen malak" data-iztriy-menyu="${k}">Изтрий менюто</button>` : ''}
         ${nomenklatura === 'svobodna' && vid === 'promenlyva' ? `<button type="button" class="vtorichen malak" data-vavezhdane="${k}">От въвеждането</button>` : ''}
-        ${nosiRolya ? '' : `<button type="button" class="vtorichen malak" data-premahni-kolona="${k}">Премахни</button>`}
+        ${nosiRolya || formula ? '' : `<button type="button" class="vtorichen malak" data-premahni-kolona="${k}">Премахни</button>`}
       </span>
-    </div>`;
+    </div>
+    ${smenyamFormula === k && formula ? formaNaFormulata(m, k, formula) : ''}`;
+}
+
+/**
+ * ФОРМАТА НА ФОРМУЛАТА · падащи менюта, не текстово поле (И92 т.9: „всичко
+ * деликатно скрито под падащи менюта").
+ *
+ * Свободен текст би искал собствен език и `eval` — двете са забранени
+ * (правило 10 · нула зависимости). Наборът е малък и изброим: четири действия
+ * и колоните на СЪЩАТА таблица, които носят данни.
+ */
+function formaNaFormulata(m: ModelNaTablitsa, kolona: number, sega?: Formula): string {
+  const operandi = m.glavi
+    .map((ime, k) => ({ ime, k }))
+    .filter(({ k }) => k !== kolona && m.formuli[k] === undefined);
+  const izbor = (nomer: number, izbrano: number | undefined, sPrazno: boolean): string => `
+    <select translate="no" name="operand${nomer}" aria-label="колона ${nomer}">
+      ${sPrazno ? `<option value=""${izbrano === undefined ? ' selected' : ''}>— няма —</option>` : ''}
+      ${operandi
+        .map(
+          ({ ime, k }) =>
+            `<option value="${k}"${k === izbrano ? ' selected' : ''}>${ekraniraj(ime)} · ${
+              IMENA_NA_VIDOVETE_STOYNOST[m.vidove[k] ?? 'tekst']
+            }</option>`,
+        )
+        .join('')}
+    </select>`;
+  return `
+    <form class="red-forma" id="forma-formula" data-kolona="${kolona}">
+      <div class="poleta tesni">
+        <div class="pole">
+          <label>Действие</label>
+          <select translate="no" name="deystvie">
+            ${DEYSTVIYA_NA_FORMULA.map(
+              (d) =>
+                `<option value="${d}"${d === sega?.deystvie ? ' selected' : ''}>${IMENA_NA_DEYSTVIYATA[d]}</option>`,
+            ).join('')}
+          </select>
+        </div>
+        <div class="pole"><label>Първа колона</label>${izbor(1, sega?.ot[0], false)}</div>
+        <div class="pole"><label>Втора колона</label>${izbor(2, sega?.ot[1], false)}</div>
+        <div class="pole"><label>Трета · само при сбор</label>${izbor(3, sega?.ot[2], true)}</div>
+      </div>
+      <p class="greshka" id="greshka-formula"></p>
+      <div class="deystviya">
+        <button type="submit" class="glaven">${sega ? 'Смени формулата' : 'Дай формулата'}</button>
+        <button type="button" class="vtorichen" id="otkazhi-formula">Откажи</button>
+        <p class="drebno">Видът на колоната се СМЯТА от операндите: евро + евро е евро, евро × число е евро,
+        „процент от" дава вида на първата. Формула върху формула не се прави — веригата гние тихо.</p>
+      </div>
+    </form>`;
 }
 
 function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
@@ -405,6 +474,7 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
             <select translate="no" id="kolona-vid" name="vid">
               <option value="promenlyva">променяща се</option>
               <option value="zatvorena">затворена · сметка или пренесен текст</option>
+              <option value="formula">формулна · смята се от други колони</option>
             </select>
           </div>
           <div class="pole">
@@ -435,6 +505,37 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
             .join('')}
         </div>`
         }
+        <div id="mvsto-za-formula" hidden>
+          <div class="poleta tesni">
+            <div class="pole">
+              <label for="nova-deystvie">Действие</label>
+              <select translate="no" id="nova-deystvie" name="deystvie">
+                ${DEYSTVIYA_NA_FORMULA.map(
+                  (d) => `<option value="${d}">${IMENA_NA_DEYSTVIYATA[d]}</option>`,
+                ).join('')}
+              </select>
+            </div>
+            ${[1, 2, 3]
+              .map(
+                (nomer) => `<div class="pole">
+              <label for="nova-operand${nomer}">${nomer === 3 ? 'Трета · само при сбор' : `${nomer === 1 ? 'Първа' : 'Втора'} колона`}</label>
+              <select translate="no" id="nova-operand${nomer}" name="operand${nomer}">
+                ${nomer === 3 ? '<option value="">— няма —</option>' : ''}
+                ${m.glavi
+                  .map((ime, k) =>
+                    m.formuli[k] === undefined
+                      ? `<option value="${k}">${ekraniraj(ime)} · ${IMENA_NA_VIDOVETE_STOYNOST[m.vidove[k] ?? 'tekst']}</option>`
+                      : '',
+                  )
+                  .join('')}
+              </select>
+            </div>`,
+              )
+              .join('')}
+          </div>
+          <p class="drebno">Формулната колона се ражда ЗАТВОРЕНА и видът ѝ се смята от операндите —
+          в нея не се пише, тя се смята. Формулата се дава при създаване; после я мени само Стопанинът.</p>
+        </div>
         <p class="greshka" id="greshka-kolona"></p>
         <div class="deystviya">
           <button type="submit" class="glaven">Добави колоната</button>
@@ -576,7 +677,7 @@ function blokNaSverkite(o: Ogledalo): string {
         ${posledni.map(redNaSverka).join('')}
       </div>`
       }
-      <p class="drebno">Разликата се записва и когато е нула — иначе „няма разлика" е неразличимо от „не е сверявано".</p>
+      <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>`;
 }
 
@@ -782,6 +883,52 @@ export function zakachiNastroyki(
       .map((c) => c.trim())
       .filter((c) => c !== '');
 
+  /** Формулата, сглобена от падащите менюта на една форма. */
+  const formulaOtFormata = (danni: FormData): Formula => {
+    const ot = [danni.get('operand1'), danni.get('operand2'), danni.get('operand3')]
+      .map((x) => String(x ?? '').trim())
+      .filter((x) => x !== '')
+      .map(Number);
+    return { deystvie: String(danni.get('deystvie')) as DeystvieNaFormula, ot };
+  };
+
+  // Полетата на формулата се показват само когато видът е „формулна" —
+  // „деликатно скрито", не трето поле, което всеки гледа и не пипа.
+  const vidNaNovata = koren.querySelector<HTMLSelectElement>('#kolona-vid');
+  const myastoZaFormula = koren.querySelector<HTMLElement>('#mvsto-za-formula');
+  vidNaNovata?.addEventListener('change', () => {
+    if (myastoZaFormula) myastoZaFormula.hidden = vidNaNovata.value !== 'formula';
+  });
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-smeni-formula]')) {
+    b.addEventListener('click', async () => {
+      smenyamFormula = Number(b.dataset['smeniFormula']);
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLButtonElement>('#otkazhi-formula')?.addEventListener('click', async () => {
+    smenyamFormula = null;
+    await prerisuvay();
+  });
+
+  const formaFormula = koren.querySelector<HTMLFormElement>('#forma-formula');
+  formaFormula?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-formula')!;
+    kazhi.textContent = '';
+    const kolona = Number(formaFormula.dataset['kolona']);
+    try {
+      const star = await hedarSega();
+      if (!star) throw new Error('Хедърът вече го няма — избери наново.');
+      const nov = smeniFormula(star, kolona, formulaOtFormata(new FormData(formaFormula)), 'sobstvenik');
+      await zapishiHedar(star, nov, `Формулата на „${star.glavi[kolona]}" е сменена.`);
+      smenyamFormula = null;
+      await prerisuvay();
+    } catch (err) {
+      kazhi.textContent = dumiZaGreshka(err);
+    }
+  });
+
   const formaKolona = koren.querySelector<HTMLFormElement>('#forma-kolona');
   formaKolona?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -795,6 +942,24 @@ export function zakachiNastroyki(
     try {
       const star = await hedarSega();
       if (!star) throw new Error('Хедърът вече го няма — избери наново.');
+
+      // ФОРМУЛНАТА КОЛОНА върви по свой път: тя няма номенклатура и не отива
+      // при роднините — формулата сочи НОМЕРА на колони в СВОЯ модел, а
+      // роднината има същата глава, но може да носи друг вид в тях.
+      if (String(danni.get('vid')) === 'formula') {
+        const ime = String(danni.get('ime') ?? '');
+        const nov = dobaviFormulnaKolona(star, {
+          ime,
+          formula: formulaOtFormata(danni),
+          rolya: 'sobstvenik',
+        });
+        await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
+        dobavyamKolona = false;
+        k.vest('dobre', `Формулната колона „${ime.trim()}" е добавена — тя се смята, не се пише.`);
+        await prerisuvay();
+        return;
+      }
+
       const opts = {
         ime: String(danni.get('ime') ?? ''),
         // Настройки е екранът на главния акаунт (И57); кой е натиснал, пише Вратата.

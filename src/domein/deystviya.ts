@@ -14,6 +14,7 @@ import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
+import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import type {
   PayloadImotDobaven,
@@ -35,6 +36,10 @@ import type {
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
+  PayloadAgentZapisan,
+  PayloadTabZapisan,
+  PayloadPredlozhenieZapisano,
+  PayloadZadachaZapisana,
   TipSabitie,
 } from './sabitiya.js';
 
@@ -267,6 +272,63 @@ export class Deystviya {
     );
   }
 
+
+  /**
+   * Записва ТАБ · секциите му и връзките между тях (И92 т.9).
+   *
+   * НЕ иска отключен период: табът не мени нито едно число — той решава
+   * какво се ПОКАЗВА. Заключен месец се гледа през същите секции.
+   */
+  async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * Записва АГЕНТ · картата и протоколът му (И92 т.10 · правило 18).
+   *
+   * НЕ иска отключен период: протоколът не мени нито едно число. Записва го
+   * човек — агентът няма достъп до Вратата и не може да си пише протокола.
+   */
+  async zapishiAgent(danni: PayloadAgentZapisan, z: Zayavka): Promise<Rezultat> {
+    // ВРАТАТА НА ПРОМЯНАТА (И94 т.6): протоколът е непроменим след
+    // създаване. Проверката стои ТУК, не на екрана — иначе вторият екран,
+    // който запише агент, ще я заобиколи, без да знае, че съществува.
+    const star = (await this.ogledalo()).agenti.get(danni.klyuch);
+    if (star) proveriPromyanata(star, danni);
+    return this.#pusni('АгентЗаписан', VID.agent, `AGENT:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * Записва ПРЕДЛОЖЕНИЕ или присъдата върху него · последното бие.
+   *
+   * `actor` е човекът (правило 18): екранът не казва „агентът записа с мое
+   * позволение", а „аз записвам". Заключеният период важи и тук — предложение
+   * за замразен месец минава по пътя на сверената промяна (правило 9).
+   */
+  async zapishiPredlozhenie(danni: PayloadPredlozhenieZapisano, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ПредложениеЗаписано', VID.predlozhenie, danni.id, danni, z);
+  }
+
+  /**
+   * Записва ЗАДАЧА на агент · възлагане, потвърждаване, превключване (И94 т.1).
+   *
+   * ВРАТАТА НА ЗАДАЧАТА: задача на ЗАКРИТ агент се отказва тук, не на екрана.
+   * Закритият е следа (И94 т.6) — работа не приема. Проверката стои при
+   * Вратата по същата причина като при протокола: втори екран, който възлага
+   * задача, ще я заобиколи, без да знае, че съществува.
+   *
+   * Не иска отключен период: задачата не мени нито едно число. Кога и какво
+   * ще предложи агентът е решение за напред, не запис за минал месец.
+   */
+  async zapishiZadacha(danni: PayloadZadachaZapisana, z: Zayavka): Promise<Rezultat> {
+    const agent = (await this.ogledalo()).agenti.get(danni.agent);
+    if (agent?.sastoyanie === 'zakrit') {
+      throw new GreshkaAgent(
+        `„${agent.ime}" е ЗАКРИТ — закритият агент не приема задачи. Направи нов.`,
+      );
+    }
+    return this.#pusni('ЗадачаЗаписана', VID.zadacha, danni.id, danni, z);
+  }
 
   /**
    * Поправка = НОВО събитие. Журналът не се пипа.

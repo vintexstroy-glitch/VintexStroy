@@ -30,9 +30,18 @@
  */
 
 import { eStotinki, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { ekraniraj } from './obshto.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
-import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
+
+/**
+ * Отказът на клипборда · ЕДИН текст за двата пътя към него (правило 17).
+ *
+ * Клавишната комбинация и контекстното меню правят едно и също; казваха го
+ * поотделно. Разминат текст в двете би изглеждал като два различни проблема
+ * пред човека, който е натиснал първо едното, после другото.
+ */
+export const KLIPBORDAT_OTKAZA = 'Клипбордът отказа — браузърът иска разрешение за копиране.';
 
 const ZNAK = 'kletka-izbrana';
 const ZNAK_OBHVAT = 'kletka-v-obhvat';
@@ -245,7 +254,7 @@ async function kopirayIzbora(): Promise<void> {
     l.append(s);
     l.hidden = false;
   } catch {
-    konteks?.vest('zle', 'Клипбордът отказа — браузърът иска разрешение за копиране.');
+    konteks?.vest('zle', KLIPBORDAT_OTKAZA);
   }
 }
 

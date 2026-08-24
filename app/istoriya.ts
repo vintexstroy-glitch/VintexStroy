@@ -13,8 +13,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { ekraniraj } from './obshto.js';
 import type { Sabitie } from '../src/yadro/index.js';
-import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
 /** Малкият бутон в реда · `vid` и `id` са същността от Журнала. */

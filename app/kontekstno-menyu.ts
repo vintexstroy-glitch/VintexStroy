@@ -15,7 +15,7 @@
 
 import type { Konteks } from './main.js';
 import { prilozhiSkritite, skriyKolona } from './skriti-koloni.js';
-import { kopirayKletkite } from './klaviatura.js';
+import { KLIPBORDAT_OTKAZA, kopirayKletkite } from './klaviatura.js';
 
 let otvorenoMenyu: HTMLElement | null = null;
 
@@ -63,7 +63,7 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
         ]);
         k.vest('dobre', 'Редът е в клипборда — поставя се в Excel като ред.');
       } catch {
-        k.vest('zle', 'Клипбордът отказа — браузърът иска разрешение за копиране.');
+        k.vest('zle', KLIPBORDAT_OTKAZA);
       }
     });
 

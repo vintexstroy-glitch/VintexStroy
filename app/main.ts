@@ -20,11 +20,13 @@ import {
   type SastoyanieNaHranilishteto,
 } from '../src/nositel/hranilishte.js';
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
-import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
-import { dumiZaGreshka, ekraniraj, narisuvayImoti, svaliFayl, zakachiFormite } from './imoti.js';
+import { vnesiZhurnal } from '../src/domein/vnos.js';
+import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
@@ -41,6 +43,8 @@ import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
+import { narisuvayII, zakachiII } from './ii.js';
+import { narisuvayTabove, zakachiTabove } from './tabove.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
 import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
@@ -85,6 +89,8 @@ export type KoyEkran =
   | 'gant'
   | 'smetki'
   | 'nastroyki'
+  | 'ii'
+  | 'tabove'
   | 'tablo';
 
 /**
@@ -94,6 +100,10 @@ export type KoyEkran =
 const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
   smetki: 'smetki-dds',
   nastroyki: 'iztochnitsi',
+  // ИИ-таблото иска ПРАВОТО (планът). Отметката и кранът се показват ВЪТРЕ,
+  // поотделно (правило 15) — иначе изключената отметка би скрила екрана, на
+  // който пише защо е скрит.
+  ii: 'svarzhi-ii',
 };
 
 export interface Konteks {
@@ -238,6 +248,16 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
     ikona: '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
   },
+  ii: {
+    ime: 'ИИ',
+    podnaslov: 'агентът чете, смята и ПРЕДЛАГА · записва човекът',
+    ikona: '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
+  },
+  tabove: {
+    ime: 'Табове',
+    podnaslov: 'стационарни и добавени · секции с таблици и графики, комбинират се',
+    ikona: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
+  },
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
@@ -356,7 +376,7 @@ async function trugvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(akaunt);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesKato();
     // Изключен екран не се показва празен — връщаме се на Имоти.
     const iska = EKRAN_ISKA[ekran];
     if (iska && !mozhe(izbor, iska)) ekran = 'imoti';
@@ -407,7 +427,19 @@ async function trugvay(): Promise<void> {
                       ? narisuvaySmetki(ogledalo, dnes)
                       : ekran === 'nastroyki'
                         ? narisuvayNastroyki(ogledalo)
-                        : narisuvayTablo(kojSam, izbor, akaunt)
+                        : ekran === 'ii'
+                          ? narisuvayII(
+                              ogledalo,
+                              {
+                                pravo: izbor.plan.vazmozhnosti.has('svarzhi-ii'),
+                                otmetka: mozhe(izbor, 'svarzhi-ii'),
+                                kran: !vrata.zatvorena,
+                              },
+                              dnes,
+                            )
+                          : ekran === 'tabove'
+                            ? narisuvayTabove(ogledalo, dnes)
+                            : narisuvayTablo(kojSam, izbor, akaunt)
           }
         </div>
       </main>`;
@@ -419,6 +451,8 @@ async function trugvay(): Promise<void> {
     else if (ekran === 'gant') zakachiGant(koren, k, prerisuvay);
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
     else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
+    else if (ekran === 'ii') zakachiII(koren, k, prerisuvay);
+    else if (ekran === 'tabove') zakachiTabove(koren, k, prerisuvay);
     else {
       zakachiTablo(
         koren,
@@ -574,7 +608,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
-    svaliFayl(fayl, `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`);
+    svaliFayl(fayl, `zhurnal-${akaunt}-${dnesKato()}.json`);
 
     const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
     zapishiBeleg({
@@ -603,7 +637,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([bajtove.slice().buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    svaliFayl(fayl, `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    svaliFayl(fayl, `masterbook-arhiv-${dnesKato()}.xlsx`);
     k.vest(
       'dobre',
       `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +
@@ -649,12 +683,9 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
             `Журналът е на ${rezultat.vsichko}. Веригата е проверена цяла, преди да влезе каквото и да е.`,
       );
     } catch (greshka) {
-      k.vest(
-        'zle',
-        greshka instanceof GreshkaVnos || greshka instanceof Error
-          ? `Внасянето е отказано. ${greshka.message}`
-          : String(greshka),
-      );
+      // GreshkaVnos РАЗШИРЯВА Error — изброяването ѝ поименно не добавяше
+      // нищо освен впечатление за точност (същият капан като другите шест).
+      k.vest('zle', `Внасянето е отказано. ${dumiZaGreshka(greshka)}`);
     } finally {
       fayl.value = '';
       await prerisuvay();

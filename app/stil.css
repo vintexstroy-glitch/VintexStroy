@@ -626,6 +626,12 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 440px;
 }
 
+/* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
+.glava.zadacha, .red.zadacha {
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 124px 72px 232px;
+  min-width: 900px;
+}
+
 /* ── двата задължителни сбора · Приход /+/ и Разход /−/ ──────────────── */
 .glava.znak, .red.znak {
   grid-template-columns: 64px minmax(0, 2fr) minmax(0, 1.2fr) 130px 132px;
@@ -953,6 +959,14 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   fill: var(--srok-prosrocheno); opacity: 0.45;
   stroke: #FBF8F3; stroke-width: 1; stroke-dasharray: 2 3;
 }
+
+/* ── стълбовете на месеците · диаграмата в Отчетите (И92 т.4) ────────────────
+   Зеленото и теракотата са ЦВЕТОВЕТЕ НА ПАРИТЕ от обобщения ред на Ганта —
+   един език за приход и разход на всеки екран. */
+.stalbove { margin-top: 6px; }
+.stalb-prihod { fill: var(--zeleno); }
+.stalb-razhod { fill: var(--aktsent); }
+.stalbove-nadpis { fill: var(--mastilo2); font-size: 10px; font-variant-numeric: tabular-nums; }
 
 
 /* ── контекстното меню · десният бутон, както в Уиндоус ─────────────────── */

@@ -24,7 +24,9 @@
  * промяна на срок е събитие в Журнала; влаченето прави тиха промяна на дата.
  */
 
-import { otData, GreshkaData } from '../src/yadro/data.js';
+import { otData } from '../src/yadro/data.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,
@@ -47,7 +49,6 @@ import {
 } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import type { Konteks } from './main.js';
@@ -209,12 +210,18 @@ function opciiOtsenki(izbrano: string): string {
  *
  * Скролът е ХОРИЗОНТАЛЕН във времето *(р52·[221])*: „да не се скролва по
  * вертикла, а по хоризонтал в времето".
+ *
+ * Изнесена е, защото Сметки я рисува като КОПИЕ (И92 т.4) — същата таблица,
+ * без сгъвачите: там се ЧЕТЕ за сверка, пише се в Управление.
  */
-function tablitsataSOcveteniPoleta(
+export function tablitsataSOcveteniPoleta(
   dela: readonly Delo[],
   r: ReturnType<typeof reshetka>,
   sumi: readonly { prihod_st: number; razhod_st: number }[],
   dnes: string,
+  sasSgavachi = true,
+  /** И95: Приходите и Разходите носят ключ — скрити ПАК се смятат (пр. 23) */
+  sasTsifrite = true,
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -237,10 +244,10 @@ function tablitsataSOcveteniPoleta(
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi)).join('')}`,
             )
             .join('')}
-          <div class="gant-sbor">Приход · Разход</div>
+          ${sasTsifrite ? '<div class="gant-sbor">Приход · Разход</div>' : ''}
         </div>
         <div class="gant-vreme" id="gant-vreme">
           <div class="gant-glava-vreme">
@@ -275,7 +282,7 @@ function tablitsataSOcveteniPoleta(
               .join('')}`,
             )
             .join('')}
-          <div class="gant-red sumi">
+          ${sasTsifrite ? `<div class="gant-red sumi">
             ${sumi
               .map(
                 (s, i) =>
@@ -286,7 +293,7 @@ function tablitsataSOcveteniPoleta(
                   }</span>`,
               )
               .join('')}
-          </div>
+          </div>` : ''}
         </div>
       </div>
       <p class="drebno">Лентите НЕ се влачат — срокът се мени от полето за срок, за да остане следа в Журнала.
@@ -298,8 +305,9 @@ function kletka(dnes: boolean): string {
   return `<span class="gant-kletka${dnes ? ' dnes' : ''}"></span>`;
 }
 
-function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string): string {
-  const sgavaemo = imaPoddela(vsichki, d.id);
+function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string, sasSgavachi = true): string {
+  // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
+  const sgavaemo = sasSgavachi && imaPoddela(vsichki, d.id);
   return `<div class="gant-delo ${svetofar(d, dnes)}${d.nadDelo ? ' poddelo' : ''}" data-ime="${ekraniraj(d.id)}">
     ${
       sgavaemo
@@ -313,7 +321,11 @@ function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string): string {
   </div>`;
 }
 
-function formaDelo(o: Ogledalo, dnes: string): string {
+/**
+ * Изнесена: Сметки я рисува СЪЩАТА (И95 — „да създаваш както като в
+ * Управление"). Един механизъм, два екрана — не втора форма.
+ */
+export function formaDelo(o: Ogledalo, dnes: string): string {
   return `
     <section class="karta">
       <div class="dyalglava"><h2>Ново дело</h2><span>Място · Обект · Дело — трите колони</span></div>
@@ -384,10 +396,11 @@ function formaDelo(o: Ogledalo, dnes: string): string {
  *
  * Затова решетката носи `data-koloni` и `data-ot`/`data-broy`, а тук те стават
  * истински CSS свойства. Политиката не се отслабва заради удобство.
+ *
+ * Изнесена е: копието в Сметки носи същата решетка и иска същите ширини.
  */
-function slozhiShirinite(koren: HTMLElement): void {
-  const gant = koren.querySelector<HTMLElement>('.gant');
-  if (gant) {
+export function slozhiShirinite(koren: HTMLElement): void {
+  for (const gant of koren.querySelectorAll<HTMLElement>('.gant')) {
     const broy = Number(gant.dataset.koloni ?? 0);
     gant.style.setProperty('--vreme', `repeat(${broy}, minmax(34px, 1fr))`);
   }
@@ -467,6 +480,18 @@ export function zakachiGant(
     zapomniPogleda();
   });
 
+  zakachiFormataNaDelo(koren, k, prerisuvay);
+}
+
+/**
+ * Изнесено: същият submit работи и в Сметки (И95). Записът минава през
+ * СЪЩИЯ zapishiDelo — един път, два екрана.
+ */
+export function zakachiFormataNaDelo(
+  koren: HTMLElement,
+  k: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
   const forma = koren.querySelector<HTMLFormElement>('#forma-delo');
   forma?.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -481,7 +506,7 @@ export function zakachiGant(
       ot = otData(String(d.get('ot') ?? ''), 'Началото на делото');
       doData = otData(String(d.get('do') ?? ''), 'Краят на делото');
     } catch (err) {
-      izhod.textContent = err instanceof GreshkaData ? err.message : String(err);
+      izhod.textContent = dumiZaGreshka(err);
       return;
     }
     if (doData < ot) {

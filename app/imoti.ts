@@ -9,12 +9,14 @@
  * и то само когато вратарят пусне (`src/domein/storno.ts`).
  */
 
-import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { GreshkaData, otData } from '../src/yadro/data.js';
+import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj } from './obshto.js';
+import { otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { zakachiStornoButoni } from './storno.js';
+import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
@@ -95,27 +97,6 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
       vzemi: (n) => (n.prekraten ? 'прекратен' : 'жив'),
     },
   ];
-}
-
-/**
- * СВАЛЯНЕ НА ФАЙЛ · единственият дом на танца Blob → адрес → връзка → клик.
- * Беше преписан три пъти (в main два, в Стойност един) — три места за един теч.
- */
-/**
- * ДУМИТЕ НА ЕДНА ГРЕШКА · един дом за израза, преписан 28 пъти.
- * Грешка с име носи message; всичко друго се казва както е.
- */
-export function dumiZaGreshka(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-export function svaliFayl(fayl: Blob, ime: string): void {
-  const adres = URL.createObjectURL(fayl);
-  const vruzka = document.createElement('a');
-  vruzka.href = adres;
-  vruzka.download = ime;
-  vruzka.click();
-  URL.revokeObjectURL(adres);
 }
 
 export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
@@ -315,7 +296,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
           imoti.length === 0
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
-              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              ? PRAZEN_FILTAR
               : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
         }
       </div>
@@ -339,7 +320,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         </div>
         ${
           filtriraniNaemi.redove.length === 0
-            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            ? PRAZEN_FILTAR
             : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaemi, dnes, (n) => redNaem(n, ogledalo))
         }
       </div>
@@ -368,7 +349,7 @@ function formaPrekratyavane(naem: Naem): string {
         <div class="poleta">
           <div class="pole">
             <label for="prekrati-kraj">Договорът свършва на</label>
-            <input translate="no" id="prekrati-kraj" name="kraj" type="date" value="${dnes()}" required>
+            <input translate="no" id="prekrati-kraj" name="kraj" type="date" value="${dnesKato()}" required>
           </div>
           <div class="pole">
             <label for="prekrati-prichina">Защо</label>
@@ -517,8 +498,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       if (surovDepozit !== '') depozit_st = otLeva(surovDepozit);
       ot = otData(String(danni.get('ot') ?? ''), 'Датата „Договор от“');
     } catch (e) {
-      greshka.textContent =
-        e instanceof GreshkaPari || e instanceof GreshkaData ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
       return;
     }
 
@@ -529,15 +509,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         await k.deystviya.popraviNaem(
           {
             naemId: rezhim.id,
-            naemetel: String(danni.get('naemetel')).trim(),
-            telefon: String(danni.get('telefon') ?? '').trim(),
-            imeyl: String(danni.get('imeyl') ?? '').trim(),
-            naem_st,
-            padezhDen: Number(danni.get('padezhDen')),
-            ot,
+            ...poletataNaNaemaOtFormata(danni, { naem_st, depozit_st, ot }),
             do: star.do,
-            depozit_st,
-            sektor: String(danni.get('sektor')),
             prichina: String(danni.get('prichina') ?? '').trim(),
           },
           { opId: opIdDeystvie },
@@ -550,15 +523,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           `N:${crypto.randomUUID()}`,
           {
             imotId: String(danni.get('imotId')),
-            naemetel: String(danni.get('naemetel')).trim(),
-            telefon: String(danni.get('telefon') ?? '').trim(),
-            imeyl: String(danni.get('imeyl') ?? '').trim(),
-            naem_st,
-            padezhDen: Number(danni.get('padezhDen')),
-            ot,
+            ...poletataNaNaemaOtFormata(danni, { naem_st, depozit_st, ot }),
             do: '',
-            depozit_st,
-            sektor: String(danni.get('sektor')),
           },
           { opId: opIdNaem },
         );
@@ -587,7 +553,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     try {
       kraj = otData(String(danni.get('kraj') ?? ''), 'Датата на края');
     } catch (e) {
-      greshka.textContent = e instanceof GreshkaData ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
       return;
     }
 
@@ -634,38 +600,58 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     });
   }
 
-  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
-  for (const [znak, kakvo] of [
-    ['data-storno-imot', 'имотът'],
-    ['data-storno-naem', 'наемът'],
-  ] as const) {
-    const vid = vidOtAtribut(znak)!;
-    for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
-      b.addEventListener('click', async () => {
-        b.disabled = true;
-        const izhod = await opitajStorno(k, Number(b.getAttribute(znak)), vid, kakvo);
-        if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
-        rezhim = { kakvo: 'nov' };
-        await prerisuvay();
-      });
-    }
-  }
+  // Обиколката е една за трите екрана (`storno.ts`); тук е само разликата —
+  // след сторното Имоти се връща в режим „нов".
+  zakachiStornoButoni(
+    koren,
+    k,
+    [
+      ['data-storno-imot', 'имотът'],
+      ['data-storno-naem', 'наемът'],
+    ],
+    async () => {
+      rezhim = { kakvo: 'nov' };
+      await prerisuvay();
+    },
+  );
 }
 
-function dnes(): string {
-  return new Date().toISOString().slice(0, 10);
+/**
+ * ПОЛЕТАТА НА НАЕМА, прочетени от ФОРМАТА · един път за двата пътя.
+ *
+ * Добавянето и поправката четат едни и същи полета. Написани поотделно, те
+ * се разминават при първото ново поле — и наемът тихо губи стойност всеки
+ * път, щом някой го поправи. Същият капан стоеше и в Огледалото; там е
+ * затворен с `poletataNaNaema`, тук — с това.
+ *
+ * Числата идват ГОТОВИ отвън: те са разчетени по-рано, за да може отказът
+ * при сгрешена сума да се каже, преди изобщо да се стигне до Вратата.
+ *
+ * Отвън остават само разликите: добавянето носи `imotId` и празен край,
+ * поправката — `naemId`, СТАРИЯ край и причината.
+ */
+function poletataNaNaemaOtFormata(
+  danni: FormData,
+  chisla: { naem_st: number; depozit_st: number; ot: string },
+): {
+  naemetel: string;
+  telefon: string;
+  imeyl: string;
+  naem_st: number;
+  padezhDen: number;
+  ot: string;
+  depozit_st: number;
+  sektor: string;
+} {
+  return {
+    naemetel: String(danni.get('naemetel')).trim(),
+    telefon: String(danni.get('telefon') ?? '').trim(),
+    imeyl: String(danni.get('imeyl') ?? '').trim(),
+    naem_st: chisla.naem_st,
+    padezhDen: Number(danni.get('padezhDen')),
+    ot: chisla.ot,
+    depozit_st: chisla.depozit_st,
+    sektor: String(danni.get('sektor')),
+  };
 }
 
-/** Днешният ден — за групите на филтъра по дата. Общ дом; Стойност също го ползва. */
-export function dnesKato(): string {
-  return dnes();
-}
-
-/** Всичко, написано от човек, минава оттук, преди да влезе в HTML. */
-export function ekraniraj(tekst: string): string {
-  return tekst
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}

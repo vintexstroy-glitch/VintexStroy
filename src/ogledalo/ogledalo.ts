@@ -19,6 +19,9 @@ import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
+import type { Agent, Predlozhenie } from '../domein/agenti.js';
+import type { Tab } from '../domein/tabove.js';
+import type { Zadacha } from '../domein/zadachi.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -192,6 +195,24 @@ export interface Ogledalo {
   readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
   /** id → делото; последният запис за същия id е ПОПРАВКА, не втори ред */
   readonly dela: ReadonlyMap<string, Delo>;
+  /** ключ → табът със секциите му; последният запис ПОПРАВЯ (И92 т.9) */
+  readonly tabove: ReadonlyMap<string, Tab>;
+  /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
+  readonly agenti: ReadonlyMap<string, Agent>;
+  /**
+   * id → предложението и присъдата му.
+   *
+   * Отделен „лог на агента" извън Журнала не се строи — той би станал втори
+   * носител на истина. Тук е Огледало на събитията, както навсякъде.
+   */
+  readonly predlozheniya: ReadonlyMap<string, Predlozhenie>;
+  /**
+   * id → задачата с разписанието ѝ (И94 т.1).
+   *
+   * Отделна от агента нарочно: протоколът е непроменим след създаване
+   * (И94 т.6), а задачите се възлагат и превключват всеки ден.
+   */
+  readonly zadachi: ReadonlyMap<string, Zadacha>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -204,6 +225,34 @@ export interface Ogledalo {
  * Изгражда Огледалото от подредена по seq редица събития.
  * Две минавания: първо кои seq са погасени, после кои се прилагат.
  */
+/**
+ * ПОЛЕТАТА, КОИТО ДВЕТЕ СЪБИТИЯ ЗА НАЕМ НОСЯТ ЕДНАКВО.
+ *
+ * „НаемДобавен" и „НаемПоправен" пишат едни и същи полета с едни и същи
+ * ПАДАНИЯ за стар Журнал. Написани поотделно, те се разминават при първото
+ * ново поле: добавянето го получава, поправката мълчи — и наемът тихо губи
+ * стойност всеки път, щом някой му поправи телефона.
+ *
+ * Отвън остават САМО разликите: добавянето слага `id`, `seq`, `imotId` и
+ * `prekraten: false`; поправката не ги пипа — прекратяването си има свое
+ * събитие.
+ */
+function poletataNaNaema(p: PayloadNaemDobaven | PayloadNaemPopraven) {
+  return {
+    naemetel: p.naemetel,
+    // Наем, записан преди контактите, ги няма — празно, не „липсва".
+    telefon: p.telefon ?? '',
+    imeyl: p.imeyl ?? '',
+    naem_st: p.naem_st,
+    padezhDen: p.padezhDen,
+    ot: p.ot,
+    do: p.do,
+    depozit_st: p.depozit_st,
+    // Наем, записан преди резен 4, няма сектор — пада към жилищен.
+    sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+  };
+}
+
 export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pogaseni = new Set<number>();
   for (const s of sabitiya) {
@@ -228,6 +277,10 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
+  const tabove = new Map<string, Tab>();
+  const agenti = new Map<string, Agent>();
+  const predlozheniya = new Map<string, Predlozhenie>();
+  const zadachi = new Map<string, Zadacha>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -254,17 +307,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           id: s.sashtnost.id,
           seq: s.seq,
           imotId: p.imotId,
-          naemetel: p.naemetel,
-          // Наем, записан преди контактите, ги няма — празно, не „липсва".
-          telefon: p.telefon ?? '',
-          imeyl: p.imeyl ?? '',
-          naem_st: p.naem_st,
-          padezhDen: p.padezhDen,
-          ot: p.ot,
-          do: p.do,
-          depozit_st: p.depozit_st,
-          // Наем, записан преди резен 4, няма сектор — пада към жилищен.
-          sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+          ...poletataNaNaema(p),
           prekraten: false,
         });
         break;
@@ -308,7 +351,39 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           otVavezhdane: p.otVavezhdane ?? [],
           zaklyucheni: p.zaklyucheni ?? [],
           predishni: p.predishni ?? [],
+          // Моделите отпреди конструктора нямат формули — колоните им носят
+          // данни. Празната карта е вярната им стойност, не липса.
+          formuli: p.formuli ?? {},
+          nomera: p.nomera ?? {},
         });
+        break;
+      }
+
+      case 'ТабЗаписан': {
+        // Последният запис за същия ключ надделява — поправка, не втори таб.
+        const p = s.payload as unknown as Tab;
+        tabove.set(p.klyuch, p);
+        break;
+      }
+
+      case 'АгентЗаписан': {
+        // Последният запис за същия ключ надделява — поправка, не втори агент.
+        const p = s.payload as unknown as Agent;
+        agenti.set(p.klyuch, p);
+        break;
+      }
+
+      case 'ПредложениеЗаписано': {
+        // Присъдата е СЪЩОТО събитие с ново съдържание: „чака" → „прието".
+        const p = s.payload as unknown as Predlozhenie;
+        predlozheniya.set(p.id, p);
+        break;
+      }
+
+      case 'ЗадачаЗаписана': {
+        // Потвърждаване и превключване са СЪЩОТО събитие с ново съдържание.
+        const p = s.payload as unknown as Zadacha;
+        zadachi.set(p.id, p);
         break;
       }
 
@@ -421,18 +496,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const naem = naemi.get(p.naemId);
         if (naem) {
           // Прекратеността НЕ се пипа оттук — тя си има свое събитие.
-          naemi.set(naem.id, {
-            ...naem,
-            naemetel: p.naemetel,
-            telefon: p.telefon ?? '',
-            imeyl: p.imeyl ?? '',
-            naem_st: p.naem_st,
-            padezhDen: p.padezhDen,
-            ot: p.ot,
-            do: p.do,
-            depozit_st: p.depozit_st,
-            sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
-          });
+          naemi.set(naem.id, { ...naem, ...poletataNaNaema(p) });
         }
         break;
       }
@@ -520,6 +584,10 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     pototsi,
     salda,
     dela,
+    tabove,
+    agenti,
+    predlozheniya,
+    zadachi,
     sverki,
     prilozheni,
     pogaseni,
