@@ -19,6 +19,7 @@ import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
+import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -192,6 +193,15 @@ export interface Ogledalo {
   readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
   /** id → делото; последният запис за същия id е ПОПРАВКА, не втори ред */
   readonly dela: ReadonlyMap<string, Delo>;
+  /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
+  readonly agenti: ReadonlyMap<string, Agent>;
+  /**
+   * id → предложението и присъдата му.
+   *
+   * Отделен „лог на агента" извън Журнала не се строи — той би станал втори
+   * носител на истина. Тук е Огледало на събитията, както навсякъде.
+   */
+  readonly predlozheniya: ReadonlyMap<string, Predlozhenie>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -228,6 +238,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
+  const agenti = new Map<string, Agent>();
+  const predlozheniya = new Map<string, Predlozhenie>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -312,6 +324,20 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // данни. Празната карта е вярната им стойност, не липса.
           formuli: p.formuli ?? {},
         });
+        break;
+      }
+
+      case 'АгентЗаписан': {
+        // Последният запис за същия ключ надделява — поправка, не втори агент.
+        const p = s.payload as unknown as Agent;
+        agenti.set(p.klyuch, p);
+        break;
+      }
+
+      case 'ПредложениеЗаписано': {
+        // Присъдата е СЪЩОТО събитие с ново съдържание: „чака" → „прието".
+        const p = s.payload as unknown as Predlozhenie;
+        predlozheniya.set(p.id, p);
         break;
       }
 
@@ -523,6 +549,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     pototsi,
     salda,
     dela,
+    agenti,
+    predlozheniya,
     sverki,
     prilozheni,
     pogaseni,

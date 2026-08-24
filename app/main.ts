@@ -41,6 +41,7 @@ import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
+import { narisuvayII, zakachiII } from './ii.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
 import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
@@ -85,6 +86,7 @@ export type KoyEkran =
   | 'gant'
   | 'smetki'
   | 'nastroyki'
+  | 'ii'
   | 'tablo';
 
 /**
@@ -94,6 +96,10 @@ export type KoyEkran =
 const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
   smetki: 'smetki-dds',
   nastroyki: 'iztochnitsi',
+  // ИИ-таблото иска ПРАВОТО (планът). Отметката и кранът се показват ВЪТРЕ,
+  // поотделно (правило 15) — иначе изключената отметка би скрила екрана, на
+  // който пише защо е скрит.
+  ii: 'svarzhi-ii',
 };
 
 export interface Konteks {
@@ -237,6 +243,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     ime: 'Управление',
     podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
     ikona: '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
+  },
+  ii: {
+    ime: 'ИИ',
+    podnaslov: 'агентът чете, смята и ПРЕДЛАГА · записва човекът',
+    ikona: '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
   },
   tablo: {
     ime: 'Табло',
@@ -407,7 +418,17 @@ async function trugvay(): Promise<void> {
                       ? narisuvaySmetki(ogledalo, dnes)
                       : ekran === 'nastroyki'
                         ? narisuvayNastroyki(ogledalo)
-                        : narisuvayTablo(kojSam, izbor, akaunt)
+                        : ekran === 'ii'
+                          ? narisuvayII(
+                              ogledalo,
+                              {
+                                pravo: izbor.plan.vazmozhnosti.has('svarzhi-ii'),
+                                otmetka: mozhe(izbor, 'svarzhi-ii'),
+                                kran: !vrata.zatvorena,
+                              },
+                              dnes,
+                            )
+                          : narisuvayTablo(kojSam, izbor, akaunt)
           }
         </div>
       </main>`;
@@ -419,6 +440,7 @@ async function trugvay(): Promise<void> {
     else if (ekran === 'gant') zakachiGant(koren, k, prerisuvay);
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
     else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
+    else if (ekran === 'ii') zakachiII(koren, k, prerisuvay);
     else {
       zakachiTablo(
         koren,

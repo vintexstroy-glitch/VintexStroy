@@ -8,6 +8,7 @@
  */
 
 import type { Sashtnost } from '../yadro/index.js';
+import type { Agent, Predlozhenie } from './agenti.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
 import type { PravaZaModel } from './kolonno.js';
@@ -28,6 +29,8 @@ export const VID = {
   potok: 'potok',
   saldo: 'saldo',
   delo: 'delo',
+  agent: 'agent',
+  predlozhenie: 'predlozhenie',
   /**
    * НЕ СЕ ПИШЕ ПОВЕЧЕ · и НЕ СЕ ЧЕТЕ.
    *
@@ -63,6 +66,8 @@ export type TipSabitie =
   | 'ПотокЗаписан'
   | 'СалдоЗаписано'
   | 'ДелоЗаписано'
+  | 'АгентЗаписан'
+  | 'ПредложениеЗаписано'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -407,6 +412,27 @@ export interface PayloadStorno {
   readonly pogasyavaSeq: number;
   readonly prichina: string;
 }
+
+/**
+ * АГЕНТЪТ · картата и протоколът му (И92 т.10).
+ *
+ * Защо е СЪБИТИЕ, а не настройка: протоколът решава какво агентът чете и
+ * какво предлага. Смени ли се тихо, старите предложения стават необясними —
+ * следата „предложено от агент X" сочи протокол, който вече не е онзи.
+ * Промяна = нов запис със същия ключ (правило 1).
+ */
+export type PayloadAgentZapisan = Agent;
+
+/**
+ * ПРЕДЛОЖЕНИЕТО и присъдата му · едно събитие, последното бие.
+ *
+ * Отделен „лог на агента" извън Журнала би станал втори носител на истина и
+ * би се разсинхронизирал (правило 17 · проучването). Затова и предложението,
+ * и присъдата са тук, а екранът им е Огледало.
+ *
+ * `actor` на записа е ЧОВЕКЪТ — агентът няма път към Вратата (правило 18).
+ */
+export type PayloadPredlozhenieZapisano = Predlozhenie;
 
 export function sashtnost(vid: Vid, id: string): Sashtnost {
   return { vid, id };

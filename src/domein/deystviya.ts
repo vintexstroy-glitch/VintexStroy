@@ -35,6 +35,8 @@ import type {
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
+  PayloadAgentZapisan,
+  PayloadPredlozhenieZapisano,
   TipSabitie,
 } from './sabitiya.js';
 
@@ -267,6 +269,27 @@ export class Deystviya {
     );
   }
 
+
+  /**
+   * Записва АГЕНТ · картата и протоколът му (И92 т.10 · правило 18).
+   *
+   * НЕ иска отключен период: протоколът не мени нито едно число. Записва го
+   * човек — агентът няма достъп до Вратата и не може да си пише протокола.
+   */
+  async zapishiAgent(danni: PayloadAgentZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('АгентЗаписан', VID.agent, `AGENT:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * Записва ПРЕДЛОЖЕНИЕ или присъдата върху него · последното бие.
+   *
+   * `actor` е човекът (правило 18): екранът не казва „агентът записа с мое
+   * позволение", а „аз записвам". Заключеният период важи и тук — предложение
+   * за замразен месец минава по пътя на сверената промяна (правило 9).
+   */
+  async zapishiPredlozhenie(danni: PayloadPredlozhenieZapisano, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ПредложениеЗаписано', VID.predlozhenie, danni.id, danni, z);
+  }
 
   /**
    * Поправка = НОВО събитие. Журналът не се пипа.

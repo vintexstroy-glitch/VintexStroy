@@ -865,9 +865,11 @@ async function main() {
       (await tekstNa(p, '[data-plan-red="lichen"]')).includes('САМО ЕДИН АКАУНТ'),
       true,
     );
+    // Таблото на агента вече е построено (ADR-026), но СВЪРЗВАНЕТО с доставчик
+    // на модел не е — затова отметката още носи „скоро": честно докъде е.
     proveri(
       'ИИ е обявен като „скоро", без бутон който лъже',
-      (await tekstNa(p, '.vazm:has-text("Свързване на ИИ")')).includes('скоро'),
+      (await tekstNa(p, '.vazm:has-text("Табло за агент")')).includes('скоро'),
       true,
     );
 
@@ -2216,6 +2218,138 @@ async function main() {
     await p.waitForSelector('.red.opis');
     proveri('Описът казва формулата на колоната',
       (await redove(p, '.red.opis')).some((r) => r[3]?.includes('формула: разлика(')), true);
+
+    // ══ 41 · ИИ-таблото (И92 т.10) ═══════════════════════════════════════════
+    razdel = '41 · ИИ-таблото';
+    await naEkran(p, 'ii', '#nov-agent');
+
+    // ТРОЙНИЯТ КОНТРОЛ · три плочки, не една (правило 15)
+    proveri('правото се вижда само за себе си', await plochka(p, 'Право'), 'дава');
+    proveri('отметката — също', await plochka(p, 'Отметка'), 'включена');
+    proveri('и кранът е трети', await plochka(p, 'Кран'), 'отворен');
+
+    // ЗАКОНИТЕ · изброени поименно, всеки със своя дом
+    proveri('законите са изброени поименно',
+      (await p.$$eval('[data-zakon]', (r) => r.length)) >= 6, true);
+    const zakonite = await p.evaluate(() => document.body.textContent);
+    proveri('и първият е, че агентът не пише',
+      zakonite.includes('Агентът не пише в Журнала'), true);
+
+    // НОВ АГЕНТ · протоколът иска забрани поименно и ТРИ умения
+    await deystvieSPrerisuvane(p, () => p.click('#nov-agent'));
+    await p.fill('#agent-ime', 'Счетоводителят');
+    await p.fill('#agent-otgovornik', 'vintexstroy@gmail.com');
+    await p.fill('#agent-rabota', 'Чете Сметки, сверява ДДС и предлага поправки.');
+    await p.check('[data-obhvat="smetki"]');
+    // ЗАБРАНИ ОТ ПРАЗНИ ДУМИ протокол не правят (правило 18). Полето е
+    // `required`, значи браузърът вече лови ПРАЗНОТО — тук се проверява
+    // онова, което само домейнът вижда: изписани интервали.
+    await p.fill('#agent-zabrani', '   ');
+    const predAgenta = await broySabitiya(p);
+    await p.click('#forma-agent button[type=submit]');
+    await p.waitForFunction(() => document.querySelector('#greshka-agent')?.textContent !== '');
+    proveri('без забрани поименно протокол няма',
+      (await tekstNa(p, '#greshka-agent')).includes('ИЗБРОЕНИ ПОИМЕННО'), true);
+    proveri('и нищо не влиза в Журнала', await broySabitiya(p), predAgenta);
+
+    await p.fill('#agent-zabrani', 'не пише в Журнала · не вижда Управление');
+    await sSabitie(p, () => p.click('#forma-agent button[type=submit]'));
+    await p.waitForSelector('#vklyuchi-agenta');
+    proveri('агентът се ражда ИЗКЛЮЧЕН',
+      (await redove(p, '.red.agent'))[0]?.[2], 'изключен');
+
+    // УМЕНИЯТА · характеристиката е умение, активирано ПОСТОЯННО (негова поръчка)
+    const umeniyaNachalo = await redove(p, '.red.umenie');
+    proveri('характеристиката стои в СЪЩИЯ списък като уменията', umeniyaNachalo.length, 1);
+    proveri('и е постоянна', umeniyaNachalo[0]?.[0]?.includes('постоянно'), true);
+    proveri('постоянното няма бутон за изключване',
+      await p.$('[data-prevklyuchi-umenie="harakteristika"]'), null);
+
+    const zaDobavyane = [
+      ['matematika', 'матрици, данни и проверки'],
+      ['masterbook-data', ''],
+      ['refresh', ''],
+    ];
+    for (let i = 0; i < zaDobavyane.length; i += 1) {
+      await p.fill('#umenie-ime', zaDobavyane[i][0]);
+      await p.fill('#umenie-tekst', zaDobavyane[i][1]);
+      await sSabitie(p, () => p.click('#forma-umenie button[type=submit]'));
+      await p.waitForFunction((n) => document.querySelectorAll('.red.umenie').length === n, i + 2);
+    }
+    proveri('добавените умения се редят', (await redove(p, '.red.umenie')).length, 4);
+    proveri('и новото се ражда ВКЛЮЧЕНО',
+      (await redove(p, '.red.umenie'))[1]?.[2], 'включено');
+
+    // ИЗКЛЮЧЕНОТО изчезва от промпта — не е надпис.
+    //
+    // Промптът стои в СГЪНАТО `<details>`, а сгънатото няма `innerText` —
+    // то е празен низ, в който всяка проверка „не съдържа" минава сама.
+    // Затова тук се чете `textContent`: то вижда и скритото.
+    const promptat = () => p.$eval('#promptat', (e) => e.textContent);
+    await sSabitie(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.umenie')].some((r) => r.textContent.includes('изключено')));
+    proveri('изключеното умение изчезва от промпта',
+      (await promptat()).includes('matematika'), false);
+    await sSabitie(p, () => p.click('[data-prevklyuchi-umenie="matematika"]'));
+    await p.waitForFunction(() =>
+      document.getElementById('promptat')?.textContent.includes('matematika') === true);
+    proveri('и се връща със същото действие',
+      (await promptat()).includes('matematika'), true);
+
+    // ВКЛЮЧВАНЕТО пита, показва рисковете, и НЕ става без изричната отметка
+    await deystvieSPrerisuvane(p, () => p.click('#vklyuchi-agenta'));
+    await p.waitForSelector('#saglasieto');
+    const saglasie = await tekstNa(p, '#saglasieto');
+    proveri('рисковете са ОПИСАНИ, не премълчани',
+      saglasie.includes('Подхвърлен текст') && saglasie.includes('Умора от съгласия'), true);
+    proveri('отметката НЕ е сложена предварително',
+      await p.$eval('#razbrah', (e) => e.checked), false);
+
+    const predVklyuchvane = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#potvardi-vklyuchvane'));
+    proveri('без отметка не се включва', await broySabitiya(p), predVklyuchvane);
+    proveri('и се казва защо',
+      (await p.evaluate(() => document.body.textContent)).includes('прочетох рисковете'), true);
+
+    await deystvieSPrerisuvane(p, () => p.click('#vklyuchi-agenta'));
+    await p.check('#razbrah');
+    await sSabitie(p, () => p.click('#potvardi-vklyuchvane'));
+    proveri('с отметка — включва се', (await redove(p, '.red.agent'))[0]?.[2], 'включен');
+
+    // ПРЕДЛОЖЕНИЕТО · чака моята дума, и сверката се вижда, дори нулева
+    await p.fill('#zadacha-tekst', 'сверѝ ДДС за август');
+    await p.fill('#zadacha-kakvo', 'Разлика от 12,00 € в акумулатора за услуги.');
+    await p.fill('#zadacha-vhod', '1200,00');
+    await p.fill('#zadacha-izhod', '1212,00');
+
+    // ЗАДАЧАТА назовава ТРИ умения (правило 25) — с две не тръгва
+    await p.selectOption('#zadacha-umenie1', 'matematika');
+    await p.selectOption('#zadacha-umenie2', 'refresh');
+    const predZadachata = await broySabitiya(p);
+    await p.click('#forma-zadacha button[type=submit]');
+    await p.waitForFunction(() => document.querySelector('#greshka-zadacha')?.textContent !== '');
+    proveri('две умения не стигат за задача',
+      (await tekstNa(p, '#greshka-zadacha')).includes('ТРИ умения'), true);
+    proveri('и предложението не влиза в Журнала', await broySabitiya(p), predZadachata);
+
+    await p.selectOption('#zadacha-umenie3', 'masterbook-data');
+    await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
+    await p.waitForSelector('.red.predlozhenie');
+    const predlozhenieto = await redove(p, '.red.predlozhenie');
+    proveri('предложението чака', predlozhenieto[0]?.[4]?.includes('чака'), true);
+    proveri('и разликата се вижда', predlozhenieto[0]?.[3], '12,00 €');
+    proveri('разминаването се брои', await plochka(p, 'Разминавания'), '1');
+
+    // ПРИСЪДАТА · записва ЧОВЕКЪТ, и предложението остава в Журнала
+    await sSabitie(p, () => p.click('[data-priemi]'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.predlozhenie')].some((r) => r.textContent.includes('прието')));
+    proveri('приемането е ново събитие, не редакция',
+      (await redove(p, '.red.predlozhenie')).length, 1);
+    proveri('и присъдата носи МОЯ имейл',
+      (await tekstNa(p, '.red.predlozhenie')).includes('vintexstroy@gmail.com'), true);
+    proveri('приетите се броят', await plochka(p, 'Приети'), '1');
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
