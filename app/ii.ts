@@ -69,6 +69,7 @@ import {
   type Iskane,
   type ZaKakvo,
 } from '../src/domein/potvarzhdenie.js';
+import { kamTekst, mesetsatKatoTablitsa } from '../src/domein/mesetsat.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
@@ -796,27 +797,27 @@ function redNaPredlozhenie(p: Predlozhenie): string {
  * гледа числата; за да прецени посоката, обобщението стига, а имената на
  * наематели и доставчици нямат работа на чужд сървър.
  */
-export function dannitezaAgenta(o: Ogledalo, a: Agent): string {
+export function dannitezaAgenta(o: Ogledalo, a: Agent, dnes: string): string {
   const redove: string[] = [];
+
+  // МЕСЕЦЪТ КАТО ТАБЛИЦА · пилотът на ADR-005 (резен 15б).
+  //
+  // Сметки и Пари гледат ЕДИН И СЪЩ месец, затова таблицата излиза ВЕДНЪЖ:
+  // агент с двата обхвата получаваше преди два реда за едно и също и щеше да
+  // сметне два пъти същите пари.
+  //
+  // Дотук тук стояха сборове и бройки — „Приходи: 1 700,00 € (2 плащания)".
+  // От такова изречение агентът може да повтори числото и толкова: не може да
+  // сравни с миналия месец, не може да покаже КЪДЕ мърда нещо. Анализ върху
+  // обобщение е мнение; анализ върху таблица е сметка (И12).
+  if (a.obhvat.includes('smetki') || a.obhvat.includes('pari')) {
+    redove.push(kamTekst(mesetsatKatoTablitsa(o, dnes.slice(0, 7), new Date().toISOString())));
+  }
+
   for (const obhvat of a.obhvat) {
     switch (obhvat) {
       case 'imoti':
         redove.push(`Имоти: ${o.imoti.size} · договори за наем: ${o.naemi.size}`);
-        break;
-      case 'pari': {
-        const prihod = [...o.plashtaniya.values()].reduce((s, p) => s + p.suma_st, 0);
-        const razhod = [...o.razhodi.values()].reduce((s, r) => s + r.suma_st, 0);
-        redove.push(
-          `Приходи: ${pishi(prihod)} € (${o.plashtaniya.size} плащания) · ` +
-            `Разходи: ${pishi(razhod)} € (${o.razhodi.size} разхода)`,
-        );
-        break;
-      }
-      case 'smetki':
-        redove.push(
-          `Подадени ДДС-справки: ${o.spravki.size} · платени: ${o.platenoDDS.size} · ` +
-            `начислени вземания: ${o.vzemaniya.size}`,
-        );
         break;
       case 'stoynost':
         redove.push(`Таблици с модел: ${o.modeli.size} · записани сверки: ${o.sverki.length}`);
@@ -824,9 +825,14 @@ export function dannitezaAgenta(o: Ogledalo, a: Agent): string {
       case 'gant':
         redove.push(`Дела в Управление: ${o.dela.size}`);
         break;
+      // Сметки и Пари вече излязоха ГОРЕ, като таблица. Изброени са поименно,
+      // а не хванати с `default`: добавен утре обхват ще падне тук на глас.
+      case 'smetki':
+      case 'pari':
+        break;
     }
   }
-  return redove.length === 0 ? 'Обхватът му е празен — няма какво да прочете.' : redove.join('\n');
+  return redove.length === 0 ? 'Обхватът му е празен — няма какво да прочете.' : redove.join('\n\n');
 }
 
 export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
@@ -1184,7 +1190,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
             const otgovor = await pusniSKlod({
               agent,
               zadacha: z.kakvo,
-              danni: dannitezaAgenta(o, agent),
+              danni: dannitezaAgenta(o, agent, new Date().toISOString().slice(0, 10)),
             });
             await k.deystviya.zapishiPredlozhenie(
               {

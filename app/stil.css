@@ -626,6 +626,13 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 440px;
 }
 
+/* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
+.glava.mesetsat, .red.mesetsat {
+  grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;
+  min-width: 860px;
+}
+.red.mesetsat .suma .drebno { font-size: 10.5px; }
+
 /* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
 .glava.zadacha, .red.zadacha {
   grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 124px 72px 232px;

@@ -177,7 +177,7 @@ function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number
     { klyuch: 'naem', ime: 'Наем', vid: 'evro', vzemi: (r) => r.naem_mesechen_st },
     { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
     { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
-    { klyuch: 'delta', ime: 'Δ', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+    { klyuch: 'delta', ime: 'Разлика', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
   ];
 }
 
@@ -363,7 +363,7 @@ export function zakachiStoynost(
         `Прочетени ${sv.vhod} обекта → ${sv.izhod} реда · разлика ${sv.razlika}` +
         (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '') +
         (otMD
-          ? ` · листата носи цени за ${sTseni.length} обекта · Σ ${pishi(sborTseni)}` +
+          ? ` · листата носи цени за ${sTseni.length} обекта · сбор ${pishi(sborTseni)}` +
             (otMD.sverki.length
               ? ` · ${otMD.sverki.length} реда, при които площите на файла не се сверяват помежду си — за тях сметката ползва чиста + общи части`
               : '')

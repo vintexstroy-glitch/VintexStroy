@@ -1397,7 +1397,7 @@ async function main() {
     const glavaNaStoynostta = (await tekstNa(p, '.glava.stoynost')).toLowerCase();
     proveri('хедърът носи А', glavaNaStoynostta.includes('по площ'), true);
     proveri('хедърът носи Б', glavaNaStoynostta.includes('по състояние'), true);
-    proveri('и разликата между тях', glavaNaStoynostta.includes('δ'), true);
+    proveri('и разликата между тях', glavaNaStoynostta.includes('разлика'), true);
     proveri('всеки ред носи и двете цени', obekti[3]?.[6] !== '' && obekti[3]?.[7] !== '', true);
     proveri('и казва ОТКЪДЕ е наемът', obekti[3]?.[5].includes('очакван'), true);
 
@@ -2100,8 +2100,8 @@ async function main() {
     const vestMD = (await tekstNa(p, '.vest')).replace(/[\s\u00A0\u202F]/g, '');
     proveri('45-те обекта влизат · разликата е нула',
       vestMD.includes('Прочетени45обекта→45реда·разлика0'), true);
-    proveri('листата носи цените · Σ 2 118 800,00 €',
-      vestMD.includes('цениза25обекта·Σ2118800,00€'), true);
+    proveri('листата носи цените · сбор 2 118 800,00 €',
+      vestMD.includes('цениза25обекта·сбор2118800,00€'), true);
     proveri('и разминатите площи на файла се КАЗВАТ, не се преглъщат',
       vestMD.includes('площитенафайланесесверяват'), true);
 
@@ -2797,6 +2797,88 @@ async function main() {
         r.map((x) => (x.querySelectorAll('.suma')[2]?.textContent ?? '').replace(/[^\d,-]/g, ''))),
       ['0,00', '0', '0,00', '0']);
 
+    // ══ 47 · счетоводният агент · пилотът на ADR-005 (резен 15б) ═════════════
+    //
+    // Негови думи: агентът „смята и предлага, и анализира финансовите
+    // показатели и отчети — оценява, предлага и показва" (ADR-005 · И11), но
+    // „не записва" (И12). Тук се доказва ЦЕЛИЯТ път: месецът става ТАБЛИЦА,
+    // екранът показва какво напуска устройството, и навън НЕ излиза нито едно
+    // име на наемател или доставчик.
+    razdel = '47 · месецът за агента';
+    await naEkran(p, 'smetki', '#forma-razhod');
+    await p.fill('#smetki-period', '2026-11');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+    proveri('месецът стои като ТАБЛИЦА, не като сборове',
+      (await p.$$eval('.red.mesetsat', (r) => r.length)) > 0, true);
+
+    const razdeli = await p.$$eval('.red.mesetsat', (r) =>
+      [...new Set(r.map((x) => x.dataset.razdel))].sort());
+    proveri('и носи трите раздела', razdeli.join('·'), 'akumulator·pokazatel·potok');
+    proveri('шестте потока са всичките',
+      await p.$$eval('.red.mesetsat[data-razdel="potok"]', (r) => r.length), 6);
+
+    // Δ се СМЯТА · сравнява се с ПРЕДХОДНИЯ месец, а той тук е празен
+    proveri('главата назовава предходния месец',
+      (await p.$eval('.glava.mesetsat', (e) => e.innerText)).includes('2026-10'), true);
+    const redFakturi = '.red.mesetsat:has-text("Фактури")';
+    proveri('Δ на Фактури е точно сега − предходен',
+      await p.$eval(redFakturi, (e) => {
+        const s = Number(e.querySelectorAll('.suma')[0].dataset.st);
+        const pr = Number(e.querySelectorAll('.suma')[1].dataset.st);
+        return Number(e.querySelector('[data-delta-st]').dataset.deltaSt) === s - pr;
+      }), true);
+    proveri('и „от нула на нещо" НЯМА процент',
+      (await p.$eval(redFakturi, (e) => e.innerText)).includes('%'), false);
+
+    // ДОСЛОВНИЯТ текст, който получава моделът · сгънатото се чете с textContent
+    const navan = await p.$eval('#mesetsat-tekst', (e) => e.textContent);
+    proveri('текстът навън носи месеца и сравнението',
+      navan.includes('МЕСЕЦ 2026-11') && navan.includes('сравнен с 2026-10'), true);
+    proveri('носи и разделите с числата',
+      navan.includes('Фактури') && navan.includes('Капитал'), true);
+    proveri('сверките излизат С него, и нулата е ИЗПИСАНА',
+      navan.includes('СВЕРКИ') && navan.includes('разлика 0.00'), true);
+    proveri('и казва, че месецът е цял', navan.includes('Всички сверки затварят.'), true);
+
+    // ГРАНИЦАТА НА ADR-029 · имената НЕ излизат
+    for (const ime of ['Стройпласт', 'Домакинство', 'Доставчик 1', 'подизпълнител']) {
+      proveri(`„${ime}" НЕ излиза навън`, navan.includes(ime), false);
+    }
+    proveri('екранът го КАЗВА, вместо да го крие',
+      (await p.evaluate(() => document.body.textContent)).includes('Какво НЕ излиза'), true);
+
+    // И таблицата НЕ пише нищо в Журнала — тя се СМЯТА при показване
+    const predTablitsa = await broySabitiya(p);
+    await p.fill('#smetki-period', '2026-10');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    await p.fill('#smetki-period', '2026-11');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    proveri('месецът се СМЯТА, не се записва', await broySabitiya(p), predTablitsa);
+
+
+
+    // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
+    //
+    // §16 гледа джоба РАНО — а знак от чужда азбука, сложен на екран, който се
+    // отваря по-късно, минаваше незабелязано. Платено с находка: едно „Δ" в
+    // Сметки (гръцка буква, U+0394) накара браузъра да дотегли ЦЯЛАТА гръцка
+    // азбука — 32 KB шрифт за един знак — и обещанието „джобът пази СВОЯ пакет"
+    // се скъса не от джоба, а от съдържанието. Затова СЪЩАТА проверка стои и
+    // тук, след като всички екрани вече са минали.
+    razdel = '48 · джобът накрая';
+    proveri('нито един екран не е довлякъл чужда азбука',
+      await p.evaluate(async () => {
+        const imena = (await caches.keys()).filter((i) => i.startsWith('masterbook-'));
+        const adresi = [];
+        for (const ime of imena) {
+          const kesh = await caches.open(ime);
+          adresi.push(...(await kesh.keys()).map((z) => z.url));
+        }
+        const ima = (a) => adresi.some((u) => u.includes(`-${a}-`));
+        return `greek:${ima('greek')} vietnamese:${ima('vietnamese')}`;
+      }),
+      'greek:false vietnamese:false');
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

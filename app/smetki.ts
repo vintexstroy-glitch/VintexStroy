@@ -44,6 +44,14 @@ import { podredi } from '../src/domein/dela.js';
 import { obobshtenRed, reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
+import {
+  IMENA_NA_RAZDELITE,
+  delta,
+  deltaProtsentiDeseti,
+  kamTekst,
+  mesetsatKatoTablitsa,
+  type RedNaMesetsa,
+} from '../src/domein/mesetsat.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
@@ -241,6 +249,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
 
+    ${blokMesetsatZaAgenta(o, mesets)}
+
     ${formaRazhod(mesets)}
 
     ${
@@ -369,6 +379,72 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
  * (правило 20), пише се в Управление. Тактът е закован на месец: сверката
  * гледа месеци, не дни.
  */
+/**
+ * МЕСЕЦЪТ ЗА АГЕНТА · това, и НИЩО друго, тръгва навън (резен 15б · ADR-005).
+ *
+ * Негови думи: агентът „смята и предлага, и анализира финансовите показатели и
+ * отчети — оценява, предлага и показва" *(ADR-005 · И11)*, но „не записва"
+ * *(И12)*. За да анализира, му трябва ТАБЛИЦА, не сборове — от изречение
+ * „Приходи: 1 700,00 €" не се вижда накъде мърда нещо.
+ *
+ * ЗАЩО СТОИ НА ЕКРАНА. Защото съдържанието му напуска устройството. Бутон
+ * „анализирай", който не показва какво изпраща, иска доверие, което не е
+ * спечелено. Тук се вижда всеки ред — и `<details>`-ът долу показва
+ * ДОСЛОВНИЯ текст, дума по дума, какъвто го получава моделът.
+ *
+ * И се вижда какво НЕ излиза: имена на наематели и доставчици няма никъде
+ * (ADR-029), а `tests/mesetsat.test.ts` го пази вместо окото.
+ */
+function blokMesetsatZaAgenta(o: Ogledalo, mesets: string): string {
+  const t = mesetsatKatoTablitsa(o, mesets, new Date().toISOString());
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Месецът за агента</h2>
+        <span>това — и нищо друго — напуска устройството</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="mesetsat">
+        <div class="glava mesetsat">
+          <span>Раздел</span><span>Ред</span><span class="suma">Сега</span>
+          <span class="suma">${ekraniraj(t.predishniyat)}</span><span class="suma">Разлика</span><span class="suma">Брой</span>
+        </div>
+        ${t.redove.map(redNaMesetsa).join('')}
+      </div>
+      <p class="drebno">Сравнява се с <b translate="no">${ekraniraj(t.predishniyat)}</b>.
+      Разликата се <b>СМЯТА</b> и не се записва — записана разлика се разминава със своите две числа
+      при първата поправка. „От нула на нещо" НЯМА процент: липсата се казва, вместо да се
+      запълни с измислено число.</p>
+      <p class="drebno">${
+        t.nared
+          ? 'Четирите сверки затварят — месецът е цял и агентът го вижда цял.'
+          : '<b>ВНИМАНИЕ:</b> сверка НЕ затваря. Агентът ще получи месеца ЗАЕДНО с това предупреждение — анализ върху непълен месец звучи също толкова убедено.'
+      }</p>
+      <details>
+        <summary>Дословният текст, който получава моделът</summary>
+        <pre id="mesetsat-tekst" translate="no">${ekraniraj(kamTekst(t))}</pre>
+      </details>
+      <p class="drebno"><b>Какво НЕ излиза:</b> имена на наематели и доставчици.
+      За да се прецени посока, редът на раздела стига; имената нямат работа на чужд сървър
+      (ADR-029). Агентът чете, смята и <b>предлага</b> — записва човекът (правило 18).</p>
+    </section>`;
+}
+
+function redNaMesetsa(r: RedNaMesetsa): string {
+  const d = delta(r);
+  const p = deltaProtsentiDeseti(r);
+  return `
+    <div class="red mesetsat" data-razdel="${r.razdel}" translate="no">
+      <span><span class="znachka tiha">${IMENA_NA_RAZDELITE[r.razdel]}</span></span>
+      <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.kakvo)}</span></span>
+      <span class="suma" data-st="${r.stoynost_st}">${pishi(r.stoynost_st)}</span>
+      <span class="suma" data-st="${r.predi_st}">${pishi(r.predi_st)}</span>
+      <span class="suma" data-delta-st="${d}">${d > 0 ? '+' : ''}${pishi(d)}${
+        p === undefined ? '' : `<span class="drebno"> ${p > 0 ? '+' : ''}${(p / 10).toFixed(1)}%</span>`
+      }</span>
+      <span class="suma">${r.broy}</span>
+    </div>`;
+}
+
 function blokDelata(o: Ogledalo, dnes: string): string {
   const dela = podredi([...o.dela.values()], dnes);
   if (dela.length === 0) return '';
