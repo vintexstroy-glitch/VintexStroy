@@ -25,7 +25,8 @@
  */
 
 import { otData } from '../src/yadro/data.js';
-import { dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,

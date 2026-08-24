@@ -16,7 +16,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
-import { dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import {
   belegNaButon,
   DEYSTVIYA,

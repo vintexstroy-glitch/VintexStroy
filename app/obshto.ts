@@ -23,18 +23,6 @@ export function dnesKato(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/**
- * ДУМИТЕ НА ЕДНА ГРЕШКА · един дом за израза, преписан 28 пъти.
- *
- * Грешка с име носи `message`; всичко друго се казва както е. НЕ се изброяват
- * класове поименно: списък от два класа падаше на `String(err)` за всеки
- * трети и залепваше латинското име на класа пред българското изречение —
- * така отказът на замразен период се четеше „GreshkaZamrazen: …".
- */
-export function dumiZaGreshka(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
 /** Всичко, написано от човек, минава оттук, преди да влезе в HTML. */
 export function ekraniraj(tekst: string): string {
   return tekst

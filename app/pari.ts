@@ -6,7 +6,8 @@
  */
 
 import { SUMATA_NAD_NULA, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { dnesKato, dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import {
   duljimo,

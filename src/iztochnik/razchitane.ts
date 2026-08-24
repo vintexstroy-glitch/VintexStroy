@@ -9,8 +9,9 @@
  * (docs/04-odit-na-verigata.md).
  */
 
-import { GreshkaPari, otLeva } from '../yadro/pari.js';
-import { GreshkaData, otData } from '../yadro/data.js';
+import { otLeva } from '../yadro/pari.js';
+import { dumiZaGreshka } from '../yadro/dumi.js';
+import { otData } from '../yadro/data.js';
 import { nameriGlavata, nameriKolona, type Tablitsa } from './tablitsa.js';
 import { poRolya, redoveSDanni, type ModelNaTablitsa } from './model.js';
 import { pozvolenaStavka, STAVKI } from '../domein/dds.js';
@@ -193,12 +194,7 @@ export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
     } catch (greshka) {
       propusnati.push({
         red: nomer,
-        zashto:
-          greshka instanceof GreshkaPari ||
-          greshka instanceof GreshkaData ||
-          greshka instanceof GreshkaRazchitane
-            ? greshka.message
-            : String(greshka),
+        zashto: dumiZaGreshka(greshka),
       });
     }
   }
@@ -325,12 +321,7 @@ export function razchetiPoModel(n: {
     } catch (greshka) {
       propusnati.push({
         red: nomer,
-        zashto:
-          greshka instanceof GreshkaPari ||
-          greshka instanceof GreshkaData ||
-          greshka instanceof GreshkaRazchitane
-            ? greshka.message
-            : String(greshka),
+        zashto: dumiZaGreshka(greshka),
       });
     }
   }

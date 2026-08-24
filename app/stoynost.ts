@@ -23,7 +23,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
-import { dnesKato, dumiZaGreshka, ekraniraj, svaliFayl } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';

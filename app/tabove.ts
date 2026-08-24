@@ -19,7 +19,8 @@
  */
 
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import {
   dobaviSektsiya,
   eStatsionaren,

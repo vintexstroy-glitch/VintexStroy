@@ -20,11 +20,12 @@ import {
   type SastoyanieNaHranilishteto,
 } from '../src/nositel/hranilishte.js';
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
-import { dnesKato, dumiZaGreshka, ekraniraj, svaliFayl } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
-import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
+import { vnesiZhurnal } from '../src/domein/vnos.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
@@ -682,12 +683,9 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
             `Журналът е на ${rezultat.vsichko}. Веригата е проверена цяла, преди да влезе каквото и да е.`,
       );
     } catch (greshka) {
-      k.vest(
-        'zle',
-        greshka instanceof GreshkaVnos || greshka instanceof Error
-          ? `Внасянето е отказано. ${greshka.message}`
-          : String(greshka),
-      );
+      // GreshkaVnos РАЗШИРЯВА Error — изброяването ѝ поименно не добавяше
+      // нищо освен впечатление за точност (същият капан като другите шест).
+      k.vest('zle', `Внасянето е отказано. ${dumiZaGreshka(greshka)}`);
     } finally {
       fayl.value = '';
       await prerisuvay();

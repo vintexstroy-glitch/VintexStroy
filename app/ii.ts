@@ -70,7 +70,8 @@ import {
   type ZaKakvo,
 } from '../src/domein/potvarzhdenie.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
-import { dnesKato, dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { dnesKato, ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';

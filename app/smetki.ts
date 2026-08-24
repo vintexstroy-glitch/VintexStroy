@@ -9,7 +9,8 @@
  */
 
 import { SUMATA_NAD_NULA, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { dumiZaGreshka, ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
