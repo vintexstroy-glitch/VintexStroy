@@ -1947,6 +1947,46 @@ async function main() {
       vidimiPredi);
     proveri('и редът за скритото пада', await p.$('.skrito-koloni'), null);
 
+    // ══ 35 · редакцията в клетката · Enter пише ПРЕЗ Вратата ════════════
+    razdel = '35 · редакцията в клетката';
+    const predRedaktsiya = await broySabitiya(p);
+
+    // Escape отказва — нищо не влиза в Журнала
+    await p.dblclick('.red.naem [data-redakt]');
+    await p.waitForSelector('.kletka-redaktor');
+    await p.keyboard.press('Escape');
+    proveri('Escape затваря без запис', await p.$('.kletka-redaktor'), null);
+    proveri('и Журналът не мърда', await broySabitiya(p), predRedaktsiya);
+
+    // невалидното ОСТАВА отворено, отказано с думи — и пак нищо не влиза
+    await p.dblclick('.red.naem [data-redakt]');
+    await p.waitForSelector('.kletka-redaktor');
+    await p.fill('.kletka-redaktor', 'абв');
+    await p.keyboard.press('Enter');
+    proveri('невалидното остава отворено и почервенява',
+      await p.$eval('.kletka-redaktor', (e) => e.classList.contains('zle')), true);
+    proveri('и нищо не е записано', await broySabitiya(p), predRedaktsiya);
+
+    // истинската поправка: Enter пише едно събитие през Вратата
+    await p.fill('.kletka-redaktor', '567,89');
+    await p.keyboard.press('Enter');
+    await p.waitForFunction((n) =>
+      Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1,
+      predRedaktsiya);
+    proveri('клетката показва новата сума',
+      (await tekstNa(p, '.red.naem [data-redakt]')).includes('567,89'), true);
+    proveri('вестта казва какво е било и какво става',
+      (await tekstNa(p, '.vest')).includes('Поправено'), true);
+
+    // F2 върху избраната клетка също отваря — картата и редакторът са едно
+    await p.click('.red.naem [data-redakt]');
+    await p.keyboard.press('F2');
+    proveri('F2 отваря редактора върху избраната клетка',
+      (await p.$('.kletka-redaktor')) !== null, true);
+    // същата стойност + Enter = нищо не влиза (белегът „смени ли се")
+    await p.keyboard.press('Enter');
+    proveri('същата стойност не ражда събитие', await broySabitiya(p), predRedaktsiya + 1);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

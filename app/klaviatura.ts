@@ -345,6 +345,15 @@ function pokazhi(): void {
   pokazhiLentata(obshtoKletki, smetniIzbora(vIzbora), zaStorno);
 }
 
+/** Активната клетка (котвата) — редакцията в клетката (F2) пита оттук. */
+export function aktivnataKletka(): HTMLElement | null {
+  if (!izbrana || !izbrana.tablitsa.isConnected) return null;
+  const red = redoveNa(izbrana.tablitsa)[izbrana.red];
+  if (!red) return null;
+  const kletki = kletkiNa(red);
+  return kletki[Math.min(izbrana.kolona, kletki.length - 1)] ?? null;
+}
+
 /** Пишещ ли е фокусът · там картата мълчи и формата си работи.
  *  Черновата (`chernova.ts`) пита същия въпрос — границата е ЕДНА. */
 export function fokusVPole(): boolean {

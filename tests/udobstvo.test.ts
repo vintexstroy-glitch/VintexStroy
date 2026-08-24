@@ -27,6 +27,7 @@ import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
 import { klyuchNaChernova, umryalaLi } from '../app/chernova.js';
 import { sDumiZaStornoto, vidOtAtribut } from '../app/storno.js';
 import { bezPatechka } from '../app/skriti-koloni.js';
+import { prichinaZaRedaktsiya, redaktorZa } from '../app/redaktsiya.js';
 import { readdirSync, readFileSync } from 'node:fs';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
@@ -159,6 +160,38 @@ describe('сметката на избора', () => {
     const s = smetniIzbora([{ tekst: 'текст', st: null }]);
     expect(s.broyPari).toBe(0);
     expect(s.sbor_st).toBe(0);
+  });
+});
+
+// ── редакцията в клетката (вълна 3 · стъпка 1) ─────────────────────────────
+describe('редакторите на клетки', () => {
+  it('наемът: чете и пише цели стотинки, изрича се в евро', () => {
+    const r = redaktorZa('naem-suma')!;
+    expect(r.kamTekst(50000)).toBe('500,00');
+    expect(r.otTekst('567,89')).toBe(56789);
+    expect(r.sDumi(56789)).toBe(`567,89${String.fromCharCode(0x202f)}€`);
+  });
+
+  it('площта: чете и пише цели кв.см; празното е „няма площ", не грешка', () => {
+    const r = redaktorZa('imot-ploshtad')!;
+    expect(r.otTekst('72,4')).toBe(724000);
+    expect(r.kamTekst(724000)).toBe('72,40'); // kvSmVM2 пише с две дробни — канонът на площта
+    expect(r.otTekst('   ')).toBe(0);
+    expect(r.sDumi(0)).toBe('без площ');
+  });
+
+  it('невалидното ОТКАЗВА с думи, не с мълчание', () => {
+    expect(() => redaktorZa('naem-suma')!.otTekst('абв')).toThrow();
+  });
+
+  it('причината носи следата — какво е било и какво става', () => {
+    expect(prichinaZaRedaktsiya('500,00 €', '567,89 €')).toBe(
+      'поправено от таблицата: 500,00 € → 567,89 €',
+    );
+  });
+
+  it('непознат редактор е null — клетка без белег не се отваря', () => {
+    expect(redaktorZa('nyama-takav')).toBeNull();
   });
 });
 

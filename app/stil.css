@@ -713,6 +713,18 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 .grupata .sborove b { color: var(--mastilo); }
+
+/* ── редакцията в клетката (вълна 3 · стъпка 1) ─────────────────────────── */
+[data-redakt] { cursor: text; }
+.kletka-redaktor {
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px;
+  padding: 4px 6px; text-align: right;
+  border: 1px solid var(--aktsent); border-radius: 3px;
+  background: #FFFFFF; color: var(--mastilo);
+  font-variant-numeric: tabular-nums;
+}
+.kletka-redaktor:focus { outline: 2px solid var(--aktsent); outline-offset: -1px; }
+.kletka-redaktor.zle { border-color: var(--aktsent); background: var(--toplo); }
 .vrazka {
   border: none; background: transparent; color: var(--aktsent);
   font-family: inherit; font-size: inherit; padding: 0; cursor: pointer;
