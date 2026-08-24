@@ -977,3 +977,19 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   outline-offset: -2px;
   border-radius: 3px;
 }
+
+/* Обхватът при Shift · оцветяването трябва да бие и белия фон на
+   замразената първа колона, и този при посочен ред — иначе селекцията
+   изглежда надупчена. */
+.red > .kletka-v-obhvat,
+.red:hover > .kletka-v-obhvat { background: var(--toplo); }
+
+/* ── статус-лентата · Брой · Сбор · Средно, както в Excel ────────────────── */
+.status-lenta {
+  position: fixed; right: 14px; bottom: 14px; z-index: 40;
+  display: flex; gap: 18px; padding: 8px 16px;
+  background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(42, 37, 33, 0.14);
+  font-size: 12.5px; color: var(--mastilo);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}

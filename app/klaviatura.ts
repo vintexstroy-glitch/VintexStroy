@@ -4,29 +4,44 @@
  * По това счетоводителят познава „истински Excel" срещу „уеб форма": ръцете
  * не посягат към мишката. Картата е неговата (И58 · ADR-022 · вълна 2):
  *
- *   клик           избира клетка
- *   стрелки        местят селекцията
- *   Enter          надолу (как се въвежда колона от числа)
- *   Tab            надясно · Shift+Tab обратно
- *   Ctrl+стрелка   до РЪБА на таблицата — първият/последният ред или колона
- *   Home / End     началото / краят на реда
- *   Escape         маха селекцията
+ *   клик             избира клетка
+ *   стрелки          местят селекцията
+ *   Shift+стрелка    ОПЪВА обхват от котвата · Shift+клик — дотам
+ *   Ctrl+A           целият блок данни на таблицата
+ *   Enter            надолу (как се въвежда колона от числа)
+ *   Tab              надясно · Shift+Tab обратно
+ *   Ctrl+стрелка     до РЪБА на таблицата — първият/последният ред или колона
+ *   Home / End       началото / краят на реда
+ *   Escape           маха селекцията
+ *
+ * СТАТУС-ЛЕНТАТА е причината обхватът да съществува: маркираш колона суми и
+ * долу пише Брой · Сбор · Средно — без бутон, без екран, както в Excel.
+ * Кое е пари, НЕ се гадае по текста: евро-клетката носи стотинките си в
+ * `data-st`, сложен при рисуването от самата стойност на модела (правило 20 ·
+ * ADR-014). Клетка без `data-st` влиза в броя, но никога в сбора — затова
+ * м², проценти и точки не могат да се смесят с евро в едно число.
  *
  * ГРАНИЦАТА: когато фокусът е в поле, изборник или бутон, картата МЪЛЧИ —
  * формите са си форми и стрелките там местят курсора в текста, не клетки.
  *
  * Селекцията е ЕКРАННА и умира с прерисуването — тя не е състояние, което
  * се помни, а поглед, който се движи. Редакция в клетката още няма (вълна 3);
- * днес картата е за ГЛЕДАНЕ и за жестовете, които идват върху селекция:
- * сборовете в статус-лентата и груповите действия стъпват точно тук.
+ * груповите действия ще стъпят върху същия обхват.
  */
 
+import { pishi } from '../src/yadro/pari.js';
+
 const ZNAK = 'kletka-izbrana';
+const ZNAK_OBHVAT = 'kletka-v-obhvat';
 
 interface Izbrana {
   readonly tablitsa: HTMLElement;
+  /** котвата — активната клетка, от която обхватът се опъва */
   red: number;
   kolona: number;
+  /** подвижният край · без Shift той стои върху котвата */
+  krayRed: number;
+  krayKolona: number;
 }
 
 let izbrana: Izbrana | null = null;
@@ -42,24 +57,132 @@ function kletkiNa(red: HTMLElement): HTMLElement[] {
 }
 
 function mahniZnaka(): void {
-  document.querySelector(`.${ZNAK}`)?.classList.remove(ZNAK);
+  for (const k of document.querySelectorAll(`.${ZNAK}, .${ZNAK_OBHVAT}`)) {
+    k.classList.remove(ZNAK, ZNAK_OBHVAT);
+  }
 }
 
-/** Слага знака и докарва клетката в очите — както Excel държи активната видима. */
-function pokazhi(): void {
-  mahniZnaka();
-  if (!izbrana) return;
-  const red = redoveNa(izbrana.tablitsa)[izbrana.red];
-  if (!red) {
-    izbrana = null;
+// ── сметката на избора · чиста, за да има тест ────────────────────────────
+export interface KletkaVIzbora {
+  readonly tekst: string;
+  /** стотинките от `data-st`, или null — клетката не е пари */
+  readonly st: number | null;
+}
+
+export interface SmetkaNaIzbora {
+  /** непразните клетки — както Excel брои */
+  readonly broy: number;
+  readonly broyPari: number;
+  readonly sbor_st: number;
+  /** закръглено до стотинка САМО за показ — то никога не влиза в сбор */
+  readonly sredno_st: number;
+}
+
+export function smetniIzbora(kletki: readonly KletkaVIzbora[]): SmetkaNaIzbora {
+  let broy = 0;
+  let broyPari = 0;
+  let sbor = 0;
+  for (const k of kletki) {
+    if (k.tekst !== '') broy += 1;
+    if (k.st !== null) {
+      broyPari += 1;
+      sbor += k.st;
+    }
+  }
+  // към НАЙ-БЛИЗКАТА стотинка, симетрично за минуса — Math.round сам по себе
+  // си тегли -0,5 към нулата, а +0,5 нагоре, и средното на дългове би куцало.
+  const sredno = broyPari === 0 ? 0 : Math.sign(sbor) * Math.round(Math.abs(sbor) / broyPari);
+  return { broy, broyPari, sbor_st: sbor, sredno_st: sredno };
+}
+
+/** Стотинките на една клетка · само каквото самата тя декларира. */
+function stNa(kletka: HTMLElement): number | null {
+  const surovo = kletka.dataset['st'];
+  if (surovo === undefined) return null;
+  const n = Number(surovo);
+  return Number.isSafeInteger(n) ? n : null;
+}
+
+// ── статус-лентата ────────────────────────────────────────────────────────
+let lenta: HTMLElement | null = null;
+
+function lentata(): HTMLElement {
+  if (!lenta || !lenta.isConnected) {
+    lenta = document.createElement('div');
+    lenta.className = 'status-lenta';
+    lenta.setAttribute('translate', 'no');
+    lenta.hidden = true;
+    document.body.append(lenta);
+  }
+  return lenta;
+}
+
+function skriyLentata(): void {
+  if (lenta) lenta.hidden = true;
+}
+
+/** Лентата се показва при обхват от 2+ клетки — една клетка не е сметка. */
+function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora): void {
+  const l = lentata();
+  if (obshtoKletki < 2) {
+    l.hidden = true;
     return;
   }
-  const kletki = kletkiNa(red);
-  izbrana.kolona = Math.min(izbrana.kolona, kletki.length - 1);
-  const kletka = kletki[izbrana.kolona];
-  if (!kletka) return;
-  kletka.classList.add(ZNAK);
-  kletka.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+  const chasti = [`Брой: ${s.broy}`];
+  if (s.broyPari > 0) chasti.push(`Сбор: ${pishi(s.sbor_st)}`);
+  if (s.broyPari > 1) chasti.push(`Средно: ${pishi(s.sredno_st)}`);
+  l.innerHTML = chasti.map((ch) => `<span>${ch}</span>`).join('');
+  l.hidden = false;
+}
+
+/** Слага знаците, смята лентата и докарва подвижния край в очите. */
+function pokazhi(): void {
+  mahniZnaka();
+  if (!izbrana) {
+    skriyLentata();
+    return;
+  }
+  const redove = redoveNa(izbrana.tablitsa);
+  if (redove.length === 0) {
+    izbrana = null;
+    skriyLentata();
+    return;
+  }
+  const posleden = redove.length - 1;
+  izbrana.red = Math.min(izbrana.red, posleden);
+  izbrana.krayRed = Math.min(izbrana.krayRed, posleden);
+
+  const otRed = Math.min(izbrana.red, izbrana.krayRed);
+  const doRed = Math.max(izbrana.red, izbrana.krayRed);
+  const otKolona = Math.min(izbrana.kolona, izbrana.krayKolona);
+  const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
+
+  const vIzbora: KletkaVIzbora[] = [];
+  let obshtoKletki = 0;
+  for (let r = otRed; r <= doRed; r += 1) {
+    const kletki = kletkiNa(redove[r]!);
+    // редовете нямат еднакъв брой клетки — обхватът се затяга във всеки ред
+    for (let c = Math.min(otKolona, kletki.length - 1); c <= Math.min(doKolona, kletki.length - 1); c += 1) {
+      const kletka = kletki[c]!;
+      kletka.classList.add(ZNAK_OBHVAT);
+      obshtoKletki += 1;
+      // бутоните не са данни — в „Брой" влизат клетките с нещо за броене,
+      // същото правило, по което „Копирай реда" ги прескача
+      if (!kletka.querySelector('button')) {
+        vIzbora.push({ tekst: kletka.textContent?.trim() ?? '', st: stNa(kletka) });
+      }
+    }
+  }
+
+  // котвата носи рамката; крайната клетка се докарва в очите — тя се движи
+  const kletkiNaKotvata = kletkiNa(redove[izbrana.red]!);
+  izbrana.kolona = Math.min(izbrana.kolona, kletkiNaKotvata.length - 1);
+  kletkiNaKotvata[izbrana.kolona]?.classList.add(ZNAK);
+  const kletkiNaKraya = kletkiNa(redove[izbrana.krayRed]!);
+  const kraen = kletkiNaKraya[Math.min(izbrana.krayKolona, kletkiNaKraya.length - 1)];
+  kraen?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+
+  pokazhiLentata(obshtoKletki, smetniIzbora(vIzbora));
 }
 
 /** Пишещ ли е фокусът · там картата мълчи и формата си работи. */
@@ -76,8 +199,20 @@ function fokusVPole(): boolean {
 let zakacheno = false;
 
 export function zakachiKlaviatura(koren: HTMLElement): void {
+  // Всяко прерисуване минава оттук: старият DOM е мъртъв и селекцията с него.
+  // Лентата обаче живее в body и без това би останала да показва сметка за
+  // клетки, които вече ги няма — лъжа на екрана, затова пада веднага.
+  if (izbrana && !izbrana.tablitsa.isConnected) {
+    izbrana = null;
+    skriyLentata();
+  }
   if (zakacheno) return;
   zakacheno = true;
+
+  // Shift+клик опъва обхват — без това браузърът би маркирал текст.
+  koren.addEventListener('mousedown', (e) => {
+    if (e.shiftKey && izbrana && (e.target as HTMLElement).closest('.red > *')) e.preventDefault();
+  });
 
   // Кликът избира · делегирано, за да живее през всички прерисувания.
   koren.addEventListener('click', (e) => {
@@ -86,11 +221,15 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
     const red = kletka.parentElement as HTMLElement;
     const tablitsa = red.closest<HTMLElement>('.tablitsa');
     if (!tablitsa) return;
-    izbrana = {
-      tablitsa,
-      red: redoveNa(tablitsa).indexOf(red),
-      kolona: kletkiNa(red).indexOf(kletka),
-    };
+    const r = redoveNa(tablitsa).indexOf(red);
+    const c = kletkiNa(red).indexOf(kletka);
+    if (e.shiftKey && izbrana && izbrana.tablitsa === tablitsa) {
+      // котвата стои, краят идва под клика — обхватът е между тях
+      izbrana.krayRed = r;
+      izbrana.krayKolona = c;
+    } else {
+      izbrana = { tablitsa, red: r, kolona: c, krayRed: r, krayKolona: c };
+    }
     pokazhi();
   });
 
@@ -99,35 +238,66 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
     if (!izbrana.tablitsa.isConnected) {
       // Прерисуването е сменило екрана под селекцията — тя си отива тихо.
       izbrana = null;
+      skriyLentata();
       return;
     }
 
     const redove = redoveNa(izbrana.tablitsa);
-    const kletki = kletkiNa(redove[izbrana.red] ?? redove[0]!);
     const posledenRed = redove.length - 1;
-    const poslednaKolona = kletki.length - 1;
-
     // Ctrl+стрелка скача до ръба — движението на Excel през блока данни.
     const doRaba = e.ctrlKey || e.metaKey;
 
+    // Ctrl+A · целият блок данни. По `code`, не по `key` — на кирилска
+    // клавиатура „A" е „А" и жестът иначе би работил само на латиница.
+    if (doRaba && e.code === 'KeyA') {
+      izbrana.red = 0;
+      izbrana.kolona = 0;
+      izbrana.krayRed = posledenRed;
+      izbrana.krayKolona = Math.max(...redove.map((r) => kletkiNa(r).length)) - 1;
+      e.preventDefault();
+      pokazhi();
+      return;
+    }
+
+    // Какво се движи: с Shift — подвижният край; без — котвата, и краят
+    // се прибира върху нея. Enter и Tab винаги прибират обхвата.
+    const sShift = e.shiftKey;
+    let r = sShift ? izbrana.krayRed : izbrana.red;
+    let c = sShift ? izbrana.krayKolona : izbrana.kolona;
+    const kletki = kletkiNa(redove[Math.min(r, posledenRed)] ?? redove[0]!);
+    const poslednaKolona = kletki.length - 1;
+
     let hvanato = true;
+    let dvizhenie = true;
     switch (e.key) {
       case 'ArrowDown':
-        izbrana.red = doRaba ? posledenRed : Math.min(izbrana.red + 1, posledenRed);
+        r = doRaba ? posledenRed : Math.min(r + 1, posledenRed);
         break;
       case 'ArrowUp':
-        izbrana.red = doRaba ? 0 : Math.max(izbrana.red - 1, 0);
+        r = doRaba ? 0 : Math.max(r - 1, 0);
         break;
       case 'ArrowRight':
-        izbrana.kolona = doRaba ? poslednaKolona : Math.min(izbrana.kolona + 1, poslednaKolona);
+        c = doRaba ? poslednaKolona : Math.min(c + 1, poslednaKolona);
         break;
       case 'ArrowLeft':
-        izbrana.kolona = doRaba ? 0 : Math.max(izbrana.kolona - 1, 0);
+        c = doRaba ? 0 : Math.max(c - 1, 0);
+        break;
+      case 'Home':
+        c = 0;
+        if (doRaba) r = 0;
+        break;
+      case 'End':
+        c = poslednaKolona;
+        if (doRaba) r = posledenRed;
         break;
       case 'Enter':
+        dvizhenie = false;
         izbrana.red = Math.min(izbrana.red + 1, posledenRed);
+        izbrana.krayRed = izbrana.red;
+        izbrana.krayKolona = izbrana.kolona;
         break;
       case 'Tab':
+        dvizhenie = false;
         if (e.shiftKey) {
           if (izbrana.kolona > 0) izbrana.kolona -= 1;
           else if (izbrana.red > 0) {
@@ -140,23 +310,26 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
           izbrana.red += 1;
           izbrana.kolona = 0;
         }
-        break;
-      case 'Home':
-        izbrana.kolona = 0;
-        if (doRaba) izbrana.red = 0;
-        break;
-      case 'End':
-        izbrana.kolona = poslednaKolona;
-        if (doRaba) izbrana.red = posledenRed;
+        izbrana.krayRed = izbrana.red;
+        izbrana.krayKolona = izbrana.kolona;
         break;
       case 'Escape':
         izbrana = null;
         mahniZnaka();
+        skriyLentata();
         return;
       default:
         hvanato = false;
     }
     if (!hvanato) return;
+    if (dvizhenie) {
+      izbrana.krayRed = r;
+      izbrana.krayKolona = c;
+      if (!sShift) {
+        izbrana.red = r;
+        izbrana.kolona = c;
+      }
+    }
     e.preventDefault(); // иначе стрелките скролват страницата под селекцията
     pokazhi();
   });

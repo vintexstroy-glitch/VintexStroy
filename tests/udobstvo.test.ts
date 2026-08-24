@@ -21,6 +21,7 @@ import {
   type KolonaSFiltar,
 } from '../app/filtri.js';
 import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran.js';
+import { smetniIzbora } from '../app/klaviatura.js';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
 describe('сравнителят по вид (ADR-014)', () => {
@@ -112,6 +113,46 @@ describe('цикълът на подредбата', () => {
     expect(f.redove[0]!.koy).toBe('Домакинство');
     smeniPodredba('proba-p2', 'koy');
     smeniPodredba('proba-p2', 'koy'); // прибиране
+  });
+});
+
+// ── сметката на избора · статус-лентата (вълна 2) ──────────────────────────
+describe('сметката на избора', () => {
+  it('брои непразните; сборува САМО клетките, които казват, че са пари', () => {
+    const s = smetniIzbora([
+      { tekst: 'СТРОЙПЛАСТ ЕООД', st: null },
+      { tekst: '1 200,00 €', st: 1200_00 },
+      { tekst: '84 м²', st: null }, // площ — число е, пари НЕ е
+      { tekst: '', st: null },
+      { tekst: '500,00 €', st: 500_00 },
+    ]);
+    expect(s.broy).toBe(4); // празната клетка не се брои
+    expect(s.broyPari).toBe(2);
+    expect(s.sbor_st).toBe(1700_00);
+    expect(s.sredno_st).toBe(850_00);
+  });
+
+  it('средното се закръгля до стотинка и НЕ влиза обратно в сбора', () => {
+    const s = smetniIzbora([
+      { tekst: 'а', st: 100 },
+      { tekst: 'б', st: 100 },
+      { tekst: 'в', st: 101 },
+    ]);
+    expect(s.sbor_st).toBe(301); // сборът е от точните стотинки
+    expect(s.sredno_st).toBe(100); // 100,333… → 100 · само за показ
+  });
+
+  it('минусът се закръгля симетрично — дълговете нямат друга посока', () => {
+    expect(smetniIzbora([
+      { tekst: 'а', st: -1 },
+      { tekst: 'б', st: -2 },
+    ]).sredno_st).toBe(-2); // -1,5 → -2, огледално на +1,5 → +2
+  });
+
+  it('без нито една парична клетка сборът е нула и не се показва', () => {
+    const s = smetniIzbora([{ tekst: 'текст', st: null }]);
+    expect(s.broyPari).toBe(0);
+    expect(s.sbor_st).toBe(0);
   });
 });
 

@@ -1693,6 +1693,55 @@ async function main() {
     proveri('в поле картата мълчи',
       await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-adres');
 
+    // ══ 29 · обхватът и статус-лентата · Брой · Сбор · Средно ═══════════
+    razdel = '29 · статус-лентата';
+    const statusnaLenta = () =>
+      p.evaluate(() => {
+        const l = document.querySelector('.status-lenta');
+        return l && !l.hidden ? l.textContent : null;
+      });
+    // Числото след етикета: спира на първия знак, който не е цифра/пауза —
+    // кирилското „С" на следващия етикет го реже само.
+    const chisloto = (tekst, sled) => {
+      const m = new RegExp(`${sled}\\s*(-?[\\d\\s\\u00A0\\u202F]+(?:,\\d+)?)`).exec(tekst);
+      return m ? Number(m[1].replace(/[\s\u00A0\u202F]/g, '').replace(',', '.')) : NaN;
+    };
+
+    // Shift+стрелка опъва обхват по колоната със сумите; лентата смята.
+    const sumiPoKletki = await p.$$eval('.red.naem .suma[data-st]', (r) =>
+      r.map((x) => Number(x.dataset.st)));
+    proveri('евро-клетките носят стотинките си (data-st)', sumiPoKletki.length > 1, true);
+    await p.click('.red.naem .suma');
+    proveri('една клетка не вдига лентата', await statusnaLenta(), null);
+    await p.keyboard.press('Shift+ArrowDown');
+    const naLentata = await statusnaLenta();
+    proveri('Shift+стрелка опъва обхват и лентата се показва', naLentata !== null, true);
+    proveri('сборът е от стотинките на клетките, не от текста',
+      chisloto(naLentata ?? '', 'Сбор:'), (sumiPoKletki[0] + sumiPoKletki[1]) / 100);
+    proveri('и средното се показва', (naLentata ?? '').includes('Средно'), true);
+
+    // Shift+клик опъва дотам; Ctrl+A хваща целия блок данни.
+    const redoveNaEkrana = await p.$$eval('.red.naem', (r) => r.length);
+    await p.click('.red.naem > :first-child');
+    const parvite = await p.$$('.red.naem > :first-child');
+    await parvite[parvite.length - 1].click({ modifiers: ['Shift'] });
+    proveri('Shift+клик опъва обхват от котвата до клика',
+      chisloto((await statusnaLenta()) ?? '', 'Брой:'), redoveNaEkrana);
+    await p.keyboard.press('Control+a');
+    proveri('Ctrl+A хваща целия блок данни',
+      chisloto((await statusnaLenta()) ?? '', 'Брой:') > redoveNaEkrana, true);
+
+    // текстови клетки без пари: лентата брои, но не съчинява сбор
+    await p.click('.red.naem > :first-child');
+    await p.keyboard.press('Shift+ArrowDown');
+    const bezPari = (await statusnaLenta()) ?? '';
+    proveri('текстов обхват има Брой', bezPari.includes('Брой'), true);
+    proveri('но НЯМА сбор — текстът не е пари', bezPari.includes('Сбор'), false);
+
+    // прерисуването убива селекцията — лентата не остава да лъже за мъртви клетки
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('смяната на екрана сваля лентата', await statusnaLenta(), null);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

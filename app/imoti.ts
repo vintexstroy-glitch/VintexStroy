@@ -365,7 +365,7 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
       <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>
-      <span class="suma">${zhivi.length ? pishi(sbor) : '—'}</span>
+      <span class="suma"${zhivi.length ? ` data-st="${sbor}"` : ''}>${zhivi.length ? pishi(sbor) : '—'}</span>
       <span>${
         zhivi.length > 1
           ? `<span class="znachka trevoga">${zhivi.length} наема</span>`
@@ -391,7 +391,7 @@ function redNaem(naem: Naem, o: Ogledalo): string {
       }${naem.imeyl ? ` · ${ekraniraj(naem.imeyl)}` : ''}</span></span>
       <span class="kletka"><span>${imot ? ekraniraj(opisi(imot)) : ekraniraj(naem.imotId)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
-      <span class="suma">${pishi(naem.naem_st)}</span>
+      <span class="suma" data-st="${naem.naem_st}">${pishi(naem.naem_st)}</span>
       <span>${
         naem.prekraten
           ? `<span class="znachka tiha">прекратен${naem.kraj ? ` ${ekraniraj(naem.kraj.slice(0, 10))}` : ''}</span>`

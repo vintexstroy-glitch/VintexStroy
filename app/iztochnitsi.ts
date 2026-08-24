@@ -431,7 +431,7 @@ function blokNaSborovete(): string {
         k.broy === 1 ? 'число' : 'числа'
       }${k.rolya ? ` · роля „${ekraniraj(IMENA_NA_ROLITE[k.rolya])}"` : ''}</span></span>
       <span class="kletka"><span>напр. ${ekraniraj(primer(sborove!.model, sborove!.tablitsa, k.kolona))}</span></span>
-      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}">${pishi(Math.abs(k.sbor_st))}</span>
+      <span class="suma${k.izklyuchena ? '' : sbor === 'razhod' ? ' duljimo' : ' plateno'}" data-st="${Math.abs(k.sbor_st)}">${pishi(Math.abs(k.sbor_st))}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-znak="${k.kolona}">${
           k.izklyuchena ? 'Върни' : 'Махни'
@@ -457,8 +457,8 @@ function blokNaSborovete(): string {
           <span></span>
           <span class="kletka"><b>${IMENA_NA_SBOROVETE.prihod} ${ZNAK.prihod} · ${IMENA_NA_SBOROVETE.razhod} ${ZNAK.razhod}</b><span>двата сбора не се махат — само се скриват</span></span>
           <span></span>
-          <span class="suma plateno">${pishi(dvata.prihod_st)}</span>
-          <span class="suma duljimo">${pishi(dvata.razhod_st)}</span>
+          <span class="suma plateno" data-st="${dvata.prihod_st}">${pishi(dvata.prihod_st)}</span>
+          <span class="suma duljimo" data-st="${dvata.razhod_st}">${pishi(dvata.razhod_st)}</span>
         </div>
       </div>
       <div class="deystviya">
@@ -491,8 +491,8 @@ function redNaRazlika(r: Razlika): string {
       <span>${znachki[r.kakvo]}</span>
       <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(opis)}${dokument ? ` · док. ${ekraniraj(dokument)}` : ''}</span></span>
       <span>${ekraniraj(r.nov?.data ?? r.star?.data ?? '')}</span>
-      <span class="suma">${r.star ? pishi(r.star.suma_st) : '—'}</span>
-      <span class="suma${r.kakvo === 'izchezval' ? ' duljimo' : ''}">${
+      <span class="suma"${r.star ? ` data-st="${r.star.suma_st}"` : ''}>${r.star ? pishi(r.star.suma_st) : '—'}</span>
+      <span class="suma${r.kakvo === 'izchezval' ? ' duljimo' : ''}"${r.nov ? ` data-st="${r.nov.suma_st}"` : ''}>${
         r.nov ? pishi(r.nov.suma_st) : '—'
       }</span>
     </div>`;

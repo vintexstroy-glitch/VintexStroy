@@ -169,8 +169,8 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>
           <span></span><span></span><span></span><span></span><span></span>
-          <span class="suma plateno">${pishi(s.obshto_st)}</span>
-          <span class="suma plateno">${pishi(s.sastoyanie_st)}</span>
+          <span class="suma plateno" data-st="${s.obshto_st}">${pishi(s.obshto_st)}</span>
+          <span class="suma plateno" data-st="${s.sastoyanie_st}">${pishi(s.sastoyanie_st)}</span>
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
         </div>
       </div>
@@ -190,13 +190,13 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
       <span class="suma">${kvSmVM2(r.chista_kvsm)}</span>
       <span class="suma">${kvSmVM2(r.obshta_kvsm)}</span>
       <span>${ekraniraj(r.izlozhenie) || '—'}</span>
-      <span class="kletka"><span>${pishi(r.naem_mesechen_st)}</span><span class="znachka ${
+      <span class="kletka" data-st="${r.naem_mesechen_st}"><span>${pishi(r.naem_mesechen_st)}</span><span class="znachka ${
         r.naemOt === 'zhurnal' ? 'dobre' : 'tiha'
       }">${r.naemOt === 'zhurnal' ? 'от Журнала' : 'очакван'}</span></span>
-      <span class="suma${r.prodaden ? '' : ' plateno'}">${
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.tsena_st}"`}>${
         r.prodaden ? '<span class="znachka tiha">ПРОДАДЕН</span>' : pishi(r.tsena_st)
       }</span>
-      <span class="suma${r.prodaden ? '' : ' plateno'}">${
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.sastoyanie_st}"`}>${
         r.prodaden ? '' : pishi(r.sastoyanie_st)
       }</span>
       <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>

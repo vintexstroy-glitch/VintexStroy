@@ -173,7 +173,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
           <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span></span>
           <span></span>
           <span class="suma"></span>
-          <span class="suma duljimo">${pishi(s.zaVnasyane_st)}</span>
+          <span class="suma duljimo" data-st="${s.zaVnasyane_st}">${pishi(s.zaVnasyane_st)}</span>
         </div>
       </div>
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
@@ -197,9 +197,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
             (x) => `
           <div class="red sverka" translate="no">
             <span class="kletka"><b>${ekraniraj(x.kakvo)}</b></span>
-            <span class="suma">${merka(x.belezhka, x.vhod)}</span>
-            <span class="suma">${merka(x.belezhka, x.izhod)}</span>
-            <span class="suma${x.nared ? '' : ' duljimo'}">${merka(x.belezhka, x.razlika)}</span>
+            <span class="suma"${vStotinki(x.belezhka, x.vhod)}>${merka(x.belezhka, x.vhod)}</span>
+            <span class="suma"${vStotinki(x.belezhka, x.izhod)}>${merka(x.belezhka, x.izhod)}</span>
+            <span class="suma${x.nared ? '' : ' duljimo'}"${vStotinki(x.belezhka, x.razlika)}>${merka(x.belezhka, x.razlika)}</span>
             <span><span class="znachka ${x.nared ? 'dobre' : 'trevoga'}">${
               x.nared ? 'затваря' : 'НЕ затваря'
             }</span></span>
@@ -321,9 +321,9 @@ function blokNaOtchetite(o: Ogledalo, mesets: string): string {
         </div>
         <div class="red sverka otchet-sverka" translate="no">
           <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
-          <span class="suma">${pishi(r.sverka.ot_sastavki_st)}</span>
-          <span class="suma">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
-          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${pishi(r.sverka.razlika_st)}</span>
+          <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
+          <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
           <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
             r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
           }</span></span>
@@ -442,8 +442,8 @@ function redNaRazhod(r: Razhod): string {
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${stavka}%${
         r.stavka === undefined ? '' : ' · от реда'
       }</span></span>
-      <span class="suma duljimo">${kakvoPishe(razbivka.obshta_st)}</span>
-      <span class="suma">${kakvoPishe(razbivka.dds_st)}</span>
+      <span class="suma duljimo" data-st="${razbivka.obshta_st}">${kakvoPishe(razbivka.obshta_st)}</span>
+      <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno-razhod="${r.seq}">Сторно</button>
         ${butonIstoriya('razhod', r.id)}
@@ -454,6 +454,12 @@ function redNaRazhod(r: Razhod): string {
 /** Стотинките се показват в евро; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
   return belezhka === MERKA.pari ? pishi(chislo) : String(chislo);
+}
+
+/** `data-st` за статус-лентата — само когато мярката наистина е пари.
+ *  Бройка без белега не влиза в сбор: евро и бройки не се смесват. */
+function vStotinki(belezhka: string | undefined, chislo: number): string {
+  return belezhka === MERKA.pari ? ` data-st="${chislo}"` : '';
 }
 
 /**
@@ -641,7 +647,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
                 : 'БЕЗ номер на документ — затова не се сдвоява'
             }</span></span>
             <span>${ekraniraj(n.dvizhenie.data)}</span>
-            <span class="suma duljimo">${kakvoPishe(n.dvizhenie.suma_st)}</span>
+            <span class="suma duljimo" data-st="${n.dvizhenie.suma_st}">${kakvoPishe(n.dvizhenie.suma_st)}</span>
           </div>`,
           )
           .join('')}
@@ -657,7 +663,7 @@ function redNaSmetka(r: RedSmetka): string {
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>
-      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${pishi(r.suma_st)}</span>
+      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}" data-st="${r.suma_st}">${pishi(r.suma_st)}</span>
     </div>`;
 }
 
@@ -675,8 +681,8 @@ function redNaDDS(r: RedDDS): string {
             : 'разхода'
       } · ${pishi(r.obshta_st)} с ДДС</span></span>
       <span>${r.stavka}%</span>
-      <span class="suma">${pishi(r.osnova_st)}</span>
-      <span class="suma">${pishi(r.dds_st)}</span>
+      <span class="suma" data-st="${r.osnova_st}">${pishi(r.osnova_st)}</span>
+      <span class="suma" data-st="${r.dds_st}">${pishi(r.dds_st)}</span>
     </div>`;
 }
 
@@ -729,17 +735,17 @@ function kalkulator(): string {
           <div class="red smyatane" translate="no">
             <span class="kletka"><b>${ekraniraj(r.opis || `ред ${i + 1}`)}</b></span>
             <span>${r.stavka}%</span>
-            <span class="suma">${kakvoPishe(r.razbivka.osnova_st)}</span>
-            <span class="suma">${kakvoPishe(r.razbivka.dds_st)}</span>
-            <span class="suma">${kakvoPishe(r.razbivka.obshta_st)}</span>
+            <span class="suma" data-st="${r.razbivka.osnova_st}">${kakvoPishe(r.razbivka.osnova_st)}</span>
+            <span class="suma" data-st="${r.razbivka.dds_st}">${kakvoPishe(r.razbivka.dds_st)}</span>
+            <span class="suma" data-st="${r.razbivka.obshta_st}">${kakvoPishe(r.razbivka.obshta_st)}</span>
           </div>`,
           )
           .join('')}
         <div class="red smyatane sbor" translate="no">
           <span><b>Сбор</b></span><span></span>
-          <span class="suma">${pishi(sborOsnova)}</span>
-          <span class="suma">${pishi(sborDDS)}</span>
-          <span class="suma">${pishi(sborObshta)}</span>
+          <span class="suma" data-st="${sborOsnova}">${pishi(sborOsnova)}</span>
+          <span class="suma" data-st="${sborDDS}">${pishi(sborDDS)}</span>
+          <span class="suma" data-st="${sborObshta}">${pishi(sborObshta)}</span>
         </div>
       </div>`
       }

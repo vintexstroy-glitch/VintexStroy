@@ -586,9 +586,9 @@ function redNaSverka(s: ZapisanaSverka): string {
       <span class="kletka"><b>${ekraniraj(s.buton)}</b><span>${ekraniraj(s.period)} · ${s.izvori.length} ${
         s.izvori.length === 1 ? 'файл' : 'файла'
       }${s.propusnati ? ` · ${s.propusnati} непрочетени` : ''}</span></span>
-      <span class="suma">${pishi(s.vhod_st)}</span>
-      <span class="suma">${pishi(s.izhod_st)}</span>
-      <span class="suma${s.razlika_st === 0 ? '' : ' duljimo'}">${pishi(s.razlika_st)}</span>
+      <span class="suma" data-st="${s.vhod_st}">${pishi(s.vhod_st)}</span>
+      <span class="suma" data-st="${s.izhod_st}">${pishi(s.izhod_st)}</span>
+      <span class="suma${s.razlika_st === 0 ? '' : ' duljimo'}" data-st="${s.razlika_st}">${pishi(s.razlika_st)}</span>
       <span><span class="znachka ${s.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
         s.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
       }</span></span>

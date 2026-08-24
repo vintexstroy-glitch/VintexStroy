@@ -205,7 +205,7 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
         <span>${v.padezh}</span>
         ${dni > 0 ? `<span class="zakasnenie">закъснял ${dni} ${dni === 1 ? 'ден' : 'дни'}</span>` : ''}
       </span>
-      <span class="suma${dni > 0 ? ' duljimo' : ''}">${pishi(v.ostatak_st)}</span>
+      <span class="suma${dni > 0 ? ' duljimo' : ''}" data-st="${v.ostatak_st}">${pishi(v.ostatak_st)}</span>
       <span class="butoni">
         ${dni > 0 ? butonPismo(o, v, dni) : ''}
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
@@ -225,7 +225,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
-      <span class="suma plateno">${pishi(p.suma_st)}</span>
+      <span class="suma plateno" data-st="${p.suma_st}">${pishi(p.suma_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
         ${butonIstoriya('plashtane', p.id)}
