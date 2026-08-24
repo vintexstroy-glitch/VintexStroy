@@ -29,8 +29,9 @@
  * груповите действия ще стъпят върху същия обхват.
  */
 
-import { pishi } from '../src/yadro/pari.js';
+import { pishi, pishiVPole } from '../src/yadro/pari.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
+import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
 const ZNAK = 'kletka-izbrana';
@@ -157,6 +158,91 @@ async function stornirayIzbranite(spisak: readonly ZaStorno[]): Promise<void> {
   if (izhod.kazano === '') return; // отказан въпрос — нищо не е пипнато
   konteks.vest(izhod.vid, izhod.kazano);
   await prerisuvayEkrana();
+}
+
+// ── клипбордният мост НАВЪН · Ctrl+C поставя се в Excel като таблица ──────
+
+/** Избраните клетки, ред по ред · бутоните не са данни и не пътуват. */
+function izbranitePoRedove(): HTMLElement[][] {
+  if (!izbrana) return [];
+  const redove = redoveNa(izbrana.tablitsa);
+  const posleden = redove.length - 1;
+  const otKolona = Math.min(izbrana.kolona, izbrana.krayKolona);
+  const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
+  const nomera = new Set<number>();
+  const doRed = Math.min(Math.max(izbrana.red, izbrana.krayRed), posleden);
+  for (let r = Math.min(izbrana.red, izbrana.krayRed); r <= doRed; r += 1) nomera.add(r);
+  for (const r of izbrana.oshte) if (r <= posleden) nomera.add(r);
+
+  const rezultat: HTMLElement[][] = [];
+  for (const r of [...nomera].sort((a, b) => a - b)) {
+    const kletki = kletkiNa(redove[r]!);
+    const tsyalRed = izbrana.oshte.has(r);
+    const ot = tsyalRed ? 0 : Math.min(otKolona, kletki.length - 1);
+    const doo = tsyalRed ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
+    rezultat.push(kletki.slice(ot, doo + 1).filter((kl) => !kl.querySelector('button')));
+  }
+  return rezultat.filter((red) => red.length > 0);
+}
+
+/**
+ * Текстът на една клетка за клипборда.
+ *
+ * Парите тръгват като ЧИСТО число („1234,56") — така Excel ги разбира като
+ * число и по тях се смята веднага. „1 234,56 €" с тясната пауза и знака би
+ * станало ТЕКСТ в чуждата таблица — колона, по която нищо не се сборува.
+ * Стойността идва от `data-st`, не от разчитане на екрана (правило 20).
+ */
+function tekstNaKletkaZaKlipborda(kl: HTMLElement): string {
+  const st = stNa(kl);
+  if (st !== null) return pishiVPole(st);
+  return kl.innerText.replace(/\s*\n\s*/g, ' · ').trim();
+}
+
+/**
+ * Двата вкуса на клипборда от готовите текстове — чиста функция с тест.
+ * TSV е за текстовите редактори; HTML-таблицата е това, което Excel чете
+ * като РЕДОВЕ И КОЛОНИ, а не като залепен низ.
+ */
+export function klipbordniVkusove(tekstove: readonly (readonly string[])[]): {
+  tsv: string;
+  html: string;
+} {
+  return {
+    tsv: tekstove.map((red) => red.join('\t')).join('\n'),
+    html: `<table>${tekstove
+      .map((red) => `<tr>${red.map((t) => `<td>${ekraniraj(t)}</td>`).join('')}</tr>`)
+      .join('')}</table>`,
+  };
+}
+
+/** Копира избора: text/plain (TSV) + text/html (истинска таблица). */
+async function kopirayIzbora(): Promise<void> {
+  const redove = izbranitePoRedove();
+  if (redove.length === 0) return;
+  const { tsv, html } = klipbordniVkusove(redove.map((red) => red.map(tekstNaKletkaZaKlipborda)));
+  try {
+    // Двата вкуса наведнъж: Excel чете text/html като таблица с клетки;
+    // текстовите редактори взимат TSV. По-старият път остава като резерва.
+    if (typeof ClipboardItem === 'undefined') {
+      await navigator.clipboard.writeText(tsv);
+    } else {
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          'text/plain': new Blob([tsv], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+        }),
+      ]);
+    }
+    // потвърждението свети в лентата до следващото движение на селекцията
+    const l = lentata();
+    const s = document.createElement('span');
+    s.textContent = `Копирано · ${redove.length} ${redove.length === 1 ? 'ред' : 'реда'}`;
+    l.append(s);
+    l.hidden = false;
+  } catch {
+    konteks?.vest('zle', 'Клипбордът отказа — браузърът иска разрешение за копиране.');
+  }
 }
 
 /** Слага знаците, смята лентата и докарва подвижния край в очите. */
@@ -300,6 +386,13 @@ export function zakachiKlaviatura(
     const posledenRed = redove.length - 1;
     // Ctrl+стрелка скача до ръба — движението на Excel през блока данни.
     const doRaba = e.ctrlKey || e.metaKey;
+
+    // Ctrl+C · избраното тръгва към клипборда — и към Excel.
+    if (doRaba && e.code === 'KeyC') {
+      void kopirayIzbora();
+      e.preventDefault();
+      return;
+    }
 
     // Ctrl+A · целият блок данни. По `code`, не по `key` — на кирилска
     // клавиатура „A" е „А" и жестът иначе би работил само на латиница.

@@ -21,7 +21,7 @@ import {
   type KolonaSFiltar,
 } from '../app/filtri.js';
 import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran.js';
-import { smetniIzbora } from '../app/klaviatura.js';
+import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
 import { umryalaLi } from '../app/chernova.js';
 import { sDumiZaStornoto } from '../app/storno.js';
 
@@ -155,6 +155,24 @@ describe('сметката на избора', () => {
     const s = smetniIzbora([{ tekst: 'текст', st: null }]);
     expect(s.broyPari).toBe(0);
     expect(s.sbor_st).toBe(0);
+  });
+});
+
+// ── клипбордният мост навън (вълна 2 · предложение 8) ──────────────────────
+describe('двата вкуса на клипборда', () => {
+  it('TSV — таб между клетките, нов ред между редовете', () => {
+    const { tsv } = klipbordniVkusove([
+      ['СТРОЙПЛАСТ ЕООД', '1200,00'],
+      ['Ток ЕАД', '120,00'],
+    ]);
+    expect(tsv).toBe('СТРОЙПЛАСТ ЕООД\t1200,00\nТок ЕАД\t120,00');
+  });
+
+  it('HTML — истинска таблица, а опасното в текста се екранира', () => {
+    const { html } = klipbordniVkusove([['<b>не е удебелено</b>', '5,00']]);
+    expect(html).toBe(
+      '<table><tr><td>&lt;b&gt;не е удебелено&lt;/b&gt;</td><td>5,00</td></tr></table>',
+    );
   });
 });
 

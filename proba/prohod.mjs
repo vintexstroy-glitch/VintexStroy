@@ -1782,6 +1782,44 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
 
+    // ══ 31 · клипбордният мост от/към истинския Excel ═══════════════════
+    razdel = '31 · клипбордният мост';
+    await p.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+
+    // НАВЪН: две суми → Ctrl+C → чисти числа с таб и нов ред, без € и паузи
+    await p.click('.red.naem .suma');
+    await p.keyboard.press('Shift+ArrowDown');
+    await p.keyboard.press('Control+c');
+    await p.waitForFunction(() =>
+      document.querySelector('.status-lenta')?.textContent?.includes('Копирано'));
+    const vKlipborda = await p.evaluate(() => navigator.clipboard.readText());
+    proveri('копирани са два реда', vKlipborda.split('\n').length, 2);
+    proveri('парите тръгват като ЧИСТИ числа — Excel смята по тях',
+      vKlipborda.split('\n').every((r) => /^\d+,\d\d$/.test(r)), true);
+    proveri('и лентата казва „Копирано"',
+      ((await statusnaLenta()) ?? '').includes('Копирано · 2 реда'), true);
+    await p.keyboard.press('Escape');
+
+    // НАВЪТРЕ: TSV от „Excel" → Ctrl+V → същият път като файл, до разликите
+    const dnesKlip = new Date().toISOString().slice(0, 10);
+    await p.evaluate((dnes) => {
+      const dt = new DataTransfer();
+      dt.setData(
+        'text/plain',
+        `Доставчик\tКакво\tДата\tСума\nПробен клипборд ЕООД\tцимент\t${dnes}\t240,00\n`,
+      );
+      document.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt }));
+    }, dnesKlip);
+    await p.waitForFunction(() => document.body.textContent.includes('Клипборд.csv'));
+    proveri('следата казва откъде е дошло',
+      (await p.evaluate(() => document.body.textContent)).includes('Клипборд.csv'), true);
+    proveri('редът от клипборда стои в разликите като нов',
+      await p.evaluate(() => document.body.textContent.includes('Пробен клипборд ЕООД')), true);
+    proveri('и нищо още не е записано — Вратата чака човека',
+      await broySabitiya(p), predaSborove + 2);
+    await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
+    proveri('отказът прибира предложението', await p.$('#otkazhi-plan'), null);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

@@ -66,6 +66,7 @@ import {
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
+import { fokusVPole } from './klaviatura.js';
 import type { Konteks } from './main.js';
 
 type Filtar = 'promenite' | 'vsichko';
@@ -96,6 +97,8 @@ let pitane: Pitane | null = null;
  * ръчният път остава като бутон без папка, за да няма два механизма.
  */
 let natisnat: Buton | null = null;
+/** Пействането се закача ВЕДНЪЖ на document — иначе всяко прерисуване трупа слушател. */
+let posteZakachen = false;
 /** Листове, които никой позволен модел не позна — броят се, не се преглъщат. */
 let nepoznati: string[] = [];
 /** Отпечатъците на всички файлове от партидата — влизат в записаната сверка. */
@@ -713,6 +716,31 @@ export function zakachiIztochnitsi(
     otvoreno = !otvoreno;
     await prerisuvay();
   });
+
+  // ── клипбордният мост НАВЪТРЕ · Ctrl+V от Excel, същият път като файл ────
+  //
+  // Маркираш в старата таблица, Ctrl+C, Ctrl+V тук — и редовете минават по
+  // ЦЕЛИЯ съществуващ път: File → отпечатък → таблица → модел → разлики →
+  // Вратата. Нищо ново не се строи за поставянето: Excel слага в клипборда
+  // TSV, а `otCSV` познава таба като разделител. Следата в Журнала казва
+  // „Клипборд.csv" — вижда се откъде е дошло.
+  if (!posteZakachen) {
+    posteZakachen = true;
+    document.addEventListener('paste', async (e) => {
+      // в поле пействането е на полето — мостът не се меси
+      if (fokusVPole()) return;
+      // входът съществува само където съществува и бутонът (правило 15)
+      if (!document.getElementById('vzemi')) return;
+      const tekst = e.clipboardData?.getData('text/plain') ?? '';
+      // без таб не е таблица от Excel — обикновен текст не се граби
+      if (!tekst.includes('\t')) return;
+      e.preventDefault();
+      drazhka = null;
+      const buton = natisnat ?? PARVIYAT;
+      const fayl = new File([tekst], 'Клипборд.csv', { type: 'text/csv' });
+      await opitaj(() => napraviPartida([fayl], buton, k), prerisuvay);
+    });
+  }
 
   const fayl = koren.querySelector<HTMLInputElement>('#fayl-iztochnik');
 
