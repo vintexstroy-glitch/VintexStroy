@@ -24,6 +24,7 @@
 
 import { pishi } from '../src/yadro/pari.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { dumiZaGreshka, svaliFayl } from './imoti.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -217,8 +218,10 @@ function sZnak(razlika_st: number): string {
 /** Базисни точки → четимо: −2 543 б.т. става „−25,4 %". */
 function vBT(bt: number): string {
   const znak = bt > 0 ? '+' : bt < 0 ? '−' : '';
-  const a = Math.abs(bt);
-  return `${znak}${Math.floor(a / 100)},${String(Math.round((a % 100) / 10))} %`;
+  // Първо се закръгля до десети, ПОСЛЕ се дели: закръглянето по остатъка
+  // губеше преноса — 2 599 б.т. излизаше „25,10 %" вместо „26,0 %".
+  const desetinki = Math.round(Math.abs(bt) / 10);
+  return `${znak}${Math.floor(desetinki / 10)},${desetinki % 10} %`;
 }
 
 /** Базисни точки като процент: 320 → „3,20 %". */
@@ -281,7 +284,7 @@ export function zakachiStoynost(
         (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '');
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
@@ -300,7 +303,7 @@ export function zakachiStoynost(
       vest = `Ценовата листа даде изложение и състояние за ${slyato.size} обекта.`;
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
@@ -318,18 +321,13 @@ export function zakachiStoynost(
       const fayl = new Blob([bajtove.slice().buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      const adres = URL.createObjectURL(fayl);
-      const vruzka = document.createElement('a');
-      vruzka.href = adres;
-      vruzka.download = `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`;
-      vruzka.click();
-      URL.revokeObjectURL(adres);
+      svaliFayl(fayl, `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`);
       k.vest(
         'dobre',
         `Ценовата листа е записана: ${smetnato.redove.length} реда · ${IMENA_NA_IZBORA[koyaTsena]}.`,
       );
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
       await prerisuvay();
     }
   });

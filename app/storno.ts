@@ -6,6 +6,7 @@
  */
 
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
+import { dumiZaGreshka } from './imoti.js';
 import type { Vid } from '../src/domein/sabitiya.js';
 import type { Konteks } from './main.js';
 
@@ -38,7 +39,7 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
   } catch (greshka) {
     return {
       stana: false,
-      kazano: greshka instanceof Error ? greshka.message : String(greshka),
+      kazano: dumiZaGreshka(greshka),
       vid: 'zle',
     };
   }

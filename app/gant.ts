@@ -47,7 +47,7 @@ import {
 } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import type { Konteks } from './main.js';
@@ -511,7 +511,7 @@ export function zakachiGant(
       k.vest('dobre', 'Делото е записано.');
       await prerisuvay();
     } catch (err) {
-      izhod.textContent = err instanceof Error ? err.message : String(err);
+      izhod.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }

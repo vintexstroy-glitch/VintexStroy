@@ -65,7 +65,7 @@ import {
   zapishiSverkata,
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
 type Filtar = 'promenite' | 'vsichko';
@@ -786,7 +786,7 @@ export function zakachiIztochnitsi(
         };
         greshka = '';
       } catch (err) {
-        greshka = err instanceof Error ? err.message : String(err);
+        greshka = dumiZaGreshka(err);
       }
       await prerisuvay();
     });
@@ -829,13 +829,39 @@ export function zakachiIztochnitsi(
         );
       }
       const { prihod_st, razhod_st } = sboroveNaPartida(redove);
+
+      // ПАРТИДАТА ЗАВЪРШВА СЪС СВЕРКА (правило 7) — и тя се ЗАПИСВА. Входът е
+      // сборът от редовете на екрана; изходът — същите потоци, прочетени
+      // обратно от Огледалото СЛЕД записа. Разликата влиза и когато е нула.
+      const sled = await k.deystviya.ogledalo();
+      let izhod_st = 0;
+      for (const r of redove) {
+        const zapisan = sled.pototsi.get(`${sborove!.model.klyuch}|${r.kolona}|${period}`);
+        if (zapisan) izhod_st += zapisan.suma_st;
+      }
+      const vhod_st = redove.reduce((sbor, r) => sbor + r.suma_st, 0);
+      await k.deystviya.zapishiSverka(
+        `SV:potok:${beleg}`,
+        {
+          buton: 'сборове към Приходи/Разходи',
+          period,
+          vhod_st,
+          izhod_st,
+          razlika_st: izhod_st - vhod_st,
+          izvori: [beleg],
+          propusnati: 0,
+        },
+        { opId: `sverka-potok:${crypto.randomUUID()}` },
+      );
+
       k.vest(
-        'dobre',
-        `Изпратено: ${pishi(prihod_st)} в Приходи · ${pishi(razhod_st)} в Разходи.`,
+        izhod_st === vhod_st ? 'dobre' : 'zle',
+        `Изпратено: ${pishi(prihod_st)} в Приходи · ${pishi(razhod_st)} в Разходи. ` +
+          `Сверката е записана · разлика ${pishi(izhod_st - vhod_st)}.`,
       );
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
     }
     await prerisuvay();
   });
@@ -897,7 +923,7 @@ export function zakachiIztochnitsi(
       );
     } catch (err) {
       greshka =
-        err instanceof GreshkaModel || err instanceof Error ? err.message : String(err);
+        dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
       await prerisuvay();
@@ -965,7 +991,7 @@ export function zakachiIztochnitsi(
       nepoznati = [];
       greshka = '';
     } catch (err) {
-      greshka = err instanceof Error ? err.message : String(err);
+      greshka = dumiZaGreshka(err);
       if (err instanceof GreshkaAktualizatsiya) {
         // Числата на партидата ги няма — изключението ги отнесе. Сверката обаче
         // не ги пита: тя чете снимката и Журнала наново.
@@ -974,7 +1000,7 @@ export function zakachiIztochnitsi(
           greshka += ` Сверката Е ЗАПИСАНА въпреки това · разлика ${pishi(svereno.razlika_st)}.`;
         } catch (vtora) {
           greshka += ` И сверката не можа да се запише: ${
-            vtora instanceof Error ? vtora.message : String(vtora)
+            dumiZaGreshka(vtora)
           }`;
         }
       }
@@ -1029,7 +1055,7 @@ async function opitaj(rabota: () => Promise<void>, prerisuvay: () => Promise<voi
   } catch (err) {
     plan = null;
     pitane = null;
-    greshka = err instanceof Error ? err.message : String(err);
+    greshka = dumiZaGreshka(err);
   }
   await prerisuvay();
 }

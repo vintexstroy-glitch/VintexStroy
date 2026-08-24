@@ -94,9 +94,3 @@ export function mozheLiDaSeStornira(
   }
 }
 
-export class GreshkaStorno extends Error {
-  constructor(prichina: string) {
-    super(prichina);
-    this.name = 'GreshkaStorno';
-  }
-}

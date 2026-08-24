@@ -21,7 +21,7 @@ import {
 } from '../src/domein/nachislyavane.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { butonIstoriya } from './istoriya.js';
 import { opitajStorno } from './storno.js';
 import type { Konteks } from './main.js';
@@ -303,9 +303,7 @@ export function zakachiPari(
       await prerisuvay();
     } catch (err) {
       greshka.textContent =
-        err instanceof GreshkaNachislyavane || err instanceof Error
-          ? err.message
-          : String(err);
+        dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -367,7 +365,7 @@ export function zakachiPari(
       k.vest('dobre', 'Плащането е прието и разнесено срещу вземането.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }

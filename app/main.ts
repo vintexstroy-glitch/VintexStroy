@@ -24,7 +24,7 @@ import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
-import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
+import { dumiZaGreshka, ekraniraj, narisuvayImoti, svaliFayl, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
@@ -282,7 +282,7 @@ async function vlizane(): Promise<Samolichnost> {
   try {
     return await vhod.vlez('google');
   } catch (greshka) {
-    koren.innerHTML = ekranatVlez(greshka instanceof Error ? greshka.message : String(greshka));
+    koren.innerHTML = ekranatVlez(dumiZaGreshka(greshka));
     throw greshka;
   }
 }
@@ -392,7 +392,7 @@ async function trugvay(): Promise<void> {
           ${mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
           ${
             ekran === 'imoti'
-              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
+              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length })
               : ekran === 'pari'
                 ? narisuvayPari(ogledalo, dnes)
                 : ekran === 'stoynost'
@@ -496,7 +496,7 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
               : hranilishte.postoyanstvo === 'изтриваемо'
                 ? 'Хранилището е ИЗТРИВАЕМО — изнасяй често'
                 : 'Постоянството е неизвестно'
-          }${hranilishte.zaeto >= 0 ? ` · ${kolkoMyasto(hranilishte.zaeto)}` : ''}
+          }${hranilishte.zaeto >= 0 ? ` · ${kolkoMyasto(hranilishte.zaeto)}${hranilishte.pozvoleno > 0 ? ` от ${kolkoMyasto(hranilishte.pozvoleno)}` : ''}` : ''}
         </div>
       </div>
     </aside>`;
@@ -566,12 +566,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
-    const adres = URL.createObjectURL(fayl);
-    const vruzka = document.createElement('a');
-    vruzka.href = adres;
-    vruzka.download = `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`;
-    vruzka.click();
-    URL.revokeObjectURL(adres);
+    svaliFayl(fayl, `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`);
 
     const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
     zapishiBeleg({
@@ -600,12 +595,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([bajtove.slice().buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    const adres = URL.createObjectURL(fayl);
-    const vruzka = document.createElement('a');
-    vruzka.href = adres;
-    vruzka.download = `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`;
-    vruzka.click();
-    URL.revokeObjectURL(adres);
+    svaliFayl(fayl, `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`);
     k.vest(
       'dobre',
       `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +
@@ -666,6 +656,6 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
 trugvay().catch((greshka: unknown) => {
   koren.innerHTML = `<div class="telo"><div class="vest zle">Приложението не тръгна: ${
-    ekraniraj(greshka instanceof Error ? greshka.message : String(greshka))
+    ekraniraj(dumiZaGreshka(greshka))
   }</div></div>`;
 });

@@ -21,6 +21,7 @@
  */
 
 import { kletka, type Tablitsa } from './tablitsa.js';
+import { svedenaGlava } from './tablitsa.js';
 import { podskazhiVid, type VidStoynost } from '../domein/vid-stoynost.js';
 
 export type { VidStoynost };
@@ -152,15 +153,6 @@ export class GreshkaModel extends Error {
 }
 
 /**
- * Отпечатъкът на хедъра: заглавията, изчистени и слепени.
- *
- * Нарочно НЕ е хеш — човек трябва да може да го погледне и да каже „а, това е
- * извлечението от ОББ". Отпечатък, който само машина чете, се дебъгва трудно.
- *
- * Празните колони в края отпадат: Excel ражда по десет на всеки лист и те
- * менят отпечатъка, без да менят таблицата.
- */
-/**
  * Заглавията на един ред, изчистени от празните в края.
  *
  * Excel ражда по десет празни колони на всеки лист; те не са част от главата.
@@ -171,13 +163,20 @@ export function glaviNaRed(t: Tablitsa, redNaGlavata: number): string[] {
   return red;
 }
 
+/**
+ * Отпечатъкът на хедъра: заглавията, СВЕДЕНИ и слепени.
+ *
+ * Нарочно НЕ е хеш — човек трябва да може да го погледне и да каже „а, това е
+ * извлечението от ОББ". Отпечатък, който само машина чете, се дебъгва трудно.
+ *
+ * Свеждането е ЕДНОТО, общото (`svedenaGlava`, правило 12): тук живееше
+ * четвърто копие без NFC — глава, писана на клавиатура, която ражда NFD,
+ * даваше ДРУГ отпечатък за същата таблица, и файлът тихо минаваше за чужд.
+ */
 export function otpechatakNaGlavata(t: Tablitsa, redNaGlavata: number): string {
-  const red = [...(t.redove[redNaGlavata] ?? [])];
-  while (red.length && red[red.length - 1]!.trim() === '') red.pop();
+  const red = glaviNaRed(t, redNaGlavata);
   if (red.length === 0) throw new GreshkaModel('Празен ред за глава — това не е хедър.');
-  return red
-    .map((k) => k.trim().toLowerCase().replace(/\s+/g, ' '))
-    .join('|');
+  return red.map(svedenaGlava).join('|');
 }
 
 /**

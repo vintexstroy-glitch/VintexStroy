@@ -69,7 +69,28 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   ];
 }
 
-export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): string {
+/**
+ * СВАЛЯНЕ НА ФАЙЛ · единственият дом на танца Blob → адрес → връзка → клик.
+ * Беше преписан три пъти (в main два, в Стойност един) — три места за един теч.
+ */
+/**
+ * ДУМИТЕ НА ЕДНА ГРЕШКА · един дом за израза, преписан 28 пъти.
+ * Грешка с име носи message; всичко друго се казва както е.
+ */
+export function dumiZaGreshka(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+export function svaliFayl(fayl: Blob, ime: string): void {
+  const adres = URL.createObjectURL(fayl);
+  const vruzka = document.createElement('a');
+  vruzka.href = adres;
+  vruzka.download = ime;
+  vruzka.click();
+  URL.revokeObjectURL(adres);
+}
+
+export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const { ogledalo } = sastoyanie;
   const imoti = [...ogledalo.imoti.values()];
   const naemi = [...ogledalo.naemi.values()].sort(
@@ -165,7 +186,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <span>${
           popravyanNaem
             ? 'новата сума важи за БЪДЕЩИТЕ начисления — вече начисленото не мърда'
-            : 'парите се въвеждат в левове и се пазят в цели стотинки'
+            : 'парите се въвеждат в евро и се пазят в цели най-малки единици'
         }</span>
       </div>
       ${
@@ -407,7 +428,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         // „72,40 €" за площ и залепваше знака на валутата при показване.
         ploshtad_kvsm = ploshtVKvSm(surovaPloshtad);
       } catch (e) {
-        greshka.textContent = e instanceof Error ? e.message : String(e);
+        greshka.textContent = dumiZaGreshka(e);
         return;
       }
     }
@@ -436,7 +457,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       }
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }
@@ -511,7 +532,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       }
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }
@@ -549,7 +570,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       k.vest('dobre', 'Наемът е прекратен. Начисленото досега си остава дължимо.');
       await prerisuvay();
     } catch (e) {
-      greshka.textContent = e instanceof Error ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
     } finally {
       buton.disabled = false;
     }

@@ -39,7 +39,7 @@ import {
 import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
-import { ekraniraj } from './imoti.js';
+import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno } from './storno.js';
 import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
@@ -451,7 +451,7 @@ function redNaRazhod(r: Razhod): string {
     </div>`;
 }
 
-/** Стотинките се показват в левове; бройките — както са. */
+/** Стотинките се показват в евро; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
   return belezhka === MERKA.pari ? pishi(chislo) : String(chislo);
 }
@@ -823,7 +823,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Салдото е записано.');
       await prerisuvay();
     } catch (err) {
-      izhod.textContent = err instanceof Error ? err.message : String(err);
+      izhod.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -880,7 +880,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Разходът е записан. Входящият ДДС влезе в акумулатора си.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     } finally {
       buton.disabled = false;
     }
@@ -909,7 +909,7 @@ export function zakachiSmetki(
       k.vest('dobre', `Справката е записана. ${mesets} е заключен — поправка само през сверена промяна.`);
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     }
   });
 
@@ -934,7 +934,7 @@ export function zakachiSmetki(
       k.vest('dobre', 'Внесеното е записано. Разликата с декларираното се вижда горе.');
       await prerisuvay();
     } catch (err) {
-      greshka.textContent = err instanceof Error ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
     }
   });
 

@@ -78,6 +78,7 @@ export class Deystviya {
   }
 
   async dobaviNaem(id: string, danni: PayloadNaemDobaven, z: Zayavka): Promise<Rezultat> {
+    proveriPadezhDen(danni.padezhDen);
     return this.#pusni('НаемДобавен', VID.naem, id, danni, z);
   }
 
@@ -91,6 +92,7 @@ export class Deystviya {
   }
 
   async popraviNaem(danni: PayloadNaemPopraven, z: Zayavka): Promise<Rezultat> {
+    proveriPadezhDen(danni.padezhDen);
     return this.#pusni('НаемПоправен', VID.naem, danni.naemId, danni, z);
   }
 
@@ -328,5 +330,26 @@ export class Deystviya {
       ...(z.expectedRev === undefined ? {} : { expectedRev: z.expectedRev }),
     };
     return this.#vrata.dobavi(op);
+  }
+}
+
+/**
+ * ПАДЕЖЪТ Е ДЕН ОТ МЕСЕЦА · 1..31, цяло (находка на сверката).
+ *
+ * Дотук нищо не го пазеше: екранната форма имаше min/max, но внос, миграция
+ * или чужд вход можеха да запишат 0, 42 или 2.5 — и `padezhZaPerioda` щеше да
+ * ги преглътне с Math.min/Math.max, раждайки падеж, който никой не е искал.
+ * Границата е при записа, с думи — не при смятането, мълчешком.
+ */
+export class GreshkaNaem extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaNaem';
+  }
+}
+
+function proveriPadezhDen(den: number): void {
+  if (!Number.isInteger(den) || den < 1 || den > 31) {
+    throw new GreshkaNaem(`Падежът е ден от месеца, 1 до 31 — получено: ${den}.`);
   }
 }

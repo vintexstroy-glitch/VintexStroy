@@ -17,6 +17,7 @@ import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
+import { klyuchNaPravo } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
 import type {
   PayloadDeloZapisano,
@@ -364,7 +365,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
 
       case 'ПравоЗаписано': {
         const p = s.payload as unknown as PravaZaModel;
-        prava.set(`${p.imeyl}|${p.model}`, p);
+        prava.set(klyuchNaPravo(p.imeyl, p.model), p);
         break;
       }
 

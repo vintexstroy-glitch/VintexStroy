@@ -20,6 +20,7 @@ import { akumulator, ddsOtObshta, stavkaNaReda, type Akumulator } from './dds.js
 import { sveriDDS, type Dvizhenie, type RezultatSverka } from './sverka-dds.js';
 import type { Stotinki } from '../yadro/pari.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
+import { platenoDDSZaPerioda } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 
 export type Posoka = 'приход' | 'разход';
@@ -314,10 +315,9 @@ export function sveriDDSZaPerioda(o: Ogledalo, period: Period): RezultatSverka {
   const fakturi = otRaka(o, period);
   const izvlecheniya = otIzvlechenie(o, period);
 
-  let vneseno = 0;
-  for (const p of o.platenoDDS.values()) {
-    if (p.period === period) vneseno += p.suma_st;
-  }
+  // Единственият дом на тази сметка е platenoDDSZaPerioda (правило 17) —
+  // ръчното копие тук вече се беше разминало по дух, ако не по число.
+  const vneseno = platenoDDSZaPerioda(o, period);
 
   return sveriDDS({
     fakturi: fakturi.map(dvizhenie),

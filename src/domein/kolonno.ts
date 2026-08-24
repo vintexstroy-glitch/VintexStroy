@@ -89,6 +89,15 @@ export function sashtnostNaPravo(imeyl: string, model: string): string {
   return `PRAVO:${imeyl}:${model}`;
 }
 
+/**
+ * Ключът в картата на Огледалото · СЪЩАТА двойка, един дом (правило 17).
+ * Съставяше се на ръка на три места — форматът му беше на един разминат
+ * интервал от тиха загуба на право.
+ */
+export function klyuchNaPravo(imeyl: string, model: string): string {
+  return `${imeyl}|${model}`;
+}
+
 export function napraviPrava(n: {
   imeyl: string;
   model: string;
@@ -130,11 +139,10 @@ export function vidNaKolona(m: ModelNaTablitsa, kolona: number): VidKolona {
 export function pravoNaKolona(
   prava: PravaZaModel | undefined,
   kolona: number,
-): PravaNaKolonaRezultat {
+): PravoNaKolona {
   return prava?.skriti.includes(kolona) ? 'skrito' : 'vizhda';
 }
 
-type PravaNaKolonaRezultat = PravoNaKolona;
 
 /**
  * МОЖЕ ЛИ ТОЗИ ЧОВЕК ДА РЕДАКТИРА ТАЗИ КОЛОНА · двата въпроса, събрани в един.
