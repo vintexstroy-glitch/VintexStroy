@@ -51,6 +51,13 @@ import {
 } from '../src/kalkulator/tsenova-lista.js';
 import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { ekraniraj } from './imoti.js';
+import {
+  filtriray,
+  glavaSFiltar,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -150,22 +157,48 @@ export function narisuvayStoynost(): string {
     ${smetnato ? tablitsaNaStoynostta(smetnato) : ''}`;
 }
 
+/** Колоните на обектите — фините филтри важат и тук (ADR-022 · вълна 2). */
+function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
+  return [
+    { klyuch: 'obekt', ime: 'Обект', vid: 'tekst', vzemi: (r) => r.obekt },
+    {
+      klyuch: 'etazh',
+      ime: 'Етаж · вид',
+      vid: 'tekst',
+      vzemi: (r) => `${r.etazh || '—'} · ${IMENA_NA_VIDOVETE_OBEKT[r.vid]}`,
+    },
+    { klyuch: 'chista', ime: 'Чиста', vid: 'chislo', vzemi: (r) => kvSmVM2(r.chista_kvsm) },
+    { klyuch: 'obshta', ime: 'Обща', vid: 'chislo', vzemi: (r) => kvSmVM2(r.obshta_kvsm) },
+    { klyuch: 'izlozhenie', ime: 'Изложение', vid: 'tekst', vzemi: (r) => r.izlozhenie },
+    { klyuch: 'naem', ime: 'Наем', vid: 'evro', vzemi: (r) => r.naem_mesechen_st },
+    { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
+    { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
+    { klyuch: 'delta', ime: 'Δ', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+  ];
+}
+
 function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
+  const dnes = new Date().toISOString().slice(0, 10);
+  const koloni = koloniNaObektite();
+  const f = filtriray('stoynost', s.redove, koloni, dnes);
   return `
     <section>
       <div class="dyalglava">
         <h2>Обектите</h2>
         <span>${s.redove.length} реда · сборът отгоре е стойността на състоянието</span>
       </div>
+      ${poleZaTarsene('stoynost')}
       <div class="tablitsa">
         <div class="glava stoynost">
-          <span>Обект</span><span>Етаж · вид</span>
-          <span class="suma">Чиста</span><span class="suma">Обща</span>
-          <span>Изложение</span><span>Наем</span>
-          <span class="suma">А · по площ</span><span class="suma">Б · по състояние</span>
-          <span class="suma">Δ</span>
+          ${koloni
+            .map((kol) => glavaSFiltar('stoynost', kol, s.redove, dnes, kol.vid === 'evro'))
+            .join('')}
         </div>
-        ${s.redove.map(redNaObekt).join('')}
+        ${
+          f.redove.length === 0
+            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            : f.redove.map(redNaObekt).join('')
+        }
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>
           <span></span><span></span><span></span><span></span><span></span>
@@ -174,7 +207,8 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
         </div>
       </div>
-      <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор.</p>
+      ${redZaSkritoto(f, 'stoynost')}
+      <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор. Скритото от филтъра ПАК влиза в сбора отгоре — той е стойността на състоянието, не на екрана (правило 23).</p>
     </section>`;
 }
 

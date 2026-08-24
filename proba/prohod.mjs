@@ -1830,6 +1830,44 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
     proveri('отказът прибира предложението', await p.$('#otkazhi-plan'), null);
 
+    // ══ 32 · фините филтри на ВСИЧКИ таблици ════════════════════════════
+    razdel = '32 · филтрите навсякъде';
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('имотите имат търсачка', (await p.$('[data-tarsi-tablitsa="imoti"]')) !== null, true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="imoti:myasto"]'));
+    proveri('името на колоната сортира и при имотите',
+      (await tekstNa(p, '[data-podredi="imoti:myasto"]')).includes('↑'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="imoti:myasto"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="imoti:myasto"]')); // изходен ред
+
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('плащанията са с филтърни глави',
+      (await p.$('[data-podredi="plashtaniya:suma"]')) !== null, true);
+    // търси се в която таблица има редове — коя е зависи от дотук изиграното
+    const tarsachkaPari = await p.evaluate(() => {
+      const t = document.querySelector('[data-tarsi-tablitsa="plashtaniya"], [data-tarsi-tablitsa="prosrocheni"], [data-tarsi-tablitsa="vsrok"]');
+      return t?.getAttribute('data-tarsi-tablitsa') ?? null;
+    });
+    proveri('в Пари има поне една таблица с търсачка', tarsachkaPari !== null, true);
+    // редовете се броят В ТАБЛИЦАТА до търсачката — две таблици делят един клас ред
+    const broyDoTarsachkata = (klyuch) => p.evaluate((kl) => {
+      const pole = document.querySelector(`[data-tarsi-tablitsa="${kl}"]`);
+      const tablitsa = pole?.closest('.tarsene-v-tablitsa')?.nextElementSibling;
+      return tablitsa ? tablitsa.querySelectorAll('.red').length : -1;
+    }, klyuch);
+    const broyPredi = await broyDoTarsachkata(tarsachkaPari);
+    proveri('таблицата до търсачката има редове', broyPredi > 0, true);
+    await p.fill(`[data-tarsi-tablitsa="${tarsachkaPari}"]`, 'няма такъв ред никъде');
+    await p.waitForFunction((kl) => {
+      const pole = document.querySelector(`[data-tarsi-tablitsa="${kl}"]`);
+      const tablitsa = pole?.closest('.tarsene-v-tablitsa')?.nextElementSibling;
+      return tablitsa !== null && tablitsa !== undefined && tablitsa.querySelectorAll('.red').length === 0;
+    }, tarsachkaPari);
+    proveri('и казва колко крие', (await tekstNa(p, '.filtar-skrito')).includes('крие'), true);
+    await deystvieSPrerisuvane(p, () => p.click(`[data-filtar-izchisti-vsichko="${tarsachkaPari}"]`));
+    proveri('„покажи всичко" връща редовете',
+      await broyDoTarsachkata(tarsachkaPari), broyPredi);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

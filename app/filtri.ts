@@ -208,8 +208,9 @@ const AZBUKA = new Intl.Collator('bg');
 export function sravnitel(vid: VidStoynost): (a: string | number, b: string | number) => number {
   if (vid === 'evro' || eChislo(vid)) {
     return (a, b) => {
-      const ca = Number(a);
-      const cb = Number(b);
+      // през българския запис: „72,4" е число, не текст — същият парсер като групите
+      const ca = typeof a === 'number' ? a : (chislo(String(a)) ?? Number.NaN);
+      const cb = typeof b === 'number' ? b : (chislo(String(b)) ?? Number.NaN);
       const na = Number.isNaN(ca);
       const nb = Number.isNaN(cb);
       if (na && nb) return AZBUKA.compare(String(a), String(b));

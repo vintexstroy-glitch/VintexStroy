@@ -42,6 +42,32 @@ function novOpId(): string {
   return crypto.randomUUID();
 }
 
+/** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2). */
+function koloniNaImotite(naemiPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
+  const zhiviNa = (i: Imot) => (naemiPoImot.get(i.id) ?? []).filter((n) => !n.prekraten);
+  return [
+    { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
+    {
+      klyuch: 'naematel',
+      ime: 'Наемател',
+      vid: 'tekst',
+      vzemi: (i) => zhiviNa(i).map((n) => n.naemetel).join(', '),
+    },
+    // площта пътува като „72,4" — сравнителят чете българския запис
+    { klyuch: 'ploshtad', ime: 'Площ', vid: 'chislo', vzemi: (i) => (i.ploshtad_kvsm > 0 ? kvSmVM2(i.ploshtad_kvsm) : '') },
+    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (i) => zhiviNa(i).reduce((s, n) => s + n.naem_st, 0) },
+    {
+      klyuch: 'sastoyanie',
+      ime: 'Състояние',
+      vid: 'tekst',
+      vzemi: (i) => {
+        const broy = zhiviNa(i).length;
+        return broy > 1 ? `${broy} наема` : broy === 1 ? 'отдаден' : 'свободен';
+      },
+    },
+  ];
+}
+
 /** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
 function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   return [
@@ -107,6 +133,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const zaeti = new Set(zhivi.map((n) => n.imotId));
 
   const filtriraniNaemi = filtriray('naemi', naemi, koloniNaNaemite(ogledalo), dnesKato());
+  const filtriraniImoti = filtriray('imoti', imoti, koloniNaImotite(naemiPoImot), dnesKato());
 
   const popravyanImot = rezhim.kakvo === 'popravi-imot' ? ogledalo.imoti.get(rezhim.id) : undefined;
   const popravyanNaem = rezhim.kakvo === 'popravi-naem' ? ogledalo.naemi.get(rezhim.id) : undefined;
@@ -268,17 +295,22 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
 
     <section>
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
+      ${imoti.length ? poleZaTarsene('imoti') : ''}
       <div class="tablitsa">
         <div class="glava imot">
-          <span>Място и единица</span><span>Наемател</span><span>Площ</span>
-          <span class="suma">Наем / мес.</span><span>Състояние</span><span></span>
+          ${koloniNaImotite(naemiPoImot)
+            .map((kol) => glavaSFiltar('imoti', kol, imoti, dnesKato(), kol.vid === 'evro'))
+            .join('')}<span></span>
         </div>
         ${
           imoti.length === 0
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
-            : imoti.map((i) => redImot(i, naemiPoImot.get(i.id) ?? [])).join('')
+            : filtriraniImoti.redove.length === 0
+              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              : filtriraniImoti.redove.map((i) => redImot(i, naemiPoImot.get(i.id) ?? [])).join('')
         }
       </div>
+      ${redZaSkritoto(filtriraniImoti, 'imoti')}
     </section>
 
     ${
