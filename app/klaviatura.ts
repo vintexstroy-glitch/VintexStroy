@@ -30,6 +30,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
+import type { Konteks } from './main.js';
 
 const ZNAK = 'kletka-izbrana';
 const ZNAK_OBHVAT = 'kletka-v-obhvat';
@@ -42,6 +44,8 @@ interface Izbrana {
   /** подвижният край · без Shift той стои върху котвата */
   krayRed: number;
   krayKolona: number;
+  /** редове, добавени с Ctrl+клик — избират се ЦЕЛИ, като за сторно */
+  readonly oshte: Set<number>;
 }
 
 let izbrana: Izbrana | null = null;
@@ -122,7 +126,7 @@ function skriyLentata(): void {
 }
 
 /** Лентата се показва при обхват от 2+ клетки — една клетка не е сметка. */
-function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora): void {
+function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora, zaStorno: readonly ZaStorno[]): void {
   const l = lentata();
   if (obshtoKletki < 2) {
     l.hidden = true;
@@ -132,7 +136,27 @@ function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora): void {
   if (s.broyPari > 0) chasti.push(`Сбор: ${pishi(s.sbor_st)}`);
   if (s.broyPari > 1) chasti.push(`Средно: ${pishi(s.sredno_st)}`);
   l.innerHTML = chasti.map((ch) => `<span>${ch}</span>`).join('');
+  // Груповото действие се показва от 2 реда нагоре — единичният ред си има
+  // своя бутон. Списъкът е снет ОТ ЕКРАНА в мига на показването: клик после
+  // работи върху точно това, което човекът е гледал.
+  if (zaStorno.length >= 2) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'vrazka';
+    b.setAttribute('data-storno-izbrani', '');
+    b.textContent = `Сторно на избраните (${zaStorno.length})`;
+    b.addEventListener('click', () => void stornirayIzbranite([...zaStorno]));
+    l.append(b);
+  }
   l.hidden = false;
+}
+
+async function stornirayIzbranite(spisak: readonly ZaStorno[]): Promise<void> {
+  if (!konteks || !prerisuvayEkrana) return;
+  const izhod = await opitajStornoNaMnogo(konteks, spisak);
+  if (izhod.kazano === '') return; // отказан въпрос — нищо не е пипнато
+  konteks.vest(izhod.vid, izhod.kazano);
+  await prerisuvayEkrana();
 }
 
 /** Слага знаците, смята лентата и докарва подвижния край в очите. */
@@ -158,11 +182,20 @@ function pokazhi(): void {
   const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
 
   const vIzbora: KletkaVIzbora[] = [];
+  const zaStorno: ZaStorno[] = [];
   let obshtoKletki = 0;
-  for (let r = otRed; r <= doRed; r += 1) {
+  const izbraniRedove = new Set<number>();
+  for (let r = otRed; r <= doRed; r += 1) izbraniRedove.add(r);
+  for (const r of izbrana.oshte) if (r <= posleden) izbraniRedove.add(r);
+
+  for (const r of izbraniRedove) {
     const kletki = kletkiNa(redove[r]!);
-    // редовете нямат еднакъв брой клетки — обхватът се затяга във всеки ред
-    for (let c = Math.min(otKolona, kletki.length - 1); c <= Math.min(doKolona, kletki.length - 1); c += 1) {
+    // Правоъгълникът взима колоните между котвата и края; ред от Ctrl+клик
+    // влиза ЦЯЛ — той е избран като ред, не като клетки.
+    const tsyalRed = izbrana.oshte.has(r);
+    const ot = tsyalRed ? 0 : Math.min(otKolona, kletki.length - 1);
+    const doo = tsyalRed ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
+    for (let c = ot; c <= doo; c += 1) {
       const kletka = kletki[c]!;
       kletka.classList.add(ZNAK_OBHVAT);
       obshtoKletki += 1;
@@ -170,6 +203,14 @@ function pokazhi(): void {
       // същото правило, по което „Копирай реда" ги прескача
       if (!kletka.querySelector('button')) {
         vIzbora.push({ tekst: kletka.textContent?.trim() ?? '', st: stNa(kletka) });
+      }
+    }
+    // Кое сторно носи редът — пита се БУТОНЪТ му, не се гадае по екрана.
+    for (const b of redove[r]!.querySelectorAll<HTMLButtonElement>('button')) {
+      const s = stornoOtButona(b);
+      if (s) {
+        zaStorno.push(s);
+        break;
       }
     }
   }
@@ -182,11 +223,12 @@ function pokazhi(): void {
   const kraen = kletkiNaKraya[Math.min(izbrana.krayKolona, kletkiNaKraya.length - 1)];
   kraen?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
 
-  pokazhiLentata(obshtoKletki, smetniIzbora(vIzbora));
+  pokazhiLentata(obshtoKletki, smetniIzbora(vIzbora), zaStorno);
 }
 
-/** Пишещ ли е фокусът · там картата мълчи и формата си работи. */
-function fokusVPole(): boolean {
+/** Пишещ ли е фокусът · там картата мълчи и формата си работи.
+ *  Черновата (`chernova.ts`) пита същия въпрос — границата е ЕДНА. */
+export function fokusVPole(): boolean {
   const e = document.activeElement;
   return (
     e instanceof HTMLInputElement ||
@@ -197,8 +239,16 @@ function fokusVPole(): boolean {
 }
 
 let zakacheno = false;
+let konteks: Konteks | null = null;
+let prerisuvayEkrana: (() => Promise<void>) | null = null;
 
-export function zakachiKlaviatura(koren: HTMLElement): void {
+export function zakachiKlaviatura(
+  koren: HTMLElement,
+  k: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
+  konteks = k;
+  prerisuvayEkrana = prerisuvay;
   // Всяко прерисуване минава оттук: старият DOM е мъртъв и селекцията с него.
   // Лентата обаче живее в body и без това би останала да показва сметка за
   // клетки, които вече ги няма — лъжа на екрана, затова пада веднага.
@@ -227,8 +277,12 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
       // котвата стои, краят идва под клика — обхватът е между тях
       izbrana.krayRed = r;
       izbrana.krayKolona = c;
+    } else if ((e.ctrlKey || e.metaKey) && izbrana && izbrana.tablitsa === tablitsa) {
+      // Ctrl+клик добавя/маха ЦЕЛИЯ ред — изборът за групово действие.
+      if (izbrana.oshte.has(r)) izbrana.oshte.delete(r);
+      else izbrana.oshte.add(r);
     } else {
-      izbrana = { tablitsa, red: r, kolona: c, krayRed: r, krayKolona: c };
+      izbrana = { tablitsa, red: r, kolona: c, krayRed: r, krayKolona: c, oshte: new Set() };
     }
     pokazhi();
   });
@@ -295,6 +349,7 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
         izbrana.red = Math.min(izbrana.red + 1, posledenRed);
         izbrana.krayRed = izbrana.red;
         izbrana.krayKolona = izbrana.kolona;
+        izbrana.oshte.clear();
         break;
       case 'Tab':
         dvizhenie = false;
@@ -312,6 +367,7 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
         }
         izbrana.krayRed = izbrana.red;
         izbrana.krayKolona = izbrana.kolona;
+        izbrana.oshte.clear();
         break;
       case 'Escape':
         izbrana = null;
@@ -326,8 +382,10 @@ export function zakachiKlaviatura(koren: HTMLElement): void {
       izbrana.krayRed = r;
       izbrana.krayKolona = c;
       if (!sShift) {
+        // движение без Shift прибира всичко — и обхвата, и Ctrl-редовете
         izbrana.red = r;
         izbrana.kolona = c;
+        izbrana.oshte.clear();
       }
     }
     e.preventDefault(); // иначе стрелките скролват страницата под селекцията

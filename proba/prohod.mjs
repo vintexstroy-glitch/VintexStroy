@@ -1742,6 +1742,46 @@ async function main() {
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('смяната на екрана сваля лентата', await statusnaLenta(), null);
 
+    // ══ 30 · груповото сторно и черновата с Ctrl+Z ══════════════════════
+    razdel = '30 · груповото и черновата';
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    // два наема, родени само за да бъдат сторнирани заедно
+    // без заковано име на имот — по §25 имотите вече са минали през поправки
+    await dobaviNaem(p, { koy: 'Групов първи', suma: '111,00', sektor: 'naem-zhilishten', padezh: '1' });
+    await dobaviNaem(p, { koy: 'Групов втори', suma: '222,00', sektor: 'naem-zhilishten', padezh: '1' });
+
+    // Ctrl+клик добавя ЦЕЛИЯ ред към избора
+    await p.click('.red.naem:has-text("Групов първи") > :first-child');
+    await p.click('.red.naem:has-text("Групов втори") > :first-child', { modifiers: ['Control'] });
+    const sIzbrani = (await statusnaLenta()) ?? '';
+    proveri('Ctrl+клик вдига лентата с групово действие',
+      sIzbrani.includes('Сторно на избраните (2)'), true);
+
+    // груповото сторно: една причина (диалогът я дава), запис на ред, вест
+    const predaSborove = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('[data-storno-izbrani]'));
+    proveri('груповото сторно пише ПО ЕДНО събитие на ред',
+      await broySabitiya(p), predaSborove + 2);
+    proveri('и казва какво стана', (await tekstNa(p, '.vest')).includes('Сторнирани 2 от 2'), true);
+    proveri('сторнираните редове ги няма',
+      await p.$$eval('.red.naem', (r) => r.filter((x) => x.textContent.includes('Групов')).length), 0);
+    proveri('лентата пада със селекцията', await statusnaLenta(), null);
+
+    // ЧЕРНОВАТА: прерисуването я убива, Ctrl+Z я връща — до Вратата, не след нея
+    await p.fill('#imot-adres', 'Черновата живее');
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+    proveri('прерисуването уби черновата',
+      await p.$eval('#imot-adres', (e) => e.value), '');
+    await p.keyboard.press('Control+z');
+    proveri('Ctrl+Z я връща в полето',
+      await p.$eval('#imot-adres', (e) => e.value), 'Черновата живее');
+    proveri('и НЕ пише в Журнала — границата е Вратата',
+      await broySabitiya(p), predaSborove + 2);
+    // подредбата се прибира на изходния ред — два клика довършват цикъла
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

@@ -22,6 +22,8 @@ import {
 } from '../app/filtri.js';
 import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran.js';
 import { smetniIzbora } from '../app/klaviatura.js';
+import { umryalaLi } from '../app/chernova.js';
+import { sDumiZaStornoto } from '../app/storno.js';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
 describe('сравнителят по вид (ADR-014)', () => {
@@ -153,6 +155,37 @@ describe('сметката на избора', () => {
     const s = smetniIzbora([{ tekst: 'текст', st: null }]);
     expect(s.broyPari).toBe(0);
     expect(s.sbor_st).toBe(0);
+  });
+});
+
+// ── черновата и груповото сторно (вълна 2 · предложение 13) ────────────────
+describe('черновата · кога е умряла', () => {
+  it('подменена стойност на писано поле = умряла', () => {
+    expect(umryalaLi({ adres: 'Витоша 12', edinitsa: 'ап. 3' }, { adres: '', edinitsa: '' })).toBe(
+      true,
+    );
+  });
+
+  it('същите стойности = жива, нищо за връщане', () => {
+    expect(umryalaLi({ adres: 'Витоша 12' }, { adres: 'Витоша 12', drugo: 'х' })).toBe(false);
+  });
+
+  it('поле, което формата ВЕЧЕ НЯМА, не я убива — сменен е режимът, не текстът', () => {
+    expect(umryalaLi({ prichina: 'сбъркан номер' }, { adres: 'Витоша 12' })).toBe(false);
+  });
+});
+
+describe('думите на груповото сторно', () => {
+  it('всички минали — казва се пълно', () => {
+    expect(sDumiZaStornoto(2, 2, [])).toBe(
+      'Сторнирани 2 от 2. Всички събития остават в Журнала.',
+    );
+  });
+
+  it('отказаното се КАЗВА поименно, не се преглъща в брояча', () => {
+    expect(sDumiZaStornoto(3, 2, ['seq 7: виси плащане'])).toBe(
+      'Сторнирани 2 от 3. Отказани — seq 7: виси плащане',
+    );
   });
 });
 
