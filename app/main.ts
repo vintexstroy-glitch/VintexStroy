@@ -42,6 +42,7 @@ import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
+import { narisuvayTabove, zakachiTabove } from './tabove.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
 import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
@@ -87,6 +88,7 @@ export type KoyEkran =
   | 'smetki'
   | 'nastroyki'
   | 'ii'
+  | 'tabove'
   | 'tablo';
 
 /**
@@ -248,6 +250,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     ime: 'ИИ',
     podnaslov: 'агентът чете, смята и ПРЕДЛАГА · записва човекът',
     ikona: '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
+  },
+  tabove: {
+    ime: 'Табове',
+    podnaslov: 'стационарни и добавени · секции с таблици и графики, комбинират се',
+    ikona: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
   },
   tablo: {
     ime: 'Табло',
@@ -428,7 +435,9 @@ async function trugvay(): Promise<void> {
                               },
                               dnes,
                             )
-                          : narisuvayTablo(kojSam, izbor, akaunt)
+                          : ekran === 'tabove'
+                            ? narisuvayTabove(ogledalo, dnes)
+                            : narisuvayTablo(kojSam, izbor, akaunt)
           }
         </div>
       </main>`;
@@ -441,6 +450,7 @@ async function trugvay(): Promise<void> {
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
     else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
     else if (ekran === 'ii') zakachiII(koren, k, prerisuvay);
+    else if (ekran === 'tabove') zakachiTabove(koren, k, prerisuvay);
     else {
       zakachiTablo(
         koren,

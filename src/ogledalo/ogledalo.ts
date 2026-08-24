@@ -20,6 +20,7 @@ import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
+import type { Tab } from '../domein/tabove.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -193,6 +194,8 @@ export interface Ogledalo {
   readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
   /** id → делото; последният запис за същия id е ПОПРАВКА, не втори ред */
   readonly dela: ReadonlyMap<string, Delo>;
+  /** ключ → табът със секциите му; последният запис ПОПРАВЯ (И92 т.9) */
+  readonly tabove: ReadonlyMap<string, Tab>;
   /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
   readonly agenti: ReadonlyMap<string, Agent>;
   /**
@@ -238,6 +241,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
+  const tabove = new Map<string, Tab>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
   const sverki: ZapisanaSverka[] = [];
@@ -324,6 +328,13 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // данни. Празната карта е вярната им стойност, не липса.
           formuli: p.formuli ?? {},
         });
+        break;
+      }
+
+      case 'ТабЗаписан': {
+        // Последният запис за същия ключ надделява — поправка, не втори таб.
+        const p = s.payload as unknown as Tab;
+        tabove.set(p.klyuch, p);
         break;
       }
 
@@ -549,6 +560,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     pototsi,
     salda,
     dela,
+    tabove,
     agenti,
     predlozheniya,
     sverki,

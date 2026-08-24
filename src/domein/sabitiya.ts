@@ -9,6 +9,7 @@
 
 import type { Sashtnost } from '../yadro/index.js';
 import type { Agent, Predlozhenie } from './agenti.js';
+import type { Tab } from './tabove.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
 import type { PravaZaModel } from './kolonno.js';
@@ -30,6 +31,7 @@ export const VID = {
   saldo: 'saldo',
   delo: 'delo',
   agent: 'agent',
+  tab: 'tab',
   predlozhenie: 'predlozhenie',
   /**
    * НЕ СЕ ПИШЕ ПОВЕЧЕ · и НЕ СЕ ЧЕТЕ.
@@ -66,6 +68,7 @@ export type TipSabitie =
   | 'ПотокЗаписан'
   | 'СалдоЗаписано'
   | 'ДелоЗаписано'
+  | 'ТабЗаписан'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   /** вече не се пише — стои, за да се четат старите Журнали */
@@ -421,6 +424,14 @@ export interface PayloadStorno {
  * следата „предложено от агент X" сочи протокол, който вече не е онзи.
  * Промяна = нов запис със същия ключ (правило 1).
  */
+/**
+ * ТАБЪТ и секциите му (И92 т.9).
+ *
+ * Защо е събитие: табът решава кой какво вижда. Смени ли се тихо, вчерашният
+ * екран става необясним. Промяна = нов запис със същия ключ (правило 1).
+ */
+export type PayloadTabZapisan = Tab;
+
 export type PayloadAgentZapisan = Agent;
 
 /**

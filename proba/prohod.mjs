@@ -2351,6 +2351,88 @@ async function main() {
       (await tekstNa(p, '.red.predlozhenie')).includes('vintexstroy@gmail.com'), true);
     proveri('приетите се броят', await plochka(p, 'Приети'), '1');
 
+    // ══ 42 · табовете и секциите (И92 т.9) ═══════════════════════════════════
+    razdel = '42 · табовете и секциите';
+    await naEkran(p, 'tabove', '#izbor-tab');
+
+    // СТАЦИОНАРЕН · допълва Сметки с още една секция, без да пипа истинския екран
+    await p.selectOption('#izbor-tab', 'smetki');
+    await p.waitForSelector('#nova-sektsiya');
+    await deystvieSPrerisuvane(p, () => p.click('#nova-sektsiya'));
+    await p.fill('#sektsiya-ime', 'Обектите');
+    await p.selectOption('#sektsiya-vid', 'tablitsa');
+    await p.selectOption('#sektsiya-iztochnik', 'imoti');
+    await sSabitie(p, () => p.click('#forma-sektsiya button[type=submit]'));
+    await p.waitForSelector('.karta:has-text("Обектите")');
+    proveri('секцията се вижда с истински данни (45-те от Малинова Долина)',
+      (await p.evaluate(() => document.body.textContent)).includes('Малинова Долина'), true);
+
+    // ВТОРА секция, свързваема — за да пробваме „изборът стеснява"
+    await deystvieSPrerisuvane(p, () => p.click('#nova-sektsiya'));
+    await p.fill('#sektsiya-ime', 'Наемите');
+    await p.selectOption('#sektsiya-vid', 'tablitsa');
+    await p.selectOption('#sektsiya-iztochnik', 'naemi');
+    await sSabitie(p, () => p.click('#forma-sektsiya button[type=submit]'));
+    await p.waitForSelector('.karta:has-text("Наемите")');
+
+    // СВЪРЗВАНЕТО · падащо меню, не текст — „по кое" пита само носителите
+    await deystvieSPrerisuvane(p, () =>
+      p.click('.karta:has-text("Наемите") [data-sektsiya-svarzhi]'));
+    await p.waitForSelector('#forma-svarzhi');
+    await p.selectOption('#forma-svarzhi [name=po]', 'imot');
+    await p.selectOption('#forma-svarzhi [name=izvor]', { label: 'Обектите' });
+    await sSabitie(p, () => p.click('#forma-svarzhi button[type=submit]'));
+    await p.waitForFunction(() =>
+      document.body.textContent.includes('стеснена от „Обектите"'));
+
+    // РЪЧЕН КРЪГ не се позволява — форма опитва да върже „Обектите" обратно
+    // към себе си през „Наемите" не се тества оттук (домейнът го пази с
+    // тест); тук се пази ПОЛЗВАНЕТО: изборът реално стеснява.
+    const naemiVSektsiyaPredi = await p.$$eval('.karta:has-text("Наемите") [data-sektsiya-red]',
+      (r) => r.length);
+    await deystvieSPrerisuvane(p, () =>
+      p.click('.karta:has-text("Обектите") [data-sektsiya-red]'));
+    const naemiVSektsiyaSled = await p.$$eval('.karta:has-text("Наемите") [data-sektsiya-red]',
+      (r) => r.length);
+    proveri('изборът в изворната секция СТЕСНЯВА вързаната',
+      naemiVSektsiyaSled <= naemiVSektsiyaPredi, true);
+    proveri('и се вижда че е стеснено', (await p.evaluate(() => document.body.textContent))
+      .includes('стеснено от избрания ред'), true);
+
+    // повторен клик на СЪЩИЯ ред разчиства избора
+    await deystvieSPrerisuvane(p, () =>
+      p.click('.karta:has-text("Обектите") [data-sektsiya-red].izbrana'));
+    const naemiVSektsiyaBezIzbor = await p.$$eval('.karta:has-text("Наемите") [data-sektsiya-red]',
+      (r) => r.length);
+    proveri('повторният клик разчиства избора', naemiVSektsiyaBezIzbor, naemiVSektsiyaPredi);
+
+    // ДОБАВЕН ТАБ · изцяло негов, с графика
+    await deystvieSPrerisuvane(p, () => p.click('#nov-tab'));
+    await p.fill('#tab-ime', 'Малинова Долина преглед');
+    const predTab = await broySabitiya(p);
+    await sSabitie(p, () => p.click('#forma-tab button[type=submit]'));
+    proveri('новият таб е събитие в Журнала', await broySabitiya(p), predTab + 1);
+
+    await deystvieSPrerisuvane(p, () => p.click('#nova-sektsiya'));
+    await p.fill('#sektsiya-ime', 'Приход и разход');
+    await p.selectOption('#sektsiya-vid', 'diagrama');
+    await p.waitForFunction(() =>
+      !document.querySelector('[data-grupa="diagrama"]')?.hidden);
+    await p.selectOption('#sektsiya-iztochnik', 'mesetsi');
+    await sSabitie(p, () => p.click('#forma-sektsiya button[type=submit]'));
+    proveri('графичната секция носи истинска диаграма',
+      await p.$$eval('svg.stalbove', (r) => r.length), 1);
+
+    // МАХАНЕ · връзката пада с нея, а другата секция остава
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-tab', 'smetki'));
+    const predMahane = await broySabitiya(p);
+    await sSabitie(p, () =>
+      p.click('.karta:has-text("Обектите") [data-sektsiya-mahni]'));
+    proveri('и махането е събитие', await broySabitiya(p), predMahane + 1);
+    proveri('другата секция остава', Boolean(await p.$('.karta:has-text("Наемите")')), true);
+    proveri('и вече не е стеснена — връзката падна с махнатата',
+      (await p.evaluate(() => document.body.textContent)).includes('стеснена от „Обектите"'), false);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

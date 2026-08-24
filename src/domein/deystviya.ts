@@ -36,6 +36,7 @@ import type {
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
   PayloadAgentZapisan,
+  PayloadTabZapisan,
   PayloadPredlozhenieZapisano,
   TipSabitie,
 } from './sabitiya.js';
@@ -269,6 +270,16 @@ export class Deystviya {
     );
   }
 
+
+  /**
+   * Записва ТАБ · секциите му и връзките между тях (И92 т.9).
+   *
+   * НЕ иска отключен период: табът не мени нито едно число — той решава
+   * какво се ПОКАЗВА. Заключен месец се гледа през същите секции.
+   */
+  async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
+  }
 
   /**
    * Записва АГЕНТ · картата и протоколът му (И92 т.10 · правило 18).
