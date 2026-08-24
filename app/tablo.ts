@@ -143,6 +143,13 @@ function kartaKoySam(koj: Samolichnost, akaunt: string): string {
         няма какво да изтече. Достъпът на други имейли минава през твоя
         доставчик: поканата, защитата и отнемането са негови, не наши.
       </p>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="izlez">Излез</button>
+        <p class="drebno">
+          Излизането маха <b>кой е влязъл</b> — Журналът остава на устройството.
+          Влизането обратно със същия имейл отваря същия Журнал.
+        </p>
+      </div>
     </section>`;
 }
 

@@ -34,7 +34,8 @@ import { arhivZaEksel } from './arhiv.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
-import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
+import { type Samolichnost } from '../src/yadro/samolichnost.js';
+import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
@@ -53,22 +54,21 @@ import { KLYUCH_OT_ALFA, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt
 let akaunt = KLYUCH_OT_ALFA;
 
 /**
- * КОЙ Е ВЛЯЗЪЛ. Днес — един собственик, вече влязъл; истинският OAuth иска
- * регистрация при тримата доставчици и негово решение с кого се почва.
- * Портът обаче стои отсега, за да не се появи после втори вход отстрани.
+ * КОЙ Е ВЛЯЗЪЛ · вече истински.
+ *
+ * Дотук тук стоеше ЗАКОВАНА самоличност, която пазеше мястото на входа. Сега
+ * влизането минава през Google и `actor` в Журнала е имейл, който доставчикът
+ * е потвърдил (ADR-021). Ключът на акаунта идва от същия имейл (ADR-020) —
+ * затова истинският вход е и онова, което прави втория акаунт истински.
+ *
+ * `kojSam` няма начална стойност: празната самоличност е по-честна от
+ * измислената. Който чете преди влизането, гърми — вместо да получи име, което
+ * никой не е дал.
  */
-const SOBSTVENIKAT: Samolichnost = {
-  dostavchik: 'google',
-  imeyl: 'vintexstroy@gmail.com',
-  ime: 'VintexStroy',
-  hranilishte: 'безплатно',
-  nachin: 'dostavchik',
-  rolya: 'sobstvenik',
-  svarzani: [],
-};
-
-const vhod = new EdinSobstvenik(SOBSTVENIKAT);
-let kojSam: Samolichnost = SOBSTVENIKAT;
+const vhod = new VhodSGoogle({
+  kade: () => document.getElementById('butonat-na-google'),
+});
+let kojSam: Samolichnost;
 let izbor: Izbor = chetiIzbor();
 
 export type KoyEkran =
@@ -234,10 +234,56 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
   },
 };
 
+/**
+ * ЕКРАНЪТ „ВЛЕЗ" · когато няма нито обхват, нито запомнен вход.
+ *
+ * НЕ се пада тихо към измислена самоличност. Това би отворило Журнал под име,
+ * което никой не е дал — и всяко събитие оттам нататък носи грешен `actor`.
+ * По-добре празен екран с обяснение, отколкото история, на която не се вярва.
+ */
+function ekranatVlez(kazano = ''): string {
+  return `
+    <div class="telo">
+      <section class="karta izbrana vhod">
+        <div class="dyalglava">
+          <h2>Влез</h2>
+          <span>без парола · самоличността идва от доставчика</span>
+        </div>
+        ${kazano ? `<p class="greshka">${ekraniraj(kazano)}</p>` : ''}
+        <div id="butonat-na-google"></div>
+        <p class="drebno">
+          Приложението никога не вижда парола — няма своя, няма възстановяване,
+          няма какво да изтече. Записва се имейлът, който Google потвърждава, и
+          той става <b>actor</b> в Журнала.
+        </p>
+      </section>
+    </div>`;
+}
+
+/**
+ * ВЛИЗАНЕТО · три пътя, в този ред, и нито един от тях не е измислена самоличност.
+ *
+ *   1. запомнен вход — тръгване без обхват отваря същия Журнал;
+ *   2. бутонът на Google — истинският вход;
+ *   3. екранът „Влез" с думи защо — когато няма нито едно от двете.
+ */
+async function vlizane(): Promise<Samolichnost> {
+  const zapomnen = zapomneniyat();
+  if (zapomnen) return zapomnen;
+
+  koren.innerHTML = ekranatVlez();
+  try {
+    return await vhod.vlez('google');
+  } catch (greshka) {
+    koren.innerHTML = ekranatVlez(greshka instanceof Error ? greshka.message : String(greshka));
+    throw greshka;
+  }
+}
+
 async function trugvay(): Promise<void> {
   // Влизането е първото нещо: `actor` в Журнала е имейл от доставчика,
   // а не низ по подразбиране — историята трябва да знае КОЙ е писал.
-  kojSam = await vhod.vlez(SOBSTVENIKAT.dostavchik);
+  kojSam = await vlizane();
 
   const dnevnik = await otvoriDnevnik('masterbook');
   const kotva = new KotvaVLocalStorage();
@@ -370,6 +416,13 @@ async function trugvay(): Promise<void> {
         },
         prerisuvay,
       );
+      koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
+        await vhod.izlez();
+        // Презареждането е нарочно: следващото тръгване минава по целия път на
+        // влизането. Опит да се „смени самоличността в движение" би оставил
+        // отворено Огледало на един акаунт под името на друг.
+        location.reload();
+      });
     }
     if (mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);

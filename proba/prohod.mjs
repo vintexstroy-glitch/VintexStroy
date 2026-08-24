@@ -8,6 +8,7 @@
  */
 
 import { chromium } from 'playwright-core';
+import { webcrypto } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { setTimeout as pochakay } from 'node:timers/promises';
 import { readFile, writeFile } from 'node:fs/promises';
@@ -52,6 +53,17 @@ const HROM = nameriHroma();
 const PORT = Number(process.env['PROBA_PORT'] ?? 4178);
 const ADRES = `http://localhost:${PORT}/`;
 
+/**
+ * Клиентският номер · същият като в `app/vhod-google.ts`.
+ *
+ * Преписан е нарочно и това е ЕДИНСТВЕНОТО преписване тук: проходът трябва да
+ * подписва жетон за същото приложение, а да внася от `app/` значи да вкара
+ * TypeScript в скрипт, който върви на голо node. Разминат ли се двата, §26
+ * пада с „жетонът е за ДРУГО приложение" — тоест проверката сама си казва.
+ */
+const KLIENT_NOMER_V_PROHODA =
+  '41382209788-ggjrn13mf5upp068flm6kup5u9usg5lg.apps.googleusercontent.com';
+
 const nahodki = [];
 const minali = [];
 let razdel = '—';
@@ -89,6 +101,33 @@ async function pochakaySurvara() {
 const tekstNa = (p, izbor) => p.$eval(izbor, (e) => e.innerText.replace(/\s+/g, ' ').trim());
 const redove = (p, izbor) =>
   p.$$eval(izbor, (r) => r.map((x) => [...x.children].map((c) => c.innerText.replace(/\s+/g, ' ').trim())));
+
+/**
+ * Влиза през подставения бутон · за след всяко изчистване на хранилището.
+ *
+ * Изтрит `localStorage` значи изтрит запомнен вход. Приложението показва
+ * „Влез" — и това е ВЯРНОТО поведение, не пречка за прохода.
+ */
+/**
+ * ДАТА СПРЯМО ДНЕС · YYYY-MM-DD.
+ *
+ * Заковани дати правят проход, който минава само в един ден от календара.
+ * Платено веднага: §24 мина цял ден, а на другата сутрин „делото до 2 дни"
+ * вече беше просрочено и броят падна от 2 на 1 — без нито един ред променен
+ * код. Светофарът се проверява с числа (7 и 2), значи и датите трябва да са
+ * спрямо днес.
+ */
+function denOtDnes(kolko) {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + kolko);
+  return d.toISOString().slice(0, 10);
+}
+
+async function vlezOtnovo(p) {
+  await p.waitForSelector('#podstaven-google');
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#forma-imot');
+}
 
 async function plochka(p, etiket) {
   // паузите се свеждат до обикновени — екранът пише тясната (U+202F), а
@@ -138,6 +177,34 @@ async function main() {
 
   const brauzar = await chromium.launch({ executablePath: HROM });
   const stranitsa = await brauzar.newPage();
+
+  // ── ПОДСТАВЕНИЯТ GOOGLE ────────────────────────────────────────────────
+  //
+  // Проходът върви БЕЗ мрежа и не може да влезе в истински акаунт. Затова тук
+  // се прави истинска ключова двойка: страницата подписва жетон с частния
+  // ключ, а публичният се сервира на адреса, от който приложението ги чете.
+  //
+  // Така се тества НАШИЯТ код по целия път — четене, шест проверки, подпис —
+  // а не скриптът на Google. Подставен подпис, който минава без проверка, би
+  // тествал само това, че сме извикали функция.
+  const dvoyka = await webcrypto.subtle.generateKey(
+    { name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+    true,
+    ['sign', 'verify'],
+  );
+  const publichen = await webcrypto.subtle.exportKey('jwk', dvoyka.publicKey);
+  const chasten = await webcrypto.subtle.exportKey('jwk', dvoyka.privateKey);
+
+  await stranitsa.route('https://www.googleapis.com/oauth2/v3/certs', (put) =>
+    put.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ keys: [{ ...publichen, kid: 'proba', kty: 'RSA', alg: 'RS256', use: 'sig' }] }),
+    }),
+  );
+  await stranitsa.route('https://accounts.google.com/gsi/client', (put) =>
+    put.fulfill({ status: 200, contentType: 'text/javascript', body: '/* подставен */' }),
+  );
   const greshkiVKonzolata = [];
   let ochakvanaTishina = false;
   stranitsa.on('pageerror', (e) => greshkiVKonzolata.push(`pageerror: ${e.message}`));
@@ -153,16 +220,105 @@ async function main() {
   // Модерният избирач на файлове отваря прозорец на самата система, който
   // никой скрипт не може да кара. Проходът минава по стария път — същият,
   // по който върви и браузър без него.
-  await stranitsa.addInitScript(() => {
-    delete globalThis.showOpenFilePicker;
-  });
+  await stranitsa.addInitScript(
+    ({ chasten, nomer }) => {
+      delete globalThis.showOpenFilePicker;
+
+      const vBase64URL = (bayta) => {
+        let dvoichno = '';
+        for (const b of new Uint8Array(bayta)) dvoichno += String.fromCharCode(b);
+        return btoa(dvoichno).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      };
+      const tekstVBase64URL = (t) => vBase64URL(new TextEncoder().encode(t));
+
+      globalThis.__napraviZheton = async (nonce, promeni = {}) => {
+        const klyuch = await crypto.subtle.importKey(
+          'jwk',
+          { ...chasten, alg: 'RS256' },
+          { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' },
+          false,
+          ['sign'],
+        );
+        const glava = tekstVBase64URL(JSON.stringify({ alg: 'RS256', kid: 'proba', typ: 'JWT' }));
+        const tvardeniya = tekstVBase64URL(
+          JSON.stringify({
+            iss: 'https://accounts.google.com',
+            aud: nomer,
+            exp: Math.floor(Date.now() / 1000) + 3600,
+            email: 'vintexstroy@gmail.com',
+            email_verified: true,
+            name: 'Иво',
+            nonce,
+            sub: '1029384756',
+            ...promeni,
+          }),
+        );
+        const podpis = await crypto.subtle.sign(
+          'RSASSA-PKCS1-v1_5',
+          klyuch,
+          new TextEncoder().encode(`${glava}.${tvardeniya}`),
+        );
+        return `${glava}.${tvardeniya}.${vBase64URL(podpis)}`;
+      };
+
+      let nastroyki = null;
+      globalThis.google = {
+        accounts: {
+          id: {
+            initialize: (n) => {
+              nastroyki = n;
+            },
+            prompt: () => {},
+            disableAutoSelect: () => {},
+            renderButton: (kade) => {
+              const b = document.createElement('button');
+              b.id = 'podstaven-google';
+              b.type = 'button';
+              b.textContent = 'Влез с Google';
+              b.addEventListener('click', async () => {
+                const zheton = await globalThis.__napraviZheton(nastroyki.nonce);
+                nastroyki.callback({ credential: zheton });
+              });
+              kade.append(b);
+            },
+          },
+        },
+      };
+    },
+    { chasten, nomer: KLIENT_NOMER_V_PROHODA },
+  );
 
   const p = stranitsa;
 
   try {
+    // ══ 0 · ВХОДЪТ · преди всичко останало ═══════════════════════════════
+    //
+    // Влизането гати целия екран: без него няма нито Журнал, нито `actor`.
+    // Затова е първият раздел, а не последният.
+    razdel = '0 · входът с Google';
+    await p.goto(ADRES);
+
+    await p.waitForSelector('#butonat-na-google');
+    proveri('без вход се показва „Влез", не празен екран', await tekstNa(p, '.vhod h2'), 'Влез');
+    proveri(
+      'и казва, че парола няма',
+      (await tekstNa(p, '.vhod .drebno')).includes('никога не вижда парола'),
+      true,
+    );
+    proveri('няма имоти преди вход', await p.$('#forma-imot'), null);
+
+    await p.click('#podstaven-google');
+    await p.waitForSelector('#forma-imot');
+    proveri('след вход се влиза в приложението', Boolean(await p.$('#forma-imot')), true);
+
+    await naEkran(p, 'tablo', '.karta');
+    proveri('Таблото казва КОЙ е влязъл', await plochka(p, 'Влязъл като'), 'Иво');
+    proveri('и под кой Журнал работи', await plochka(p, 'Кой Журнал'), 'vintexstroy@gmail.com');
+    proveri('ролята е неговата дума', await plochka(p, 'Роля'), 'собственик');
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 1 · празно състояние ═════════════════════════════════════════════
     razdel = '1 · празно';
-    await p.goto(ADRES);
     await p.waitForSelector('#forma-imot');
     proveri('нула събития в началото', await broySabitiya(p), 0);
     proveri('без имоти', (await tekstNa(p, '.prazno')).includes('Още няма нито един имот'), true);
@@ -611,7 +767,9 @@ async function main() {
       localStorage.clear();
     });
     await p.reload();
-    await p.waitForSelector('#forma-imot');
+    // Изтритото хранилище маха и запомнения вход — точно както при истински
+    // човек, който си изчисти данните за сайта. Влиза се пак.
+    await vlezOtnovo(p);
 
     await dobaviImot(p, 'Дианабад', 'ОФИС № 3', '');
     await dobaviNaem(p, { imot: 'Дианабад · ОФИС № 3', koy: 'Стройпласт ЕООД', suma: '1200,00', sektor: 'naem-targovski', padezh: '5' });
@@ -675,7 +833,8 @@ async function main() {
     razdel = '15 · таблото';
     await naEkran(p, 'tablo', '.vazmozhnosti');
 
-    proveri('казва кой е влязъл', await plochka(p, 'Влязъл като'), 'VintexStroy');
+    // Името вече идва от жетона на Google, не от закован ред (ADR-021).
+    proveri('казва кой е влязъл', await plochka(p, 'Влязъл като'), 'Иво');
     proveri('казва през кого', await plochka(p, 'През'), 'Google');
     proveri('казва чие е хранилището', await plochka(p, 'Хранилище'), 'Безплатно');
     proveri('казва ролята', await plochka(p, 'Роля'), 'собственик');
@@ -1313,11 +1472,11 @@ async function main() {
 
     // ТРИТЕ КОЛОНИ · дело БЕЗ обект е нормално (негов случай).
     await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Акт 15',
-      otgovornik: 'Николай Петков', ot: '2026-08-23', do: '2026-09-30', otsenka: 'спешно-важно' });
+      otgovornik: 'Николай Петков', ot: denOtDnes(0), do: denOtDnes(38), otsenka: 'спешно-важно' });
     await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Кофраж',
-      otgovornik: 'Тихомир Иванов', ot: '2026-08-23', do: '2026-08-24', otsenka: 'спешно-неважно' });
+      otgovornik: 'Тихомир Иванов', ot: denOtDnes(0), do: denOtDnes(1), otsenka: 'спешно-неважно' });
     await zapishiDelo(p, { myasto: 'Хисаря', obekt: '', ime: 'Оглед без обект',
-      otgovornik: 'Ивайло Петков', ot: '2026-08-23', do: '2026-08-23', otsenka: 'важно-неспешно' });
+      otgovornik: 'Ивайло Петков', ot: denOtDnes(0), do: denOtDnes(0), otsenka: 'важно-неспешно' });
 
     proveri('три дела на екрана', (await p.$$eval('.gant-delo', (e) => e.length)), 3);
     proveri('двете места стоят като редове', (await p.$$eval('.gant-myasto', (e) => e.length)), 2);
@@ -1363,7 +1522,7 @@ async function main() {
     proveri('мястото НЯМА сгъвач',
       await p.$$eval('.gant-myasto .sgavach', (e) => e.length), 0);
     await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Арматура',
-      otgovornik: 'Тихомир Иванов', ot: '2026-08-25', do: '2026-08-28', otsenka: 'нито-едно',
+      otgovornik: 'Тихомир Иванов', ot: denOtDnes(2), do: denOtDnes(5), otsenka: 'нито-едно',
       nad: 'Акт 15' });
     proveri('подделото се вижда', (await p.$$eval('.gant-delo.poddelo', (e) => e.length)), 1);
     await deystvieSPrerisuvane(p, () => p.click('.gant-delo:has-text("Акт 15") [data-sgavi]'));
@@ -1430,6 +1589,12 @@ async function main() {
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
+    // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
+    // не казва нищо, а снимката се гледа чак после.
+    const naEkrana = await p
+      .evaluate(() => document.getElementById('ekran')?.innerText?.slice(0, 300) ?? 'няма екран')
+      .catch(() => 'екранът не се чете');
+    console.log(`\n  НА ЕКРАНА В МИГА НА СПЪВАНЕТО:\n  ${naEkrana.replace(/\n/g, '\n  ')}\n`);
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
   }
 

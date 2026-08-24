@@ -4,14 +4,28 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <!--
-    Приложението не прави НИТО ЕДНА мрежова заявка навън — нито скрипт, нито
-    шрифт. Затова стената е глуха: ВСИЧКО от собствения адрес и нищо друго.
+    СТЕНАТА · всичко от собствения адрес, и НИЩО друго освен ВХОДА.
+    Шрифтовете, кодът и данните са местни; навън се ходи само за самоличност.
     `ws://localhost` е само за `npm run dev`.
+
+    ЧЕТИРИТЕ ИЗКЛЮЧЕНИЯ СА ИМЕНУВАНИ, не общи (ADR-021):
+
+      script-src  accounts.google.com — скриптът на бутона, теглен САМО при
+                  натискане; в готовия пакет и в джоба го няма (правило 10)
+      connect-src accounts.google.com — самото влизане
+                  www.googleapis.com  — ПУБЛИЧНИТЕ ключове, с които се проверява
+                  подписът на жетона; без тях проверката не може да стане
+      frame-src   accounts.google.com — прозорчето, в което човек избира акаунт
+
+    Тук НЕ пише „https:" и не пише звезда. Стена, отворена изобщо, е стена,
+    свалена — а единственото, което ни трябва навън, са три точни адреса.
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    img-src 'self' data:;
-    connect-src 'self' ws://localhost:* ws://127.0.0.1:*;
+    img-src 'self' data: https://lh3.googleusercontent.com;
+    script-src 'self' https://accounts.google.com;
+    connect-src 'self' ws://localhost:* ws://127.0.0.1:* https://accounts.google.com https://www.googleapis.com;
+    frame-src https://accounts.google.com;
     object-src 'none';
     base-uri 'none';
     form-action 'none'">

@@ -13,3 +13,4 @@ export * from './vrata.js';
 export * from './sverka.js';
 export * from './kotva.js';
 export * from './samolichnost.js';
+export * from './zheton.js';
