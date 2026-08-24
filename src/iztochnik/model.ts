@@ -23,6 +23,8 @@
 import { kletka, type Tablitsa } from './tablitsa.js';
 import { svedenaGlava } from './tablitsa.js';
 import { podskazhiVid, type VidStoynost } from '../domein/vid-stoynost.js';
+// САМО ТИП · при превода изчезва, значи няма кръг между модела и формулите.
+import type { Formula } from '../domein/formuli.js';
 
 export type { VidStoynost };
 
@@ -143,6 +145,17 @@ export interface ModelNaTablitsa {
    * Вж. `src/domein/vid-stoynost.ts`.
    */
   readonly vidove: Readonly<Record<number, VidStoynost>>;
+  /**
+   * ФОРМУЛИТЕ · колона → сметката, която я пълни (И92 т.8).
+   *
+   * „Формулите ще се пишат само при създаване на таблиците, а след това ще се
+   * редактира само от Стопанина." Липсата на запис значи колона с ДАННИ —
+   * третото състояние (празна) е липсата на клетки, не запис тук.
+   *
+   * Формулната колона е ЗАТВОРЕНА: в нея не се пише, тя се смята. Операндите
+   * са НОМЕРА, за да не чупи преименуването. Вж. `src/domein/formuli.ts`.
+   */
+  readonly formuli: Readonly<Record<number, Formula>>;
 }
 
 export class GreshkaModel extends Error {
@@ -271,6 +284,9 @@ export function napraviModel(n: {
     // Видовете са ПРЕДЛОЖЕНИЕ по заглавието; човекът ги потвърждава в
     // Редактора. Подаденото отвън бие подсказката — то е вече негово решение.
     vidove: Object.freeze({ ...podskazaniVidove(tablitsa, redNaGlavata), ...(n.vidove ?? {}) }),
+    // Формулите се дават при СЪЗДАВАНЕ (И92 т.8) — моделът, роден от файл,
+    // няма нито една: неговите колони носят данни, писани другаде.
+    formuli: Object.freeze({}),
   });
 }
 
@@ -312,8 +328,20 @@ export function belegNaModel(m: ModelNaTablitsa): string {
     `${[...m.otVavezhdane].join('.')}|${[...m.zaklyucheni].join('.')}|` +
     // Видът решава дали колоната е пари — смяната му мени сборовете и
     // затова е промяна, а не украса.
-    `${vidovePoRed(m)}`
+    `${vidovePoRed(m)}|` +
+    // Формулата решава КАКВО ПИШЕ в колоната. Без нея в белега смяната на
+    // сметката минаваше за „нищо ново" и не влизаше в Журнала — тиха
+    // промяна на числа, точно каквото Журналът съществува да не допуска.
+    `${formuliPoRed(m)}`
   );
+}
+
+/** Формулите, подредени по колона — за белега. */
+function formuliPoRed(m: ModelNaTablitsa): string {
+  return Object.entries(m.formuli ?? {})
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([k, f]) => `${k}:${f.deystvie}(${f.ot.join('.')})`)
+    .join(';');
 }
 
 /** Видовете, подредени по колона — за белега. */

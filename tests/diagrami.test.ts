@@ -72,6 +72,7 @@ describe('месечните пари за диаграмата', () => {
         stavka: -1,
         nachin: 'банка',
         data: '2026-08-03',
+        dokument: '',
       },
       { opId: 'op-r-1' },
     );
@@ -108,7 +109,7 @@ describe('месечните пари за диаграмата', () => {
     const vzemane = [...o.vzemaniya.values()][0]!;
     await deystviya.priemiPlashtane(
       'P-star',
-      { vzemaneId: vzemane.id, suma_st: stotinki(100_00), nachin: 'брой', data: '2020-01-01' },
+      { vzemaneId: vzemane.id, suma_st: stotinki(100_00), nachin: 'в брой', data: '2020-01-01' },
       { opId: 'op-p-star' },
     );
     const m = mesechnitePari(await deystviya.ogledalo(), '2026-08-22', 12);

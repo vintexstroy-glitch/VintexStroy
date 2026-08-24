@@ -51,6 +51,7 @@ import type { Rolya as RolyaNaChovek } from '../yadro/samolichnost.js';
 import { vidNaKolona, IMENA_NA_VIDOVETE } from './kolonno.js';
 import { svedenaGlava } from '../iztochnik/tablitsa.js';
 import { VIDOVE_STOYNOST, type VidStoynost } from './vid-stoynost.js';
+import { proveriFormula, sDumiFormula, type Formula } from './formuli.js';
 
 export class GreshkaRedaktor extends Error {
   constructor(message: string) {
@@ -377,6 +378,17 @@ export function premahniKolona(
         'без нея редът не става запис. Първо се дава ролята на друга колона.',
     );
   }
+  // ОПЕРАНД НЕ СЕ МАХА ИЗПОД ФОРМУЛА. Проучването: „веригите гният тихо" —
+  // Airtable дава #ERROR след факта. Тук се отказва ПРЕДИ, и се казва коя
+  // формула държи колоната.
+  const zavisim = Object.entries(m.formuli).find(([, f]) => f.ot.includes(kolona));
+  if (zavisim) {
+    const [nomer, formula] = zavisim;
+    throw new GreshkaRedaktor(
+      `Колона „${m.glavi[kolona]}" влиза във формулата на „${m.glavi[Number(nomer)]}" ` +
+        `(${sDumiFormula(m, formula)}). Първо се сменя формулата.`,
+    );
+  }
 
   const glavi = m.glavi.filter((_, i) => i !== kolona);
   const koloni: Partial<Record<Rolya, number>> = {};
@@ -402,6 +414,84 @@ export function premahniKolona(
     // изчезва от Приходи/Разходи, а колона с номер на фактура може да влезе
     // в сбор. Числото си остава число — затова никой не забелязва.
     vidove: bezKolonaVKarta(m.vidove, kolona),
+    // Формулите се местят с два хода: ключът (коя колона е формулна) и
+    // операндите ВЪТРЕ в нея. Само първото би оставило формула, сочеща
+    // съседа отляво — сметка, която мълчи и лъже.
+    formuli: bezKolonaVFormuli(m.formuli, kolona),
+  });
+}
+
+/** Формулите след махане на колона: ключът слиза, операндите — също. */
+function bezKolonaVFormuli(
+  karta: Readonly<Record<number, Formula>>,
+  kolona: number,
+): Readonly<Record<number, Formula>> {
+  const izhod: Record<number, Formula> = {};
+  for (const [k, f] of Object.entries(karta)) {
+    const nomer = Number(k);
+    if (nomer === kolona) continue;
+    izhod[nomer > kolona ? nomer - 1 : nomer] = Object.freeze({
+      ...f,
+      ot: Object.freeze(f.ot.map((o) => (o > kolona ? o - 1 : o))),
+    });
+  }
+  return Object.freeze(izhod);
+}
+
+/**
+ * ДОБАВЯ ФОРМУЛНА КОЛОНА · сметката се дава ПРИ СЪЗДАВАНЕТО (И92 т.8).
+ *
+ * „Формулите ще се пишат само при създаване на таблиците, а след това ще се
+ * редактира само от Стопанина." Тук е първата половина: раждането. Втората е
+ * `smeniFormula` — и двете минават през `samoUpravitel`.
+ *
+ * Формулната колона е ЗАТВОРЕНА по устройство, не по избор: в нея не се пише,
+ * тя се смята (правило 23 — затворената не се редактира от никого). Видът ѝ
+ * също не се избира — СМЯТА СЕ от операндите (`vidNaFormulata`), защото
+ * „евро × число" е евро, каквото и да е сложил човекът в падащото меню.
+ */
+export function dobaviFormulnaKolona(
+  m: ModelNaTablitsa,
+  n: { readonly ime: string; readonly formula: Formula; readonly rolya: RolyaNaChovek },
+): ModelNaTablitsa {
+  samoUpravitel(n.rolya, 'Раждането на формулна колона');
+  const ime = proveriIme(m, n.ime);
+  const vid = proveriFormula(m, n.formula);
+
+  const kolona = m.glavi.length;
+  return Object.freeze({
+    ...sGlavi(m, [...m.glavi, ime]),
+    zatvoreni: Object.freeze([...m.zatvoreni, kolona]),
+    vidove: Object.freeze({ ...m.vidove, [kolona]: vid }),
+    formuli: Object.freeze({ ...m.formuli, [kolona]: n.formula }),
+  });
+}
+
+/**
+ * СМЕНЯ ФОРМУЛАТА на вече родена колона — само Стопанинът (И92 т.8).
+ *
+ * Смяната е ново събитие `МоделЗаписан` (правило 1): старата формула остава в
+ * Журнала и се вижда кой я е сменил и кога. Видът се пресмята наново — новата
+ * сметка може да го е сменила от число на евро.
+ */
+export function smeniFormula(
+  m: ModelNaTablitsa,
+  kolona: number,
+  formula: Formula,
+  rolya: RolyaNaChovek,
+): ModelNaTablitsa {
+  samoUpravitel(rolya, 'Смяната на формула');
+  proveriKolona(m, kolona);
+  if (m.formuli[kolona] === undefined) {
+    throw new GreshkaRedaktor(
+      `Колона „${m.glavi[kolona]}" носи данни, не формула. Формула се дава при създаване на колоната.`,
+    );
+  }
+  const vid = proveriFormula(m, formula, kolona);
+  return Object.freeze({
+    ...m,
+    vidove: Object.freeze({ ...m.vidove, [kolona]: vid }),
+    formuli: Object.freeze({ ...m.formuli, [kolona]: formula }),
   });
 }
 
@@ -457,11 +547,16 @@ export function opisNaPodredba(modeli: readonly ModelNaTablitsa[]): readonly Red
       const vid = IMENA_NA_VIDOVETE[vidNaKolona(m, kolona)];
       const nomenklatura = IMENA_NA_NOMENKLATURITE[vidNomenklatura(m, kolona)];
       const zaklyucheno = m.zaklyucheni.includes(kolona) ? ' · името е заключено' : '';
+      // Формулната колона казва СМЕТКАТА си на мястото на номенклатурата: тя
+      // няма меню, а човекът, който чете Описа, пита точно „откъде идва това".
+      const formula = m.formuli[kolona];
       redove.push({
         ime,
         vid: 'kolona',
         dom: m.klyuch,
-        belezhka: `${vid} · ${nomenklatura}${zaklyucheno}`,
+        belezhka: formula
+          ? `${vid} · формула: ${sDumiFormula(m, formula)}`
+          : `${vid} · ${nomenklatura}${zaklyucheno}`,
       });
       for (const chlen of m.menyuta[kolona] ?? []) {
         redove.push({ ime: chlen, vid: 'chlen', dom: `${m.klyuch} · ${ime}`, belezhka: '' });

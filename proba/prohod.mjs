@@ -2154,6 +2154,69 @@ async function main() {
       await p.$eval('svg.stalbove .stalbove-mesets:last-of-type', (g) => Number(g.dataset.razhodSt)),
       stalbPredi + 3300);
 
+    // ══ 40 · формулната колона (И92 т.8–9) ═══════════════════════════════════
+    razdel = '40 · формулната колона';
+    await naEkran(p, 'nastroyki', '#litse-hedari');
+    await p.selectOption('#izbor-hedar', { index: 1 });
+    await p.waitForSelector('.red.redaktor');
+
+    await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
+    proveri('полетата на формулата стоят СКРИТИ, докато видът не е формулна',
+      await p.$eval('#mvsto-za-formula', (e) => e.hidden), true);
+    await p.selectOption('#kolona-vid', 'formula');
+    await p.waitForFunction(() => document.getElementById('mvsto-za-formula')?.hidden === false);
+    proveri('изборът „формулна" ги показва',
+      await p.$eval('#mvsto-za-formula', (e) => e.hidden), false);
+
+    // операндите са колоните на СЪЩАТА таблица, с вида си до името
+    const operandi = await p.$$eval('#nova-operand1 option', (o) => o.map((x) => x.textContent.trim()));
+    proveri('операндите казват вида на всяка колона',
+      operandi.some((t) => t.includes('·')), true);
+
+    // Операндите се избират по ВИД, както би направил човек: сборът иска две
+    // колони в евро. Избор „по ред" би хванал дата и текст — и формулата пада
+    // с думи, вместо да се запише (точно каквото проверката иска да НЕ става).
+    const vEvro = await p.$$eval('#nova-operand1 option', (o) =>
+      o.filter((x) => x.textContent.includes('евро')).map((x) => x.value));
+    proveri('таблицата има поне две колони в евро за сбор', vEvro.length >= 2, true);
+    await p.fill('#kolona-ime', 'Общо с ДДС');
+    await p.selectOption('#nova-deystvie', 'sbor');
+    await p.selectOption('#nova-operand1', vEvro[0]);
+    await p.selectOption('#nova-operand2', vEvro[1]);
+    await sSabitie(p, () => p.click('#forma-kolona button[type=submit]'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.redaktor')].some((r) => r.textContent.includes('формула')));
+
+    const redoveNaHedara = await redove(p, '.red.redaktor');
+    const formulniyat = redoveNaHedara.find((r) => r.some((k) => k.includes('формула')));
+    proveri('формулната колона казва СМЕТКАТА си в реда',
+      Boolean(formulniyat?.some((k) => k.includes('сбор('))), true);
+    proveri('и се вижда като ЗАТВОРЕНА — в нея не се пише',
+      formulniyat?.[1], 'затворена');
+
+    // ПРАВИЛОТО: формулната колона няма „Запиши" и няма „Премахни" — тя е сметка
+    const broyKoloni = redoveNaHedara.length;
+    proveri('няма бутон „Запиши" за формулната колона',
+      await p.$(`[data-zapishi-kolona="${broyKoloni - 1}"]`), null);
+    proveri('нито „Премахни"',
+      await p.$(`[data-premahni-kolona="${broyKoloni - 1}"]`), null);
+
+    // СМЯНАТА · само Стопанинът, и е ново събитие (правило 1)
+    await deystvieSPrerisuvane(p, () => p.click(`[data-smeni-formula="${broyKoloni - 1}"]`));
+    await p.waitForSelector('#forma-formula');
+    await p.selectOption('#forma-formula [name=deystvie]', 'razlika');
+    await sSabitie(p, () => p.click('#forma-formula button[type=submit]'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.redaktor')].some((r) => r.textContent.includes('разлика(')));
+    proveri('смяната на формулата се вижда в реда',
+      (await redove(p, '.red.redaktor')).some((r) => r.some((k) => k.includes('разлика('))), true);
+
+    // и Описът на Подредба носи формулата — „всичко именувано е ред"
+    await deystvieSPrerisuvane(p, () => p.click('#litse-opis'));
+    await p.waitForSelector('.red.opis');
+    proveri('Описът казва формулата на колоната',
+      (await redove(p, '.red.opis')).some((r) => r[3]?.includes('формула: разлика(')), true);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
