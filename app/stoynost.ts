@@ -24,7 +24,7 @@
 
 import { pishi } from '../src/yadro/pari.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { dumiZaGreshka, svaliFayl } from './imoti.js';
+import { dnesKato, dumiZaGreshka, svaliFayl } from './imoti.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -53,7 +53,7 @@ import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { ekraniraj } from './imoti.js';
 import {
   filtriray,
-  glavaSFiltar,
+  glaviNaTablitsata,
   grupiranaTablitsa,
   poleZaTarsene,
   redZaSkritoto,
@@ -179,7 +179,7 @@ function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number
 }
 
 function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
-  const dnes = new Date().toISOString().slice(0, 10);
+  const dnes = dnesKato();
   const koloni = koloniNaObektite();
   const f = filtriray('stoynost', s.redove, koloni, dnes);
   return `
@@ -189,11 +189,9 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         <span>${s.redove.length} реда · сборът отгоре е стойността на състоянието</span>
       </div>
       ${poleZaTarsene('stoynost')}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="stoynost">
         <div class="glava stoynost">
-          ${koloni
-            .map((kol) => glavaSFiltar('stoynost', kol, s.redove, dnes, kol.vid === 'evro'))
-            .join('')}
+          ${glaviNaTablitsata('stoynost', koloni, s.redove, dnes)}
         </div>
         ${
           f.redove.length === 0

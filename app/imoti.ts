@@ -14,7 +14,7 @@ import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glavaSFiltar, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
@@ -42,9 +42,11 @@ function novOpId(): string {
   return crypto.randomUUID();
 }
 
-/** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2). */
-function koloniNaImotite(naemiPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
-  const zhiviNa = (i: Imot) => (naemiPoImot.get(i.id) ?? []).filter((n) => !n.prekraten);
+/** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2).
+ *  Картата е с ЖИВИТЕ наеми, сметната веднъж — `vzemi` се вика от търсене,
+ *  подредба и групиране, и филтриране на всяко повикване би било разточително. */
+function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
+  const zhiviNa = (i: Imot) => zhiviPoImot.get(i.id) ?? [];
   return [
     { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
     {
@@ -133,8 +135,16 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const mesechno = zhivi.reduce((sbor, n) => sbor + n.naem_st, 0);
   const zaeti = new Set(zhivi.map((n) => n.imotId));
 
-  const filtriraniNaemi = filtriray('naemi', naemi, koloniNaNaemite(ogledalo), dnesKato());
-  const filtriraniImoti = filtriray('imoti', imoti, koloniNaImotite(naemiPoImot), dnesKato());
+  // веднъж на рисуване — не по три пъти по-надолу в шаблона
+  const dnes = dnesKato();
+  const koloniNaemi = koloniNaNaemite(ogledalo);
+  const zhiviPoImot = new Map<string, Naem[]>();
+  for (const [id, spisak] of naemiPoImot) {
+    zhiviPoImot.set(id, spisak.filter((n) => !n.prekraten));
+  }
+  const koloniImoti = koloniNaImotite(zhiviPoImot);
+  const filtriraniNaemi = filtriray('naemi', naemi, koloniNaemi, dnes);
+  const filtriraniImoti = filtriray('imoti', imoti, koloniImoti, dnes);
 
   const popravyanImot = rezhim.kakvo === 'popravi-imot' ? ogledalo.imoti.get(rezhim.id) : undefined;
   const popravyanNaem = rezhim.kakvo === 'popravi-naem' ? ogledalo.naemi.get(rezhim.id) : undefined;
@@ -280,7 +290,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
           <div class="pole">
             <label for="naem-ot">Договор от</label>
             <input translate="no" id="naem-ot" name="ot" type="date" required
-                   value="${popravyanNaem ? ekraniraj(popravyanNaem.ot.slice(0, 10)) : dnes()}">
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.ot.slice(0, 10)) : dnes}">
           </div>
           ${popravyanNaem ? polePrichina('naem') : ''}
         </div>
@@ -297,18 +307,16 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     <section>
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
       ${imoti.length ? poleZaTarsene('imoti') : ''}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="imoti">
         <div class="glava imot">
-          ${koloniNaImotite(naemiPoImot)
-            .map((kol) => glavaSFiltar('imoti', kol, imoti, dnesKato(), kol.vid === 'evro'))
-            .join('')}<span></span>
+          ${glaviNaTablitsata('imoti', koloniImoti, imoti, dnes)}<span></span>
         </div>
         ${
           imoti.length === 0
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniNaImotite(naemiPoImot), dnesKato(), (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
@@ -325,19 +333,14 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         }</span>
       </div>
       ${poleZaTarsene('naemi')}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="naemi">
         <div class="glava naem">
-          ${koloniNaNaemite(ogledalo)
-            .filter((kol) => !kol.samoZaTarsene)
-            .map((kol) =>
-              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'evro'),
-            )
-            .join('')}<span></span>
+          ${glaviNaTablitsata('naemi', koloniNaemi, naemi, dnes)}<span></span>
         </div>
         ${
           filtriraniNaemi.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaNaemite(ogledalo), dnesKato(), (n) => redNaem(n, ogledalo))
+            : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaemi, dnes, (n) => redNaem(n, ogledalo))
         }
       </div>
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
@@ -653,8 +656,8 @@ function dnes(): string {
   return new Date().toISOString().slice(0, 10);
 }
 
-/** Днешният ден — за групите на филтъра по дата. */
-function dnesKato(): string {
+/** Днешният ден — за групите на филтъра по дата. Общ дом; Стойност също го ползва. */
+export function dnesKato(): string {
   return dnes();
 }
 

@@ -13,7 +13,7 @@
  */
 
 import { ekraniraj } from './imoti.js';
-import { pishi } from '../src/yadro/pari.js';
+import { eStotinki, pishi } from '../src/yadro/pari.js';
 import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
@@ -231,8 +231,8 @@ export function sravnitel(vid: VidStoynost): (a: string | number, b: string | nu
   if (vid === 'evro' || eChislo(vid)) {
     return (a, b) => {
       // през българския запис: „72,4" е число, не текст — същият парсер като групите
-      const ca = typeof a === 'number' ? a : (chislo(String(a)) ?? Number.NaN);
-      const cb = typeof b === 'number' ? b : (chislo(String(b)) ?? Number.NaN);
+      const ca = typeof a === 'number' ? a : (chislo(a) ?? Number.NaN);
+      const cb = typeof b === 'number' ? b : (chislo(b) ?? Number.NaN);
       const na = Number.isNaN(ca);
       const nb = Number.isNaN(cb);
       if (na && nb) return AZBUKA.compare(String(a), String(b));
@@ -339,7 +339,7 @@ export function sboroveNaGrupata<T>(
         // празното (напр. продаден обект) не е нула по право — то просто липсва
         if (surovo === '') return sbor;
         const st = Number(surovo);
-        return sbor + (Number.isSafeInteger(st) ? st : 0);
+        return sbor + (eStotinki(st) ? st : 0);
       }, 0),
     }));
 }
@@ -379,21 +379,30 @@ export function grupiranaTablitsa<T>(
 }
 
 // ── рисуването ────────────────────────────────────────────────────────────
-/** Заглавна клетка със стрелка — като колонна глава в Explorer. */
+/**
+ * Заглавна клетка със стрелка — като колонна глава в Explorer.
+ *
+ * Правилата на колоната се прилагат ТУК, при дома на модела ѝ, не по памет
+ * при повикващия: `samoZaTarsene` колона не рисува глава (тя се търси, не
+ * стои); коя глава е сума, казва видът (правило 20 · ADR-014). Главата
+ * носи ключа и името си (`data-kolona` · `data-ime`) — скриването и
+ * контекстното меню четат тях, не остъргват боядисания текст.
+ */
 export function glavaSFiltar<T>(
   tablitsa: string,
   k: KolonaSFiltar<T>,
   redove: readonly T[],
   dnes: string,
-  suma = false,
 ): string {
+  if (k.samoZaTarsene) return '';
+  const suma = k.vid === 'evro';
   const pald = klyuchNa(tablitsa, k.klyuch);
   const broy = izbrano.get(pald)?.size ?? 0;
   const podredba = podredbi.get(tablitsa);
   const aktivnaPodredba = podredba?.kolona === k.klyuch;
   // Името на колоната Е бутонът за подредба — както в Explorer и Excel:
   // клик подрежда нагоре, втори клик надолу, трети връща изходния ред.
-  return `<span class="glavicha${suma ? ' suma' : ''}">
+  return `<span class="glavicha${suma ? ' suma' : ''}" data-kolona="${ekraniraj(k.klyuch)}" data-ime="${ekraniraj(k.ime)}">
     <button type="button" class="ime-kolona${aktivnaPodredba ? ' podredena' : ''}"
       data-podredi="${ekraniraj(pald)}"
       aria-label="Подреди по ${ekraniraj(k.ime)}">${ekraniraj(k.ime)}${
@@ -403,6 +412,16 @@ export function glavaSFiltar<T>(
       aria-label="Филтър по ${ekraniraj(k.ime)}">${broy ? '▼' : '▾'}</button>
     ${otvoreno === pald ? menyu(tablitsa, k, redove, dnes) : ''}
   </span>`;
+}
+
+/** Целите глави на една таблица — циклите по екраните бяха четири преписа. */
+export function glaviNaTablitsata<T>(
+  tablitsa: string,
+  koloni: readonly KolonaSFiltar<T>[],
+  redove: readonly T[],
+  dnes: string,
+): string {
+  return koloni.map((k) => glavaSFiltar(tablitsa, k, redove, dnes)).join('');
 }
 
 function menyu<T>(

@@ -41,7 +41,7 @@ import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glavaSFiltar, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
@@ -218,11 +218,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         : `<section>
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
       ${poleZaTarsene('razhodi')}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="razhodi">
         <div class="glava razhod">
-          ${KOLONI_RAZHODI.map((kol) =>
-            glavaSFiltar('razhodi', kol, razhodi, dnes, kol.vid !== 'tekst'),
-          ).join('')}<span></span>
+          ${glaviNaTablitsata('razhodi', KOLONI_RAZHODI, razhodi, dnes)}<span></span>
         </div>
         ${
           filtriraniRazhodi.redove.length === 0

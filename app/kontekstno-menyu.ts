@@ -14,22 +14,14 @@
  */
 
 import type { Konteks } from './main.js';
-import { klyuchNaTablitsata, prilozhiSkritite, skriyKolona } from './skriti-koloni.js';
+import { prilozhiSkritite, skriyKolona } from './skriti-koloni.js';
+import { kopirayKletkite } from './klaviatura.js';
 
 let otvorenoMenyu: HTMLElement | null = null;
 
 function zatvori(): void {
   otvorenoMenyu?.remove();
   otvorenoMenyu = null;
-}
-
-/** Текстът на реда за клипборда · клетките, без бутоните, с табулация. */
-function redVTekst(red: HTMLElement): string {
-  return [...red.children]
-    .filter((k) => !k.classList.contains('butoni') && !k.querySelector('button'))
-    .map((k) => (k as HTMLElement).innerText.replace(/\s*\n\s*/g, ' · ').trim())
-    .filter((t) => t !== '')
-    .join('\t');
 }
 
 /** Закача се ВЕДНЪЖ — коренът живее през всички прерисувания, а менюто
@@ -62,9 +54,13 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
       menyu.append(b);
     };
 
+    // Копирането минава през СЪЩАТА врата като Ctrl+C върху селекция —
+    // един текст на клетка, същите чисти числа от `data-st`.
     dobavi('Копирай реда', async () => {
       try {
-        await navigator.clipboard.writeText(redVTekst(red));
+        await kopirayKletkite([
+          [...red.children].filter((kl) => !kl.querySelector('button')) as HTMLElement[],
+        ]);
         k.vest('dobre', 'Редът е в клипборда — поставя се в Excel като ред.');
       } catch {
         k.vest('zle', 'Клипбордът отказа — браузърът иска разрешение за копиране.');
@@ -72,17 +68,21 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
     });
 
     // „Скрий колоната" · само на екрана — скритото ПАК се смята (правило 23).
-    // Предлага се само върху колона с ИМЕ в главата: бутоните не са колона.
+    // Ключът и името идват от главата (двигателят ги печата) — нищо не се
+    // остъргва от боядисан текст. Бутоните не са колона.
     const kletka = (e.target as HTMLElement).closest<HTMLElement>('.red > *');
     const tablitsa = red.closest<HTMLElement>('.tablitsa');
-    const klyuchat = tablitsa && klyuchNaTablitsata(tablitsa);
-    if (kletka && tablitsa && klyuchat) {
+    const imeNaTablitsata = tablitsa?.dataset['tablitsa'];
+    if (kletka && tablitsa && imeNaTablitsata) {
       const nomer = [...red.children].indexOf(kletka);
-      const glavata = tablitsa.querySelector<HTMLElement>('.glava')?.children[nomer];
-      const ime = glavata?.textContent?.replace(/[▾▼↑↓]/g, '').trim() ?? '';
-      if (ime !== '' && !kletka.querySelector('button')) {
+      const glavata = tablitsa.querySelector<HTMLElement>('.glava')?.children[nomer] as
+        | HTMLElement
+        | undefined;
+      const kolona = glavata?.dataset['kolona'];
+      const ime = glavata?.dataset['ime'];
+      if (kolona !== undefined && ime !== undefined && !kletka.querySelector('button')) {
         dobavi(`Скрий колоната „${ime}"`, () => {
-          skriyKolona(klyuchat, nomer);
+          skriyKolona(imeNaTablitsata, kolona);
           // на живо, без прерисуване — скриването е козметика върху DOM
           prilozhiSkritite(document.body);
         });

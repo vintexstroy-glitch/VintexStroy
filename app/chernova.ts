@@ -34,7 +34,7 @@
 import { fokusVPole } from './klaviatura.js';
 
 /** Стекът не расте до безкрай — под тавана старото пада мълчаливо. */
-export const TAVAN_NA_STEKA = 20;
+const TAVAN_NA_STEKA = 20;
 
 export interface Chernova {
   /** ключът: id на формата · нейните data-* атрибути (същността) */
@@ -68,8 +68,16 @@ export function klyuchNaChernova(id: string, danni: Readonly<Record<string, stri
   return [id, ...chasti].join('·');
 }
 
+/** Ключът е неизменен, докато формата живее — смята се веднъж, не на клавиш. */
+const klyuchove = new WeakMap<HTMLFormElement, string>();
+
 function klyuchNaFormata(forma: HTMLFormElement): string {
-  return klyuchNaChernova(forma.id, { ...forma.dataset });
+  let k = klyuchove.get(forma);
+  if (k === undefined) {
+    k = klyuchNaChernova(forma.id, { ...forma.dataset });
+    klyuchove.set(forma, k);
+  }
+  return k;
 }
 
 /** Полетата на формата, каквито са в мига — отметки и скритото не влизат. */
@@ -106,11 +114,9 @@ export function zakachiChernovata(koren: HTMLElement): void {
   for (const [klyuch, ch] of [...zhivi]) {
     const forma = document.getElementById(ch.id);
     if (!(forma instanceof HTMLFormElement)) continue; // друг екран — чака
-    if (klyuchNaFormata(forma) !== klyuch) {
-      // същият id, ДРУГА същност — черновата умира, но не ляга върху чуждото
-      pogrebi(ch);
-      zhivi.delete(klyuch);
-    } else if (umryalaLi(ch.poleta, snimka(forma))) {
+    // подменена стойност — или същият id с ДРУГА същност: черновата умира,
+    // но не ляга върху чуждото
+    if (klyuchNaFormata(forma) !== klyuch || umryalaLi(ch.poleta, snimka(forma))) {
       pogrebi(ch);
       zhivi.delete(klyuch);
     }

@@ -9,14 +9,17 @@
  * целите, а скриването е козметика върху готовия DOM — маха клетките от
  * очите и стеснява решетката. Нито една сметка не минава оттук.
  *
+ * Помни се КЛЮЧЪТ на колоната (`data-kolona`, печатан от двигателя в
+ * главата), не поредният ѝ номер: добавена или разместена колона утре не
+ * бива да кара запомнен номер да скрие ДРУГА колона. Номерът се решава
+ * при прилагане, от главата на екрана. Таблицата казва името си сама
+ * (`data-tablitsa` от рисуването) — нищо не се гадае от белези на филтъра.
+ *
  * Скритата колона не изчезва тихо: под таблицата остава ред
  * „Скрити колони: N · покажи ги" — скрито, за което нищо не напомня,
- * се превръща в изгубено.
- *
- * Помни се ЕКРАННО (`pamet-ekran`), по ключ на таблица — как се гледа,
- * не какво е вярно. Това е скриване ПО ЖЕЛАНИЕ на гледащия; скриването
- * ПО ПРАВО (колонното право, ADR-011) е друго решение с друг дом и те
- * не се сливат (правило 15: изключено ≠ липсващо).
+ * се превръща в изгубено. Помни се екранно (`pamet-ekran`), по таблица.
+ * Скриването ПО ЖЕЛАНИЕ (това) и скриването ПО ПРАВО (колонното право,
+ * ADR-011) са две решения с два дома и не се сливат (правило 15).
  */
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -46,29 +49,32 @@ export function bezPatechka(shablon: string, nomer: number): string {
 
 const KLYUCH = 'skriti-koloni';
 
-function skritite(): Record<string, number[]> {
-  return chetiEkranno<Record<string, number[]>>(KLYUCH, {});
+function skritite(): Record<string, string[]> {
+  return chetiEkranno<Record<string, string[]>>(KLYUCH, {});
 }
 
-export function skriyKolona(tablitsa: string, nomer: number): void {
+export function skriyKolona(tablitsa: string, kolona: string): void {
   const vsichki = skritite();
   const spisak = vsichki[tablitsa] ?? [];
-  if (!spisak.includes(nomer)) spisak.push(nomer);
+  if (!spisak.includes(kolona)) spisak.push(kolona);
   vsichki[tablitsa] = spisak;
   zapomniEkranno(KLYUCH, vsichki);
 }
 
-export function pokazhiKolonite(tablitsa: string): void {
+function pokazhiKolonite(tablitsa: string): void {
   const vsichki = skritite();
   delete vsichki[tablitsa];
   zapomniEkranno(KLYUCH, vsichki);
 }
 
-/** Ключът на таблицата — от белега за подредба в собствената ѝ глава. */
-export function klyuchNaTablitsata(tablitsa: HTMLElement): string | null {
-  const beleg = tablitsa.querySelector<HTMLElement>('[data-podredi]')?.dataset['podredi'];
-  if (!beleg) return null;
-  return beleg.slice(0, beleg.indexOf(':'));
+/** Номерата на скритите колони — решени при прилагане, от главата. */
+function nomeraNaSkritite(glava: HTMLElement, klyuchove: readonly string[]): Set<number> {
+  const nomera = new Set<number>();
+  [...glava.children].forEach((kletka, i) => {
+    const k = (kletka as HTMLElement).dataset['kolona'];
+    if (k !== undefined && klyuchove.includes(k)) nomera.add(i);
+  });
+  return nomera;
 }
 
 /**
@@ -78,15 +84,18 @@ export function klyuchNaTablitsata(tablitsa: HTMLElement): string | null {
  */
 export function prilozhiSkritite(koren: HTMLElement): void {
   const vsichki = skritite();
-  for (const tablitsa of koren.querySelectorAll<HTMLElement>('.tablitsa')) {
-    const klyuch = klyuchNaTablitsata(tablitsa);
-    if (!klyuch) continue;
-    const skriti = vsichki[klyuch] ?? [];
+  for (const tablitsa of koren.querySelectorAll<HTMLElement>('.tablitsa[data-tablitsa]')) {
+    const klyuch = tablitsa.dataset['tablitsa']!;
+    const klyuchove = vsichki[klyuch] ?? [];
+    const glava = tablitsa.querySelector<HTMLElement>('.glava');
+    // обичайният случай — нищо скрито и никаква следа: една проверка, край.
+    // `getComputedStyle` по ред при всяко прерисуване би било разточително.
+    if (klyuchove.length === 0 && !glava?.dataset['shablon']) continue;
+    if (!glava) continue;
+    const nomera = nomeraNaSkritite(glava, klyuchove);
 
-    const redove = tablitsa.querySelectorAll<HTMLElement>('.glava, .red');
-    for (const red of redove) {
-      const shablonat = red.dataset['shablon'] ?? getComputedStyle(red).gridTemplateColumns;
-      if (skriti.length === 0) {
+    for (const red of tablitsa.querySelectorAll<HTMLElement>('.glava, .red')) {
+      if (nomera.size === 0) {
         // връщане: оригиналът си идва, следата пада
         if (red.dataset['shablon'] !== undefined) {
           red.style.gridTemplateColumns = '';
@@ -95,26 +104,27 @@ export function prilozhiSkritite(koren: HTMLElement): void {
         for (const kletka of red.children) (kletka as HTMLElement).hidden = false;
         continue;
       }
+      const shablonat = red.dataset['shablon'] ?? getComputedStyle(red).gridTemplateColumns;
       red.dataset['shablon'] = shablonat;
       // пътечките падат от най-задната напред — номерата да не се разместят
       let nov = shablonat;
-      for (const n of [...skriti].sort((a, b) => b - a)) nov = bezPatechka(nov, n);
+      for (const n of [...nomera].sort((a, b) => b - a)) nov = bezPatechka(nov, n);
       red.style.gridTemplateColumns = nov;
       [...red.children].forEach((kletka, i) => {
-        (kletka as HTMLElement).hidden = skriti.includes(i);
+        (kletka as HTMLElement).hidden = nomera.has(i);
       });
     }
 
     // редът „Скрити колони: N · покажи ги" — скритото не се премълчава
     const sled = tablitsa.nextElementSibling;
     const stariyat = sled?.classList.contains('skrito-koloni') ? sled : null;
-    if (skriti.length === 0) {
+    if (nomera.size === 0) {
       stariyat?.remove();
       continue;
     }
     const red = stariyat ?? document.createElement('p');
     red.className = 'drebno skrito-koloni';
-    red.innerHTML = `Скрити колони: ${skriti.length} · <button type="button" class="vrazka" data-pokazhi-koloni="${klyuch}">покажи ги</button>`;
+    red.innerHTML = `Скрити колони: ${nomera.size} · <button type="button" class="vrazka" data-pokazhi-koloni="${klyuch}">покажи ги</button>`;
     red.querySelector('button')!.addEventListener('click', () => {
       pokazhiKolonite(klyuch);
       prilozhiSkritite(koren);

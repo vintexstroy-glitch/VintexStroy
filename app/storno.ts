@@ -29,20 +29,8 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
   );
   if (prichina === null) return { stana: false, kazano: '', vid: 'dobre' };
 
-  try {
-    await k.deystviya.storniraj(
-      `S:${crypto.randomUUID()}`,
-      { pogasyavaSeq: seq, prichina: prichina.trim() || 'без посочена причина' },
-      { opId: `storno:${crypto.randomUUID()}` },
-      vid,
-    );
-  } catch (greshka) {
-    return {
-      stana: false,
-      kazano: dumiZaGreshka(greshka),
-      vid: 'zle',
-    };
-  }
+  const otkaz = await stornirajSled(k, seq, vid, prichina);
+  if (otkaz !== null) return { stana: false, kazano: otkaz, vid: 'zle' };
 
   return {
     stana: true,
@@ -59,22 +47,21 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
  * ЕДИНСТВЕНИЯТ дом на този факт (правило 17): и екраните при закачането на
  * единичното сторно, и груповото четат ОТТУК. Втори списък другаде би се
  * разминал тихо — ред с непознат белег просто изпада от „Сторно на
- * избраните", без грешка.
+ * избраните", без грешка. Ключът е самият HTML-атрибут — без преводач
+ * kebab↔camel по средата.
  */
 const VID_OT_BELEGA: Readonly<Record<string, Vid>> = {
-  stornoImot: VID.imot,
-  stornoNaem: VID.naem,
-  stornoVzemane: VID.vzemane,
-  storno: VID.plashtane,
-  stornoRazhod: VID.razhod,
+  'data-storno-imot': VID.imot,
+  'data-storno-naem': VID.naem,
+  'data-storno-vzemane': VID.vzemane,
+  'data-storno': VID.plashtane,
+  'data-storno-razhod': VID.razhod,
 };
+const BELEZITE = Object.entries(VID_OT_BELEGA);
 
 /** Видът по HTML-атрибута („data-storno-naem" → наем) — или null за чужд белег. */
 export function vidOtAtribut(atribut: string): Vid | null {
-  const beleg = atribut
-    .replace(/^data-/, '')
-    .replace(/-([a-z])/g, (_, bukva: string) => bukva.toUpperCase());
-  return VID_OT_BELEGA[beleg] ?? null;
+  return VID_OT_BELEGA[atribut] ?? null;
 }
 
 export interface ZaStorno {
@@ -84,11 +71,39 @@ export interface ZaStorno {
 
 /** Чете от бутон на ред кое сторно носи — или null, ако не е сторно-бутон. */
 export function stornoOtButona(b: HTMLButtonElement): ZaStorno | null {
-  for (const [beleg, vid] of Object.entries(VID_OT_BELEGA)) {
-    const seq = b.dataset[beleg];
-    if (seq !== undefined) return { seq: Number(seq), vid };
+  for (const [atribut, vid] of BELEZITE) {
+    const seq = b.getAttribute(atribut);
+    if (seq !== null) return { seq: Number(seq), vid };
   }
   return null;
+}
+
+/**
+ * Сторнира един seq с ГОТОВА причина — ядрото, през което минават и
+ * единичното, и груповото: една врата, един запис, едни думи на отказа.
+ * Връща null при успех, иначе отказа с думи. Чете живото наново — при
+ * партида предишният запис променя какво е позволено.
+ */
+async function stornirajSled(
+  k: Konteks,
+  seq: number,
+  vid: Vid,
+  prichina: string,
+): Promise<string | null> {
+  const [sabitiya, ogledalo] = await Promise.all([k.deystviya.sabitiya(), k.deystviya.ogledalo()]);
+  const otgovor = mozheLiDaSeStornira(sabitiya, ogledalo, seq);
+  if (!otgovor.mozhe) return otgovor.prichina;
+  try {
+    await k.deystviya.storniraj(
+      `S:${crypto.randomUUID()}`,
+      { pogasyavaSeq: seq, prichina: prichina.trim() || 'без посочена причина' },
+      { opId: `storno:${crypto.randomUUID()}` },
+      vid,
+    );
+    return null;
+  } catch (greshka) {
+    return dumiZaGreshka(greshka);
+  }
 }
 
 /**
@@ -133,24 +148,9 @@ export async function opitajStornoNaMnogo(
   const otkazani: string[] = [];
   let stanali = 0;
   for (const { seq, vid } of spisak) {
-    const sabitiya = await k.deystviya.sabitiya();
-    const ogledalo = await k.deystviya.ogledalo();
-    const otgovor = mozheLiDaSeStornira(sabitiya, ogledalo, seq);
-    if (!otgovor.mozhe) {
-      otkazani.push(`seq ${seq}: ${otgovor.prichina}`);
-      continue;
-    }
-    try {
-      await k.deystviya.storniraj(
-        `S:${crypto.randomUUID()}`,
-        { pogasyavaSeq: seq, prichina: prichina.trim() || 'без посочена причина' },
-        { opId: `storno:${crypto.randomUUID()}` },
-        vid,
-      );
-      stanali += 1;
-    } catch (greshka) {
-      otkazani.push(`seq ${seq}: ${dumiZaGreshka(greshka)}`);
-    }
+    const otkaz = await stornirajSled(k, seq, vid, prichina);
+    if (otkaz !== null) otkazani.push(`seq ${seq}: ${otkaz}`);
+    else stanali += 1;
   }
   return {
     stana: stanali > 0,

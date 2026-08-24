@@ -25,7 +25,7 @@ import { butonIstoriya } from './istoriya.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
 import {
   filtriray,
-  glavaSFiltar,
+  glaviNaTablitsata,
   grupiranaTablitsa,
   poleZaTarsene,
   redZaSkritoto,
@@ -77,18 +77,6 @@ function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
     { klyuch: 'nachin', ime: 'Начин', vid: 'tekst', vzemi: (p) => p.nachin },
     { klyuch: 'suma', ime: 'Сума', vid: 'evro', vzemi: (p) => p.suma_st },
   ];
-}
-
-/** Главата на таблица с вземания или плащания — колоните са с филтри. */
-function glavaNaTablitsa<T>(
-  tablitsa: string,
-  koloni: readonly KolonaSFiltar<T>[],
-  redove: readonly T[],
-  dnes: string,
-): string {
-  return koloni
-    .map((kol) => glavaSFiltar(tablitsa, kol, redove, dnes, kol.vid === 'evro'))
-    .join('');
 }
 
 export function narisuvayPari(o: Ogledalo, dnes: string): string {
@@ -161,9 +149,9 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         <span>${zakasneli.length ? 'най-закъснелите отгоре' : 'няма'}</span>
       </div>
       ${zakasneli.length ? poleZaTarsene('prosrocheni') : ''}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="prosrocheni">
         <div class="glava vzemane">
-          ${glavaNaTablitsa('prosrocheni', koloniVz, zakasneli, dnes)}<span></span>
+          ${glaviNaTablitsata('prosrocheni', koloniVz, zakasneli, dnes)}<span></span>
         </div>
         ${
           zakasneli.length === 0
@@ -182,9 +170,9 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         : `<section>
       <div class="dyalglava"><h2>В срок</h2><span>${otvoreni.length}</span></div>
       ${poleZaTarsene('vsrok')}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="vsrok">
         <div class="glava vzemane">
-          ${glavaNaTablitsa('vsrok', koloniVz, otvoreni, dnes)}<span></span>
+          ${glaviNaTablitsata('vsrok', koloniVz, otvoreni, dnes)}<span></span>
         </div>
         ${
           fOtvoreni.redove.length === 0
@@ -211,9 +199,9 @@ function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {
         <span>${o.plashtaniya.size} · поправка = сторно, не триене</span>
       </div>
       ${vsichki.length ? poleZaTarsene('plashtaniya') : ''}
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="plashtaniya">
         <div class="glava plashtane">
-          ${glavaNaTablitsa('plashtaniya', koloni, vsichki, dnes)}<span></span>
+          ${glaviNaTablitsata('plashtaniya', koloni, vsichki, dnes)}<span></span>
         </div>
         ${
           vsichki.length === 0

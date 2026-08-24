@@ -29,7 +29,7 @@
  * груповите действия ще стъпят върху същия обхват.
  */
 
-import { pishi, pishiVPole } from '../src/yadro/pari.js';
+import { eStotinki, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
 import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
@@ -105,7 +105,7 @@ function stNa(kletka: HTMLElement): number | null {
   const surovo = kletka.dataset['st'];
   if (surovo === undefined) return null;
   const n = Number(surovo);
-  return Number.isSafeInteger(n) ? n : null;
+  return eStotinki(n) ? n : null;
 }
 
 // ── статус-лентата ────────────────────────────────────────────────────────
@@ -133,11 +133,11 @@ function skriyLentata(): void {
 
 /** Лентата се показва при обхват от 2+ клетки — една клетка не е сметка. */
 function pokazhiLentata(obshtoKletki: number, s: SmetkaNaIzbora, zaStorno: readonly ZaStorno[]): void {
-  const l = lentata();
   if (obshtoKletki < 2) {
     skriyLentata();
     return;
   }
+  const l = lentata();
   const chasti = [`Брой: ${s.broy}`];
   if (s.broyPari > 0) chasti.push(`Сбор: ${pishi(s.sbor_st)}`);
   if (s.broyPari > 1) chasti.push(`Средно: ${pishi(s.sredno_st)}`);
@@ -169,29 +169,11 @@ async function stornirayIzbranite(spisak: readonly ZaStorno[]): Promise<void> {
 
 /** Избраните клетки, ред по ред · бутоните не са данни и не пътуват. */
 function izbranitePoRedove(): HTMLElement[][] {
-  if (!izbrana) return [];
-  const redove = redoveNa(izbrana.tablitsa);
-  const posleden = redove.length - 1;
-  const otKolona = Math.min(izbrana.kolona, izbrana.krayKolona);
-  const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
-  const nomera = new Set<number>();
-  const doRed = Math.min(Math.max(izbrana.red, izbrana.krayRed), posleden);
-  for (let r = Math.min(izbrana.red, izbrana.krayRed); r <= doRed; r += 1) nomera.add(r);
-  for (const r of izbrana.oshte) if (r <= posleden) nomera.add(r);
-
-  // Смесен избор (правоъгълник + Ctrl-редове) би дал редове с РАЗЛИЧЕН брой
-  // клетки — а в Excel това размества колоните: сумата на единия ред ляга в
-  // колона A, на другия в колона D. Щом има цели редове, всички тръгват цели.
-  const vsichkiTseli = izbrana.oshte.size > 0;
-
-  const rezultat: HTMLElement[][] = [];
-  for (const r of [...nomera].sort((a, b) => a - b)) {
-    const kletki = kletkiNa(redove[r]!);
-    const ot = vsichkiTseli ? 0 : Math.min(otKolona, kletki.length - 1);
-    const doo = vsichkiTseli ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
-    rezultat.push(kletki.slice(ot, doo + 1).filter((kl) => !kl.querySelector('button')));
-  }
-  return rezultat.filter((red) => red.length > 0);
+  return obhvatNaIzbora(true)
+    .map(({ kletki, ot, doo }) =>
+      kletki.slice(ot, doo + 1).filter((kl) => !kl.querySelector('button')),
+    )
+    .filter((red) => red.length > 0);
 }
 
 /**
@@ -225,25 +207,35 @@ export function klipbordniVkusove(tekstove: readonly (readonly string[])[]): {
   };
 }
 
-/** Копира избора: text/plain (TSV) + text/html (истинска таблица). */
+/**
+ * Пише редове клетки в клипборда: TSV + HTML-таблица. ЕДНАТА врата навън —
+ * Ctrl+C и „Копирай реда" от контекстното меню минават оттук, с един текст
+ * на клетка и едни чисти числа. Хвърля, когато клипбордът откаже.
+ */
+export async function kopirayKletkite(
+  redove: readonly (readonly HTMLElement[])[],
+): Promise<void> {
+  const { tsv, html } = klipbordniVkusove(redove.map((red) => red.map(tekstNaKletkaZaKlipborda)));
+  // Двата вкуса наведнъж: Excel чете text/html като таблица с клетки;
+  // текстовите редактори взимат TSV. По-старият път остава като резерва.
+  if (typeof ClipboardItem === 'undefined') {
+    await navigator.clipboard.writeText(tsv);
+  } else {
+    await navigator.clipboard.write([
+      new ClipboardItem({
+        'text/plain': new Blob([tsv], { type: 'text/plain' }),
+        'text/html': new Blob([html], { type: 'text/html' }),
+      }),
+    ]);
+  }
+}
+
+/** Копира избора и свети в лентата, докато селекцията не мръдне. */
 async function kopirayIzbora(): Promise<void> {
   const redove = izbranitePoRedove();
   if (redove.length === 0) return;
-  const { tsv, html } = klipbordniVkusove(redove.map((red) => red.map(tekstNaKletkaZaKlipborda)));
   try {
-    // Двата вкуса наведнъж: Excel чете text/html като таблица с клетки;
-    // текстовите редактори взимат TSV. По-старият път остава като резерва.
-    if (typeof ClipboardItem === 'undefined') {
-      await navigator.clipboard.writeText(tsv);
-    } else {
-      await navigator.clipboard.write([
-        new ClipboardItem({
-          'text/plain': new Blob([tsv], { type: 'text/plain' }),
-          'text/html': new Blob([html], { type: 'text/html' }),
-        }),
-      ]);
-    }
-    // потвърждението свети в лентата до следващото движение на селекцията;
+    await kopirayKletkite(redove);
     // предишното „Копирано" пада — две потвърждения едно до друго са шум
     const l = lentata();
     l.querySelector('.kopirano')?.remove();
@@ -255,6 +247,50 @@ async function kopirayIzbora(): Promise<void> {
   } catch {
     konteks?.vest('zle', 'Клипбордът отказа — браузърът иска разрешение за копиране.');
   }
+}
+
+/** Един ред от геометрията на избора · клетките и прозорецът от колони. */
+interface RedOtIzbora {
+  readonly red: HTMLElement;
+  readonly kletki: HTMLElement[];
+  readonly ot: number;
+  readonly doo: number;
+}
+
+/**
+ * ГЕОМЕТРИЯТА НА ИЗБОРА · едно място я смята, две политики я четат.
+ *
+ * Погледът (лентата, знаците) взима Ctrl-редовете цели, а правоъгълника —
+ * по колони. Клипбордът, щом има и един цял ред, взима ВСИЧКИ цели —
+ * иначе редовете излизат с различна дължина и колоните в Excel се
+ * разместват. Двете сметки бяха преписани поотделно и дрейфът между
+ * „каквото лентата смята" и „каквото Ctrl+C копира" щеше да е тих.
+ */
+function obhvatNaIzbora(vsichkiTseli: boolean): RedOtIzbora[] {
+  if (!izbrana) return [];
+  const redove = redoveNa(izbrana.tablitsa);
+  const posleden = redove.length - 1;
+  if (posleden < 0) return [];
+  const otKolona = Math.min(izbrana.kolona, izbrana.krayKolona);
+  const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
+  const nomera = new Set<number>();
+  const doRed = Math.min(Math.max(izbrana.red, izbrana.krayRed), posleden);
+  for (let r = Math.min(izbrana.red, izbrana.krayRed); r <= doRed; r += 1) nomera.add(r);
+  for (const r of izbrana.oshte) if (r <= posleden) nomera.add(r);
+  const tselite = vsichkiTseli && izbrana.oshte.size > 0;
+
+  return [...nomera].sort((a, b) => a - b).map((nomer) => {
+    const red = redove[nomer]!;
+    const kletki = kletkiNa(red);
+    // ред от Ctrl+клик влиза ЦЯЛ — той е избран като ред, не като клетки
+    const tsyal = tselite || izbrana!.oshte.has(nomer);
+    return {
+      red,
+      kletki,
+      ot: tsyal ? 0 : Math.min(otKolona, kletki.length - 1),
+      doo: tsyal ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1),
+    };
+  });
 }
 
 /** Слага знаците, смята лентата и докарва подвижния край в очите. */
@@ -274,25 +310,10 @@ function pokazhi(): void {
   izbrana.red = Math.min(izbrana.red, posleden);
   izbrana.krayRed = Math.min(izbrana.krayRed, posleden);
 
-  const otRed = Math.min(izbrana.red, izbrana.krayRed);
-  const doRed = Math.max(izbrana.red, izbrana.krayRed);
-  const otKolona = Math.min(izbrana.kolona, izbrana.krayKolona);
-  const doKolona = Math.max(izbrana.kolona, izbrana.krayKolona);
-
   const vIzbora: KletkaVIzbora[] = [];
   const zaStorno: ZaStorno[] = [];
   let obshtoKletki = 0;
-  const izbraniRedove = new Set<number>();
-  for (let r = otRed; r <= doRed; r += 1) izbraniRedove.add(r);
-  for (const r of izbrana.oshte) if (r <= posleden) izbraniRedove.add(r);
-
-  for (const r of izbraniRedove) {
-    const kletki = kletkiNa(redove[r]!);
-    // Правоъгълникът взима колоните между котвата и края; ред от Ctrl+клик
-    // влиза ЦЯЛ — той е избран като ред, не като клетки.
-    const tsyalRed = izbrana.oshte.has(r);
-    const ot = tsyalRed ? 0 : Math.min(otKolona, kletki.length - 1);
-    const doo = tsyalRed ? kletki.length - 1 : Math.min(doKolona, kletki.length - 1);
+  for (const { red, kletki, ot, doo } of obhvatNaIzbora(false)) {
     for (let c = ot; c <= doo; c += 1) {
       const kletka = kletki[c]!;
       kletka.classList.add(ZNAK_OBHVAT);
@@ -304,7 +325,7 @@ function pokazhi(): void {
       }
     }
     // Кое сторно носи редът — пита се БУТОНЪТ му, не се гадае по екрана.
-    for (const b of redove[r]!.querySelectorAll<HTMLButtonElement>('button')) {
+    for (const b of red.querySelectorAll<HTMLButtonElement>('button')) {
       const s = stornoOtButona(b);
       if (s) {
         zaStorno.push(s);
@@ -424,6 +445,11 @@ export function zakachiKlaviatura(
 
     // Какво се движи: с Shift — подвижният край; без — котвата, и краят
     // се прибира върху нея. Enter и Tab винаги прибират обхвата.
+    const priberi = () => {
+      izbrana!.krayRed = izbrana!.red;
+      izbrana!.krayKolona = izbrana!.kolona;
+      izbrana!.oshte.clear();
+    };
     const sShift = e.shiftKey;
     let r = sShift ? izbrana.krayRed : izbrana.red;
     let c = sShift ? izbrana.krayKolona : izbrana.kolona;
@@ -456,9 +482,7 @@ export function zakachiKlaviatura(
       case 'Enter':
         dvizhenie = false;
         izbrana.red = Math.min(izbrana.red + 1, posledenRed);
-        izbrana.krayRed = izbrana.red;
-        izbrana.krayKolona = izbrana.kolona;
-        izbrana.oshte.clear();
+        priberi();
         break;
       case 'Tab':
         dvizhenie = false;
@@ -474,9 +498,7 @@ export function zakachiKlaviatura(
           izbrana.red += 1;
           izbrana.kolona = 0;
         }
-        izbrana.krayRed = izbrana.red;
-        izbrana.krayKolona = izbrana.kolona;
-        izbrana.oshte.clear();
+        priberi();
         break;
       case 'Escape':
         izbrana = null;
@@ -488,13 +510,14 @@ export function zakachiKlaviatura(
     }
     if (!hvanato) return;
     if (dvizhenie) {
-      izbrana.krayRed = r;
-      izbrana.krayKolona = c;
-      if (!sShift) {
+      if (sShift) {
+        izbrana.krayRed = r;
+        izbrana.krayKolona = c;
+      } else {
         // движение без Shift прибира всичко — и обхвата, и Ctrl-редовете
         izbrana.red = r;
         izbrana.kolona = c;
-        izbrana.oshte.clear();
+        priberi();
       }
     }
     e.preventDefault(); // иначе стрелките скролват страницата под селекцията
