@@ -71,6 +71,7 @@ import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
+import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -675,7 +676,7 @@ function blokNaSverkite(o: Ogledalo): string {
         ${posledni.map(redNaSverka).join('')}
       </div>`
       }
-      <p class="drebno">Разликата се записва и когато е нула — иначе „няма разлика" е неразличимо от „не е сверявано".</p>
+      <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>`;
 }
 

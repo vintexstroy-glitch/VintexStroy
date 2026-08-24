@@ -39,6 +39,45 @@ export async function opitajStorno(k: Konteks, seq: number, vid: Vid, kakvo: str
   };
 }
 
+/**
+ * ОКАЧВА сторно-бутоните на един екран · един механизъм, три екрана.
+ *
+ * Имоти, Пари и Сметки пишеха една и съща обиколка: изключи бутона, викни
+ * вратаря, кажи вестта, прерисувай. Три копия на един ред мисъл — и всяка
+ * поправка в единия оставяше другите два както са били.
+ *
+ * Разликата между трите е ЕДНА: какво става СЛЕД сторното — Имоти връща
+ * режима си, Пари маха избраното, Сметки само прерисува. Затова обиколката
+ * е тук, а разликата идва като `sled`.
+ *
+ * И една дребна печалба, платена веднага: видът вече не се взима с `!`.
+ * Чужд белег се отказва С ДУМИ още при закачането — тих пропуск изглежда
+ * като бутон, който просто не работи.
+ */
+export function zakachiStornoButoni(
+  koren: HTMLElement,
+  k: Konteks,
+  znatsi: readonly (readonly [string, string])[],
+  sled: () => Promise<void>,
+): void {
+  for (const [znak, kakvo] of znatsi) {
+    const vid = vidOtAtribut(znak);
+    if (vid === null) {
+      throw new Error(`„${znak}" не е сторно-белег. Домът им е VID_OT_BELEGA в този файл.`);
+    }
+    for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
+      b.addEventListener('click', async () => {
+        // Изключва се и НЕ се връща: екранът се прерисува целият, а дотогава
+        // второ натискане би пуснало вратаря втори път по същия seq.
+        b.disabled = true;
+        const izhod = await opitajStorno(k, Number(b.getAttribute(znak)), vid, kakvo);
+        if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
+        await sled();
+      });
+    }
+  }
+}
+
 // ── сторно на избраните · груповото минава през СЪЩАТА врата ──────────────
 
 /**

@@ -13,8 +13,8 @@ import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { zakachiStornoButoni } from './storno.js';
+import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
@@ -315,7 +315,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
           imoti.length === 0
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
-              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              ? PRAZEN_FILTAR
               : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
         }
       </div>
@@ -339,7 +339,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         </div>
         ${
           filtriraniNaemi.redove.length === 0
-            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            ? PRAZEN_FILTAR
             : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaemi, dnes, (n) => redNaem(n, ogledalo))
         }
       </div>
@@ -634,22 +634,20 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     });
   }
 
-  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
-  for (const [znak, kakvo] of [
-    ['data-storno-imot', 'имотът'],
-    ['data-storno-naem', 'наемът'],
-  ] as const) {
-    const vid = vidOtAtribut(znak)!;
-    for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
-      b.addEventListener('click', async () => {
-        b.disabled = true;
-        const izhod = await opitajStorno(k, Number(b.getAttribute(znak)), vid, kakvo);
-        if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
-        rezhim = { kakvo: 'nov' };
-        await prerisuvay();
-      });
-    }
-  }
+  // Обиколката е една за трите екрана (`storno.ts`); тук е само разликата —
+  // след сторното Имоти се връща в режим „нов".
+  zakachiStornoButoni(
+    koren,
+    k,
+    [
+      ['data-storno-imot', 'имотът'],
+      ['data-storno-naem', 'наемът'],
+    ],
+    async () => {
+      rezhim = { kakvo: 'nov' };
+      await prerisuvay();
+    },
+  );
 }
 
 function dnes(): string {

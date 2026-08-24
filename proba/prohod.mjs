@@ -821,6 +821,12 @@ async function main() {
     await p.click('#forma-razhod button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-razhod')?.textContent !== '');
     proveri('формата отказва с думи', (await tekstNa(p, '#greshka-razhod')).includes('заключен'), true);
+    // И С НЕГОВИТЕ думи, не с чуждото име на класа. Дотук екранът изброяваше
+    // две грешки поименно и падаше на `String(err)` за всяка друга — а
+    // отказът на замразен период е точно „всяка друга". Затова човекът
+    // виждаше „GreshkaZamrazen: …" залепено пред българското изречение.
+    proveri('и БЕЗ латинско име на клас пред изречението',
+      /[A-Za-z]{4,}/.test(await tekstNa(p, '#greshka-razhod')), false);
 
     // внесеното на ръка — на части, разликата свети и после гасне
     await p.fill('#dds-suma', '150,00');

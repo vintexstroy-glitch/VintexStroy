@@ -8,9 +8,9 @@
  * преизчислява при всяко показване — включително сверката.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { GreshkaData, otData } from '../src/yadro/data.js';
-import { MERKA } from '../src/yadro/sverka.js';
+import { SUMATA_NAD_NULA, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { otData } from '../src/yadro/data.js';
+import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
 import {
@@ -47,8 +47,8 @@ import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
-import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { opitajStorno, zakachiStornoButoni } from './storno.js';
+import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
@@ -222,7 +222,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
           )
           .join('')}
       </div>
-      <p class="drebno">Разликата се записва и когато е нула — иначе „няма разлика" е неразличимо от „не е сверявано".</p>
+      <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
 
     ${formaRazhod(mesets)}
@@ -239,7 +239,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         </div>
         ${
           filtriraniRazhodi.redove.length === 0
-            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            ? PRAZEN_FILTAR
             : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, redNaRazhod)
         }
       </div>
@@ -838,7 +838,7 @@ export function zakachiSmetki(
     try {
       obshta_st = otLeva(String(danni.get('suma')));
     } catch (err) {
-      greshka.textContent = err instanceof GreshkaPari ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
       return;
     }
 
@@ -875,7 +875,7 @@ export function zakachiSmetki(
       ot = otData(String(danni.get('ot') ?? ''), 'Датата, от която важи салдото');
     } catch (err) {
       izhod.textContent =
-        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
+        dumiZaGreshka(err);
       return;
     }
 
@@ -913,11 +913,11 @@ export function zakachiSmetki(
       data = otData(String(danni.get('data') ?? ''), 'Датата на разхода');
     } catch (err) {
       greshka.textContent =
-        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
+        dumiZaGreshka(err);
       return;
     }
     if (suma_st <= 0) {
-      greshka.textContent = 'Сумата трябва да е повече от нула.';
+      greshka.textContent = SUMATA_NAD_NULA;
       return;
     }
 
@@ -1013,14 +1013,6 @@ export function zakachiSmetki(
     await prerisuvay();
   });
 
-  // ── сторно на разход ─────────────────────────────────────────────────────
-  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-storno-razhod]')) {
-    b.addEventListener('click', async () => {
-      b.disabled = true;
-      // Видът — от единствения дом на „белег → вид" (правило 17 · storno.ts).
-      const izhod = await opitajStorno(k, Number(b.dataset['stornoRazhod']), vidOtAtribut('data-storno-razhod')!, 'разходът');
-      if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
-      await prerisuvay();
-    });
-  }
+  // ── сторно на разход · същата обиколка като в Имоти и Пари ───────────────
+  zakachiStornoButoni(koren, k, [['data-storno-razhod', 'разходът']], prerisuvay);
 }

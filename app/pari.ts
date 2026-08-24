@@ -5,8 +5,8 @@
  * КОНКРЕТНО вземане. Поправка = сторно, не изтриване.
  */
 
-import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { GreshkaData, otData } from '../src/yadro/data.js';
+import { SUMATA_NAD_NULA, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { otData } from '../src/yadro/data.js';
 import {
   duljimo,
   prosrocheni,
@@ -22,15 +22,8 @@ import {
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { butonIstoriya } from './istoriya.js';
-import { opitajStorno, vidOtAtribut } from './storno.js';
-import {
-  filtriray,
-  glaviNaTablitsata,
-  grupiranaTablitsa,
-  poleZaTarsene,
-  redZaSkritoto,
-  type KolonaSFiltar,
-} from './filtri.js';
+import { zakachiStornoButoni } from './storno.js';
+import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
@@ -157,7 +150,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
           zakasneli.length === 0
             ? '<p class="prazno">Нищо не е просрочено.</p>'
             : fZakasneli.redove.length === 0
-              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              ? PRAZEN_FILTAR
               : grupiranaTablitsa('prosrocheni', fZakasneli.redove, koloniVz, dnes, (v) => redVzemane(o, v, v.dniZakasnenie))
         }
       </div>
@@ -176,7 +169,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         </div>
         ${
           fOtvoreni.redove.length === 0
-            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            ? PRAZEN_FILTAR
             : grupiranaTablitsa('vsrok', fOtvoreni.redove, koloniVz, dnes, (v) => redVzemane(o, v, 0))
         }
       </div>
@@ -207,7 +200,7 @@ function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {
           vsichki.length === 0
             ? '<p class="prazno">Още няма прието плащане.</p>'
             : f.redove.length === 0
-              ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+              ? PRAZEN_FILTAR
               : grupiranaTablitsa('plashtaniya', f.redove, koloni, dnes, (p) => redPlashtane(o, p))
         }
       </div>
@@ -404,12 +397,11 @@ export function zakachiPari(
       suma_st = otLeva(String(danni.get('suma')));
       data = otData(String(danni.get('data') ?? ''), 'Датата на плащането');
     } catch (err) {
-      greshka.textContent =
-        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
+      greshka.textContent = dumiZaGreshka(err);
       return;
     }
     if (suma_st <= 0) {
-      greshka.textContent = 'Сумата трябва да е повече от нула.';
+      greshka.textContent = SUMATA_NAD_NULA;
       return;
     }
 
@@ -437,20 +429,18 @@ export function zakachiPari(
   });
 
   // ── сторно · и на плащане, и на начисление, винаги през вратаря ─────────
-  // Видът идва от единствения дом на „белег → вид" (правило 17 · storno.ts).
-  for (const [znak, kakvo] of [
-    ['data-storno', 'плащането'],
-    ['data-storno-vzemane', 'начислението'],
-  ] as const) {
-    const vid = vidOtAtribut(znak)!;
-    for (const b of koren.querySelectorAll<HTMLButtonElement>(`[${znak}]`)) {
-      b.addEventListener('click', async () => {
-        b.disabled = true;
-        const izhod = await opitajStorno(k, Number(b.getAttribute(znak)), vid, kakvo);
-        if (izhod.kazano) k.vest(izhod.vid, izhod.kazano);
-        izbrano = null;
-        await prerisuvay();
-      });
-    }
-  }
+  // Обиколката е една за трите екрана (`storno.ts`); тук е само разликата —
+  // след сторното избраното вземане се пуска.
+  zakachiStornoButoni(
+    koren,
+    k,
+    [
+      ['data-storno', 'плащането'],
+      ['data-storno-vzemane', 'начислението'],
+    ],
+    async () => {
+      izbrano = null;
+      await prerisuvay();
+    },
+  );
 }

@@ -81,10 +81,24 @@ export function pogadniPeriod(tablitsa: Tablitsa): string {
   if (glava < 0) return '';
   const kolona = nameriKolona(tablitsa, glava, 'дата');
   if (kolona < 0) return '';
+  return naychestiyatMesets(tablitsa.redove.slice(glava + 1).map((r) => r?.[kolona] ?? ''));
+}
 
+/**
+ * НАЙ-ЧЕСТИЯТ МЕСЕЦ измежду разчетените дати · ГЛАСУВАНЕ, не първата клетка.
+ *
+ * Първата дата лъже: една сгрешена клетка най-отгоре би обявила цялата таблица
+ * за друг месец. Затова всяка разчетена дата дава ГЛАС, а неразчетената мълчи —
+ * тя не знае за кого да гласува.
+ *
+ * Двата викащи се различават САМО по това ОТКЪДЕ идват суровите клетки: с
+ * глава, намерена по думи, или през модел. Сметката е една и живее тук —
+ * написана два пъти, тя щеше да се разминава при първата поправка в едната.
+ */
+function naychestiyatMesets(surovi: readonly string[]): string {
   const broy = new Map<string, number>();
-  for (let i = glava + 1; i < tablitsa.redove.length; i += 1) {
-    const surovo = (tablitsa.redove[i]?.[kolona] ?? '').trim();
+  for (const kletka of surovi) {
+    const surovo = kletka.trim();
     if (surovo === '') continue;
     try {
       const mesets = dataOtKletka(surovo).slice(0, 7);
@@ -93,6 +107,9 @@ export function pogadniPeriod(tablitsa: Tablitsa): string {
       // Неразчетена дата не гласува за период.
     }
   }
+  // Равен брой → печели първият срещнат: Map пази реда на вписване, а
+  // сортирането е устойчиво. Така два еднакво чести месеца не се разменят
+  // между две четения на един и същи файл.
   return [...broy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
 }
 
@@ -220,18 +237,7 @@ export function stavkaOtSuma(obshta_st: number, dds_st: number): number {
 
 /** Кой месец е таблицата според МОДЕЛА — пак по най-често срещаната дата. */
 export function periodPoModel(m: ModelNaTablitsa, t: Tablitsa): string {
-  const broy = new Map<string, number>();
-  for (const i of redoveSDanni(m, t)) {
-    const surovo = poRolya(m, t, i, 'data');
-    if (surovo === '') continue;
-    try {
-      const mesets = dataOtKletka(surovo).slice(0, 7);
-      broy.set(mesets, (broy.get(mesets) ?? 0) + 1);
-    } catch {
-      // Неразчетена дата не гласува за период.
-    }
-  }
-  return [...broy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
+  return naychestiyatMesets([...redoveSDanni(m, t)].map((i) => poRolya(m, t, i, 'data')));
 }
 
 /**

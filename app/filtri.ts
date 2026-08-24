@@ -487,6 +487,15 @@ export function redZaSkritoto(f: Filtrirano<unknown>, tablitsa: string): string 
   } · <button type="button" class="vrazka" data-filtar-izchisti-vsichko="${ekraniraj(tablitsa)}">покажи всичко</button></p>`;
 }
 
+/**
+ * КОГАТО ФИЛТЪРЪТ НЕ ОСТАВИ НИЩО · един дом за едно изречение (правило 17).
+ *
+ * Стоеше в седем таблици на четири екрана. Преписаното изречение се
+ * разминава при първата поправка в едното — и тогава един и същ празен
+ * резултат почва да се обяснява с два различни текста.
+ */
+export const PRAZEN_FILTAR = '<p class="prazno">Филтърът не остави нито един ред.</p>';
+
 /** Закача се веднъж на екран — обслужва всички таблици в него. */
 export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void>): void {
   // ── подредбата: име → нагоре → надолу → изходен ред ──

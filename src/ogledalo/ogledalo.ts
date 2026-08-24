@@ -225,6 +225,34 @@ export interface Ogledalo {
  * Изгражда Огледалото от подредена по seq редица събития.
  * Две минавания: първо кои seq са погасени, после кои се прилагат.
  */
+/**
+ * ПОЛЕТАТА, КОИТО ДВЕТЕ СЪБИТИЯ ЗА НАЕМ НОСЯТ ЕДНАКВО.
+ *
+ * „НаемДобавен" и „НаемПоправен" пишат едни и същи полета с едни и същи
+ * ПАДАНИЯ за стар Журнал. Написани поотделно, те се разминават при първото
+ * ново поле: добавянето го получава, поправката мълчи — и наемът тихо губи
+ * стойност всеки път, щом някой му поправи телефона.
+ *
+ * Отвън остават САМО разликите: добавянето слага `id`, `seq`, `imotId` и
+ * `prekraten: false`; поправката не ги пипа — прекратяването си има свое
+ * събитие.
+ */
+function poletataNaNaema(p: PayloadNaemDobaven | PayloadNaemPopraven) {
+  return {
+    naemetel: p.naemetel,
+    // Наем, записан преди контактите, ги няма — празно, не „липсва".
+    telefon: p.telefon ?? '',
+    imeyl: p.imeyl ?? '',
+    naem_st: p.naem_st,
+    padezhDen: p.padezhDen,
+    ot: p.ot,
+    do: p.do,
+    depozit_st: p.depozit_st,
+    // Наем, записан преди резен 4, няма сектор — пада към жилищен.
+    sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+  };
+}
+
 export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pogaseni = new Set<number>();
   for (const s of sabitiya) {
@@ -279,17 +307,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           id: s.sashtnost.id,
           seq: s.seq,
           imotId: p.imotId,
-          naemetel: p.naemetel,
-          // Наем, записан преди контактите, ги няма — празно, не „липсва".
-          telefon: p.telefon ?? '',
-          imeyl: p.imeyl ?? '',
-          naem_st: p.naem_st,
-          padezhDen: p.padezhDen,
-          ot: p.ot,
-          do: p.do,
-          depozit_st: p.depozit_st,
-          // Наем, записан преди резен 4, няма сектор — пада към жилищен.
-          sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
+          ...poletataNaNaema(p),
           prekraten: false,
         });
         break;
@@ -478,18 +496,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const naem = naemi.get(p.naemId);
         if (naem) {
           // Прекратеността НЕ се пипа оттук — тя си има свое събитие.
-          naemi.set(naem.id, {
-            ...naem,
-            naemetel: p.naemetel,
-            telefon: p.telefon ?? '',
-            imeyl: p.imeyl ?? '',
-            naem_st: p.naem_st,
-            padezhDen: p.padezhDen,
-            ot: p.ot,
-            do: p.do,
-            depozit_st: p.depozit_st,
-            sektor: p.sektor ?? SEKTOR_PO_PODRAZBIRANE,
-          });
+          naemi.set(naem.id, { ...naem, ...poletataNaNaema(p) });
         }
         break;
       }

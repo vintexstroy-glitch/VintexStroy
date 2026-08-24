@@ -53,14 +53,7 @@ import {
 } from '../src/kalkulator/tsenova-lista.js';
 import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { ekraniraj } from './imoti.js';
-import {
-  filtriray,
-  glaviNaTablitsata,
-  grupiranaTablitsa,
-  poleZaTarsene,
-  redZaSkritoto,
-  type KolonaSFiltar,
-} from './filtri.js';
+import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -205,7 +198,7 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         </div>
         ${
           f.redove.length === 0
-            ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
+            ? PRAZEN_FILTAR
             : grupiranaTablitsa('stoynost', f.redove, koloni, dnes, redNaObekt)
         }
         <div class="red stoynost sbor" translate="no">

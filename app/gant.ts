@@ -24,7 +24,7 @@
  * промяна на срок е събитие в Журнала; влаченето прави тиха промяна на дата.
  */
 
-import { otData, GreshkaData } from '../src/yadro/data.js';
+import { otData } from '../src/yadro/data.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,
@@ -505,7 +505,7 @@ export function zakachiFormataNaDelo(
       ot = otData(String(d.get('ot') ?? ''), 'Началото на делото');
       doData = otData(String(d.get('do') ?? ''), 'Краят на делото');
     } catch (err) {
-      izhod.textContent = err instanceof GreshkaData ? err.message : String(err);
+      izhod.textContent = dumiZaGreshka(err);
       return;
     }
     if (doData < ot) {
