@@ -44,7 +44,7 @@ import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
-import { slozhiShirinite, tablitsataSOcveteniPoleta } from './gant.js';
+import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
@@ -71,6 +71,12 @@ let greshkaSaldo = '';
 
 /** Кой месец се гледа · помни се (ADR-022): счетоводителят живее в един месец. */
 let period: string | null = chetiEkranno<string | null>('smetki.period', null);
+/**
+ * Виждат ли се Приходите и Разходите в решетката на делата (И95): „показано
+ * всички те цифри там с опция да ги изключваш пускаш". Скриването пипа
+ * ЕКРАНА и нищо друго (правило 23) — сборовете пак се смятат.
+ */
+let sTsifrite = chetiEkranno('smetki.tsifrite', true);
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -359,15 +365,23 @@ function blokDelata(o: Ogledalo, dnes: string): string {
   const parvata = r.koloni[0]!;
   const poslednata = r.koloni[r.koloni.length - 1]!;
   const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
+  // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `
     <section>
       <div class="dyalglava">
         <h2>Делата · копието от Управление</h2>
-        <span>чете се за сверка — пише се в Управление, посоката е една</span>
+        <span>същата таблица · със същата форма за ново дело (И95)</span>
       </div>
+      <label class="vazm">
+        <input type="checkbox" id="klyuch-tsifrite"${sTsifrite ? ' checked' : ''}>
+        <span class="vazm-tyalo"><b>Приходите и Разходите в решетката</b>
+        <span>скриването пипа екрана и нищо друго — сборовете ПАК се смятат (правило 23)</span></span>
+      </label>
     </section>
     ${narisuvayDiagrama(dela, r, dnes)}
-    ${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false)}`;
+    ${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}
+    ${formaDelo(o, dnes)}`;
 }
 
 function poleNaOtcheta(p: Pole): string {
@@ -796,6 +810,14 @@ export function zakachiSmetki(
 ): void {
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
+
+  // И95 · същата форма за дело работи и оттук — един механизъм, два екрана.
+  zakachiFormataNaDelo(koren, k, prerisuvay);
+  koren.querySelector<HTMLInputElement>('#klyuch-tsifrite')?.addEventListener('change', async (e) => {
+    sTsifrite = (e.target as HTMLInputElement).checked;
+    zapomniEkranno('smetki.tsifrite', sTsifrite);
+    await prerisuvay();
+  });
 
   const formaPeriod = koren.querySelector<HTMLFormElement>('#forma-period');
   formaPeriod?.addEventListener('submit', async (e) => {

@@ -2135,8 +2135,9 @@ async function main() {
       await p.$$eval('svg.diagrama:not(.stalbove)', (r) => r.length), 1);
     proveri('копието се ЧЕТЕ — няма нито един сгъвач',
       await p.$$eval('#ekran button.sgavach', (r) => r.length), 0);
-    proveri('и няма форма за дело — пише се в Управление',
-      await p.$('#forma-delo'), null);
+    // И95 обърна старото „няма форма": „да създаваш както като в Управление".
+    proveri('и формата за дело Е там (И95) — един механизъм, два екрана',
+      Boolean(await p.$('#forma-delo')), true);
 
     // диаграмата в Отчетите: 12 месеца, стълбовете носят числата си
     proveri('Отчетите носят стълбовете на месеците',
@@ -2432,6 +2433,59 @@ async function main() {
     proveri('другата секция остава', Boolean(await p.$('.karta:has-text("Наемите")')), true);
     proveri('и вече не е стеснена — връзката падна с махнатата',
       (await p.evaluate(() => document.body.textContent)).includes('стеснена от „Обектите"'), false);
+
+    // ══ 43 · адресната книга (И94 т.2) и копието с форма (И95) ═══════════════
+    razdel = '43 · адресната книга';
+
+    // книгата стои на екрана Табове: вградените с номера 1·2·3, моделите с поле
+    proveri('адресната книга се вижда',
+      (await p.evaluate(() => document.body.textContent)).includes('Адресната книга'), true);
+    proveri('вградените носят закованите номера',
+      await p.$$eval('[data-tablitsa="adresna-kniga"] .red', (r) =>
+        r.some((x) => x.textContent.includes('Дела') && x.textContent.includes('Мястото'))), true);
+
+    // на моделна колона се дава номер · записът е събитие
+    const imaModelniKoloni = await p.$$eval('[data-nomer-vhod]', (r) => r.length);
+    proveri('моделните колони имат поле за номер', imaModelniKoloni > 0, true);
+    const parvoPoleZaNomer = await p.$eval('[data-nomer-vhod]', (e) => e.dataset.nomerVhod);
+    await p.fill(`[data-nomer-vhod="${parvoPoleZaNomer}"]`, '100');
+    const predNomer = await broySabitiya(p);
+    await sSabitie(p, () => p.click(`[data-zapishi-nomer="${parvoPoleZaNomer}"]`));
+    proveri('номерът е ново събитие МоделЗаписан', await broySabitiya(p), predNomer + 1);
+    proveri('и връзката с един край се КАЗВА',
+      (await p.evaluate(() => document.body.textContent)).includes('с ЕДИН край'), true);
+
+    // измислен номер в запазената зона се отказва с думи, нищо не влиза
+    await p.fill(`[data-nomer-vhod="${parvoPoleZaNomer}"]`, '7');
+    const predLosh = await broySabitiya(p);
+    await p.click(`[data-zapishi-nomer="${parvoPoleZaNomer}"]`);
+    await p.waitForFunction(() => document.body.textContent.includes('запазени за вградените'));
+    proveri('запазената зона се пази', await broySabitiya(p), predLosh);
+
+    // И95 · копието в Сметки: формата за дело Е там, и цифрите носят ключ
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('в Сметки може да се СЪЗДАВА — формата от Управление е там',
+      Boolean(await p.$('#forma-delo')), true);
+    proveri('и редът Приходи·Разходи се вижда',
+      await p.$$eval('.gant-red.sumi', (r) => r.length), 1);
+    const predKlyuch = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#klyuch-tsifrite'));
+    proveri('ключът СКРИВА цифрите — екранът, не сметката',
+      await p.$$eval('.gant-red.sumi', (r) => r.length), 0);
+    proveri('и скриването не пише в Журнала', await broySabitiya(p), predKlyuch);
+    await deystvieSPrerisuvane(p, () => p.click('#klyuch-tsifrite'));
+    proveri('и се връща', await p.$$eval('.gant-red.sumi', (r) => r.length), 1);
+
+    // създаването от Сметки е СЪЩИЯТ запис като от Управление
+    const predDelo = await broySabitiya(p);
+    await zapishiDelo(p, {
+      myasto: 'Малинова Долина', obekt: '', ime: 'Проба от Сметки',
+      otgovornik: 'Иво', ot: denOtDnes(0), do: denOtDnes(3), otsenka: 'важно-неспешно',
+    });
+    proveri('делото от Сметки влиза в Журнала', await broySabitiya(p), predDelo + 1);
+    await naEkran(p, 'gant', '#forma-delo');
+    proveri('и Управление го вижда — един механизъм, два екрана',
+      (await p.evaluate(() => document.body.textContent)).includes('Проба от Сметки'), true);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

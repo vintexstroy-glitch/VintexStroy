@@ -219,6 +219,8 @@ export function tablitsataSOcveteniPoleta(
   sumi: readonly { prihod_st: number; razhod_st: number }[],
   dnes: string,
   sasSgavachi = true,
+  /** И95: Приходите и Разходите носят ключ — скрити ПАК се смятат (пр. 23) */
+  sasTsifrite = true,
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -244,7 +246,7 @@ export function tablitsataSOcveteniPoleta(
             ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi)).join('')}`,
             )
             .join('')}
-          <div class="gant-sbor">Приход · Разход</div>
+          ${sasTsifrite ? '<div class="gant-sbor">Приход · Разход</div>' : ''}
         </div>
         <div class="gant-vreme" id="gant-vreme">
           <div class="gant-glava-vreme">
@@ -279,7 +281,7 @@ export function tablitsataSOcveteniPoleta(
               .join('')}`,
             )
             .join('')}
-          <div class="gant-red sumi">
+          ${sasTsifrite ? `<div class="gant-red sumi">
             ${sumi
               .map(
                 (s, i) =>
@@ -290,7 +292,7 @@ export function tablitsataSOcveteniPoleta(
                   }</span>`,
               )
               .join('')}
-          </div>
+          </div>` : ''}
         </div>
       </div>
       <p class="drebno">Лентите НЕ се влачат — срокът се мени от полето за срок, за да остане следа в Журнала.
@@ -318,7 +320,11 @@ function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string, sasSgavach
   </div>`;
 }
 
-function formaDelo(o: Ogledalo, dnes: string): string {
+/**
+ * Изнесена: Сметки я рисува СЪЩАТА (И95 — „да създаваш както като в
+ * Управление"). Един механизъм, два екрана — не втора форма.
+ */
+export function formaDelo(o: Ogledalo, dnes: string): string {
   return `
     <section class="karta">
       <div class="dyalglava"><h2>Ново дело</h2><span>Място · Обект · Дело — трите колони</span></div>
@@ -473,6 +479,18 @@ export function zakachiGant(
     zapomniPogleda();
   });
 
+  zakachiFormataNaDelo(koren, k, prerisuvay);
+}
+
+/**
+ * Изнесено: същият submit работи и в Сметки (И95). Записът минава през
+ * СЪЩИЯ zapishiDelo — един път, два екрана.
+ */
+export function zakachiFormataNaDelo(
+  koren: HTMLElement,
+  k: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
   const forma = koren.querySelector<HTMLFormElement>('#forma-delo');
   forma?.addEventListener('submit', async (e) => {
     e.preventDefault();

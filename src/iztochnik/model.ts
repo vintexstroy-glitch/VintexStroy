@@ -156,6 +156,15 @@ export interface ModelNaTablitsa {
    * са НОМЕРА, за да не чупи преименуването. Вж. `src/domein/formuli.ts`.
    */
   readonly formuli: Readonly<Record<number, Formula>>;
+  /**
+   * НОМЕРАТА НА ВРЪЗКИТЕ · колона → номер в адресната книга (И94 т.2).
+   *
+   * „Връзката между таблиците както в Ексел, с номер на полето… сходни
+   * номера за връзка." Две колони с ЕДИН номер са свързани. Номерът се
+   * мести С колоната (както формулите — ADR-025), затова преномериране
+   * не чупи връзка. Вж. `src/domein/adresna-kniga.ts` · ADR-028.
+   */
+  readonly nomera: Readonly<Record<number, number>>;
 }
 
 export class GreshkaModel extends Error {
@@ -287,6 +296,8 @@ export function napraviModel(n: {
     // Формулите се дават при СЪЗДАВАНЕ (И92 т.8) — моделът, роден от файл,
     // няма нито една: неговите колони носят данни, писани другаде.
     formuli: Object.freeze({}),
+    // Номерата на връзките ги дава Стопанинът после, от адресната книга.
+    nomera: Object.freeze({}),
   });
 }
 
@@ -332,8 +343,19 @@ export function belegNaModel(m: ModelNaTablitsa): string {
     // Формулата решава КАКВО ПИШЕ в колоната. Без нея в белега смяната на
     // сметката минаваше за „нищо ново" и не влизаше в Журнала — тиха
     // промяна на числа, точно каквото Журналът съществува да не допуска.
-    `${formuliPoRed(m)}`
+    `${formuliPoRed(m)}|` +
+    // Номерът на връзката решава С КОГО говори колоната — смяната му е
+    // промяна, не украса (И94 т.2 · ADR-028).
+    `${nomeraPoRed(m)}`
   );
+}
+
+/** Номерата на връзките, подредени по колона — за белега. */
+function nomeraPoRed(m: ModelNaTablitsa): string {
+  return Object.entries(m.nomera ?? {})
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([k, n]) => `${k}:${n}`)
+    .join(';')
 }
 
 /** Формулите, подредени по колона — за белега. */

@@ -327,6 +327,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // Моделите отпреди конструктора нямат формули — колоните им носят
           // данни. Празната карта е вярната им стойност, не липса.
           formuli: p.formuli ?? {},
+          nomera: p.nomera ?? {},
         });
         break;
       }

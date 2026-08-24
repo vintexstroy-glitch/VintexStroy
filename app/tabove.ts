@@ -45,6 +45,14 @@ import {
   type VidSektsiya,
 } from '../src/domein/tabove.js';
 import { podredi } from '../src/domein/dela.js';
+import {
+  adresnaKniga,
+  samotni,
+  sledvashtNomer,
+  vrazkataNaNomer,
+  type RedVKnigata,
+} from '../src/domein/adresna-kniga.js';
+import { dayNomer } from '../src/domein/redaktor.js';
 import { reshetka, obobshtenRed } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
@@ -193,7 +201,74 @@ export function narisuvayTabove(o: Ogledalo, dnes: string): string {
       ${dobavyamTab ? formaNovTab() : ''}
     </section>
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
-    ${izbran ? blokTab(o, izbran, dnes) : ''}`;
+    ${izbran ? blokTab(o, izbran, dnes) : ''}
+    ${blokAdresnaKniga(o)}`;
+}
+
+/**
+ * АДРЕСНАТА КНИГА · общата таблица на връзките (И94 т.2).
+ *
+ * Негови думи: „обща екселска таблица, където да имат СХОДНИ НОМЕРА за
+ * връзка." Номерът е ВРЪЗКА, не адрес: две колони с един номер са свързани.
+ * Книгата е ОГЛЕДАЛО — смята се от моделите при всяко показване; записът е
+ * самият модел (правило 17). Номер дава само Стопанинът, и това е ново
+ * събитие МоделЗаписан — със следа.
+ */
+function blokAdresnaKniga(o: Ogledalo): string {
+  const kniga = adresnaKniga([...o.modeli.values()]);
+  const bezDvoyka = samotni(kniga);
+  const sledvasht = sledvashtNomer(kniga);
+
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Адресната книга</h2>
+        <span>връзката е ПО НОМЕР, като в Ексел · сходни номера = свързани колони</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="adresna-kniga">
+        <div class="glava opis"><span>№</span><span>Таблица</span><span>Колона</span><span>Свързана с</span></div>
+        ${kniga.map((r) => redVKnigata(kniga, r)).join('')}
+      </div>
+      ${
+        bezDvoyka.length
+          ? `<p class="drebno" id="samotnite">Номер${bezDvoyka.length === 1 ? '' : 'а'} с ЕДИН край: ${bezDvoyka.join(' · ')} —
+        връзка с един край не връзва нищо; чака втората колона.</p>`
+          : ''
+      }
+      <p class="drebno">Вградените връзки носят номера 1 · 2 · 3 и не се менят. На колона от твой
+      хедър номер дава Стопанинът — следващият свободен е <b>${sledvasht}</b>; номер 0 маха връзката.
+      Книгата се смята от моделите при всяко показване — тя е Огледало, не втори носител.</p>
+    </section>`;
+}
+
+function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
+  const drugite = kniga.filter(
+    (x) => x.nomer === r.nomer && r.nomer > 0 && !(x.tablitsa === r.tablitsa && x.kolona === r.kolona),
+  );
+  const vgradenaVrazka = vrazkataNaNomer(r.nomer);
+  return `
+    <div class="red opis${r.nomer === 0 ? ' propusnat' : ''}" translate="no">
+      <span>${
+        r.otkade === 'vgradena'
+          ? `<b>${r.nomer}</b>`
+          : `<input data-nomer-vhod="${ekraniraj(r.tablitsa)}·${r.indeks}" value="${r.nomer || ''}"
+              inputmode="numeric" placeholder="—" aria-label="номер на връзка" class="tesen">`
+      }</span>
+      <span>${ekraniraj(r.tablitsa)}${r.otkade === 'vgradena' ? '' : ' · хедър'}</span>
+      <span><b>${ekraniraj(r.kolona)}</b></span>
+      <span>${
+        r.nomer === 0
+          ? '<span class="znachka tiha">без връзка</span>'
+          : ekraniraj(
+              drugite.map((x) => `${x.tablitsa} · ${x.kolona}`).join(' · ') ||
+                (vgradenaVrazka ? 'чака втори край' : 'чака втори край'),
+            )
+      }${
+        r.otkade === 'model'
+          ? ` <button type="button" class="vtorichen malak" data-zapishi-nomer="${ekraniraj(r.tablitsa)}·${r.indeks}">Запиши</button>`
+          : ''
+      }</span>
+    </div>`;
 }
 
 const IMENA_NA_STATSIONARNITE: Readonly<Record<string, string>> = Object.freeze({
@@ -544,6 +619,31 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
       try {
         const t = await tabSega(izbranTab, imeNaStatsionaren(izbranTab), eStatsionaren(izbranTab));
         await zapishiTaba(razvarzhiSektsiya(t, klyuch), 'Връзката е махната.');
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+  }
+
+  // АДРЕСНАТА КНИГА · номерът се дава от Стопанина, запис = ново събитие.
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-nomer]')) {
+    b.addEventListener('click', async () => {
+      const [klyuchModel, indeks] = b.dataset['zapishiNomer']!.split('·');
+      const pole = koren.querySelector<HTMLInputElement>(
+        `[data-nomer-vhod="${CSS.escape(b.dataset['zapishiNomer']!)}"]`,
+      );
+      try {
+        const o = await k.deystviya.ogledalo();
+        const m = o.modeli.get(klyuchModel!);
+        if (!m) throw new Error('Хедърът вече го няма.');
+        const nomer = pole?.value.trim() === '' ? 0 : Number(pole?.value);
+        if (Number.isNaN(nomer)) throw new Error(`„${pole?.value}" не е номер.`);
+        const nov = dayNomer(m, Number(indeks), nomer, 'sobstvenik');
+        await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
+        greshka = '';
+        k.vest('dobre', nomer === 0 ? 'Връзката е махната.' : `Колоната носи номер ${nomer}.`);
+        await prerisuvay();
       } catch (err) {
         greshka = dumiZaGreshka(err);
         await prerisuvay();

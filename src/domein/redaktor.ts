@@ -52,6 +52,7 @@ import { vidNaKolona, IMENA_NA_VIDOVETE } from './kolonno.js';
 import { svedenaGlava } from '../iztochnik/tablitsa.js';
 import { VIDOVE_STOYNOST, type VidStoynost } from './vid-stoynost.js';
 import { proveriFormula, sDumiFormula, type Formula } from './formuli.js';
+import { proveriNomer } from './adresna-kniga.js';
 
 export class GreshkaRedaktor extends Error {
   constructor(message: string) {
@@ -418,6 +419,7 @@ export function premahniKolona(
     // операндите ВЪТРЕ в нея. Само първото би оставило формула, сочеща
     // съседа отляво — сметка, която мълчи и лъже.
     formuli: bezKolonaVFormuli(m.formuli, kolona),
+    nomera: bezKolonaVKarta(m.nomera, kolona),
   });
 }
 
@@ -492,6 +494,34 @@ export function smeniFormula(
     ...m,
     vidove: Object.freeze({ ...m.vidove, [kolona]: vid }),
     formuli: Object.freeze({ ...m.formuli, [kolona]: formula }),
+  });
+}
+
+/**
+ * ДАВА НОМЕР НА ВРЪЗКА на колона (И94 т.2 · адресната книга).
+ *
+ * „Връзката между таблиците както в Ексел, с номер на полето." Две колони
+ * с един номер са свързани. Номер 0 МАХА връзката — и това е решение на
+ * човек, затова също минава оттук, а не с изтриване на ключ някъде.
+ * Проверката на самия номер е в `adresna-kniga.ts` — един дом.
+ */
+export function dayNomer(
+  m: ModelNaTablitsa,
+  kolona: number,
+  nomer: number,
+  rolya: RolyaNaChovek,
+): ModelNaTablitsa {
+  samoUpravitel(rolya, 'Номерът на връзка');
+  proveriKolona(m, kolona);
+  proveriNomer(nomer);
+  if (nomer === 0) {
+    const nomera = { ...m.nomera };
+    delete nomera[kolona];
+    return Object.freeze({ ...m, nomera: Object.freeze(nomera) });
+  }
+  return Object.freeze({
+    ...m,
+    nomera: Object.freeze({ ...m.nomera, [kolona]: nomer }),
   });
 }
 
