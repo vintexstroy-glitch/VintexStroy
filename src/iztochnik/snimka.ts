@@ -37,6 +37,11 @@ export interface RedOtSnimka {
   readonly suma_st: number;
   readonly data: string;
   readonly dokument: string;
+  /**
+   * Ставката, ако таблицата я казва на реда. Липсва ли — човек я избира при
+   * потвърждаване и тогава важи подсказката на сектора.
+   */
+  readonly stavka?: number;
 }
 
 export interface Propusnat {

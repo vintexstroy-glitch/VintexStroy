@@ -16,11 +16,17 @@ import {
   GreshkaVhod,
   imaKlyuch,
   IMENA_NA_DOSTAVCHITSITE,
+  sParola,
+  TEKST_ZA_PAROLATA,
   IMENA_NA_ROLITE,
+  chetiRolya,
   mozheDaRedaktira,
   VhodVPametta,
   type Samolichnost,
 } from '../src/yadro/samolichnost.js';
+import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { fold } from '../src/ogledalo/ogledalo.js';
+import { SHA } from './pomoshtni.js';
 
 const IVO: Samolichnost = {
   dostavchik: 'google',
@@ -28,7 +34,7 @@ const IVO: Samolichnost = {
   ime: 'Иво',
   hranilishte: 'безплатно',
   nachin: 'dostavchik',
-  rolya: 'stopanin',
+  rolya: 'sobstvenik',
   svarzani: [],
 };
 
@@ -37,7 +43,33 @@ describe('входът без парола', () => {
     const vhod = new EdinSobstvenik(IVO);
     // `vlez` взима САМО доставчик. Ако някой добави втори довод, това пада.
     expect(vhod.vlez.length).toBe(1);
+    // Самата парола НИКОГА не се пази в самоличността — нито избрана, нито не.
     expect(Object.keys(IVO)).not.toContain('parola');
+  });
+
+  it('парола НЕ се появява без изричен избор', () => {
+    // Правило 13, стеснено: по подразбиране няма парола. Тя е избор, не
+    // подразбиране — и точно това пази този тест.
+    expect(sParola(IVO)).toBe(false);
+    expect(sParola({ ...IVO, nachin: 'klyuch' })).toBe(false);
+    expect(sParola({ ...IVO, nachin: 'parola' })).toBe(true);
+  });
+
+  it('изборът на парола идва с ИНФОРМИРАН текст, не с празно поле', () => {
+    // Човек има право да поеме риска. Да го поеме незнаейки — няма.
+    expect(TEKST_ZA_PAROLATA).toMatch(/не може да ти я върне/);
+    expect(TEKST_ZA_PAROLATA).toMatch(/заключен завинаги/);
+    // И текстът сочи по-добрия път, вместо само да плаши.
+    expect(TEKST_ZA_PAROLATA).toMatch(/Ключът на устройството/);
+  });
+
+  it('имейлът за връзка остава дори в напълно офлайн издание', () => {
+    // Негови думи: остава за комуникация, дори приложението да е свалено офлайн.
+    const oflayn = { ...IVO, nachin: 'klyuch' as const, imeylZaVrazka: 'ivo@example.com' };
+    expect(oflayn.imeylZaVrazka).toBe('ivo@example.com');
+    // Той НЕ е вход — входът си остава `nachin`.
+    expect(sParola(oflayn)).toBe(false);
+    expect(imaKlyuch(oflayn)).toBe(true);
   });
 
   it('влиза през своя доставчик и се помни', async () => {
@@ -109,5 +141,61 @@ describe('входът в паметта · за тестовете надолу
     await vhod.izlez();
     expect(vhod.tekushta()).toBeNull();
     await expect(vhod.vlez('microsoft')).rejects.toThrow(GreshkaVhod);
+  });
+});
+
+/**
+ * ДУМАТА Е „СОБСТВЕНИК" · и старият запис не пада между ролите.
+ *
+ * Дотук кодът пишеше `stopanin` — дума, която НЕ се среща в нито един негов
+ * ред. Преименуването пипа стойност, която ВЕЧЕ СТОИ в Журнала, а Журналът е
+ * само за добавяне: старото събитие не се преписва (правило 1). Затова
+ * четенето знае двете думи, а писането — само новата.
+ */
+describe('преименуването на ролята', () => {
+  it('старата дума от Журнала се чете като новата', () => {
+    expect(chetiRolya('stopanin')).toBe('sobstvenik');
+    expect(chetiRolya('sobstvenik')).toBe('sobstvenik');
+  });
+
+  it('другите две роли минават непокътнати', () => {
+    expect(chetiRolya('redaktor')).toBe('redaktor');
+    expect(chetiRolya('nablyudatel')).toBe('nablyudatel');
+  });
+
+  it('НЕПОЗНАТА роля НЕ става тихо наблюдател', () => {
+    // Мълчаливото падане към най-слабата роля изглежда безопасно, но крие
+    // повредения запис: човек без права гледа празен екран и никой не знае защо.
+    expect(chetiRolya('измислена')).toBe('измислена');
+  });
+
+  it('на екрана пише неговата дума', () => {
+    expect(IMENA_NA_ROLITE.sobstvenik).toBe('собственик');
+  });
+});
+
+/**
+ * И през ЦЕЛИЯ път: старо събитие → Врата → Огледало → екран.
+ *
+ * Мостът в `chetiRolya` е верен само ако някой го вика. Тестът минава по
+ * истинския път, вместо да проверява функцията сама за себе си.
+ */
+describe('стар запис за служител · през Журнала до Огледалото', () => {
+  it('роля „stopanin" излиза от Огледалото като собственик', async () => {
+    const dnevnik = new DnevnikVPametta();
+    const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
+    await vrata.dobavi({
+      naematel: 'vintexstroy',
+      actor: 'vintexstroy@gmail.com',
+      opId: 'op-star-sluzhitel',
+      ts: '2026-08-01T09:00:00.000Z',
+      type: 'СлужителЗаписан',
+      sashtnost: { vid: 'sluzhitel', id: 'SLUZHITEL:ivo@primer.bg' },
+      // ТОЧНО каквото е записано преди преименуването
+      payload: { imeyl: 'ivo@primer.bg', ime: 'Иво', rolya: 'stopanin' },
+    });
+
+    const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
+    expect(o.sluzhiteli.get('ivo@primer.bg')?.rolya).toBe('sobstvenik');
   });
 });

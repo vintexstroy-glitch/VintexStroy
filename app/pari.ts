@@ -5,7 +5,7 @@
  * КОНКРЕТНО вземане. Поправка = сторно, не изтриване.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import {
   duljimo,
@@ -20,6 +20,7 @@ import {
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
 import { VID } from '../src/domein/sabitiya.js';
+import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { ekraniraj } from './imoti.js';
 import { opitajStorno } from './storno.js';
 import type { Konteks } from './main.js';
@@ -51,22 +52,22 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Дължимо общо</span>
-        <span class="chislo">${kakvoPishe(duljimo(o) as never)}</span>
-        <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · лв.</span>
+        <span class="chislo" translate="no">${pishi(duljimo(o))}</span>
+        <span class="pod">${o.vzemaniya.size} ${o.vzemaniya.size === 1 ? 'вземане' : 'вземания'} · €</span>
       </div>
       <div class="plochka${prosrocheno_st > 0 ? ' trevoga' : ''}">
         <span class="etiket">Просрочено</span>
-        <span class="chislo">${kakvoPishe(prosrocheno_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(prosrocheno_st)}</span>
         <span class="pod">${zakasneli.length} ${zakasneli.length === 1 ? 'вземане' : 'вземания'}</span>
       </div>
       <div class="plochka">
         <span class="etiket">Събрано през ${mesets}</span>
-        <span class="chislo">${kakvoPishe(sabranoMesets as never)}</span>
+        <span class="chislo" translate="no">${pishi(sabranoMesets)}</span>
         <span class="pod">по дата на плащане</span>
       </div>
       <div class="plochka">
         <span class="etiket">Отворени, в срок</span>
-        <span class="chislo">${otvoreni.length}</span>
+        <span class="chislo" translate="no">${otvoreni.length}</span>
         <span class="pod">още не са закъснели</span>
       </div>
     </div>
@@ -80,7 +81,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         <div class="poleta tesni">
           <div class="pole">
             <label for="period">Месец</label>
-            <input id="period" name="period" type="month" value="${mesets}" required>
+            <input translate="no" id="period" name="period" type="month" value="${mesets}" required>
           </div>
         </div>
         <p class="greshka" id="greshka-nachisli"></p>
@@ -149,27 +150,63 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
   `;
 }
 
-function opisiVzemane(o: Ogledalo, v: Vzemane): { koy: string; kade: string } {
+function opisiVzemane(
+  o: Ogledalo,
+  v: Vzemane,
+): { koy: string; kade: string; telefon: string; imeyl: string } {
   const naem = o.naemi.get(v.naemId);
   const imot = naem ? o.imoti.get(naem.imotId) : undefined;
   return {
     koy: naem?.naemetel ?? '—',
     kade: imot ? `${imot.adres} · ${imot.edinitsa}` : v.naemId,
+    telefon: naem?.telefon ?? '',
+    imeyl: naem?.imeyl ?? '',
   };
 }
 
+/**
+ * БУТОНЪТ ЗА ПИСМО · само когато има КЪДЕ да отиде.
+ *
+ * Писмото тръгва от пощата на собственика с попълнен текст — той го чете и
+ * натиска Изпрати. Автоматичното изпращане иска сървър (правило 10), а писмо
+ * за пари, което никой не е прочел, отива и до онзи, който е платил в брой
+ * вчера.
+ *
+ * Без имейл бутон НЯМА, но телефонът се вижда: тогава се звъни.
+ */
+function butonPismo(o: Ogledalo, v: Vzemane, dni: number): string {
+  const { koy, kade, imeyl } = opisiVzemane(o, v);
+  const adres = adresZaPoshta(
+    napishiPismo({
+      naemetel: koy,
+      imeyl,
+      imot: kade,
+      period: v.period,
+      padezh: v.padezh,
+      ostatak_st: v.ostatak_st,
+      dniZakasnenie: dni,
+    }),
+  );
+  if (!adres) return '';
+  return `<a class="vtorichen malak kato-buton" href="${ekraniraj(adres)}" data-pismo="${ekraniraj(v.id)}">Писмо</a>`;
+}
+
 function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
-  const { koy, kade } = opisiVzemane(o, v);
+  const { koy, kade, telefon, imeyl } = opisiVzemane(o, v);
+  const zavrazka = [telefon, imeyl].filter((x) => x !== '').join(' · ');
   return `
-    <div class="red vzemane">
-      <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(kade)}</span></span>
+    <div class="red vzemane" translate="no">
+      <span class="kletka"><b>${ekraniraj(koy)}</b><span>${ekraniraj(kade)}${
+        zavrazka ? ` · ${ekraniraj(zavrazka)}` : ''
+      }</span></span>
       <span class="kletka"><span>${v.period}</span></span>
       <span class="kletka">
         <span>${v.padezh}</span>
         ${dni > 0 ? `<span class="zakasnenie">закъснял ${dni} ${dni === 1 ? 'ден' : 'дни'}</span>` : ''}
       </span>
-      <span class="suma${dni > 0 ? ' duljimo' : ''}">${kakvoPishe(v.ostatak_st as never)}</span>
+      <span class="suma${dni > 0 ? ' duljimo' : ''}">${pishi(v.ostatak_st)}</span>
       <span class="butoni">
+        ${dni > 0 ? butonPismo(o, v, dni) : ''}
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>
@@ -182,11 +219,11 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
   const v = o.vzemaniya.get(p.vzemaneId);
   const opis = v ? opisiVzemane(o, v) : { koy: '—', kade: p.vzemaneId };
   return `
-    <div class="red plashtane">
+    <div class="red plashtane" translate="no">
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
-      <span class="suma plateno">${kakvoPishe(p.suma_st as never)}</span>
+      <span class="suma plateno">${pishi(p.suma_st)}</span>
       <span class="butoni">
         <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
       </span>
@@ -206,25 +243,25 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
       <form id="forma-plashtane" data-vzemane="${ekraniraj(v.id)}">
         <div class="poleta">
           <div class="pole">
-            <label for="pl-suma">Сума, лв.</label>
-            <input id="pl-suma" name="suma" inputmode="decimal" required
-                   value="${kakvoPishe(v.ostatak_st as never)}" autocomplete="off">
+            <label for="pl-suma">Сума, €</label>
+            <input translate="no" id="pl-suma" name="suma" inputmode="decimal" required
+                   value="${pishiVPole(v.ostatak_st)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="pl-nachin">Начин</label>
-            <select id="pl-nachin" name="nachin">
+            <select translate="no" id="pl-nachin" name="nachin">
               <option value="банка">банка</option>
               <option value="в брой">в брой</option>
             </select>
           </div>
           <div class="pole">
             <label for="pl-data">Дата</label>
-            <input id="pl-data" name="data" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
+            <input translate="no" id="pl-data" name="data" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
           </div>
         </div>
         <p class="greshka" id="greshka-plashtane"></p>
         <div class="deystviya">
-          <button type="submit" class="glaven">Приеми ${kakvoPishe(v.ostatak_st as never)} лв.</button>
+          <button type="submit" class="glaven">Приеми ${pishi(v.ostatak_st)}</button>
           <button type="button" class="vtorichen" data-otkazhi>Откажи</button>
           <p class="drebno">Сумата се редактира — частичното плащане е нормално и остатъкът се смята сам.</p>
         </div>

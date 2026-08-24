@@ -1,3 +1,270 @@
+/* ШРИФТОВЕТЕ ЖИВЕЯТ ТУК, не при Google.
+   Причината не е спестен байт, а правило 10: нищо чуждо в готовия пакет.
+   Дотук видът на приложението висеше на чужда заявка при всяко отваряне.
+
+   ВСИЧКИ азбуки стоят тук — цели, не подрязани. `unicode-range` кара браузъра
+   да тегли само онази, която му трябва, така че онлайн цената е нула.
+   Кой пакет се пази ПРЕДВАРИТЕЛНО за офлайн решава `src/domein/azbuki.ts` —
+   избира се при сваляне, веднъж. */
+
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-cyrillic.woff2') format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-cyrillic-ext.woff2') format('woff2');
+  unicode-range: U+0460-052F, U+1C80-1C8A, U+20B4, U+2DE0-2DFF, U+A640-A69F, U+FE2E-FE2F;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-greek.woff2') format('woff2');
+  unicode-range: U+0370-0377, U+037A-037F, U+0384-038A, U+038C, U+038E-03A1, U+03A3-03FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-greek-ext.woff2') format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-greek-ext.woff2') format('woff2');
+  unicode-range: U+1F00-1FFF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'IBM Plex Sans';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/ibm-plex-sans-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('./shrifty/literata-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+@font-face {
+  font-family: 'Literata';
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url('./shrifty/literata-vietnamese.woff2') format('woff2');
+  unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+}
+
+
 /* Визуалният език от design/README.md — дословно. */
 
 :root {
@@ -10,6 +277,16 @@
   --aktsent-tumen: #8E4526;
   --zeleno: #2E7D5E;
   --toplo: #F6E7DE;
+
+  /* СВЕТОФАРЪТ НА СРОКА · неговите думи (р59·[71]): „свети нормално… 1 седмица
+     преди да дойде деня се оцветява автоматично с жъл цвят… когато останат
+     2 дниу свети в червено." Тези четири не са палитра — те са правило. */
+  --srok-normalno: #7A9E8E;
+  --srok-zhalto: #C99A2E;
+  --srok-cherveno: #C0442A;
+  --srok-prosrocheno: #8E2A16;
+  /* „всички проекти с един цвят тъмно графитено" (р52·[221]) */
+  --grafiteno: #3A3632;
 }
 
 * { box-sizing: border-box; }
@@ -82,6 +359,9 @@ button { font-family: inherit; cursor: pointer; }
   padding: 10px 14px; font-size: 13px; color: var(--mastilo); min-height: 40px;
 }
 .vtorichen:hover { background: var(--panel); }
+/* Връзка, която изглежда като бутон: „Писмо" отваря пощата, значи е <a>, не
+   <button> — така работят и „отвори в нов раздел", и десният бутон. */
+a.kato-buton { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* ── плочки ──────────────────────────────────────────────────────── */
 .plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
@@ -263,6 +543,12 @@ button { font-family: inherit; cursor: pointer; }
 .punkt b { font-size: 13.5px; font-weight: 500; }
 .punkt span { font-size: 12px; color: var(--mastilo2); }
 .menyu .drebno { padding: 8px 10px 4px; border-top: 1px solid var(--liniya); margin-top: 4px; }
+.menyupapka {
+  padding: 8px 10px 3px; margin: 0;
+  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--mastilo2);
+}
+.menyupapka:not(:first-child) { border-top: 1px solid var(--liniya); margin-top: 4px; }
 
 /* ── планът на актуализацията ────────────────────────────────────────── */
 .dyalglava h2.malko { font-size: 14px; }
@@ -277,6 +563,75 @@ button { font-family: inherit; cursor: pointer; }
   min-width: 360px;
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 12.5px; }
+
+/* ── Настройки · бутоните са модели на пътища ────────────────────────── */
+.glava.buton, .red.buton {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 96px minmax(0, 1.8fr) 168px;
+  min-width: 760px;
+}
+.glava.model, .red.model {
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) 130px minmax(0, 1.6fr);
+  min-width: 700px;
+}
+/* Стойност на Състояние · Калкулаторът */
+.glava.stoynost, .red.stoynost {
+  grid-template-columns: minmax(0, 1.6fr) 130px 84px 84px 96px 118px 128px 128px 78px;
+  min-width: 1040px;
+}
+.pole.tyasno { min-width: 210px; }
+.pole.tyasno select { font-size: 13px; }
+.plochka.golyama .chislo { font-size: 30px; }
+.plochka .chislo.malka { font-size: 17px; }
+
+/* Редакторът на хедъри · колоната и лицата ѝ */
+.glava.redaktor, .red.redaktor {
+  /* Колона · Вид · СТОЙНОСТ · Номенклатура · Готово меню · бутони.
+     „Стойност" е новата: тя казва дали сборът на колоната отива в Приходи и
+     Разходи (ADR-014), а дотук се задаваше само с гадаене при внасяне. */
+  grid-template-columns: minmax(0, 1.5fr) 118px 150px minmax(0, 1.2fr) minmax(0, 1.4fr) 260px;
+  min-width: 980px;
+}
+.red.redaktor input {
+  width: 100%;
+  font: inherit;
+  padding: 4px 6px;
+  border: 1px solid var(--liniya);
+  border-radius: 4px;
+  background: var(--hartiya);
+  color: inherit;
+}
+.red.redaktor input:disabled { opacity: 0.6; }
+.red.redaktor select { width: 100%; font: inherit; padding: 3px 4px; }
+/* Колоната, чийто сбор ОТИВА нанякъде, го казва под падащото меню — иначе
+   „евро" и „число" изглеждат като разлика в надпис, а не в поведение. */
+.red.redaktor .kletka > span { font-size: 10.5px; color: var(--mastilo2); }
+.glava.opis, .red.opis {
+  grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 1.4fr) minmax(0, 1.6fr);
+  min-width: 700px;
+}
+.glava.zapisanasverka, .red.zapisanasverka {
+  grid-template-columns: minmax(0, 2fr) 116px 116px 116px 128px;
+  min-width: 640px;
+}
+.glava.deystvie, .red.deystvie {
+  grid-template-columns: 40px minmax(0, 2fr) 96px 120px;
+  min-width: 440px;
+}
+
+/* ── двата задължителни сбора · Приход /+/ и Разход /−/ ──────────────── */
+.glava.znak, .red.znak {
+  grid-template-columns: 64px minmax(0, 2fr) minmax(0, 1.2fr) 130px 132px;
+  min-width: 640px;
+}
+.red.znak.mahnata { opacity: 0.55; }
+.znachka.plyus { background: #E7F0E4; color: #2F5D2A; }
+.znachka.minus { background: #F6E7E4; color: #7A2F22; }
+
+/* ── сверката на ДДС · КЪДЕ е разликата, не само колко ───────────────── */
+.glava.nesvarshen, .red.nesvarshen {
+  grid-template-columns: 132px minmax(0, 2.4fr) 108px 120px;
+  min-width: 600px;
+}
 .karta.izbrana .tablitsa { background: #FFFFFF; }
 
 /* ── фините филтри в стил Уиндоус ────────────────────────────────────── */
@@ -345,3 +700,199 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
 }
 .red.planred.tuk { background: var(--toplo); }
+
+/* ── КОЛОННОТО ПРАВО · скритият ред над хедъра ─────────────────────────────
+   Негови думи: „в всеки хедър се показва СКРИТ РЕД НАД ХЕДЪРА с отметки…
+   само криене от служителя на колони по избор." Затова редът стои НАД името
+   на колоната, а не в отделен диалог: човек вижда какво пипа. */
+.hedar { margin: 14px 0; }
+.hedar > b { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.skritred {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 8px; border-radius: 5px;
+  background: var(--toplo); border: 1px dashed var(--liniya);
+}
+.pravo {
+  display: flex; align-items: center; gap: 7px;
+  padding: 6px 9px; border-radius: 4px; cursor: pointer;
+  background: var(--hartiya); border: 1px solid var(--liniya); font-size: 12.5px;
+}
+.pravo input { width: 15px; height: 15px; accent-color: var(--aktsent); flex-shrink: 0; }
+.pravo .drebno { font-size: 11px; color: var(--mastilo2); }
+/* Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
+   да се вижда, вместо да се помни. */
+.pravo.skrita { opacity: 0.5; }
+.pravo.skrita > span:first-of-type { text-decoration: line-through; }
+
+/* ── ОТЧЕТИТЕ · всяко число с формулата си ──────────────────────────────────
+   Негова поръчка (И90): „полета в Секция Отчети… които да покзват тези
+   стойности с формули между всички таблици."
+
+   Затова формулата НЕ е в подсказка при посочване и не е скрита зад бутон:
+   тя стои под числото, винаги. Число, което трябва да се разглобява с клик,
+   се чете като готово — а половината от тези числа още не са пълни. */
+.otcheti {
+  display: grid; gap: 10px; margin: 12px 0;
+  grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
+}
+.pole-otchet {
+  padding: 12px 14px; border-radius: 6px;
+  background: var(--hartiya); border: 1px solid var(--liniya);
+}
+.pole-otchet .glavata {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+}
+.pole-otchet .chislo { font-size: 21px; }
+.pole-otchet .kakvo {
+  margin: 6px 0 9px; font-size: 12px; line-height: 1.45; color: var(--mastilo2);
+}
+.pole-otchet .formula {
+  list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px dashed var(--liniya);
+}
+.pole-otchet .formula li {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
+  padding: 4px 0; font-size: 12.5px;
+}
+.pole-otchet .formula .otkade {
+  grid-column: 1 / -1; font-size: 11px; color: var(--mastilo2);
+}
+.pole-otchet .formula .suma { font-variant-numeric: tabular-nums; }
+/* Непълното число го КАЗВА. Скритото „чака" е по-лошо от липсващото число:
+   първото изглежда като отговор. */
+.pole-otchet .chaka { margin-top: 8px; color: var(--aktsent); }
+.pole-otchet .palno { margin-top: 8px; }
+
+/* ── ГАНТЪТ · таблицата с оцветени полета ───────────────────────────────────
+   И52: „десктоп = диаграма; телефон и HTML = таблица с оцветени полета".
+   Изданието днес Е HTML, затова това е основният изглед.
+
+   При СТАРТ е 50/50 — негово число (р75·[64]): „при старт е разделено на 2
+   между таблица и частта с таблица на Гант". Дръжката `resize` мести делението;
+   по-старото 1/3 ↔ 2/3 (р48·[75] · р51·[145]) е за разгъната диаграма и не е
+   надживяно. */
+.gant {
+  display: grid; grid-template-columns: 1fr 1fr;
+  border: 1px solid var(--liniya); border-radius: 6px; overflow: hidden;
+  background: var(--hartiya);
+}
+.gant-imena { border-right: 2px solid var(--liniya); resize: horizontal; overflow: hidden; min-width: 180px; }
+/* Скролът е ХОРИЗОНТАЛЕН ВЪВ ВРЕМЕТО, не вертикален — негова дума (р52·[221]):
+   „да не се скролва по вертикла, а по хоризонтал в времето". */
+.gant-vreme { overflow-x: auto; overflow-y: hidden; }
+.gant-glava, .gant-glava-vreme {
+  height: 34px; display: flex; align-items: center; padding: 0 10px;
+  background: var(--panel); border-bottom: 1px solid var(--liniya);
+  font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mastilo2);
+}
+.gant-glava-vreme { display: grid; grid-template-columns: var(--vreme); padding: 0; }
+.gant-glava-vreme span {
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10.5px; border-left: 1px solid var(--liniya); white-space: nowrap;
+}
+/* ДНЕС Е ПЪРВАТА КОЛОНА и се вижда като такава — иначе „скрол наляво показва
+   историята" няма откъде да тръгне. */
+.gant-glava-vreme .dnes { background: var(--toplo); color: var(--aktsent-tumen); font-weight: 600; }
+
+/* „всички проекти с един цвят тъмно графитено" (р52·[221]).
+   Мястото стои на СВОЙ ред, делата под него започват отместени — негово:
+   „Направи името на всеки проект в първа колона, а на задачите следващите
+   редове да започват от втора колона" (р52·[231]). */
+.gant-myasto {
+  height: 30px; display: flex; align-items: center; padding: 0 10px;
+  background: var(--grafiteno); color: #F4EFE7;
+  font-weight: 600; font-size: 12.5px; letter-spacing: 0.01em;
+}
+.gant-delo {
+  height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
+  border-bottom: 1px solid var(--liniya); font-size: 12.5px;
+}
+/* „задачите с редуващи се цветове, бял и светло сив, за да се открояват" */
+.gant-delo:nth-of-type(even) { background: var(--panel); }
+.gant-delo.poddelo { padding-left: 34px; font-size: 12px; }
+.gant-delo b { font-weight: 500; }
+.gant-delo .drebno { margin-left: auto; white-space: nowrap; }
+/* „С Удебелен Проекта и Задачите с по налък шрифт и не удебеллени" (р48·[99]) */
+.gant-delo.zhalto b { color: var(--srok-zhalto); }
+.gant-delo.cherveno b { color: var(--srok-cherveno); }
+.gant-delo.prosrocheno b { color: var(--srok-prosrocheno); font-weight: 600; }
+.sgavach {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0;
+  background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 10px;
+}
+.sgavach.prazen { cursor: default; }
+.gant-sbor, .gant-red.sumi {
+  height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
+}
+.gant-sbor { display: flex; align-items: center; padding: 0 10px; font-size: 11.5px; color: var(--mastilo2); }
+
+.gant-red {
+  position: relative; height: 26px; display: grid; grid-template-columns: var(--vreme);
+  border-bottom: 1px solid var(--liniya);
+}
+.gant-red.prazen { height: 30px; background: var(--grafiteno); }
+.gant-kletka { border-left: 1px solid var(--liniya); }
+.gant-kletka.dnes { background: var(--toplo); }
+.gant-red.prazen .gant-kletka.dnes { background: rgba(178, 94, 56, 0.35); }
+
+/* ЛЕНТАТА · „ЦВЕТОВЕТЕ СПОРЕД СРОКА КАТО ПЛЪТНА ЛЕНТА" (р59·[41], главните са
+   негови). Не се влачи — негова забрана (р83·[35]). */
+.gant-lenta {
+  position: absolute; top: 4px; height: 18px;
+  grid-row: 1; grid-column: var(--ot) / span var(--broy);
+  display: flex; align-items: center; gap: 2px; padding: 0 6px;
+  border-radius: 3px; overflow: hidden; white-space: nowrap;
+  font-size: 11.5px; color: #FBF8F3; cursor: default;
+  background: var(--srok-normalno);
+}
+.gant-lenta.zhalto { background: var(--srok-zhalto); }
+.gant-lenta.cherveno { background: var(--srok-cherveno); }
+.gant-lenta.prosrocheno { background: var(--srok-prosrocheno); }
+/* „КОГАТО Е ЕДНОДНЕВНО ДЕЛО ДА СЕ ОЦВЕТЯВА И С ЦВЯТ НА ПОЛЕТО ПАК И С ЦВЯТ НА
+   ТЕКСТА И САМАТА ДАТА" — затова еднодневното носи и рамка, не само запълване. */
+.gant-lenta.ednodnevno { box-shadow: inset 0 0 0 2px rgba(251, 248, 243, 0.55); }
+.gant-lenta b { font-weight: 500; }
+
+.gant-suma {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  border-left: 1px solid var(--liniya); font-size: 9.5px; line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+.gant-suma.dnes { background: var(--toplo); }
+.gant-suma b { color: var(--zeleno); font-weight: 500; }
+.gant-suma i { color: var(--aktsent); font-style: normal; }
+
+.lentata { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.takt { display: inline-flex; border: 1px solid var(--liniya); border-radius: 5px; overflow: hidden; }
+.takt button {
+  padding: 6px 12px; background: var(--hartiya); border: none;
+  border-right: 1px solid var(--liniya); cursor: pointer; font-size: 12.5px;
+}
+.takt button:last-child { border-right: none; }
+.takt button.izbran { background: var(--aktsent); color: #FBF8F3; }
+#sega { font-weight: 600; letter-spacing: 0.04em; }
+
+/* ── ДИАГРАМАТА · дизайнът на графиката ─────────────────────────────────────
+   И56 чака ТОЧНО нея, за да се реши кое къде остава. Разликата от решетката:
+   лентата е ВРЕМЕ, не клетки — дело от три дни и дело от трийсет се четат по
+   дължина, а не по броене на квадратчета. */
+.diagrama-obvivka { overflow-x: auto; border: 1px solid var(--liniya); border-radius: 6px; background: var(--hartiya); }
+.diagrama { display: block; min-width: 100%; }
+/* Решетката е БЛЕДА нарочно: ориентир, не съдържание. */
+.diagrama-liniya { stroke: var(--liniya); stroke-width: 1; }
+.diagrama-nadpis { fill: var(--mastilo2); font-size: 10px; }
+.diagrama-ime { fill: var(--mastilo); font-size: 12px; }
+.diagrama-red.poddelo .diagrama-ime { fill: var(--mastilo2); font-size: 11px; }
+.diagrama-lenta { fill: var(--srok-normalno); }
+.diagrama-red.zhalto .diagrama-lenta { fill: var(--srok-zhalto); }
+.diagrama-red.cherveno .diagrama-lenta { fill: var(--srok-cherveno); }
+.diagrama-red.prosrocheno .diagrama-lenta { fill: var(--srok-prosrocheno); }
+/* ДНЕШНАТА ЛИНИЯ · това, което решетката не може да покаже — докъде е стигнало
+   времето през ВСИЧКИ дела наведнъж. */
+.diagrama-dnes { stroke: var(--aktsent); stroke-width: 2; stroke-dasharray: 3 3; }
+.diagrama-dnesnadpis { fill: var(--aktsent); font-size: 10px; letter-spacing: 0.05em; }
+/* ОПАШКАТА НА ПРОСРОЧЕНОТО · щрихована, за да казва „това вече трябваше да
+   свърши" без да се чете нито една дума. */
+.diagrama-zakasnyalo {
+  fill: var(--srok-prosrocheno); opacity: 0.45;
+  stroke: #FBF8F3; stroke-width: 1; stroke-dasharray: 2 3;
+}

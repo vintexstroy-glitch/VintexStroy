@@ -25,16 +25,32 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { ekraniraj, narisuvayImoti, zakachiFormite } from './imoti.js';
+import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
+import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
+import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { EdinSobstvenik, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
+import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
+import { SEGA } from '../src/izdanie.js';
+import { KLYUCH_OT_ALFA, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt.js';
 
-const NAEMATEL = 'vintexstroy';
+/**
+ * КЛЮЧЪТ НА АКАУНТА · вече не е закован ред.
+ *
+ * Решава се веднъж, при тръгване (`koyZhurnal`): ако на това устройство вече
+ * има Журнал от Алфа, отваря се ТОЙ — ключът му влиза в хеша и не се преселва
+ * (правило 4). Иначе акаунтът тръгва с имейла на влезлия.
+ *
+ * `let`, защото стойността се знае едва СЛЕД влизането и след първото четене
+ * от носителя; дотогава е ключът от Алфа, за да има какво да се прочете.
+ */
+let akaunt = KLYUCH_OT_ALFA;
 
 /**
  * КОЙ Е ВЛЯЗЪЛ. Днес — един собственик, вече влязъл; истинският OAuth иска
@@ -47,7 +63,7 @@ const SOBSTVENIKAT: Samolichnost = {
   ime: 'VintexStroy',
   hranilishte: 'безплатно',
   nachin: 'dostavchik',
-  rolya: 'stopanin',
+  rolya: 'sobstvenik',
   svarzani: [],
 };
 
@@ -55,7 +71,14 @@ const vhod = new EdinSobstvenik(SOBSTVENIKAT);
 let kojSam: Samolichnost = SOBSTVENIKAT;
 let izbor: Izbor = chetiIzbor();
 
-export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'tablo';
+export type KoyEkran =
+  | 'imoti'
+  | 'pari'
+  | 'stoynost'
+  | 'gant'
+  | 'smetki'
+  | 'nastroyki'
+  | 'tablo';
 
 /**
  * Кой екран от коя възможност зависи. Таблото го няма тук нарочно: то е
@@ -63,6 +86,7 @@ export type KoyEkran = 'imoti' | 'pari' | 'smetki' | 'tablo';
  */
 const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
   smetki: 'smetki-dds',
+  nastroyki: 'iztochnitsi',
 };
 
 export interface Konteks {
@@ -112,6 +136,66 @@ let hranilishte: SastoyanieNaHranilishteto = {
 };
 let ekran: KoyEkran = 'imoti';
 
+/**
+ * ДЖОБЪТ · служебният работник.
+ *
+ * Той прави приложението продукт, който се отваря без мрежа — план 1 от
+ * ADR-006. Регистрацията е тиха: провали ли се, приложението работи както
+ * досега, само че иска мрежа за да се отвори.
+ *
+ * `imaNova` пали ТИХ ред в лентата, когато нова версия чака. Нарочно не
+ * презарежда сама: човек може да въвежда плащане точно в този миг.
+ */
+let imaNova = false;
+
+/**
+ * АЗБУЧНИЯТ ПАКЕТ · решава се ВЕДНЪЖ, при сваляне.
+ *
+ * Негови думи: „Искам да е опция при сваляне само." Затова адресът го носи
+ * (`?azbuki=evropa`) — рекламата по региони дава различен адрес — и оттам
+ * нататък се помни. В приложението няма бутон за него: смяната на азбуките
+ * значи ново сваляне, не отметка.
+ */
+const KLYUCH_AZBUKI = 'masterbook:azbuki';
+
+function koyPaket(): string {
+  try {
+    const otAdresa = new URLSearchParams(location.search).get('azbuki');
+    if (otAdresa) {
+      const izbran = paket(otAdresa).klyuch;
+      localStorage.setItem(KLYUCH_AZBUKI, izbran);
+      return izbran;
+    }
+    return paket(localStorage.getItem(KLYUCH_AZBUKI)).klyuch;
+  } catch {
+    // Частен прозорец: пакетът важи за тази сесия.
+    return PAKET_PO_PODRAZBIRANE;
+  }
+}
+
+async function zakachiDzhoba(prerisuvay: () => Promise<void>): Promise<void> {
+  if (!('serviceWorker' in navigator) || import.meta.env.DEV) return;
+  try {
+    // Пакетът пътува с адреса на работника — той го чете от `location.search`.
+    const zapis = await navigator.serviceWorker.register(`./sw.js?azbuki=${koyPaket()}`);
+    // Нова версия, която чака реда си да влезе.
+    if (zapis.waiting) imaNova = true;
+    zapis.addEventListener('updatefound', () => {
+      const nov = zapis.installing;
+      nov?.addEventListener('statechange', () => {
+        // `controller` значи, че вече има стара версия — иначе е първо пускане.
+        if (nov.state === 'installed' && navigator.serviceWorker.controller) {
+          imaNova = true;
+          void prerisuvay();
+        }
+      });
+    });
+  } catch {
+    // Частен прозорец, забранени работници, или подаден през `file://`.
+    // Приложението работи; само джобът го няма.
+  }
+}
+
 const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }> = {
   imoti: {
     ime: 'Имоти',
@@ -127,6 +211,21 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     ime: 'Сметки',
     podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
     ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
+  },
+  nastroyki: {
+    ime: 'Настройки',
+    podnaslov: 'бутоните са модели на пътища · нищо не е константа',
+    ikona: '<circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"></path>',
+  },
+  stoynost: {
+    ime: 'Стойност на Състояние',
+    podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
+    ikona: '<path d="M4 20V9"></path><path d="M9.5 20V4"></path><path d="M15 20v-7"></path><path d="M20.5 20V7"></path><path d="M2.5 20h19"></path>',
+  },
+  gant: {
+    ime: 'Управление',
+    podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
+    ikona: '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
   },
   tablo: {
     ime: 'Табло',
@@ -156,10 +255,15 @@ async function trugvay(): Promise<void> {
   // Постоянство: изтриваемото хранилище е дупката №1 за „нула загуба".
   hranilishte = await osiguriHranilishte();
 
+  // КОЙ ЖУРНАЛ · първо се пита има ли вече такъв от Алфа, после кой е влязъл.
+  // Обратният ред би оставил първия Журнал невидим в мига, в който истинският
+  // вход тръгне: данните му стоят на диска, но под ключ, който никой не пита.
+  akaunt = koyZhurnal(kojSam, (await dnevnik.chetiVsichki(KLYUCH_OT_ALFA)).length > 0);
+
   // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
-  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(NAEMATEL);
+  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(akaunt);
   const proverka = proveriKotvata(
-    kotva.cheti(NAEMATEL),
+    kotva.cheti(akaunt),
     sabitiyaVNachaloto[sabitiyaVNachaloto.length - 1]?.seq ?? 0,
     (seq) => sabitiyaVNachaloto.find((s) => s.seq === seq)?.hash,
   );
@@ -175,7 +279,7 @@ async function trugvay(): Promise<void> {
   const deystviya = new Deystviya({
     vrata,
     dnevnik,
-    naematel: NAEMATEL,
+    naematel: akaunt,
     actor: kojSam.imeyl,
     chasovnik: () => new Date().toISOString(),
   });
@@ -191,7 +295,7 @@ async function trugvay(): Promise<void> {
   };
 
   async function prerisuvay(): Promise<void> {
-    const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await dnevnik.chetiVsichki(akaunt);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
     const dnes = new Date().toISOString().slice(0, 10);
@@ -209,7 +313,7 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
-            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona() : ''}
+            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             ${
               mozhe(izbor, 'iznos-vnos')
@@ -226,7 +330,7 @@ async function trugvay(): Promise<void> {
                 ? '<button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>'
                 : ''
             }
-            <input type="file" id="fayl" accept="application/json,.json" hidden>
+            <input translate="no" type="file" id="fayl" accept="application/json,.json" hidden>
           </div>
         </header>
         <div class="telo">
@@ -237,9 +341,15 @@ async function trugvay(): Promise<void> {
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length }, k)
               : ekran === 'pari'
                 ? narisuvayPari(ogledalo, dnes)
-                : ekran === 'smetki'
-                  ? narisuvaySmetki(ogledalo, dnes)
-                  : narisuvayTablo(kojSam, izbor)
+                : ekran === 'stoynost'
+                  ? narisuvayStoynost()
+                  : ekran === 'gant'
+                    ? narisuvayGant(ogledalo, dnes)
+                    : ekran === 'smetki'
+                      ? narisuvaySmetki(ogledalo, dnes)
+                      : ekran === 'nastroyki'
+                        ? narisuvayNastroyki(ogledalo)
+                        : narisuvayTablo(kojSam, izbor, akaunt)
           }
         </div>
       </main>`;
@@ -247,7 +357,10 @@ async function trugvay(): Promise<void> {
     poslednaVest = null;
     if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
     else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
+    else if (ekran === 'stoynost') zakachiStoynost(koren, k, prerisuvay);
+    else if (ekran === 'gant') zakachiGant(koren, k, prerisuvay);
     else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
+    else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
     else {
       zakachiTablo(
         koren,
@@ -264,6 +377,8 @@ async function trugvay(): Promise<void> {
   }
 
   await prerisuvay();
+  // Последно, за да не бави първото рисуване.
+  await zakachiDzhoba(prerisuvay);
 }
 
 function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
@@ -295,7 +410,7 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
     <aside class="strana">
       <div class="marka">
         <b>VintexStroy</b>
-        <span>MasterBook</span>
+        <span>MasterBook · ${SEGA.ime}</span>
       </div>
       <nav class="nav">${punktove}</nav>
       <div class="veriga">
@@ -304,6 +419,12 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
         </div>
         <div class="redche" data-broi="${v.broi}">${v.broi} ${v.broi === 1 ? 'събитие' : 'събития'} · местно, в този браузър</div>
         <div class="redche">${redZaIznos(v.broi)}</div>
+        ${
+          imaNova
+            ? `<div class="redche"><span class="tochka"></span>
+                 <b>Има нова версия</b> · затвори и отвори пак</div>`
+            : ''
+        }
         <div class="redche">
           <span class="tochka ${hranilishte.postoyanstvo === 'изтриваемо' ? 'zle' : ''}"></span>
           ${
@@ -348,7 +469,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   }
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const rezultat = await proveriVerigata(sabitiya, sha256Web);
     sastoyanieNaVerigata = {
       tsyala: rezultat.tsyala,
@@ -372,19 +493,19 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
   koren.querySelector<HTMLButtonElement>('#iznesi')?.addEventListener('click', async () => {
     // Свалянето е ПРАВО, не даденост — думата на собственика.
-    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, akaunt))) {
       k.vest('zle', 'Нямаш право да сваляш Журнала. Свалянето се дава по списък.');
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
     const adres = URL.createObjectURL(fayl);
     const vruzka = document.createElement('a');
     vruzka.href = adres;
-    vruzka.download = `zhurnal-${NAEMATEL}-${new Date().toISOString().slice(0, 10)}.json`;
+    vruzka.download = `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`;
     vruzka.click();
     URL.revokeObjectURL(adres);
 
@@ -404,12 +525,12 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
 
   // ── архив за Ексел · всеки лист с готови филтри ──────────────────────────
   koren.querySelector<HTMLButtonElement>('#arhiv')?.addEventListener('click', async () => {
-    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, NAEMATEL))) {
+    if (!(await k.pravata.mozheDaIznasya(kojSam.imeyl, akaunt))) {
       k.vest('zle', 'Нямаш право да сваляш архива. Свалянето се дава по списък.');
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(NAEMATEL);
+    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
     const ogledalo = await k.deystviya.ogledalo();
     const bajtove = arhivZaEksel(sabitiya, ogledalo, new Date().toISOString());
     const fayl = new Blob([bajtove.slice().buffer], {
@@ -437,7 +558,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const izbran = fayl.files?.[0];
     if (!izbran) return;
 
-    const sega = (await k.dnevnik.chetiVsichki(NAEMATEL)).length;
+    const sega = (await k.dnevnik.chetiVsichki(akaunt)).length;
     const potvarzhdenie =
       sega === 0
         ? `Да внеса ли „${izbran.name}"?`
@@ -452,7 +573,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       const rezultat = await vnesiZhurnal({
         vrata: k.vrata,
         dnevnik: k.dnevnik,
-        naematel: NAEMATEL,
+        naematel: akaunt,
         actor: kojSam.imeyl,
         tekst: await izbran.text(),
         kogato: new Date().toISOString(),

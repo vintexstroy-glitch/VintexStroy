@@ -33,6 +33,7 @@ import {
   OPISANIE,
   OSHTE_NE_E_ZAPOCHNATO,
   plan,
+  PLAN_PO_PODRAZBIRANE,
   PLANOVE,
   stigaLiHranilishteto,
   type Vazmozhnost,
@@ -41,6 +42,7 @@ import {
   smeniPlan,
 } from '../src/domein/planove.js';
 import { ekraniraj } from './imoti.js';
+import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -96,7 +98,7 @@ const RED: readonly Vazmozhnost[] = [
   'svarzhi-ii',
 ];
 
-function kartaKoySam(koj: Samolichnost): string {
+function kartaKoySam(koj: Samolichnost, akaunt: string): string {
   const vrazki = koj.svarzani.length
     ? koj.svarzani.map((d) => IMENA_NA_DOSTAVCHITSITE[d]).join(' · ')
     : 'няма вързани';
@@ -110,25 +112,30 @@ function kartaKoySam(koj: Samolichnost): string {
       <div class="plochki">
         <div class="plochka">
           <div class="etiket">Влязъл като</div>
-          <div class="chislo malak">${ekraniraj(koj.ime)}</div>
+          <div class="chislo malak" translate="no">${ekraniraj(koj.ime)}</div>
           <div class="pod">${ekraniraj(koj.imeyl)}</div>
         </div>
         <div class="plochka">
           <div class="etiket">През</div>
-          <div class="chislo malak">${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}</div>
           <div class="pod">${
             koj.nachin === 'klyuch' ? 'с ключ на тази машина' : 'през доставчика'
           }</div>
         </div>
         <div class="plochka">
           <div class="etiket">Хранилище</div>
-          <div class="chislo malak">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
+          <div class="chislo malak" translate="no">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
           <div class="pod">при ${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}, не при нас</div>
         </div>
         <div class="plochka">
           <div class="etiket">Роля</div>
-          <div class="chislo malak">${IMENA_NA_ROLITE[koj.rolya]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[koj.rolya]}</div>
           <div class="pod">вързани акаунти: ${ekraniraj(vrazki)}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Кой Журнал</div>
+          <div class="chislo malak" translate="no">${ekraniraj(akaunt)}</div>
+          <div class="pod">${ekraniraj(sDumiZaAkaunta(akaunt).split(' · ')[1] ?? '')}</div>
         </div>
       </div>
       <p class="drebno">
@@ -197,7 +204,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     const broi = p.vazmozhnosti.size;
 
     return `
-      <div class="red planred${tuk ? ' tuk' : ''}">
+      <div class="red planred${tuk ? ' tuk' : ''}" data-plan-red="${p.klyuch}">
         <div class="kletka">
           <b>${ekraniraj(p.ime)}${tuk ? ' · сега' : ''}</b>
           <span>${ekraniraj(p.zaKogo)}</span>
@@ -205,7 +212,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
         <div class="kletka">
           <b>${broi} ${broi === 1 ? 'възможност' : 'възможности'}</b>
           <span>${
-            p.klyuch === 'standarten' ? 'ЦЯЛАТА функционалност' : 'от таблицата на плана'
+            p.klyuch === PLAN_PO_PODRAZBIRANE ? 'ЦЯЛАТА функционалност' : 'от таблицата на плана'
           }</span>
         </div>
         <div class="kletka">
@@ -241,17 +248,17 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
         ${redove}
       </div>
       <p class="drebno">
-        Мащабът се плаща на доставчика на хранилището, не на нас. Стандартният е
-        стартъпът и носи цялата функционалност; над него се купуват място и
-        сигурност от Google, Microsoft или Apple, а при Холдинг — и поръчкова
-        работа по договор. ИИ ще е добавка с цена, която се СВЪРЗВА — не вградена;
+        Мащабът се плаща на доставчика на хранилището, не на нас. Стартъпът е
+        <b>Професионален · онлайн</b> и носи цялата функционалност; място и
+        сигурност се купуват от Google, Microsoft или Apple, а поръчковата работа
+        е по договор. ИИ ще е добавка с цена, която се СВЪРЗВА — не вградена;
         това е отделен проект и още не е започнал.
       </p>
     </section>`;
 }
 
-export function narisuvayTablo(koj: Samolichnost, izbor: Izbor): string {
-  return kartaKoySam(koj) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
+export function narisuvayTablo(koj: Samolichnost, izbor: Izbor, akaunt: string): string {
+  return kartaKoySam(koj, akaunt) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
 }
 
 /**

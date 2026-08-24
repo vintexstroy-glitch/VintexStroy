@@ -16,7 +16,9 @@
  */
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
-import { akumulator, ddsOtObshta, type Akumulator } from './dds.js';
+import { akumulator, ddsOtObshta, stavkaNaReda, type Akumulator } from './dds.js';
+import { sveriDDS, type Dvizhenie, type RezultatSverka } from './sverka-dds.js';
+import type { Stotinki } from '../yadro/pari.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 
@@ -70,6 +72,11 @@ export interface RedSmetka {
 /** Един ред от ДДС-разбивката — по акумулатор и по страна, не общо. */
 export interface RedDDS {
   readonly akumulator: Akumulator;
+  /**
+   * Ставката НА РЕДА, не на акумулатора. Един сектор може да носи движения на
+   * различни ставки — тогава той дава два реда, не един среден.
+   */
+  readonly stavka: number;
   readonly strana: StranaDDS;
   readonly obshta_st: number;
   readonly osnova_st: number;
@@ -92,6 +99,8 @@ export interface Smetki {
   readonly dds_vhod_st: number;
   readonly sverki: readonly Sverka[];
   readonly nared: boolean;
+  /** третото число · фактури ↔ извлечения ↔ внесено */
+  readonly ddsSverka: RezultatSverka;
 }
 
 /** Разходите за периода, най-новите отгоре. */
@@ -160,7 +169,7 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
       'изход',
     ),
     ...razbiy(
-      razhodi.map((r) => ({ sektor: r.sektor, obshta_st: r.suma_st })),
+      razhodi.map((r) => ({ sektor: r.sektor, obshta_st: r.suma_st, ot_reda: r.stavka })),
       'вход',
     ),
   ];
@@ -204,6 +213,7 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
     period,
     redove,
     dds,
+    ddsSverka: sveriDDSZaPerioda(o, period),
     prihod_st,
     sabrano_st: kesh_st + banka_st,
     razhod_st,
@@ -215,24 +225,33 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
   };
 }
 
-/** Групира по акумулатор и изважда ДДС-то от общата цена. */
+/**
+ * Групира по акумулатор И ПО СТАВКА, после изважда ДДС-то от общата цена.
+ *
+ * Ставката влиза в ключа, защото от резен 12 тя идва от РЕДА: същият сектор
+ * може да носи и 20%, и 9% (нощувки), и 0% (необлагаема доставка). Слеят ли се
+ * в един ред, изваденото ДДС е средно аритметично на нищо.
+ */
 function razbiy(
-  redove: readonly { sektor: string | undefined; obshta_st: number }[],
+  redove: readonly { sektor: string | undefined; obshta_st: number; ot_reda?: number | undefined }[],
   strana: StranaDDS,
 ): RedDDS[] {
-  const po = new Map<string, { a: Akumulator; obshta_st: number; broi: number }>();
+  const po = new Map<string, { a: Akumulator; stavka: number; obshta_st: number; broi: number }>();
   for (const r of redove) {
     const a = akumulator(r.sektor);
-    const veche = po.get(a.klyuch) ?? { a, obshta_st: 0, broi: 0 };
-    po.set(a.klyuch, { a, obshta_st: veche.obshta_st + r.obshta_st, broi: veche.broi + 1 });
+    const stavka = stavkaNaReda(r.sektor, r.ot_reda);
+    const klyuch = `${a.klyuch}|${stavka}`;
+    const veche = po.get(klyuch) ?? { a, stavka, obshta_st: 0, broi: 0 };
+    po.set(klyuch, { a, stavka, obshta_st: veche.obshta_st + r.obshta_st, broi: veche.broi + 1 });
   }
 
   return [...po.values()]
-    .sort((x, y) => x.a.klyuch.localeCompare(y.a.klyuch))
-    .map(({ a, obshta_st, broi }) => {
-      const razbivka = ddsOtObshta(obshta_st, a.stavka);
+    .sort((x, y) => x.a.klyuch.localeCompare(y.a.klyuch) || x.stavka - y.stavka)
+    .map(({ a, stavka, obshta_st, broi }) => {
+      const razbivka = ddsOtObshta(obshta_st, stavka);
       return {
         akumulator: a,
+        stavka,
         strana,
         obshta_st,
         osnova_st: razbivka.osnova_st,
@@ -240,4 +259,71 @@ function razbiy(
         broi,
       };
     });
+}
+
+// ── ТРЕТОТО ЧИСЛО · фактури ↔ извлечения ↔ внесено ────────────────────────
+
+/**
+ * Кои разходи са „фактури" и кои — „извлечения".
+ *
+ * Границата е СЛЕДАТА, не видът на документа. Ред без `klyuch` е въведен от
+ * човек — това е каквото той ЗНАЕ. Ред с `klyuch` е дошъл от прочетена
+ * таблица или извлечение — това е каквото БАНКАТА (или доставчикът) е видял.
+ *
+ * Затова разминаването между двете купчини е точно въпросът, който той
+ * зададе: „веднага се хваща липсата и се намира по извлеченията или липсата
+ * на кешови фактури."
+ */
+export function otRaka(o: Ogledalo, period: Period): Razhod[] {
+  return razhodiZaPerioda(o, period).filter((r) => r.klyuch === '');
+}
+
+export function otIzvlechenie(o: Ogledalo, period: Period): Razhod[] {
+  return razhodiZaPerioda(o, period).filter((r) => r.klyuch !== '');
+}
+
+/** Едно движение за сверката — от разход, какъвто и да е неговият произход. */
+function dvizhenie(r: Razhod): Dvizhenie {
+  return {
+    data: r.data,
+    suma_st: r.suma_st as Stotinki,
+    dokument: r.dokument,
+    opisanie: `${r.dostavchik} · ${r.opis}`,
+  };
+}
+
+/** Изваденото ДДС на купчина редове, всеки със СВОЯТА ставка. */
+function ddsNa(redove: readonly Razhod[]): Stotinki {
+  let sbor = 0;
+  for (const r of redove) {
+    sbor += ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st;
+  }
+  return sbor as Stotinki;
+}
+
+/**
+ * Сверява трите ъгъла за един период.
+ *
+ * НЕ влиза в `sverki` на Сметки нарочно. Онези сверки са вход↔изход на партида
+ * и всяка тяхна разлика е дефект. Тази тук е ДИАГНОЗА: човек, който води само
+ * на ръка, няма извлечения, и разлика от целия оборот не значи повреда. Затова
+ * стои на свой ред, с думи какво значи — а разликата се записва и когато е
+ * нула, точно както иска правило 7.
+ */
+export function sveriDDSZaPerioda(o: Ogledalo, period: Period): RezultatSverka {
+  const fakturi = otRaka(o, period);
+  const izvlecheniya = otIzvlechenie(o, period);
+
+  let vneseno = 0;
+  for (const p of o.platenoDDS.values()) {
+    if (p.period === period) vneseno += p.suma_st;
+  }
+
+  return sveriDDS({
+    fakturi: fakturi.map(dvizhenie),
+    izvlecheniya: izvlecheniya.map(dvizhenie),
+    dds_ot_fakturi_st: ddsNa(fakturi),
+    dds_ot_izvlecheniya_st: ddsNa(izvlecheniya),
+    dds_vneseno_st: vneseno as Stotinki,
+  });
 }

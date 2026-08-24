@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="112" fill="#2A2521"/>
+  <!-- Журналът: подвързан гръб отляво, страници отдясно -->
+  <rect x="128" y="112" width="34" height="288" rx="8" fill="#B25E38"/>
+  <rect x="176" y="112" width="208" height="288" rx="10" fill="#FBF8F3"/>
+  <!-- редовете, които се добавят и не се трият -->
+  <g fill="#2A2521" opacity="0.82">
+    <rect x="208" y="164" width="144" height="14" rx="7"/>
+    <rect x="208" y="212" width="112" height="14" rx="7"/>
+    <rect x="208" y="260" width="144" height="14" rx="7"/>
+  </g>
+  <!-- сверката: чавка, която затваря -->
+  <path d="M212 316 l30 30 l64 -68" fill="none" stroke="#2E7D5E"
+        stroke-width="22" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

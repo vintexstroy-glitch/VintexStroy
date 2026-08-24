@@ -8,12 +8,19 @@
  * преизчислява при всяко показване — включително сверката.
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { MERKA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
-import { AKUMULATORI, akumulator, ddsOtObshta, sektoriNaRazhod } from '../src/domein/dds.js';
+import {
+  AKUMULATORI,
+  akumulator,
+  ddsOtObshta,
+  sektoriNaRazhod,
+  stavkaNaReda,
+  STAVKI,
+} from '../src/domein/dds.js';
 import {
   potok,
   potototsiNaRazhod,
@@ -22,6 +29,15 @@ import {
   type RedDDS,
   type RedSmetka,
 } from '../src/domein/smetki.js';
+import { sDumi, type RezultatSverka } from '../src/domein/sverka-dds.js';
+import {
+  IMENA_NA_DZHOBOVETE,
+  otcheti,
+  saldoNa,
+  type Otcheti,
+  type Pole,
+} from '../src/domein/otcheti.js';
+import { sboratZaKapitala } from './stoynost.js';
 import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './imoti.js';
@@ -31,6 +47,19 @@ import type { Konteks } from './main.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();
+let opIdSaldo = crypto.randomUUID();
+/**
+ * Ключът на ЕДНО подаване на справка · живее, докато формата стои отворена.
+ *
+ * Дотук стоеше `spravka:${mesets}` — ключ от СЪДЪРЖАНИЕТО, който правило 20
+ * забранява поименно. Последицата беше тиха и скъпа: сторнираш подадена
+ * справка, за да я поправиш, подаваш втора за същия месец — и `opId`-ът вече е
+ * минавал, значи Вратата връща стария резултат, нищо не влиза в Журнала, а
+ * екранът пише „Справката е записана". Месецът остава ОТКЛЮЧЕН, докато
+ * собственикът мисли, че е подал.
+ */
+let opIdSpravka = crypto.randomUUID();
+let greshkaSaldo = '';
 
 /** Кой месец се гледа. Живее, докато екранът стои отворен. */
 let period: string | null = null;
@@ -48,7 +77,7 @@ const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
   { klyuch: 'koy', ime: 'Доставчик и описание', vid: 'tekst', vzemi: (r) => r.dostavchik },
   { klyuch: 'potok', ime: 'Поток', vid: 'tekst', vzemi: (r) => potok(r.potok)?.ime ?? r.potok },
   { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (r) => akumulator(r.sektor).sektor },
-  { klyuch: 'suma', ime: 'Обща сума', vid: 'suma', vzemi: (r) => r.suma_st },
+  { klyuch: 'suma', ime: 'Обща сума', vid: 'evro', vzemi: (r) => r.suma_st },
   { klyuch: 'data', ime: 'ДДС', vid: 'data', vzemi: (r) => r.data },
 ];
 
@@ -63,25 +92,27 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Приход за ${ekraniraj(mesets)}</span>
-        <span class="chislo">${kakvoPishe(s.prihod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.prihod_st)}</span>
         <span class="pod">начислено · обща цена с ДДС</span>
       </div>
       <div class="plochka">
         <span class="etiket">ДДС ${s.zaVnasyane_st < 0 ? 'за възстановяване' : 'за внасяне'}</span>
-        <span class="chislo">${kakvoPishe(s.zaVnasyane_st as never)}</span>
-        <span class="pod">изход ${kakvoPishe(s.dds_izhod_st as never)} − вход ${kakvoPishe(s.dds_vhod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.zaVnasyane_st)}</span>
+        <span class="pod">изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span>
       </div>
       <div class="plochka">
         <span class="etiket">Разход за ${ekraniraj(mesets)}</span>
-        <span class="chislo">${kakvoPishe(s.razhod_st as never)}</span>
+        <span class="chislo" translate="no">${pishi(s.razhod_st)}</span>
         <span class="pod">заплати + кредити + фактури</span>
       </div>
       <div class="plochka${s.nared ? '' : ' trevoga'}">
         <span class="etiket">Разлика по сверката</span>
-        <span class="chislo">${kakvoPishe(razlika as never)}</span>
+        <span class="chislo" translate="no">${pishi(razlika)}</span>
         <span class="pod">${s.nared ? 'сверката затваря' : 'НЕ затваря — виж долу'}</span>
       </div>
     </div>
+
+    ${formaSalda(o)}
 
     <section class="karta">
       <div class="dyalglava"><h2>Период</h2><span>сметките се смятат наново за всеки месец</span></div>
@@ -89,7 +120,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         <div class="poleta tesni">
           <div class="pole">
             <label for="smetki-period">Месец</label>
-            <input id="smetki-period" name="period" type="month" value="${ekraniraj(mesets)}" required>
+            <input translate="no" id="smetki-period" name="period" type="month" value="${ekraniraj(mesets)}" required>
           </div>
         </div>
         <div class="deystviya">
@@ -127,18 +158,20 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
             ? '<p class="prazno">Няма начислено за този месец.<br>ДДС се извежда от начисленото, не от влезлите пари.</p>'
             : s.dds.map(redNaDDS).join('')
         }
-        <div class="red dds sbor">
+        <div class="red dds sbor" translate="no">
           <span></span>
-          <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${kakvoPishe(
-            s.dds_izhod_st as never,
-          )} − вход ${kakvoPishe(s.dds_vhod_st as never)}</span></span>
+          <span class="kletka"><b>${s.zaVnasyane_st < 0 ? 'За възстановяване' : 'За внасяне'}</b><span>изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span></span>
           <span></span>
           <span class="suma"></span>
-          <span class="suma duljimo">${kakvoPishe(s.zaVnasyane_st as never)}</span>
+          <span class="suma duljimo">${pishi(s.zaVnasyane_st)}</span>
         </div>
       </div>
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>
+
+    ${blokNaOtchetite(o, mesets)}
+
+    ${blokNaSverkataDDS(s.ddsSverka)}
 
     ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
 
@@ -152,7 +185,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ${s.sverki
           .map(
             (x) => `
-          <div class="red sverka">
+          <div class="red sverka" translate="no">
             <span class="kletka"><b>${ekraniraj(x.kakvo)}</b></span>
             <span class="suma">${merka(x.belezhka, x.vhod)}</span>
             <span class="suma">${merka(x.belezhka, x.izhod)}</span>
@@ -194,6 +227,128 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   `;
 }
 
+/**
+ * САЛДАТА · „Редактируеми отгоре в Сметки" *(р57·[18])*.
+ *
+ * Тук влиза САМО началото. Движенията се четат от Журнала — ако и двете се
+ * пишеха, едно движение би се броило два пъти и Ликвидността щеше да лъже
+ * точно там, където се гледа.
+ */
+function formaSalda(o: Ogledalo): string {
+  const banka_st = saldoNa(o, 'banka');
+  const trezor_st = saldoNa(o, 'trezor');
+  const lipsvat = !o.salda.has('banka') || !o.salda.has('trezor');
+  return `
+    <section class="karta">
+      <div class="dyalglava">
+        <h2>Салда</h2>
+        <span>ръчно начало · движенията идват от Журнала</span>
+      </div>
+      <form id="forma-saldo">
+        <div class="poleta tesni">
+          <div class="pole">
+            <label for="saldo-kade">Джоб</label>
+            <select id="saldo-kade" name="kade">
+              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${pishi(banka_st)}</option>
+              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${pishi(trezor_st)}</option>
+            </select>
+          </div>
+          <div class="pole">
+            <label for="saldo-suma">Начално салдо</label>
+            <input translate="no" id="saldo-suma" name="suma" inputmode="decimal" placeholder="10 000,00" required>
+          </div>
+          <div class="pole">
+            <label for="saldo-ot">От дата</label>
+            <input translate="no" id="saldo-ot" name="ot" type="date" required>
+          </div>
+        </div>
+        <div class="deystviya">
+          <button type="submit" class="vtorichen">Запиши салдото</button>
+          <p class="greshka" id="greshka-saldo">${ekraniraj(greshkaSaldo)}</p>
+        </div>
+        <p class="drebno">${
+          lipsvat
+            ? 'Липсващо салдо се брои за нула — Ликвидността го казва, вместо да го скрие.'
+            : 'Повторен запис ПОПРАВЯ салдото на джоба; втори ред не се ражда.'
+        } Отрицателно се приема — овърдрафтът е дълг, не грешка.</p>
+      </form>
+    </section>`;
+}
+
+/**
+ * ОТЧЕТИТЕ · всяко число с формулата си под него.
+ *
+ * Негова поръчка (И90): „ще правиш полета в Секция Отчети където ще се сложар
+ * полета които да покзват тези стойности с формули между всички таблици."
+ *
+ * Затова тук няма голо число: под всяко стои от какво е съставено и откъде се
+ * чете. Число, което никой не може да разглоби, е усещане с цифра пред себе си.
+ */
+function blokNaOtchetite(o: Ogledalo, mesets: string): string {
+  // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
+  // може да различи „нула" от „още не е смятано" (правило 15).
+  const stoynost_st = sboratZaKapitala();
+  const r: Otcheti = otcheti(
+    o,
+    mesets,
+    new Date().toISOString(),
+    stoynost_st === undefined ? {} : { stoynostNaSastoyanie_st: stoynost_st },
+  );
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Отчети</h2>
+        <span>${ekraniraj(mesets)} · всяко число с формулата си</span>
+      </div>
+      <div class="otcheti">
+        ${r.poleta.map(poleNaOtcheta).join('')}
+      </div>
+      <div class="tablitsa">
+        <div class="glava sverka">
+          <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
+          <span class="suma">Разлика</span><span></span>
+        </div>
+        <div class="red sverka otchet-sverka" translate="no">
+          <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
+          <span class="suma">${pishi(r.sverka.ot_sastavki_st)}</span>
+          <span class="suma">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}">${pishi(r.sverka.razlika_st)}</span>
+          <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
+            r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
+          }</span></span>
+        </div>
+      </div>
+      <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+    </section>`;
+}
+
+function poleNaOtcheta(p: Pole): string {
+  return `
+    <article class="pole-otchet" data-pole="${ekraniraj(p.klyuch)}">
+      <div class="glavata">
+        <span class="etiket">${ekraniraj(p.ime)}</span>
+        <span class="chislo" translate="no">${pishi(p.sbor_st)}</span>
+      </div>
+      <p class="kakvo">${ekraniraj(p.kakvo)}</p>
+      <ul class="formula" translate="no">
+        ${p.sastavki
+          .map(
+            (c) => `<li>
+              <span class="ime">${ekraniraj(c.ime)}</span>
+              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${pishi(c.suma_st)}</span>
+              <span class="otkade">${ekraniraj(c.otkade)}</span>
+            </li>`,
+          )
+          .join('')}
+      </ul>
+      ${
+        p.chaka.length === 0
+          ? '<p class="drebno palno">Числото е пълно — нищо не липсва.</p>'
+          : `<p class="drebno chaka">Чака: ${p.chaka.map(ekraniraj).join(' · ')}</p>`
+      }
+    </article>`;
+}
+
 function formaRazhod(mesets: string): string {
   return `
     <section class="karta">
@@ -202,7 +357,7 @@ function formaRazhod(mesets: string): string {
         <div class="poleta">
           <div class="pole">
             <label for="razhod-potok">Поток</label>
-            <select id="razhod-potok" name="potok" required>
+            <select translate="no" id="razhod-potok" name="potok" required>
               ${potototsiNaRazhod()
                 .map((p) => `<option value="${ekraniraj(p.klyuch)}">${ekraniraj(p.ime)}</option>`)
                 .join('')}
@@ -210,7 +365,7 @@ function formaRazhod(mesets: string): string {
           </div>
           <div class="pole">
             <label for="razhod-sektor">Сектор — важи за Фактури</label>
-            <select id="razhod-sektor" name="sektor" required>
+            <select translate="no" id="razhod-sektor" name="sektor" required>
               ${sektoriNaRazhod()
                 .filter((a) => a.stavka > 0)
                 .map((a) => `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
@@ -218,37 +373,45 @@ function formaRazhod(mesets: string): string {
             </select>
           </div>
           <div class="pole">
+            <label for="razhod-stavka">Ставка на ТАЗИ фактура</label>
+            <select translate="no" id="razhod-stavka" name="stavka" required>
+              ${STAVKI.map(
+                (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
+              ).join('')}
+            </select>
+          </div>
+          <div class="pole">
             <label for="razhod-dostavchik">Доставчик или получател</label>
-            <input id="razhod-dostavchik" name="dostavchik" required placeholder="напр. Материали ООД" autocomplete="off">
+            <input translate="no" id="razhod-dostavchik" name="dostavchik" required placeholder="напр. Материали ООД" autocomplete="off">
           </div>
           <div class="pole">
             <label for="razhod-opis">За какво</label>
-            <input id="razhod-opis" name="opis" required placeholder="напр. цимент" autocomplete="off">
+            <input translate="no" id="razhod-opis" name="opis" required placeholder="напр. цимент" autocomplete="off">
           </div>
           <div class="pole">
-            <label for="razhod-suma">Обща сума, лв. — с ДДС</label>
-            <input id="razhod-suma" name="suma" required inputmode="decimal" placeholder="600,00" autocomplete="off">
+            <label for="razhod-suma">Обща сума, € — с ДДС</label>
+            <input translate="no" id="razhod-suma" name="suma" required inputmode="decimal" placeholder="600,00" autocomplete="off">
           </div>
           <div class="pole">
             <label for="razhod-nachin">Платено</label>
-            <select id="razhod-nachin" name="nachin">
+            <select translate="no" id="razhod-nachin" name="nachin">
               <option value="банка">по банка</option>
               <option value="в брой">в брой</option>
             </select>
           </div>
           <div class="pole">
             <label for="razhod-data">Дата</label>
-            <input id="razhod-data" name="data" type="date" value="${ekraniraj(mesets)}-01" required>
+            <input translate="no" id="razhod-data" name="data" type="date" value="${ekraniraj(mesets)}-01" required>
           </div>
           <div class="pole">
             <label for="razhod-dokument">Документ (по избор)</label>
-            <input id="razhod-dokument" name="dokument" placeholder="номер на фактура" autocomplete="off">
+            <input translate="no" id="razhod-dokument" name="dokument" placeholder="номер на фактура" autocomplete="off">
           </div>
         </div>
         <p class="greshka" id="greshka-razhod"></p>
         <div class="deystviya">
           <button type="submit" class="glaven">Запиши разхода</button>
-          <p class="drebno">Записва се като <b>РазходЗаписан</b>. Заплатите и кредитите нямат ДДС — секторът им се слага сам. При <b>Фактури</b> секторът избира ставката, с която ДДС-то се <b>изважда</b> от общата сума.</p>
+          <p class="drebno">Записва се като <b>РазходЗаписан</b>. Заплатите и кредитите нямат ДДС — секторът им се слага сам. При <b>Фактури</b> ставката е <b>на тази фактура</b>: секторът само предлага, а нощувките на 9% и необлагаемата доставка се въвеждат както са.</p>
         </div>
       </form>
     </section>`;
@@ -256,14 +419,18 @@ function formaRazhod(mesets: string): string {
 
 function redNaRazhod(r: Razhod): string {
   const a = akumulator(r.sektor);
-  const razbivka = ddsOtObshta(r.suma_st, a.stavka);
+  // Ставката е НА РЕДА; секторът само подсказва, когато редът мълчи.
+  const stavka = stavkaNaReda(r.sektor, r.stavka);
+  const razbivka = ddsOtObshta(r.suma_st, stavka);
   return `
-    <div class="red razhod">
+    <div class="red razhod" translate="no">
       <span class="kletka"><b>${ekraniraj(r.dostavchik)}</b><span>${ekraniraj(r.opis)} · ${ekraniraj(r.data)}${
         r.dokument ? ` · док. ${ekraniraj(r.dokument)}` : ''
       } · ${ekraniraj(r.nachin)}</span></span>
       <span class="kletka"><span>${ekraniraj(potok(r.potok)?.ime ?? r.potok)}</span></span>
-      <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
+      <span class="kletka"><span>${ekraniraj(a.sektor)} · ${stavka}%${
+        r.stavka === undefined ? '' : ' · от реда'
+      }</span></span>
       <span class="suma duljimo">${kakvoPishe(razbivka.obshta_st)}</span>
       <span class="suma">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
@@ -274,7 +441,7 @@ function redNaRazhod(r: Razhod): string {
 
 /** Стотинките се показват в левове; бройките — както са. */
 function merka(belezhka: string | undefined, chislo: number): string {
-  return belezhka === MERKA.pari ? kakvoPishe(chislo as never) : String(chislo);
+  return belezhka === MERKA.pari ? pishi(chislo) : String(chislo);
 }
 
 /**
@@ -304,31 +471,31 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
       <div class="plochki">
         <div class="plochka">
           <span class="etiket">Изчислено в Сметки</span>
-          <span class="chislo">${kakvoPishe(izchisleno_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(izchisleno_st)}</span>
           <span class="pod">изход − вход, от Журнала</span>
         </div>
         <div class="plochka${spravka && razlikaDeklarirano !== 0 ? ' trevoga' : ''}">
           <span class="etiket">Декларирано</span>
-          <span class="chislo">${spravka ? kakvoPishe(spravka.deklarirano_st as never) : '—'}</span>
+          <span class="chislo" translate="no">${spravka ? pishi(spravka.deklarirano_st) : '—'}</span>
           <span class="pod">${
             spravka
               ? razlikaDeklarirano === 0
                 ? 'съвпада с изчисленото'
-                : `РАЗМИНАВАНЕ ${kakvoPishe(razlikaDeklarirano as never)} лв. — провери`
+                : `РАЗМИНАВАНЕ ${pishi(razlikaDeklarirano)} — провери`
               : 'още няма справка'
           }</span>
         </div>
         <div class="plochka${spravka && razlikaPlateno !== 0 ? ' trevoga' : ''}">
           <span class="etiket">Платено</span>
-          <span class="chislo">${kakvoPishe(plateno_st as never)}</span>
+          <span class="chislo" translate="no">${pishi(plateno_st)}</span>
           <span class="pod">${
             !spravka
               ? 'въвежда се от платежното'
               : razlikaPlateno === 0
                 ? 'внесено докрай'
                 : razlikaPlateno < 0
-                  ? `остават ${kakvoPishe(-razlikaPlateno as never)} лв.`
-                  : `надвнесени ${kakvoPishe(razlikaPlateno as never)} лв.`
+                  ? `остават ${pishi(-razlikaPlateno)}`
+                  : `надвнесени ${pishi(razlikaPlateno)}`
           }</span>
         </div>
       </div>
@@ -338,16 +505,16 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           ? `<form id="forma-dds-plateno">
         <div class="poleta">
           <div class="pole">
-            <label for="dds-suma">Внесено, лв.</label>
-            <input id="dds-suma" name="suma" required inputmode="decimal" placeholder="200,00" autocomplete="off">
+            <label for="dds-suma">Внесено, €</label>
+            <input translate="no" id="dds-suma" name="suma" required inputmode="decimal" placeholder="200,00" autocomplete="off">
           </div>
           <div class="pole">
             <label for="dds-data">Дата на плащането</label>
-            <input id="dds-data" name="data" type="date" required>
+            <input translate="no" id="dds-data" name="data" type="date" required>
           </div>
           <div class="pole">
             <label for="dds-nachin">Начин</label>
-            <select id="dds-nachin" name="nachin">
+            <select translate="no" id="dds-nachin" name="nachin">
               <option value="банка">по банка</option>
               <option value="в брой">в брой</option>
             </select>
@@ -363,17 +530,17 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           : `<form id="forma-spravka">
         <div class="poleta">
           <div class="pole">
-            <label for="spravka-dds">Деклариран ДДС, лв.</label>
-            <input id="spravka-dds" name="dds" required inputmode="decimal"
-              value="${kakvoPishe(izchisleno_st as never)}" autocomplete="off">
+            <label for="spravka-dds">Деклариран ДДС, €</label>
+            <input translate="no" id="spravka-dds" name="dds" required inputmode="decimal"
+              value="${pishiVPole(izchisleno_st)}" autocomplete="off">
           </div>
           <div class="pole">
             <label for="spravka-data">Дата на подаване</label>
-            <input id="spravka-data" name="data" type="date" required>
+            <input translate="no" id="spravka-data" name="data" type="date" required>
           </div>
           <div class="pole">
             <label for="spravka-belezhka">Бележка (по избор)</label>
-            <input id="spravka-belezhka" name="belezhka" placeholder="напр. вх. номер" autocomplete="off">
+            <input translate="no" id="spravka-belezhka" name="belezhka" placeholder="напр. вх. номер" autocomplete="off">
           </div>
         </div>
         <p class="greshka" id="greshka-spravka"></p>
@@ -386,21 +553,105 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
     </section>`;
 }
 
+/**
+ * ТРЕТИЯТ ЪГЪЛ · „виждам разлика — КЪДЕ е тя".
+ *
+ * Дотук екранът казваше КОЛКО: изчислено ↔ декларирано ↔ платено. Три числа,
+ * и когато не съвпаднат, човек тръгва да рови на ръка.
+ *
+ * Тук е другият въпрос — неговият: „когато се прочетат извлеченията… веднага
+ * се хваща липсата и се намира по извлеченията или липсата на кешови фактури."
+ * Затова редовете долу не са число, а СПИСЪК: кое движение няма фактура, коя
+ * фактура няма движение.
+ *
+ * Разликата се показва и когато е НУЛА (правило 7): проверената нула е нещо
+ * различно от нулата, за която никой не е питал.
+ */
+function blokNaSverkataDDS(r: RezultatSverka): string {
+  const bezDvizheniya =
+    r.dds_ot_fakturi_st === 0 && r.dds_ot_izvlecheniya_st === 0 && r.nesvarsheni.length === 0;
+
+  return `
+    <section class="karta${r.svereno || bezDvizheniya ? '' : ' izbrana'}">
+      <div class="dyalglava">
+        <h2>Сверка на ДДС</h2>
+        <span>фактури ↔ извлечения ↔ внесено</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">ДДС от фактури</span>
+          <span class="chislo" translate="no">${kakvoPishe(r.dds_ot_fakturi_st)}</span>
+          <span class="pod">каквото е въведено на ръка</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">ДДС от извлечения</span>
+          <span class="chislo" translate="no">${kakvoPishe(r.dds_ot_izvlecheniya_st)}</span>
+          <span class="pod">каквото е прочетено от таблица</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Внесено</span>
+          <span class="chislo" translate="no">${kakvoPishe(r.dds_vneseno_st)}</span>
+          <span class="pod">от платежното, на ръка</span>
+        </div>
+        <div class="plochka${r.razlika_st === 0 ? '' : ' trevoga'}">
+          <span class="etiket">Разлика</span>
+          <span class="chislo" translate="no">${kakvoPishe(r.razlika_st)}</span>
+          <span class="pod">${
+            bezDvizheniya
+              ? 'няма движения за този месец'
+              : r.razlika_st === 0
+                ? 'проверена нула — не е „не е питано"'
+                : 'виж КЪДЕ е, долу'
+          }</span>
+        </div>
+      </div>
+
+      <p class="drebno">${ekraniraj(bezDvizheniya ? 'Още няма нито фактури, нито прочетени извлечения за този месец.' : sDumi(r))}</p>
+
+      ${
+        r.nesvarsheni.length === 0
+          ? ''
+          : `<div class="tablitsa">
+        <div class="glava nesvarshen">
+          <span>Какво липсва</span><span>Движение</span><span>Дата</span>
+          <span class="suma">Сума</span>
+        </div>
+        ${r.nesvarsheni
+          .map(
+            (n) => `<div class="red nesvarshen" translate="no">
+            <span><span class="znachka trevoga">${
+              n.prichina === 'lipsva-faktura' ? 'липсва фактура' : 'липсват пари'
+            }</span></span>
+            <span class="kletka"><b>${ekraniraj(n.dvizhenie.opisanie)}</b><span>${
+              n.dvizhenie.dokument
+                ? `док. ${ekraniraj(n.dvizhenie.dokument)}`
+                : 'БЕЗ номер на документ — затова не се сдвоява'
+            }</span></span>
+            <span>${ekraniraj(n.dvizhenie.data)}</span>
+            <span class="suma duljimo">${kakvoPishe(n.dvizhenie.suma_st)}</span>
+          </div>`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno">Сдвоява се по <b>номер на документ</b>, не по сума и дата: две фактури за 1200 € в един ден се случват, а два документа с един номер — не. Движение без номер не се преглъща, а стои тук.</p>`
+      }
+    </section>`;
+}
+
 function redNaSmetka(r: RedSmetka): string {
   return `
-    <div class="red smetka">
+    <div class="red smetka" translate="no">
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>
-      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${kakvoPishe(
-        r.suma_st as never,
-      )}</span>
+      <span class="suma${r.suma_st === 0 ? '' : r.posoka === 'приход' ? ' plateno' : ' duljimo'}">${pishi(r.suma_st)}</span>
     </div>`;
 }
 
 function redNaDDS(r: RedDDS): string {
   return `
-    <div class="red dds">
+    <div class="red dds" translate="no">
       <span><span class="znachka ${r.strana === 'изход' ? 'dobre' : 'tiha'}">${r.strana}</span></span>
       <span class="kletka"><b>${ekraniraj(r.akumulator.sektor)}</b><span>${r.broi} ${
         r.strana === 'изход'
@@ -410,10 +661,10 @@ function redNaDDS(r: RedDDS): string {
           : r.broi === 1
             ? 'разход'
             : 'разхода'
-      } · ${kakvoPishe(r.obshta_st as never)} с ДДС</span></span>
-      <span>${r.akumulator.stavka}%</span>
-      <span class="suma">${kakvoPishe(r.osnova_st as never)}</span>
-      <span class="suma">${kakvoPishe(r.dds_st as never)}</span>
+      } · ${pishi(r.obshta_st)} с ДДС</span></span>
+      <span>${r.stavka}%</span>
+      <span class="suma">${pishi(r.osnova_st)}</span>
+      <span class="suma">${pishi(r.dds_st)}</span>
     </div>`;
 }
 
@@ -430,15 +681,15 @@ function kalkulator(): string {
         <div class="poleta">
           <div class="pole">
             <label for="smyatane-opis">За какво (по избор)</label>
-            <input id="smyatane-opis" name="opis" placeholder="напр. фактура 1042" autocomplete="off">
+            <input translate="no" id="smyatane-opis" name="opis" placeholder="напр. фактура 1042" autocomplete="off">
           </div>
           <div class="pole">
-            <label for="smyatane-suma">Обща цена, лв. — с ДДС</label>
-            <input id="smyatane-suma" name="suma" required inputmode="decimal" placeholder="1200,00" autocomplete="off">
+            <label for="smyatane-suma">Обща цена, € — с ДДС</label>
+            <input translate="no" id="smyatane-suma" name="suma" required inputmode="decimal" placeholder="1200,00" autocomplete="off">
           </div>
           <div class="pole">
             <label for="smyatane-stavka">Ставка</label>
-            <select id="smyatane-stavka" name="stavka" required>
+            <select translate="no" id="smyatane-stavka" name="stavka" required>
               ${[...new Set(AKUMULATORI.map((a) => a.stavka))]
                 .sort((a, b) => a - b)
                 .map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
@@ -465,7 +716,7 @@ function kalkulator(): string {
         ${redove
           .map(
             (r, i) => `
-          <div class="red smyatane">
+          <div class="red smyatane" translate="no">
             <span class="kletka"><b>${ekraniraj(r.opis || `ред ${i + 1}`)}</b></span>
             <span>${r.stavka}%</span>
             <span class="suma">${kakvoPishe(r.razbivka.osnova_st)}</span>
@@ -474,11 +725,11 @@ function kalkulator(): string {
           </div>`,
           )
           .join('')}
-        <div class="red smyatane sbor">
+        <div class="red smyatane sbor" translate="no">
           <span><b>Сбор</b></span><span></span>
-          <span class="suma">${kakvoPishe(sborOsnova as never)}</span>
-          <span class="suma">${kakvoPishe(sborDDS as never)}</span>
-          <span class="suma">${kakvoPishe(sborObshta as never)}</span>
+          <span class="suma">${pishi(sborOsnova)}</span>
+          <span class="suma">${pishi(sborDDS)}</span>
+          <span class="suma">${pishi(sborObshta)}</span>
         </div>
       </div>`
       }
@@ -528,6 +779,45 @@ export function zakachiSmetki(
     await prerisuvay();
   });
 
+  // ── салдото на един джоб ─────────────────────────────────────────────────
+  const formaNaSaldo = koren.querySelector<HTMLFormElement>('#forma-saldo');
+  formaNaSaldo?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    greshkaSaldo = '';
+    const izhod = koren.querySelector<HTMLElement>('#greshka-saldo')!;
+    izhod.textContent = '';
+    const danni = new FormData(formaNaSaldo);
+    const buton = formaNaSaldo.querySelector<HTMLButtonElement>('button[type=submit]')!;
+
+    let saldo_st: number;
+    let ot: string;
+    try {
+      saldo_st = otLeva(String(danni.get('suma')));
+      ot = otData(String(danni.get('ot') ?? ''), 'Датата, от която важи салдото');
+    } catch (err) {
+      izhod.textContent =
+        err instanceof GreshkaPari || err instanceof GreshkaData ? err.message : String(err);
+      return;
+    }
+
+    buton.disabled = true;
+    try {
+      await k.deystviya.zapishiSaldo(
+        { kade: String(danni.get('kade')) as 'banka' | 'trezor', saldo_st, ot },
+        { opId: opIdSaldo },
+      );
+      // нов opId чак СЛЕД успешен запис — дотогава повторното натискане е
+      // същата операция и Журналът връща същия резултат (правило 5)
+      opIdSaldo = crypto.randomUUID();
+      k.vest('dobre', 'Салдото е записано.');
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = err instanceof Error ? err.message : String(err);
+    } finally {
+      buton.disabled = false;
+    }
+  });
+
   // ── нов разход ───────────────────────────────────────────────────────────
   const formaRazhoda = koren.querySelector<HTMLFormElement>('#forma-razhod');
   formaRazhoda?.addEventListener('submit', async (e) => {
@@ -555,6 +845,8 @@ export function zakachiSmetki(
     // Заплатите и кредитите си носят сектора — изборът важи само за фактурите.
     const potokKlyuch = String(danni.get('potok'));
     const sektor = potokKlyuch === 'fakturi' ? String(danni.get('sektor')) : potokKlyuch;
+    // Ставката се пита само при фактури; заплатите и кредитите си носят нула.
+    const stavka = potokKlyuch === 'fakturi' ? Number(danni.get('stavka')) : 0;
 
     buton.disabled = true;
     try {
@@ -569,6 +861,7 @@ export function zakachiSmetki(
           nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
           data,
           dokument: String(danni.get('dokument') ?? '').trim(),
+          stavka,
         },
         { opId: opIdRazhod },
       );
@@ -599,8 +892,9 @@ export function zakachiSmetki(
           data: otData(String(danni.get('data') ?? ''), 'Датата на подаване'),
           belezhka: String(danni.get('belezhka') ?? '').trim(),
         },
-        { opId: `spravka:${mesets}` },
+        { opId: opIdSpravka },
       );
+      opIdSpravka = crypto.randomUUID();
       k.vest('dobre', `Справката е записана. ${mesets} е заключен — поправка само през сверена промяна.`);
       await prerisuvay();
     } catch (err) {

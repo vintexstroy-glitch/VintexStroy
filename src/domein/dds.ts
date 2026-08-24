@@ -32,8 +32,18 @@ export interface Akumulator {
 }
 
 /**
- * Декларираната таблица на акумулаторите. Смени ли се ставка — един ред тук,
- * не търсене из кода.
+ * Декларираната таблица на акумулаторите.
+ *
+ * ВАЖНО за `stavka` тук: тя е **ПОДСКАЗКА по подразбиране**, не закон.
+ *
+ * Негови думи: „ДДС е **избор при въвеждане на всяка фактура** и при четене на
+ * таблици. Там фигурира в създадена колона от хедъра на таблицата."
+ *
+ * Затова истинската ставка идва от РЕДА — от фактурата или от колоната в
+ * таблицата. Тази тук казва само какво да се предложи, когато редът мълчи.
+ * Иначе клиент с нощувки на 9% няма как да въведе вярно, а секторът му е
+ * „наем"; и обратно — необлагаема доставка в облагаем сектор би взела 20%
+ * само защото съседът ѝ ги взема.
  */
 export const AKUMULATORI: readonly Akumulator[] = Object.freeze([
   { klyuch: 'naem-zhilishten', darzhava: 'BG', sektor: 'наем · жилищен', stavka: 0 },
@@ -55,6 +65,34 @@ const PO_KLYUCH = new Map(AKUMULATORI.map((a) => [a.klyuch, a]));
 /** Акумулаторът по ключ. Непознат ключ пада към подразбирането, не хвърля. */
 export function akumulator(klyuch: string | undefined): Akumulator {
   return PO_KLYUCH.get(klyuch ?? '') ?? PO_KLYUCH.get(SEKTOR_PO_PODRAZBIRANE)!;
+}
+
+/**
+ * СТАВКИТЕ, между които се избира на реда. Цял процент, не дроб.
+ *
+ * Изброени поименно, за да не се появи 21% от невнимание. Смени ли се закон —
+ * един ред тук.
+ */
+export const STAVKI: readonly number[] = Object.freeze([0, 9, 20]);
+
+export function pozvolenaStavka(s: number): boolean {
+  return STAVKI.includes(s);
+}
+
+/**
+ * Ставката за един ред: неговата, ако я е казал; иначе подсказката на сектора.
+ *
+ * Тук е поправката към старото поведение. Дотук ставката ИДВАШЕ от сектора и
+ * нямаше как да се смени; сега секторът само предлага.
+ */
+export function stavkaNaReda(sektor: string | undefined, ot_reda?: number): number {
+  if (ot_reda === undefined) return akumulator(sektor).stavka;
+  if (!pozvolenaStavka(ot_reda)) {
+    throw new GreshkaDDS(
+      `Ставка ${ot_reda}% не съществува. Позволените са: ${STAVKI.join('%, ')}%.`,
+    );
+  }
+  return ot_reda;
 }
 
 /** Секторите, между които се избира във формите. */

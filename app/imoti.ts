@@ -9,7 +9,7 @@
  * и то само когато вратарят пусне (`src/domein/storno.ts`).
  */
 
-import { GreshkaPari, kakvoPishe, otLeva } from '../src/yadro/pari.js';
+import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import { VID } from '../src/domein/sabitiya.js';
@@ -54,8 +54,10 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
         return i ? `${i.adres} · ${i.edinitsa}` : n.imotId;
       },
     },
+    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon },
+    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl },
     { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
-    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'suma', vzemi: (n) => n.naem_st },
+    { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (n) => n.naem_st },
     {
       klyuch: 'sastoyanie',
       ime: 'Състояние',
@@ -92,22 +94,22 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
     <div class="plochki">
       <div class="plochka">
         <span class="etiket">Единици</span>
-        <span class="chislo">${imoti.length}</span>
+        <span class="chislo" translate="no">${imoti.length}</span>
         <span class="pod">въведени от теб</span>
       </div>
       <div class="plochka">
         <span class="etiket">Отдадени</span>
-        <span class="chislo">${zaeti.size} / ${imoti.length}</span>
+        <span class="chislo" translate="no">${zaeti.size} / ${imoti.length}</span>
         <span class="pod">${imoti.length - zaeti.size} без наем</span>
       </div>
       <div class="plochka">
         <span class="etiket">Месечен наем</span>
-        <span class="chislo">${kakvoPishe(mesechno as never)}</span>
-        <span class="pod">начислено · лв.</span>
+        <span class="chislo" translate="no">${pishi(mesechno)}</span>
+        <span class="pod">начислено · €</span>
       </div>
       <div class="plochka">
         <span class="etiket">Събития</span>
-        <span class="chislo">${sastoyanie.sabitiya}</span>
+        <span class="chislo" translate="no">${sastoyanie.sabitiya}</span>
         <span class="pod">в Журнала</span>
       </div>
     </div>
@@ -127,18 +129,18 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="poleta">
           <div class="pole">
             <label for="imot-adres">Място или адрес</label>
-            <input id="imot-adres" name="adres" required placeholder="напр. Малинова" autocomplete="off"
+            <input translate="no" id="imot-adres" name="adres" required placeholder="напр. Малинова" autocomplete="off"
                    value="${popravyanImot ? ekraniraj(popravyanImot.adres) : ''}">
           </div>
           <div class="pole">
             <label for="imot-edinitsa">Единица</label>
-            <input id="imot-edinitsa" name="edinitsa" required placeholder="напр. АП. № 1" autocomplete="off"
+            <input translate="no" id="imot-edinitsa" name="edinitsa" required placeholder="напр. АП. № 1" autocomplete="off"
                    value="${popravyanImot ? ekraniraj(popravyanImot.edinitsa) : ''}">
           </div>
           <div class="pole">
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
-            <input id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
-                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kakvoPishe((popravyanImot.ploshtad_kvsm / 100) as never) : ''}">
+            <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
+                   value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? pishiVPole(popravyanImot.ploshtad_kvsm / 100) : ''}">
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -171,7 +173,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="poleta">
           <div class="pole">
             <label for="naem-imot">Имот</label>
-            <select id="naem-imot" name="imotId" required ${popravyanNaem ? 'disabled' : ''}>
+            <select translate="no" id="naem-imot" name="imotId" required ${popravyanNaem ? 'disabled' : ''}>
               ${imoti
                 .map(
                   (i) =>
@@ -184,17 +186,27 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
           </div>
           <div class="pole">
             <label for="naem-naemetel">Наемател</label>
-            <input id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off"
+            <input translate="no" id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off"
                    value="${popravyanNaem ? ekraniraj(popravyanNaem.naemetel) : ''}">
           </div>
           <div class="pole">
-            <label for="naem-suma">Наем на месец, лв. — с ДДС</label>
-            <input id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem ? kakvoPishe(popravyanNaem.naem_st as never) : ''}">
+            <label for="naem-telefon">Телефон (по избор)</label>
+            <input translate="no" id="naem-telefon" name="telefon" placeholder="0888 123 456" autocomplete="off"
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.telefon) : ''}">
+          </div>
+          <div class="pole">
+            <label for="naem-imeyl">Имейл (по избор)</label>
+            <input translate="no" id="naem-imeyl" name="imeyl" type="email" placeholder="ime@primer.bg" autocomplete="off"
+                   value="${popravyanNaem ? ekraniraj(popravyanNaem.imeyl) : ''}">
+          </div>
+          <div class="pole">
+            <label for="naem-suma">Наем на месец, € — с ДДС</label>
+            <input translate="no" id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
+                   value="${popravyanNaem ? pishiVPole(popravyanNaem.naem_st) : ''}">
           </div>
           <div class="pole">
             <label for="naem-sektor">Сектор — определя ставката</label>
-            <select id="naem-sektor" name="sektor" required>
+            <select translate="no" id="naem-sektor" name="sektor" required>
               ${sektoriNaNaem()
                 .map(
                   (a) =>
@@ -206,18 +218,18 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
             </select>
           </div>
           <div class="pole">
-            <label for="naem-depozit">Депозит, лв. (по избор)</label>
-            <input id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
-                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? kakvoPishe(popravyanNaem.depozit_st as never) : ''}">
+            <label for="naem-depozit">Депозит, € (по избор)</label>
+            <input translate="no" id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
+                   value="${popravyanNaem && popravyanNaem.depozit_st > 0 ? pishiVPole(popravyanNaem.depozit_st) : ''}">
           </div>
           <div class="pole">
             <label for="naem-padezh">Падеж — ден от месеца</label>
-            <input id="naem-padezh" name="padezhDen" type="number" min="1" max="31" required
+            <input translate="no" id="naem-padezh" name="padezhDen" type="number" min="1" max="31" required
                    value="${popravyanNaem ? popravyanNaem.padezhDen : 1}">
           </div>
           <div class="pole">
             <label for="naem-ot">Договор от</label>
-            <input id="naem-ot" name="ot" type="date" required
+            <input translate="no" id="naem-ot" name="ot" type="date" required
                    value="${popravyanNaem ? ekraniraj(popravyanNaem.ot.slice(0, 10)) : dnes()}">
           </div>
           ${popravyanNaem ? polePrichina('naem') : ''}
@@ -226,7 +238,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="deystviya">
           <button type="submit" class="glaven">${popravyanNaem ? 'Запиши поправката' : 'Запиши наема'}</button>
           ${popravyanNaem ? '<button type="button" class="vtorichen" data-otkazhi-rezhim>Откажи</button>' : ''}
-          <p class="drebno">1150,50 лв. става 115050 стотинки. Никакъв float — иначе стотинките се разминават в ДДС.<br>Сумата е <b>обща цена с ДДС</b>; ДДС-то се изважда на отделен ред в „Сметки", не се прибавя тук.</p>
+          <p class="drebno">1150,50 € става 115050 най-малки единици. Никакъв float — иначе центовете се разминават в ДДС.<br>Сумата е <b>обща цена с ДДС</b>; ДДС-то се изважда на отделен ред в „Сметки", не се прибавя тук.</p>
         </div>
       </form>`
       }
@@ -261,7 +273,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana, _k: Konteks): str
         <div class="glava naem">
           ${koloniNaNaemite(ogledalo)
             .map((kol) =>
-              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'suma'),
+              glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'evro'),
             )
             .join('')}<span></span>
         </div>
@@ -281,7 +293,7 @@ function polePrichina(koe: string): string {
   return `
     <div class="pole">
       <label for="${koe}-prichina">Защо се поправя</label>
-      <input id="${koe}-prichina" name="prichina" placeholder="напр. сбъркан номер" autocomplete="off">
+      <input translate="no" id="${koe}-prichina" name="prichina" placeholder="напр. сбъркан номер" autocomplete="off">
     </div>`;
 }
 
@@ -296,11 +308,11 @@ function formaPrekratyavane(naem: Naem): string {
         <div class="poleta">
           <div class="pole">
             <label for="prekrati-kraj">Договорът свършва на</label>
-            <input id="prekrati-kraj" name="kraj" type="date" value="${dnes()}" required>
+            <input translate="no" id="prekrati-kraj" name="kraj" type="date" value="${dnes()}" required>
           </div>
           <div class="pole">
             <label for="prekrati-prichina">Защо</label>
-            <input id="prekrati-prichina" name="prichina" placeholder="напр. изнесоха се" autocomplete="off">
+            <input translate="no" id="prekrati-prichina" name="prichina" placeholder="напр. изнесоха се" autocomplete="off">
           </div>
         </div>
         <p class="greshka" id="greshka-prekrati"></p>
@@ -325,11 +337,11 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
           : `и още ${zhivi.length - 1} · ${zhivi.slice(1).map((n) => ekraniraj(n.naemetel)).join(', ')}`
       }</span>`;
   return `
-    <div class="red imot">
+    <div class="red imot" translate="no">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
-      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${kakvoPishe((imot.ploshtad_kvsm / 100) as never)} м²` : '—'}</span></span>
-      <span class="suma">${zhivi.length ? kakvoPishe(sbor as never) : '—'}</span>
+      <span class="kletka"><span>${imot.ploshtad_kvsm > 0 ? `${pishi(imot.ploshtad_kvsm / 100)} м²` : '—'}</span></span>
+      <span class="suma">${zhivi.length ? pishi(sbor) : '—'}</span>
       <span>${
         zhivi.length > 1
           ? `<span class="znachka trevoga">${zhivi.length} наема</span>`
@@ -348,11 +360,13 @@ function redNaem(naem: Naem, o: Ogledalo): string {
   const imot = o.imoti.get(naem.imotId);
   const a = akumulator(naem.sektor);
   return `
-    <div class="red naem">
-      <span class="kletka"><b>${ekraniraj(naem.naemetel)}</b><span>падеж ${naem.padezhDen}-о число · от ${ekraniraj(naem.ot.slice(0, 10))}</span></span>
+    <div class="red naem" translate="no">
+      <span class="kletka"><b>${ekraniraj(naem.naemetel)}</b><span>падеж ${naem.padezhDen}-о число · от ${ekraniraj(naem.ot.slice(0, 10))}${
+        naem.telefon ? ` · ${ekraniraj(naem.telefon)}` : ''
+      }${naem.imeyl ? ` · ${ekraniraj(naem.imeyl)}` : ''}</span></span>
       <span class="kletka"><span>${imot ? ekraniraj(opisi(imot)) : ekraniraj(naem.imotId)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${a.stavka}%</span></span>
-      <span class="suma">${kakvoPishe(naem.naem_st as never)}</span>
+      <span class="suma">${pishi(naem.naem_st)}</span>
       <span>${
         naem.prekraten
           ? `<span class="znachka tiha">прекратен${naem.kraj ? ` ${ekraniraj(naem.kraj.slice(0, 10))}` : ''}</span>`
@@ -452,6 +466,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           {
             naemId: rezhim.id,
             naemetel: String(danni.get('naemetel')).trim(),
+            telefon: String(danni.get('telefon') ?? '').trim(),
+            imeyl: String(danni.get('imeyl') ?? '').trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
             ot,
@@ -471,6 +487,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           {
             imotId: String(danni.get('imotId')),
             naemetel: String(danni.get('naemetel')).trim(),
+            telefon: String(danni.get('telefon') ?? '').trim(),
+            imeyl: String(danni.get('imeyl') ?? '').trim(),
             naem_st,
             padezhDen: Number(danni.get('padezhDen')),
             ot,

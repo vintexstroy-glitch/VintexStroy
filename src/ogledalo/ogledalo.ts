@@ -12,7 +12,18 @@
  */
 
 import type { Sabitie } from '../yadro/index.js';
+import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
+import type { ModelNaTablitsa } from '../iztochnik/model.js';
+import type { Buton } from '../domein/butoni.js';
+import type { PravaZaModel } from '../domein/kolonno.js';
+import type { Delo } from '../domein/dela.js';
+import type {
+  PayloadDeloZapisano,
+  PayloadSluzhitelZapisan,
+  PayloadPotokZapisan,
+  PayloadSaldoZapisano,
+} from '../domein/sabitiya.js';
 import type {
   PayloadImotDobaven,
   PayloadImotPopraven,
@@ -22,7 +33,10 @@ import type {
   PayloadPlashtanePrieto,
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
+  PayloadButonZapisan,
+  PayloadModelZapisan,
   PayloadSpravkaPodadena,
+  PayloadSverkaZapisana,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -42,6 +56,10 @@ export interface Naem {
   readonly seq: number;
   readonly imotId: string;
   readonly naemetel: string;
+  /** телефон за връзка · празно, когато не е записан */
+  readonly telefon: string;
+  /** имейл за връзка · празно значи, че писмо не може да тръгне */
+  readonly imeyl: string;
   readonly naem_st: number;
   readonly padezhDen: number;
   readonly ot: string;
@@ -91,6 +109,11 @@ export interface Razhod {
   readonly nachin: string;
   readonly data: string;
   readonly dokument: string;
+  /**
+   * Ставката, с която ДДС-то се изважда ОТ ТОЗИ РЕД.
+   * Липсва при записите отпреди резен 12 — тогава важи ставката на сектора.
+   */
+  readonly stavka?: number;
   /** ключ от източник; празно за ръчно въведен */
   readonly klyuch: string;
   /** кой файл и коя негова версия го донесе */
@@ -117,6 +140,19 @@ export interface PlashtaneDDS {
   readonly nachin: string;
 }
 
+/** Една сверка, както живее в Журнала: числата плюс кога и кой seq. */
+export interface ZapisanaSverka {
+  readonly seq: number;
+  readonly kogato: string;
+  readonly buton: string;
+  readonly period: string;
+  readonly vhod_st: number;
+  readonly izhod_st: number;
+  readonly razlika_st: number;
+  readonly izvori: readonly string[];
+  readonly propusnati: number;
+}
+
 export interface Ogledalo {
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
@@ -126,6 +162,37 @@ export interface Ogledalo {
   /** период → живата справка; има я = периодът е заключен */
   readonly spravki: ReadonlyMap<string, Spravka>;
   readonly platenoDDS: ReadonlyMap<string, PlashtaneDDS>;
+  /** име на модела → картата на хедъра; вж. `src/iztochnik/model.ts` */
+  readonly modeli: ReadonlyMap<string, ModelNaTablitsa>;
+  /** име на бутона → моделът на пътя; вж. `src/domein/butoni.ts` */
+  readonly butoni: ReadonlyMap<string, Buton>;
+  /** имейл → служителят с ролята му; вж. `src/domein/sluzhiteli.ts` */
+  readonly sluzhiteli: ReadonlyMap<string, PayloadSluzhitelZapisan>;
+  /**
+   * „<имейл>|<модел>" → скритите за него колони в този хедър.
+   *
+   * Ключът е двоен, защото правото важи за ДВОЙКА: един човек в един хедър.
+   * Вж. `src/domein/kolonno.ts`.
+   */
+  readonly prava: ReadonlyMap<string, PravaZaModel>;
+  /**
+   * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
+   *
+   * Ключът е ТРОЕН, защото редът е един за двойка колона·месец: повторното
+   * изпращане ПОПРАВЯ същия ред, вместо да ражда втори. Вж. `src/domein/potok.ts`.
+   */
+  readonly pototsi: ReadonlyMap<string, PayloadPotokZapisan>;
+  /**
+   * „banka" · „trezor" → началното салдо на джоба.
+   *
+   * Ръчно начало; движенията се четат от плащанията и разходите и НЕ се
+   * дублират тук. Повторен запис ПОПРАВЯ джоба, не ражда втори.
+   */
+  readonly salda: ReadonlyMap<string, PayloadSaldoZapisano>;
+  /** id → делото; последният запис за същия id е ПОПРАВКА, не втори ред */
+  readonly dela: ReadonlyMap<string, Delo>;
+  /** записаните сверки, най-новата последна — включително нулевите */
+  readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
   /** seq-овете, които сторно е погасило (и самите сторна) */
@@ -153,6 +220,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const razhodi = new Map<string, Razhod>();
   const spravki = new Map<string, Spravka>();
   const platenoDDS = new Map<string, PlashtaneDDS>();
+  const modeli = new Map<string, ModelNaTablitsa>();
+  const butoni = new Map<string, Buton>();
+  const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
+  const prava = new Map<string, PravaZaModel>();
+  const pototsi = new Map<string, PayloadPotokZapisan>();
+  const salda = new Map<string, PayloadSaldoZapisano>();
+  const dela = new Map<string, Delo>();
+  const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
   for (const s of sabitiya) {
@@ -179,6 +254,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           seq: s.seq,
           imotId: p.imotId,
           naemetel: p.naemetel,
+          // Наем, записан преди контактите, ги няма — празно, не „липсва".
+          telefon: p.telefon ?? '',
+          imeyl: p.imeyl ?? '',
           naem_st: p.naem_st,
           padezhDen: p.padezhDen,
           ot: p.ot,
@@ -204,9 +282,96 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           nachin: p.nachin,
           data: p.data,
           dokument: p.dokument,
+          // `?? {}` не става: `stavka: undefined` не е същото като липсващо
+          // поле при `exactOptionalPropertyTypes`.
+          ...(p.stavka === undefined ? {} : { stavka: p.stavka }),
           klyuch: p.klyuch ?? '',
           izvor: p.izvor ?? '',
         });
+        break;
+      }
+
+      case 'МоделЗаписан': {
+        const p = s.payload as unknown as PayloadModelZapisan;
+        // Последният запис за същото име надделява — поправка, не втори модел.
+        // Моделите отпреди резен 13 нямат `izklyucheni`, отпреди резен 14 —
+        // `zatvoreni` и `glavi`, отпреди резен 15 — номенклатурите на
+        // Редактора. Падат към празно и към сведения отпечатък, вместо да
+        // пукат при първото четене на стар Журнал.
+        modeli.set(p.klyuch, {
+          ...p,
+          izklyucheni: p.izklyucheni ?? [],
+          zatvoreni: p.zatvoreni ?? [],
+          glavi: p.glavi ?? p.otpechatak.split('|'),
+          menyuta: p.menyuta ?? {},
+          otVavezhdane: p.otVavezhdane ?? [],
+          zaklyucheni: p.zaklyucheni ?? [],
+          predishni: p.predishni ?? [],
+        });
+        break;
+      }
+
+      case 'БутонЗаписан': {
+        const p = s.payload as unknown as PayloadButonZapisan;
+        butoni.set(p.klyuch, p);
+        break;
+      }
+
+      case 'СлужителЗаписан': {
+        const p = s.payload as unknown as PayloadSluzhitelZapisan;
+        // Смяна на ролята е ново събитие върху същия човек — последното бие.
+        // Ролята се ЧЕТЕ през моста: запис отпреди преименуването носи старата
+        // дума, а Журналът не се преписва (правило 1).
+        sluzhiteli.set(p.imeyl, { ...p, rolya: chetiRolya(p.rolya) });
+        break;
+      }
+
+      case 'ПотокЗаписан': {
+        const p = s.payload as unknown as PayloadPotokZapisan;
+        // Последният запис за същата колона в същия месец надделява —
+        // поправка, не втори ред.
+        pototsi.set(`${p.model}|${p.kolona}|${p.period}`, p);
+        break;
+      }
+
+      case 'ДелоЗаписано': {
+        const p = s.payload as unknown as PayloadDeloZapisano;
+        const id = s.sashtnost.id;
+        dela.set(id, {
+          id,
+          // seq-ът на СЪЗДАВАНЕТО не се мени от поправки — сторното сочи него
+          seq: dela.get(id)?.seq ?? s.seq,
+          myasto: p.myasto,
+          obekt: p.obekt,
+          ime: p.ime,
+          otgovornik: p.otgovornik,
+          ot: p.ot,
+          do: p.do,
+          otsenka: p.otsenka as Delo['otsenka'],
+          sastoyanie: p.sastoyanie as Delo['sastoyanie'],
+          nadDelo: p.nadDelo,
+          dokument: p.dokument,
+        });
+        break;
+      }
+
+      case 'СалдоЗаписано': {
+        const p = s.payload as unknown as PayloadSaldoZapisano;
+        // Джобът е един; последният запис за него е поправка, не втори ред.
+        salda.set(p.kade, p);
+        break;
+      }
+
+      case 'ПравоЗаписано': {
+        const p = s.payload as unknown as PravaZaModel;
+        prava.set(`${p.imeyl}|${p.model}`, p);
+        break;
+      }
+
+
+      case 'СверкаЗаписана': {
+        const p = s.payload as unknown as PayloadSverkaZapisana;
+        sverki.push({ ...p, seq: s.seq, kogato: s.ts });
         break;
       }
 
@@ -258,6 +423,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           naemi.set(naem.id, {
             ...naem,
             naemetel: p.naemetel,
+            telefon: p.telefon ?? '',
+            imeyl: p.imeyl ?? '',
             naem_st: p.naem_st,
             padezhDen: p.padezhDen,
             ot: p.ot,
@@ -314,13 +481,48 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ВалутаИзбрана':
+        // ЗНАЕН тип, НАРОЧНО пренебрегнат — не „непознат".
+        //
+        // Старите Журнали носят това събитие; новите не го пишат (ADR-014:
+        // валутата е ЕДНА, няма курс и живее в КОЛОНАТА, не в цифрата).
+        // Формата му е `PayloadValutaIzbrana` в `sabitiya.ts` — типът стои
+        // нарочно, за да е записано КАКВО има в един стар Журнал, макар нищо
+        // от него да не ни трябва вече.
+        // Затова тук няма какво да се приложи — но случаят стои поименно,
+        // защото знаен тип, паднал в `default`, е неразличим от печатна грешка.
+        break;
+
       default:
-        // Непознат тип не събаря Огледалото — брои се, но не мени нищо.
+        // НЕПОЗНАТ тип не събаря Огледалото — брои се, но не мени нищо.
+        //
+        // Снизходителността тук е нарочна и е обратната страна на строгостта
+        // при входа (`#pusni` иска `TipSabitie`): стар код трябва да може да
+        // прочете по-нов Журнал. Махне ли се това, едно бъдещо събитие ще
+        // събори Огледалото на всеки, който още не се е обновил.
         break;
     }
   }
 
-  return { imoti, naemi, vzemaniya, plashtaniya, razhodi, spravki, platenoDDS, prilozheni, pogaseni };
+  return {
+    imoti,
+    naemi,
+    vzemaniya,
+    plashtaniya,
+    razhodi,
+    spravki,
+    platenoDDS,
+    modeli,
+    butoni,
+    sluzhiteli,
+    prava,
+    pototsi,
+    salda,
+    dela,
+    sverki,
+    prilozheni,
+    pogaseni,
+  };
 }
 
 type BezPresmetnato = Omit<Vzemane, 'ostatak_st' | 'sastoyanie'>;
@@ -347,13 +549,6 @@ export function sabrano(o: Ogledalo): number {
   let sbor = 0;
   for (const p of o.plashtaniya.values()) sbor += p.suma_st;
   return sbor;
-}
-
-/** Вземанията за един наем, подредени по период. */
-export function vzemaniyaZaNaem(o: Ogledalo, naemId: string): Vzemane[] {
-  return [...o.vzemaniya.values()]
-    .filter((v) => v.naemId === naemId)
-    .sort((a, b) => a.period.localeCompare(b.period));
 }
 
 export interface ProsrocheneVzemane extends Vzemane {

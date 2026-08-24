@@ -1,0 +1,83 @@
+/**
+ * ПЕЧАТЪТ · вписва имената на построените файлове в служебния работник.
+ *
+ * Vite слага хеш в имената (`index-B1f70MVw.css`), затова работникът не може
+ * да ги знае предварително. Този скрипт чете `dist/` СЛЕД build и ги впечатва.
+ *
+ * Защо не плъгин: правило 10. Тридесет реда наш код срещу чужда зависимост,
+ * която прави същото — същата сметка като при писача на .xlsx.
+ *
+ * Версията е отпечатък на самото съдържание. Значи: не се ли е сменило нищо,
+ * кешът не се сменя и телефонът не тегли пак.
+ */
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+import { PAKETI } from '../src/domein/azbuki.ts';
+
+const DIST = new URL('../dist/', import.meta.url).pathname;
+
+/** Всички файлове в dist, освен самия работник. */
+function vsichkiFaylove(papka = DIST) {
+  const namereni = [];
+  for (const vpis of readdirSync(papka)) {
+    const pat = join(papka, vpis);
+    if (statSync(pat).isDirectory()) namereni.push(...vsichkiFaylove(pat));
+    else if (vpis !== 'sw.js') namereni.push(pat);
+  }
+  return namereni;
+}
+
+const vsichki = vsichkiFaylove().sort();
+const adres = (f) => `./${relative(DIST, f)}`;
+
+// Шрифтовете НЕ влизат в черупката — те се пазят по пакет (виж долу).
+const eShrift = (f) => f.endsWith('.woff2');
+const cherupka = vsichki.filter((f) => !eShrift(f)).map(adres);
+
+/**
+ * Кой файл на коя азбука е. Vite хешира имената (`literata-greek-BxK2.woff2`),
+ * затова се разпознава по НАЧАЛОТО на името — подмножеството е в него.
+ *
+ * Редът е важен: `latin-ext` съдържа `latin` като подниз, затова по-дългите
+ * имена се пробват първи. Иначе цялата европейска азбука би влязла в пакета
+ * за България — тихо и незабелязано.
+ */
+const PODMNOZHESTVA = ['cyrillic-ext', 'latin-ext', 'greek-ext', 'cyrillic', 'latin', 'greek', 'vietnamese'];
+function koyaAzbuka(pat) {
+  const ime = relative(DIST, pat);
+  return PODMNOZHESTVA.find((p) => new RegExp(`-${p}-[^/]*\\.woff2$`).test(ime));
+}
+
+const shrifty = vsichki.filter(eShrift);
+const azbuki = {};
+for (const p of PAKETI) {
+  azbuki[p.klyuch] = shrifty.filter((f) => p.podmnozhestva.includes(koyaAzbuka(f))).map(adres);
+}
+
+// Никой шрифт не бива да остане без азбука — иначе тихо изпада от всеки пакет.
+const bezdomni = shrifty.filter((f) => !koyaAzbuka(f)).map(adres);
+if (bezdomni.length) {
+  throw new Error(`Шрифтове без разпозната азбука: ${bezdomni.join(', ')}`);
+}
+
+// Версията идва от СЪДЪРЖАНИЕТО, не от часовника — иначе всяко построяване
+// би пратило телефона да тегли същите байтове наново.
+const otpechatak = createHash('sha256');
+for (const f of vsichki) otpechatak.update(readFileSync(f));
+const versiya = otpechatak.digest('hex').slice(0, 12);
+
+const pat = join(DIST, 'sw.js');
+const izhod = readFileSync(pat, 'utf8')
+  .replace('__VERSIYA__', versiya)
+  .replace('__CHERUPKA__', JSON.stringify(['./', ...cherupka], null, 2))
+  .replace('__AZBUKI__', JSON.stringify(azbuki, null, 2));
+
+writeFileSync(pat, izhod);
+
+const kb = (fs) => (fs.reduce((s, f) => s + statSync(f).size, 0) / 1024).toFixed(1);
+console.log(`  джобът: ${cherupka.length} файла · ${kb(vsichki.filter((f) => !eShrift(f)))} KB · версия ${versiya}`);
+for (const p of PAKETI) {
+  const negovi = shrifty.filter((f) => p.podmnozhestva.includes(koyaAzbuka(f)));
+  console.log(`    азбуки „${p.klyuch}": ${negovi.length} файла · ${kb(negovi)} KB`);
+}
