@@ -345,6 +345,11 @@ function pokazhi(): void {
   pokazhiLentata(obshtoKletki, smetniIzbora(vIzbora), zaStorno);
 }
 
+/** Клетките на избора, в реда на редовете — груповото въвеждане пита оттук. */
+export function kletkiteNaIzbora(): HTMLElement[] {
+  return obhvatNaIzbora(false).flatMap(({ kletki, ot, doo }) => kletki.slice(ot, doo + 1));
+}
+
 /** Активната клетка (котвата) — редакцията в клетката (F2) пита оттук. */
 export function aktivnataKletka(): HTMLElement | null {
   if (!izbrana || !izbrana.tablitsa.isConnected) return null;

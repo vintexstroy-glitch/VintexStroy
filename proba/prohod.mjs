@@ -1987,6 +1987,47 @@ async function main() {
     await p.keyboard.press('Enter');
     proveri('същата стойност не ражда събитие', await broySabitiya(p), predRedaktsiya + 1);
 
+    // ══ 36 · груповото въвеждане · Ctrl+D и Ctrl+Enter ══════════════════
+    razdel = '36 · груповото въвеждане';
+    const naemniKletki = await p.$$eval('.red.naem [data-redakt]', (r) => r.length);
+    proveri('има поне два наема за груповия жест', naemniKletki >= 2, true);
+    const predGrupovoto = await broySabitiya(p);
+
+    // Ctrl+D: най-горната избрана стойност се дърпа надолу — по запис на ред
+    await p.click('.red.naem [data-redakt]'); // котва: първата сума (567,89)
+    await p.keyboard.press('Shift+ArrowDown'); // обхватът хваща втората
+    await p.keyboard.press('Control+d');
+    await p.waitForFunction((n) =>
+      Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1,
+      predGrupovoto);
+    proveri('Ctrl+D пише едно събитие за различния ред', await broySabitiya(p), predGrupovoto + 1);
+    const dvete = await p.$$eval('.red.naem [data-redakt]', (r) =>
+      r.slice(0, 2).map((x) => x.dataset.surovo));
+    proveri('и двете клетки носят една стойност', dvete[0] === dvete[1], true);
+    proveri('вестта казва колко са поправени', (await tekstNa(p, '.vest')).includes('поправени 1'), true);
+
+    // Ctrl+D върху вече равни: нищо ново — и Журналът не мърда
+    await p.click('.red.naem [data-redakt]');
+    await p.keyboard.press('Shift+ArrowDown');
+    await deystvieSPrerisuvane(p, () => p.keyboard.press('Control+d'));
+    proveri('върху равни Ctrl+D не ражда събития', await broySabitiya(p), predGrupovoto + 1);
+    proveri('и го КАЗВА, не премълчава', (await tekstNa(p, '.vest')).includes('вече'), true);
+
+    // Ctrl+Enter: опънат избор → F2 → ново число → ляга във ВСИЧКИ
+    await p.click('.red.naem [data-redakt]');
+    await p.keyboard.press('Shift+ArrowDown');
+    await p.keyboard.press('F2');
+    await p.waitForSelector('.kletka-redaktor');
+    await p.fill('.kletka-redaktor', '444,44');
+    await p.keyboard.press('Control+Enter');
+    await p.waitForFunction((n) =>
+      Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 2,
+      predGrupovoto + 1);
+    proveri('Ctrl+Enter пише по едно събитие на ред', await broySabitiya(p), predGrupovoto + 3);
+    proveri('и двата реда показват новото число',
+      await p.$$eval('.red.naem [data-redakt]', (r) =>
+        r.slice(0, 2).every((x) => x.textContent.includes('444,44'))), true);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

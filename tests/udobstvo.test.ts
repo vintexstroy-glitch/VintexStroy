@@ -27,7 +27,7 @@ import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
 import { klyuchNaChernova, umryalaLi } from '../app/chernova.js';
 import { sDumiZaStornoto, vidOtAtribut } from '../app/storno.js';
 import { bezPatechka } from '../app/skriti-koloni.js';
-import { prichinaZaRedaktsiya, redaktorZa } from '../app/redaktsiya.js';
+import { prichinaZaRedaktsiya, redaktorZa, sDumiZaGrupovoto } from '../app/redaktsiya.js';
 import { readdirSync, readFileSync } from 'node:fs';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
@@ -192,6 +192,20 @@ describe('редакторите на клетки', () => {
 
   it('непознат редактор е null — клетка без белег не се отваря', () => {
     expect(redaktorZa('nyama-takav')).toBeNull();
+  });
+});
+
+describe('думите на груповия запис', () => {
+  it('казва и прескоченото — половин истина за пари не се търпи', () => {
+    expect(sDumiZaGrupovoto('Ctrl+D · надолу', 2, 1, '567,89 €', [])).toBe(
+      'Ctrl+D · надолу: поправени 2 реда → 567,89 €. 1 вече беше така.',
+    );
+  });
+
+  it('нищо ново + отказ — и двете се казват', () => {
+    expect(sDumiZaGrupovoto('Ctrl+Enter · във всички избрани', 0, 0, '5,00 €', ['месецът е заключен'])).toBe(
+      'Ctrl+Enter · във всички избрани: нищо ново → 5,00 €. Отказани — месецът е заключен',
+    );
   });
 });
 
