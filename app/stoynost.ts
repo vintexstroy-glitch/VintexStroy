@@ -34,8 +34,10 @@ import {
   IMENA_NA_VIDOVETE_OBEKT,
   kvSmVM2,
   prochetiPloshti,
+  vidPoIme,
   type ProchetenObekt,
 } from '../src/kalkulator/chetene.js';
+import { eListTseniMD, prochetiTseniMD, type ProchetenoTseniMD } from '../src/kalkulator/tseni-md.js';
 import { MATRITSA_ZA_RAZRABOTKA } from '../src/kalkulator/matritsa.js';
 import {
   sverkaNaPartida,
@@ -64,6 +66,9 @@ import type { Konteks } from './main.js';
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
 let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
+/** Последният прочит на „ЦЕНИ МД" · носи цените и белега ПРОДАДЕН — за
+ *  вписването в Имоти и делата (И92). */
+let otMD: ProchetenoTseniMD | null = null;
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
 /** Коя цена се пуска при износ. Негов отговор: „и двете" · изборът се помни. */
@@ -148,6 +153,11 @@ export function narisuvayStoynost(): string {
           </select>
         </label>
         <button type="button" class="vtorichen" id="pishi-tseni"${smetnato ? '' : ' disabled'}>Запиши в Ценови листи</button>
+        ${
+          otMD
+            ? '<button type="button" class="glaven" id="vpishi-obekti">Впиши обектите в Имоти и делата им</button>'
+            : ''
+        }
       </div>
       <input type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
       <input type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
@@ -299,22 +309,72 @@ export function zakachiStoynost(
     const fayl = (e.target as HTMLInputElement).files?.[0];
     if (!fayl) return;
     try {
-      const t = await tablitsiSasSito(fayl, eListSPloshti);
+      // Кой лист влиза: „ЦЕНИ МД" се познава по ГЛАВАТА (не по името),
+      // старото площообразуване — по името на листа, както досега.
+      const t = await tablitsiSasSito(
+        fayl,
+        (tablitsa) => eListTseniMD(tablitsa) || eListSPloshti(tablitsa.ime),
+      );
       const vsichki: ProchetenObekt[] = [];
       let propusnati = 0;
+      otMD = null;
       for (const tablitsa of t) {
-        const r = prochetiPloshti(tablitsa);
-        vsichki.push(...r.obekti);
-        propusnati += r.propusnati;
+        if (eListTseniMD(tablitsa)) {
+          // Файлът „ЦЕНИ МД" носи ВСИЧКО наведнъж: площите — тук, а
+          // изложение · стаи · тераси · ПРОДАДЕН пълнят и Ценовата листа.
+          const r = prochetiTseniMD(tablitsa);
+          otMD = r;
+          const slyato = new Map<string, OtTsenovaLista>(otLista);
+          // Редовете, при които „Обща площ" на файла не излиза от неговите
+          // собствени чиста + общи части, влизат в сметката СЪС сбора на
+          // двете сверими колони — иначе сметката би отказала („обща
+          // по-малка от чистата") или би оценила по число, което файлът сам
+          // опровергава. Файлът се чете дословно, разминаването се КАЗВА
+          // във вестта; поправя се само какво влиза в сметката, не записът.
+          const razminati = new Set(r.sverki.map((s) => s.obekt));
+          for (const red of r.redove) {
+            vsichki.push({
+              obekt: red.obekt,
+              vid: vidPoIme(red.obekt),
+              etazh: red.etazh,
+              kota: red.kota,
+              chista_kvsm: red.chista_kvsm,
+              obshta_kvsm: razminati.has(red.obekt)
+                ? red.chista_kvsm + red.obshti_kvsm
+                : red.obshta_kvsm,
+              dvor_kvsm: 0,
+            });
+            slyato.set(red.obekt, {
+              izlozhenie: red.izlozhenie,
+              stai: red.stai,
+              terasi_kvsm: red.terasi_kvsm,
+              prodaden: red.prodaden,
+            });
+          }
+          otLista = slyato;
+          propusnati += r.propusnati;
+        } else {
+          const r = prochetiPloshti(tablitsa);
+          vsichki.push(...r.obekti);
+          propusnati += r.propusnati;
+        }
       }
       obekti = Object.freeze(vsichki);
       await vzemiNaemite();
       presmetni();
       // Сверката вход↔изход се казва на глас, дори когато е нула (правило 7).
       const sv = smetnato ? sverkaNaPartida(obekti, smetnato) : { vhod: 0, izhod: 0, razlika: 0 };
+      const sTseni = otMD ? otMD.redove.filter((r) => r.tsena_st !== null) : [];
+      const sborTseni = sTseni.reduce((s, r) => s + (r.tsena_st ?? 0), 0);
       vest =
         `Прочетени ${sv.vhod} обекта → ${sv.izhod} реда · разлика ${sv.razlika}` +
-        (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '');
+        (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '') +
+        (otMD
+          ? ` · листата носи цени за ${sTseni.length} обекта · Σ ${pishi(sborTseni)}` +
+            (otMD.sverki.length
+              ? ` · ${otMD.sverki.length} реда, при които площите на файла не се сверяват помежду си — за тях сметката ползва чиста + общи части`
+              : '')
+          : '');
       greshka = '';
     } catch (err) {
       greshka = dumiZaGreshka(err);
@@ -347,6 +407,28 @@ export function zakachiStoynost(
     await prerisuvay();
   });
 
+  // ── „ЦЕНИ МД" → Имоти и Делата · И92: „вкарани през Управление се появяват
+  // в Калкулатора" — и обратно: прочетеното тук става ИСТИНСКИ имоти и дела,
+  // с истински събития през Вратата. Повторното натискане не удвоява: каквото
+  // огледалото вече носи, се прескача и се КАЗВА.
+  koren.querySelector<HTMLButtonElement>('#vpishi-obekti')?.addEventListener('click', async (e) => {
+    if (!otMD) return;
+    const buton = e.target as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const izhod = await vpishiMD(k, otMD);
+      k.vest(
+        'dobre',
+        `Вписано: ${izhod.imoti} ${izhod.imoti === 1 ? 'имот' : 'имота'} и ${izhod.dela} дела` +
+          (izhod.veche ? ` · ${izhod.veche} вече бяха вписани и не се удвояват` : '') +
+          ' · всичко е в Журнала, със следа.',
+      );
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+    }
+    await prerisuvay();
+  });
+
   koren.querySelector<HTMLButtonElement>('#pishi-tseni')?.addEventListener('click', async () => {
     if (!smetnato) return;
     try {
@@ -367,6 +449,106 @@ export function zakachiStoynost(
 }
 
 /**
+ * ВПИСВАНЕТО НА „ЦЕНИ МД" · обектите стават Имоти, задачите — Дела (И92).
+ *
+ * Всяко нещо е ОТДЕЛНО събитие през Вратата, със свой opId — Журналът пази
+ * събития, не партиди. Задачите са по неговата поръчка: „Акт 16 с дело към
+ * Имота Малинова Долина"; за всеки НЕПРОДАДЕН обект — „Ремонт" с поддело
+ * „Плащане на сметки" и „Оглед за продажба или Наем". Продаденото не се
+ * ремонтира от нас. Задачите после се редактират свободно — „при всеки
+ * бизнес се различават" (негови думи).
+ *
+ * Идемпотентността е по ОГЛЕДАЛОТО: имот с този адрес и единица, или дело
+ * със същото място·обект·име, не се вписва втори път — брои се и се казва.
+ */
+export const MD_ADRES = 'Малинова Долина';
+
+export async function vpishiMD(
+  k: Konteks,
+  md: ProchetenoTseniMD,
+): Promise<{ imoti: number; dela: number; veche: number }> {
+  const og = await k.deystviya.ogledalo();
+  const imaImot = new Set(
+    [...og.imoti.values()].map((i) => `${i.adres}·${i.edinitsa}`),
+  );
+  const imaDelo = new Set(
+    [...og.dela.values()].map((d) => `${d.myasto}·${d.obekt}·${d.ime}`),
+  );
+  const dnes = new Date().toISOString().slice(0, 10);
+  const sledDni = (broy: number) =>
+    new Date(Date.parse(`${dnes}T00:00:00Z`) + broy * 86_400_000).toISOString().slice(0, 10);
+
+  let imoti = 0;
+  let dela = 0;
+  let veche = 0;
+
+  const delo = async (
+    obekt: string,
+    ime: string,
+    otsenka: string,
+    doDni: number,
+    nadDelo = '',
+  ): Promise<string> => {
+    const klyuch = `${MD_ADRES}·${obekt}·${ime}`;
+    if (imaDelo.has(klyuch)) {
+      veche += 1;
+      const staro = [...og.dela.values()].find(
+        (d) => d.myasto === MD_ADRES && d.obekt === obekt && d.ime === ime,
+      );
+      return staro?.id ?? '';
+    }
+    const id = crypto.randomUUID();
+    await k.deystviya.zapishiDelo(
+      id,
+      {
+        myasto: MD_ADRES,
+        obekt,
+        ime,
+        otgovornik: '',
+        ot: dnes,
+        do: sledDni(doDni),
+        otsenka,
+        sastoyanie: 'чака',
+        nadDelo,
+        dokument: '',
+      },
+      { opId: `md-delo:${crypto.randomUUID()}` },
+    );
+    dela += 1;
+    return id;
+  };
+
+  // имотът-майка и делата на самата сграда
+  const akt16 = await delo('', 'Акт 16', 'спешно-важно', 30);
+  if (akt16 !== '') await delo('', 'Документи за Акт 16', 'спешно-важно', 14, akt16);
+  const remontObshti = await delo('', 'Ремонт общи части', 'важно-неспешно', 45);
+  if (remontObshti !== '') {
+    await delo('', 'Плащане на сметки', 'важно-неспешно', 45, remontObshti);
+  }
+
+  for (const red of md.redove) {
+    // обектът става ИМОТ: адресът е сградата, единицата е обектът
+    if (imaImot.has(`${MD_ADRES}·${red.obekt}`)) {
+      veche += 1;
+    } else {
+      await k.deystviya.dobaviImot(
+        `I:${crypto.randomUUID()}`,
+        { adres: MD_ADRES, edinitsa: red.obekt, ploshtad_kvsm: red.chista_kvsm },
+        { opId: `md-imot:${crypto.randomUUID()}` },
+      );
+      imoti += 1;
+    }
+
+    if (red.prodaden) continue; // продаденото не се ремонтира от нас
+    const remont = await delo(red.obekt, 'Ремонт', 'важно-неспешно', 21);
+    if (remont !== '') await delo(red.obekt, 'Плащане на сметки', 'нито-едно', 21, remont);
+    await delo(red.obekt, 'Оглед за продажба или Наем', 'спешно-важно', 7);
+  }
+
+  return { imoti, dela, veche };
+}
+
+/**
  * Разчита избрания файл и връща листовете, които минават през ситото.
  *
  * Полето за файл живее В РАЗМЕТКАТА, а не се прави в движение: така работи и
@@ -381,7 +563,7 @@ export function zakachiStoynost(
  */
 async function tablitsiSasSito(
   fayl: File,
-  sito: (ime: string) => boolean,
+  sito: (t: Tablitsa) => boolean,
 ): Promise<Tablitsa[]> {
   const danni = await fayl.arrayBuffer();
   const tablitsi = fayl.name.toLowerCase().endsWith('.csv')
@@ -393,7 +575,7 @@ async function tablitsiSasSito(
   // изнесеното от човека рядко се казва „площо".
   if (vsichki.length <= 1) return vsichki;
 
-  const minali = vsichki.filter((t) => sito(t.ime));
+  const minali = vsichki.filter((t) => sito(t));
   if (minali.length === 0) {
     throw new Error(
       `Във „${fayl.name}" няма лист с площи. От книга с много листове се четат ` +

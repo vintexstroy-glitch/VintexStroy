@@ -2078,6 +2078,49 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="vsrok:ostatak"]'));
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="vsrok:ostatak"]'));
 
+    // ══ 38 · „ЦЕНИ МД" · файлът → Калкулатора → Имоти и Делата (И92) ════
+    razdel = '38 · Малинова Долина';
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+    await p.setInputFiles('#fayl-ploshti', new URL('../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
+    const vestMD = (await tekstNa(p, '.vest')).replace(/[\s\u00A0\u202F]/g, '');
+    proveri('45-те обекта влизат · разликата е нула',
+      vestMD.includes('Прочетени45обекта→45реда·разлика0'), true);
+    proveri('листата носи цените · Σ 2 118 800,00 €',
+      vestMD.includes('цениза25обекта·Σ2118800,00€'), true);
+    proveri('и разминатите площи на файла се КАЗВАТ, не се преглъщат',
+      vestMD.includes('площитенафайланесесверяват'), true);
+
+    // ВПИСВАНЕТО: обектите стават Имоти, задачите — Дела, през Вратата
+    const predMD = await broySabitiya(p);
+    await p.click('#vpishi-obekti');
+    await p.waitForFunction(() => document.body.textContent.includes('Вписано:'));
+    const vestVpis = await tekstNa(p, '.vest');
+    proveri('вписани са 45 имота', vestVpis.includes('45 имота'), true);
+    proveri('и 79 дела (4 на сградата + 3 на всеки непродаден)',
+      vestVpis.includes('79 дела'), true);
+    proveri('всяко е събитие в Журнала', await broySabitiya(p), predMD + 45 + 79);
+
+    // ПОВТОРНОТО натискане НЕ удвоява — казва „вече бяха вписани"
+    await p.click('#vpishi-obekti');
+    await p.waitForFunction(() => document.body.textContent.includes('не се удвояват'));
+    proveri('повторното вписване не пише нищо', await broySabitiya(p), predMD + 45 + 79);
+
+    // обектите се ДВИЖАТ в другите таблици: Имоти ги вижда
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.fill('[data-tarsi-tablitsa="imoti"]', 'Малинова Долина');
+    await p.waitForFunction(() =>
+      document.querySelectorAll('.red.imot').length === 45);
+    proveri('Имоти показва 45-те обекта на Малинова Долина',
+      await p.$$eval('.red.imot', (r) => r.length), 45);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="imoti"]'));
+
+    // и Управление вижда делата — с Акт 16 към самата сграда
+    await naEkran(p, 'gant', '#forma-delo');
+    const gantTekst = await p.evaluate(() => document.body.textContent);
+    proveri('Гант носи Акт 16', gantTekst.includes('Акт 16'), true);
+    proveri('и огледите за продажба или наем', gantTekst.includes('Оглед за продажба или Наем'), true);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
