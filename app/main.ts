@@ -37,6 +37,7 @@ import { zakachiIstoriya } from './istoriya.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { zakachiKlaviatura } from './klaviatura.js';
 import { zakachiChernovata } from './chernova.js';
+import { prilozhiSkritite } from './skriti-koloni.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { type Samolichnost } from '../src/yadro/samolichnost.js';
@@ -440,6 +441,7 @@ async function trugvay(): Promise<void> {
     zakachiKontekstnoMenyu(koren, k);
     zakachiKlaviatura(koren, k, prerisuvay);
     zakachiChernovata(koren);
+    prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }
 

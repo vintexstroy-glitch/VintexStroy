@@ -26,6 +26,7 @@ import { chetiEkranno, zabraviEkranno, zapomniEkranno } from '../app/pamet-ekran
 import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
 import { klyuchNaChernova, umryalaLi } from '../app/chernova.js';
 import { sDumiZaStornoto, vidOtAtribut } from '../app/storno.js';
+import { bezPatechka } from '../app/skriti-koloni.js';
 import { readdirSync, readFileSync } from 'node:fs';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
@@ -158,6 +159,18 @@ describe('сметката на избора', () => {
     const s = smetniIzbora([{ tekst: 'текст', st: null }]);
     expect(s.broyPari).toBe(0);
     expect(s.sbor_st).toBe(0);
+  });
+});
+
+// ── скриването на колона (вълна 1 · предложение 9, последното парче) ───────
+describe('пътечките на решетката', () => {
+  it('маха пътечка по номер, без да реже вътре в скобите', () => {
+    expect(bezPatechka('minmax(0, 2fr) minmax(0, 1.6fr) 96px', 1)).toBe('minmax(0, 2fr) 96px');
+    expect(bezPatechka('290.5px 232px 96px', 0)).toBe('232px 96px');
+  });
+
+  it('номер извън списъка не пипа нищо', () => {
+    expect(bezPatechka('96px 120px', 5)).toBe('96px 120px');
   });
 });
 

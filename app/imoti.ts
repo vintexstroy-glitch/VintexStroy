@@ -81,8 +81,9 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
         return i ? `${i.adres} · ${i.edinitsa}` : n.imotId;
       },
     },
-    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon },
-    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl },
+    // в клетката на името са, не в своя колона — търсят се, не се рисуват
+    { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (n) => n.telefon, samoZaTarsene: true },
+    { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (n) => n.imeyl, samoZaTarsene: true },
     { klyuch: 'sektor', ime: 'Сектор', vid: 'tekst', vzemi: (n) => akumulator(n.sektor).sektor },
     { klyuch: 'naem', ime: 'Наем / мес.', vid: 'evro', vzemi: (n) => n.naem_st },
     {
@@ -327,6 +328,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       <div class="tablitsa">
         <div class="glava naem">
           ${koloniNaNaemite(ogledalo)
+            .filter((kol) => !kol.samoZaTarsene)
             .map((kol) =>
               glavaSFiltar('naemi', kol, naemi, dnesKato(), kol.vid === 'evro'),
             )

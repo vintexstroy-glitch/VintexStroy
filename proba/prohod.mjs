@@ -1912,6 +1912,41 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('[data-grupiray="naemi:imot"]'));
     proveri('„Махни групирането" прибира групите', await p.$('.grupata'), null);
 
+    // ══ 34 · скриването на колона · правило 23 в действие ═══════════════
+    razdel = '34 · скритата колона';
+    const mesechenPredi = await plochka(p, 'Месечен наем');
+    const vidimiPredi = await p.$$eval('.glava.naem > *', (r) =>
+      r.filter((x) => !x.hidden).length);
+
+    // десен бутон върху клетката „Сектор" → „Скрий колоната"
+    await p.click('.red.naem .kletka:nth-of-type(3)', { button: 'right' });
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('менюто предлага скриване с името на колоната',
+      (await tekstNa(p, '.kontekstno-menyu')).includes('Скрий колоната „Сектор"'), true);
+    await p.click('.kontekstno-menyu button:has-text("Скрий колоната")');
+    proveri('колоната изчезна от главата',
+      await p.$$eval('.glava.naem > *', (r) => r.filter((x) => !x.hidden).length),
+      vidimiPredi - 1);
+    proveri('и от редовете',
+      await p.$eval('.red.naem', (red) => [...red.children].some((x) => x.hidden)), true);
+    proveri('редът под таблицата казва какво е скрито',
+      (await tekstNa(p, '.skrito-koloni')).includes('Скрити колони: 1'), true);
+
+    // СКРИТОТО ПАК СЕ СМЯТА: плочката „Месечен наем" не мърда
+    proveri('скритото ПАК се смята — сборът не мърда',
+      await plochka(p, 'Месечен наем'), mesechenPredi);
+
+    // презареждането помни скритото; „покажи ги" го връща
+    await p.reload();
+    await p.waitForSelector('#forma-imot');
+    proveri('презареждането помни скритата колона',
+      await p.$eval('.red.naem', (red) => [...red.children].some((x) => x.hidden)), true);
+    await p.click('[data-pokazhi-koloni="naemi"]');
+    proveri('„покажи ги" връща колоната',
+      await p.$$eval('.glava.naem > *', (r) => r.filter((x) => !x.hidden).length),
+      vidimiPredi);
+    proveri('и редът за скритото пада', await p.$('.skrito-koloni'), null);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

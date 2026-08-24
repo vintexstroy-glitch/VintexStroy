@@ -33,6 +33,13 @@ export interface KolonaSFiltar<T> {
   readonly ime: string;
   readonly vid: VidStoynost;
   readonly vzemi: (red: T) => string | number;
+  /**
+   * Колона, която търсенето и филтрите ВИЖДАТ, а главата НЕ рисува —
+   * телефонът и имейлът на наемателя стоят в клетката на името, не в своя
+   * визуална колона. Без този белег главата описва повече колони, отколкото
+   * редът има клетки, и излишните преливат на втори ред в решетката.
+   */
+  readonly samoZaTarsene?: boolean;
 }
 
 /**
