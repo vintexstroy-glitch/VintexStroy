@@ -2691,6 +2691,100 @@ async function main() {
     proveri('и „забрави го" го маха', await p.evaluate(() =>
       localStorage.getItem('masterbook:klod-klyuch')), null);
 
+    // ══ 46 · всички потоци през всички акумулатори (И94 т.7) ═════════════════
+    //
+    // Негови думи: „Изпълни всички потоци в акумолатора и направи сверки и
+    // тестове." Тестът в `tests/potoci-akumulatori.test.ts` го прави в домейна;
+    // ТУК се доказва другото — че ЕКРАНЪТ ги стига: че формата предлага всеки
+    // поток и всеки сектор, че шестте реда се появяват и че четирите сверки
+    // затварят, когато в месеца има ВСИЧКО, а не когато има едно.
+    razdel = '46 · потоците и акумулаторите';
+    await naEkran(p, 'smetki', '#forma-razhod');
+
+    // Отделен месец, за да не се смесва с натрупаното от по-ранните раздели.
+    await p.fill('#smetki-period', '2026-11');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+    proveri('формата предлага ВСИЧКИ разходни потоци',
+      (await p.$$eval('#razhod-potok option', (o) => o.map((x) => x.value))).sort().join('·'),
+      'fakturi·krediti·zaplati');
+    // Секторът се избира САМО за „Фактури" — трите, които носят ДДС. Заплатите
+    // и кредитите взимат акумулатора си ОТ ПОТОКА, вместо да се крият в чужд:
+    // затова тук са три, а на „вход" по-долу излизат ПЕТ.
+    proveri('секторът предлага трите, които носят ДДС',
+      (await p.$$eval('#razhod-sektor option', (o) => o.map((x) => x.value))).sort().join('·'),
+      'pokupki-materiali·pokupki-uslugi·uslugi-stroitelni');
+
+    // Шестте записа покриват трите разходни потока и петте разходни
+    // акумулатора, а „покупки · услуги" носи ДВЕ ставки — така се вижда, че
+    // ставката идва от РЕДА, а не от сектора (ADR-009).
+    const razhoditeNaProbata = [
+      ['zaplati', '', '3400,00', undefined, 'заплати за ноември'],
+      ['krediti', '', '890,00', undefined, 'вноска по кредит'],
+      ['fakturi', 'pokupki-materiali', '1440,00', '20', 'цимент'],
+      ['fakturi', 'pokupki-uslugi', '654,00', '9', 'нощувки на екипа'],
+      ['fakturi', 'uslugi-stroitelni', '2400,00', '20', 'подизпълнител'],
+      ['fakturi', 'pokupki-uslugi', '300,00', '0', 'застраховка'],
+    ];
+    for (let i = 0; i < razhoditeNaProbata.length; i += 1) {
+      const [potok, sektor, suma, stavka, opis] = razhoditeNaProbata[i];
+      await zapishiRazhod(p, {
+        potok, sektor, dostavchik: `Доставчик ${i + 1}`, opis, suma,
+        nachin: 'банка', data: '2026-11-12', dokument: `Ф-${3000 + i}`, stavka,
+      });
+    }
+
+    // Приходната страна · начислява се за СЪЩИЯ месец, за да има и „изход".
+    // Начисляването живее в Пари; оттам се връщаме в Сметки за месеца.
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await p.fill('#period', '2026-11');
+    await p.click('#forma-nachisli button[type=submit]');
+    await p.waitForFunction(() => !document.querySelector('#forma-nachisli button[type=submit]')?.disabled);
+    // ПОТОЦИТЕ „КЕШ" и „БАНКА" · как парите реално са влезли. Едно вземане,
+    // платено на две части, пълни и двата — и точно затова те НЕ се събират
+    // с „Наеми": иначе едни и същи 300 € биха се броили два пъти.
+    for (const [suma, nachin, data] of [['100,00', 'в брой', '2026-11-06'], ['200,00', 'банка', '2026-11-07']]) {
+      await p.click('[data-plati]');
+      await p.waitForSelector('#forma-plashtane');
+      await p.fill('#pl-suma', suma);
+      await p.selectOption('#pl-nachin', nachin);
+      await p.fill('#pl-data', data);
+      await sSabitie(p, () => p.click('#forma-plashtane button[type=submit]'));
+    }
+
+    await naEkran(p, 'smetki', '#forma-razhod');
+    await p.fill('#smetki-period', '2026-11');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+    proveri('шестте потока имат свой ред',
+      await p.$$eval('.red.smetka', (r) => r.length), 6);
+    proveri('и нито един не остана празен',
+      await p.$$eval('.red.smetka', (r) =>
+        r.every((x) => Number(x.querySelector('.suma')?.dataset.st ?? 0) > 0)), true);
+
+    // СЕДЕМТЕ АКУМУЛАТОРА · всеки с движение, всеки на своята страна
+    const akumulatorite = await p.$$eval('.red.dds', (r) =>
+      r.map((x) => `${x.querySelector('.znachka')?.textContent.trim()}|${x.querySelector('b')?.textContent.trim()}`));
+    proveri('приходните акумулатори са на страна „изход"',
+      akumulatorite.filter((a) => a.startsWith('изход')).length >= 2, true);
+    proveri('и петте разходни са на „вход"',
+      new Set(akumulatorite.filter((a) => a.startsWith('вход')).map((a) => a.split('|')[1])).size, 5);
+    proveri('един акумулатор с ДВЕ ставки дава ДВА реда',
+      akumulatorite.filter((a) => a.endsWith('покупки · услуги')).length, 2);
+
+    // ЧЕТИРИТЕ СВЕРКИ · всяка затваря, и нулата се ПОКАЗВА (правило 7)
+    const SVERKI = '.red.sverka:not(.otchet-sverka)';
+    proveri('четирите сверки са налице', await p.$$eval(SVERKI, (r) => r.length), 4);
+    proveri('и всяка затваря',
+      await p.$$eval(SVERKI, (r) =>
+        r.every((x) => x.textContent.includes('затваря') && !x.textContent.includes('НЕ затваря'))), true);
+    // Нулата се ПОКАЗВА, не се премълчава (правило 7): „няма разлика" трябва да
+    // е различимо от „не е сверявано", затова клетката носи число, не празно.
+    proveri('разликата се показва и когато е нула',
+      await p.$$eval(SVERKI, (r) =>
+        r.map((x) => (x.querySelectorAll('.suma')[2]?.textContent ?? '').replace(/[^\d,-]/g, ''))),
+      ['0,00', '0', '0,00', '0']);
+
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
@@ -2841,15 +2935,22 @@ async function plati(p, koy, suma, nachin, data) {
   }, predi);
 }
 
-async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin, data, dokument }) {
+async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin, data, dokument, stavka }) {
   await p.selectOption('#razhod-potok', potok);
-  await p.selectOption('#razhod-sektor', sektor);
+  // Сектор се избира САМО при „Фактури". Заплатите и кредитите взимат
+  // акумулатора си ОТ ПОТОКА (`app/smetki.ts` · `dds.ts`): те не носят ДДС и
+  // стоят в свои акумулатори, вместо да се крият в чужд. Затова полето и не
+  // ги предлага — а помощникът не се преструва, че ги избира.
+  if (potok === 'fakturi') await p.selectOption('#razhod-sektor', sektor);
   await p.fill('#razhod-dostavchik', dostavchik);
   await p.fill('#razhod-opis', opis);
   await p.fill('#razhod-suma', suma);
   await p.selectOption('#razhod-nachin', nachin);
   await p.fill('#razhod-data', data);
   await p.fill('#razhod-dokument', dokument);
+  // Ставката е избор НА РЕДА (ADR-009). Не се подава ли — остава каквото
+  // формата предлага, точно както при човек, който не я пипа.
+  if (stavka !== undefined) await p.selectOption('#razhod-stavka', String(stavka));
   await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
 }
 
