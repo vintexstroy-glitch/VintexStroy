@@ -12,8 +12,8 @@
  * Един двигател за всички таблици: колоните се описват, не се програмират.
  */
 
-import { ekraniraj } from './imoti.js';
 import { eStotinki, pishi } from '../src/yadro/pari.js';
+import { ekraniraj } from './obshto.js';
 import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 

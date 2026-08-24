@@ -11,8 +11,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { ekraniraj } from './obshto.js';
 import type { MesetsSPari } from '../src/domein/diagrami.js';
-import { ekraniraj } from './imoti.js';
 
 /** Геометрията · един месец е гнездо от два стълба и надпис под тях. */
 const GNEZDO = 58;

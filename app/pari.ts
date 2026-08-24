@@ -6,6 +6,7 @@
  */
 
 import { SUMATA_NAD_NULA, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { dnesKato, dumiZaGreshka, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import {
   duljimo,
@@ -20,7 +21,6 @@ import {
   zaNachislyavane,
 } from '../src/domein/nachislyavane.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { butonIstoriya } from './istoriya.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
@@ -317,7 +317,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
           </div>
           <div class="pole">
             <label for="pl-data">Дата</label>
-            <input translate="no" id="pl-data" name="data" type="date" value="${new Date().toISOString().slice(0, 10)}" required>
+            <input translate="no" id="pl-data" name="data" type="date" value="${dnesKato()}" required>
           </div>
         </div>
         <p class="greshka" id="greshka-plashtane"></p>

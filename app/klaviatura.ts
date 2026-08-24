@@ -30,8 +30,8 @@
  */
 
 import { eStotinki, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { ekraniraj } from './obshto.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
-import { ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 
 /**

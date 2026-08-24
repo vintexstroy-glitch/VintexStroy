@@ -10,6 +10,7 @@
  */
 
 import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { dnesKato, dumiZaGreshka, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
@@ -95,27 +96,6 @@ function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
       vzemi: (n) => (n.prekraten ? 'прекратен' : 'жив'),
     },
   ];
-}
-
-/**
- * СВАЛЯНЕ НА ФАЙЛ · единственият дом на танца Blob → адрес → връзка → клик.
- * Беше преписан три пъти (в main два, в Стойност един) — три места за един теч.
- */
-/**
- * ДУМИТЕ НА ЕДНА ГРЕШКА · един дом за израза, преписан 28 пъти.
- * Грешка с име носи message; всичко друго се казва както е.
- */
-export function dumiZaGreshka(e: unknown): string {
-  return e instanceof Error ? e.message : String(e);
-}
-
-export function svaliFayl(fayl: Blob, ime: string): void {
-  const adres = URL.createObjectURL(fayl);
-  const vruzka = document.createElement('a');
-  vruzka.href = adres;
-  vruzka.download = ime;
-  vruzka.click();
-  URL.revokeObjectURL(adres);
 }
 
 export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
@@ -368,7 +348,7 @@ function formaPrekratyavane(naem: Naem): string {
         <div class="poleta">
           <div class="pole">
             <label for="prekrati-kraj">Договорът свършва на</label>
-            <input translate="no" id="prekrati-kraj" name="kraj" type="date" value="${dnes()}" required>
+            <input translate="no" id="prekrati-kraj" name="kraj" type="date" value="${dnesKato()}" required>
           </div>
           <div class="pole">
             <label for="prekrati-prichina">Защо</label>
@@ -674,20 +654,3 @@ function poletataNaNaemaOtFormata(
   };
 }
 
-function dnes(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-/** Днешният ден — за групите на филтъра по дата. Общ дом; Стойност също го ползва. */
-export function dnesKato(): string {
-  return dnes();
-}
-
-/** Всичко, написано от човек, минава оттук, преди да влезе в HTML. */
-export function ekraniraj(tekst: string): string {
-  return tekst
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}

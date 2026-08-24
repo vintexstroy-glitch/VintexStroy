@@ -9,6 +9,7 @@
  */
 
 import { SUMATA_NAD_NULA, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { dumiZaGreshka, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -46,7 +47,6 @@ import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';

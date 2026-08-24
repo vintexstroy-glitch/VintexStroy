@@ -41,8 +41,8 @@ import {
   prevklyuchi,
   smeniPlan,
 } from '../src/domein/planove.js';
-import { ekraniraj } from './imoti.js';
 import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
+import { ekraniraj } from './obshto.js';
 
 const KLYUCH = 'masterbook:izbor';
 

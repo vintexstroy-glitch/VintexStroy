@@ -19,6 +19,7 @@
  */
 
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
+import { dumiZaGreshka, ekraniraj } from './obshto.js';
 import {
   dobaviSektsiya,
   eStatsionaren,
@@ -59,7 +60,6 @@ import { mesechnitePari } from '../src/domein/diagrami.js';
 import { pishi } from '../src/yadro/pari.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { stalboveNaMesetsite } from './diagrami.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
 

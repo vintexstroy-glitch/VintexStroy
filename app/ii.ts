@@ -70,10 +70,10 @@ import {
   type ZaKakvo,
 } from '../src/domein/potvarzhdenie.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
+import { dnesKato, dumiZaGreshka, ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
 
@@ -1022,7 +1022,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
         const star = await agentSega();
         if (!star) return;
         await k.deystviya.zapishiAgent(
-          { ...star, sastoyanie: 'vklyuchen', ot: new Date().toISOString().slice(0, 10) },
+          { ...star, sastoyanie: 'vklyuchen', ot: dnesKato() },
           { opId: `agent:${crypto.randomUUID()}` },
         );
         pitamZaSaglasie = false;

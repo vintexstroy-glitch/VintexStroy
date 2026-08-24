@@ -23,9 +23,9 @@
  */
 
 import { otSuma, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { dumiZaGreshka } from './obshto.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import { aktivnataKletka, fokusVPole, kletkiteNaIzbora } from './klaviatura.js';
-import { dumiZaGreshka } from './imoti.js';
 import type { Konteks } from './main.js';
 
 /** Причината, която влиза в Журнала — чиста, за да има тест. */

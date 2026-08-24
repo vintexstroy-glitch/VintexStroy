@@ -16,6 +16,7 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { dumiZaGreshka, ekraniraj } from './obshto.js';
 import {
   belegNaButon,
   DEYSTVIYA,
@@ -69,7 +70,6 @@ import { klyuchNaPravo,
 import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import type { Konteks } from './main.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 

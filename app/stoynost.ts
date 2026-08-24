@@ -23,8 +23,8 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { dnesKato, dumiZaGreshka, ekraniraj, svaliFayl } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { dnesKato, dumiZaGreshka, svaliFayl } from './imoti.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
@@ -52,7 +52,6 @@ import {
   type KoyaTsena,
 } from '../src/kalkulator/tsenova-lista.js';
 import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
-import { ekraniraj } from './imoti.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
 
@@ -429,7 +428,7 @@ export function zakachiStoynost(
       const fayl = new Blob([bajtove.slice().buffer], {
         type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       });
-      svaliFayl(fayl, `ЦЕНИ-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      svaliFayl(fayl, `ЦЕНИ-${dnesKato()}.xlsx`);
       k.vest(
         'dobre',
         `Ценовата листа е записана: ${smetnato.redove.length} реда · ${IMENA_NA_IZBORA[koyaTsena]}.`,
@@ -467,7 +466,7 @@ export async function vpishiMD(
   const imaDelo = new Set(
     [...og.dela.values()].map((d) => `${d.myasto}·${d.obekt}·${d.ime}`),
   );
-  const dnes = new Date().toISOString().slice(0, 10);
+  const dnes = dnesKato();
   const sledDni = (broy: number) =>
     new Date(Date.parse(`${dnes}T00:00:00Z`) + broy * 86_400_000).toISOString().slice(0, 10);
 

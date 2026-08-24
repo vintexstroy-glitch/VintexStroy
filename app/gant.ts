@@ -25,6 +25,7 @@
  */
 
 import { otData } from '../src/yadro/data.js';
+import { dumiZaGreshka, ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,
@@ -47,7 +48,6 @@ import {
 } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import type { Konteks } from './main.js';

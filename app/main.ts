@@ -20,11 +20,12 @@ import {
   type SastoyanieNaHranilishteto,
 } from '../src/nositel/hranilishte.js';
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
+import { dnesKato, dumiZaGreshka, ekraniraj, svaliFayl } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
 import { GreshkaVnos, vnesiZhurnal } from '../src/domein/vnos.js';
-import { dumiZaGreshka, ekraniraj, narisuvayImoti, svaliFayl, zakachiFormite } from './imoti.js';
+import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
@@ -374,7 +375,7 @@ async function trugvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(akaunt);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
-    const dnes = new Date().toISOString().slice(0, 10);
+    const dnes = dnesKato();
     // Изключен екран не се показва празен — връщаме се на Имоти.
     const iska = EKRAN_ISKA[ekran];
     if (iska && !mozhe(izbor, iska)) ekran = 'imoti';
@@ -606,7 +607,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
-    svaliFayl(fayl, `zhurnal-${akaunt}-${new Date().toISOString().slice(0, 10)}.json`);
+    svaliFayl(fayl, `zhurnal-${akaunt}-${dnesKato()}.json`);
 
     const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
     zapishiBeleg({
@@ -635,7 +636,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const fayl = new Blob([bajtove.slice().buffer], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
-    svaliFayl(fayl, `masterbook-arhiv-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    svaliFayl(fayl, `masterbook-arhiv-${dnesKato()}.xlsx`);
     k.vest(
       'dobre',
       `Архивът е свален: 5 листа, ${sabitiya.length} събития, всеки лист с готови филтри. ` +

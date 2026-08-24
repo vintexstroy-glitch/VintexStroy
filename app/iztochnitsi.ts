@@ -12,6 +12,7 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { dumiZaGreshka, ekraniraj } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
@@ -65,7 +66,6 @@ import {
   zapishiSverkata,
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
-import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { fokusVPole } from './klaviatura.js';
 import type { Konteks } from './main.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
