@@ -25,6 +25,7 @@ import { butonIstoriya } from './istoriya.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import type { Konteks } from './main.js';
+import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
 let izbrano: string | null = null;
@@ -311,8 +312,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
           <div class="pole">
             <label for="pl-nachin">Начин</label>
             <select translate="no" id="pl-nachin" name="nachin">
-              <option value="банка">банка</option>
-              <option value="в брой">в брой</option>
+              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
@@ -412,7 +412,7 @@ export function zakachiPari(
         {
           vzemaneId: formaPl.dataset['vzemane']!,
           suma_st,
-          nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
+          nachin: String(danni.get('nachin')) as NachinNaPlashtane,
           data,
         },
         { opId: opIdPlashtane },

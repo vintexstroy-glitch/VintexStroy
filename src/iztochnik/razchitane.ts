@@ -73,6 +73,39 @@ export function klyuchNaRazhod(r: {
 }
 
 /**
+ * СУМАТА ОТ КЛЕТКА · и защо „лв." още се маха.
+ *
+ * Валутата на модела е евро и лев няма (правило 3) — но ВНАСЯНОТО идва от
+ * стари таблици, писани, когато е имало. Файлът не се поправя, той се ЧЕТЕ:
+ * махат се интервалите и надписът, числото остава.
+ *
+ * Нулата е ОТКАЗ, не сума: ред за нула лева в таблица с разходи значи
+ * непопълнена клетка, а не разход, който не струва нищо.
+ */
+function sumaOtKletka(surovo: string): number {
+  const suma_st = otLeva(surovo.replace(/\s|лв\.?/gi, ''));
+  if (suma_st === 0) throw new GreshkaRazchitane('Сумата е нула.');
+  return suma_st;
+}
+
+/**
+ * ЕДИНСТВЕНИЯТ КЛЮЧ на реда · два реда с един ключ са грешка В ИЗТОЧНИКА.
+ *
+ * Вторият получава свой (`#2`), вместо да презапише първия. Двата четеца —
+ * този по думи и този по модел — броят поотделно; написан два пъти, броячът
+ * се разминава и единият почва тихо да изяжда редове.
+ */
+function edinstvenKlyuch(
+  vidyani: Map<string, number>,
+  r: { dokument: string; data: string; koy: string; suma_st: number },
+): string {
+  const osnoven = klyuchNaRazhod(r);
+  const povtoreno = (vidyani.get(osnoven) ?? 0) + 1;
+  vidyani.set(osnoven, povtoreno);
+  return povtoreno === 1 ? osnoven : `${osnoven}#${povtoreno}`;
+}
+
+/**
  * Кой месец е таблицата — по най-често срещаната дата, не по името на файла.
  * Празен низ, ако не се разчита нито една дата.
  */
@@ -145,8 +178,7 @@ export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
     if (koy === '' && surovaSuma === '' && surovaData === '') continue;
 
     try {
-      const suma_st = otLeva(surovaSuma.replace(/\s|лв\.?/gi, ''));
-      if (suma_st === 0) throw new GreshkaRazchitane('Сумата е нула.');
+      const suma_st = sumaOtKletka(surovaSuma);
       const data = dataOtKletka(surovaData);
       if (data.slice(0, 7) !== n.period) {
         propusnati.push({ red: nomer, zashto: `Датата ${data} е извън ${n.period}.` });
@@ -155,11 +187,7 @@ export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
       if (koy === '') throw new GreshkaRazchitane('Няма доставчик.');
 
       const dokument = vzemi(kolona.dokument);
-      const osnoven = klyuchNaRazhod({ dokument, data, koy, suma_st });
-      // Два реда с един ключ са грешка в източника — вторият получава своя.
-      const povtoreno = (vidyani.get(osnoven) ?? 0) + 1;
-      vidyani.set(osnoven, povtoreno);
-      const klyuch = povtoreno === 1 ? osnoven : `${osnoven}#${povtoreno}`;
+      const klyuch = edinstvenKlyuch(vidyani, { dokument, data, koy, suma_st });
 
       redove.push({ klyuch, koy, suma_st, data, dokument, opis: vzemi(kolona.opis) || koy });
     } catch (greshka) {
@@ -268,8 +296,7 @@ export function razchetiPoModel(n: {
     if (surovaSuma === '' && surovaData === '' && koy === '' && osnovanie === '') continue;
 
     try {
-      const suma_st = otLeva(surovaSuma.replace(/\s|лв\.?/gi, ''));
-      if (suma_st === 0) throw new GreshkaRazchitane('Сумата е нула.');
+      const suma_st = sumaOtKletka(surovaSuma);
       const data = dataOtKletka(surovaData);
       if (data.slice(0, 7) !== n.period) {
         propusnati.push({ red: nomer, zashto: `Датата ${data} е извън ${n.period}.` });
@@ -282,10 +309,7 @@ export function razchetiPoModel(n: {
       if (shte === '') throw new GreshkaRazchitane('Няма нито контрагент, нито основание.');
 
       const dokument = poRolya(m, t, i, 'dokument');
-      const osnoven = klyuchNaRazhod({ dokument, data, koy: shte, suma_st });
-      const povtoreno = (vidyani.get(osnoven) ?? 0) + 1;
-      vidyani.set(osnoven, povtoreno);
-      const klyuch = povtoreno === 1 ? osnoven : `${osnoven}#${povtoreno}`;
+      const klyuch = edinstvenKlyuch(vidyani, { dokument, data, koy: shte, suma_st });
 
       const stavka = stavkaNaRed(m, t, i, suma_st);
 

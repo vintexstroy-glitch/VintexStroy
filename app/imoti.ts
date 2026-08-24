@@ -9,8 +9,8 @@
  * и то само когато вратарят пусне (`src/domein/storno.ts`).
  */
 
-import { GreshkaPari, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
-import { GreshkaData, otData } from '../src/yadro/data.js';
+import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
@@ -517,8 +517,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       if (surovDepozit !== '') depozit_st = otLeva(surovDepozit);
       ot = otData(String(danni.get('ot') ?? ''), 'Датата „Договор от“');
     } catch (e) {
-      greshka.textContent =
-        e instanceof GreshkaPari || e instanceof GreshkaData ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
       return;
     }
 
@@ -529,15 +528,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         await k.deystviya.popraviNaem(
           {
             naemId: rezhim.id,
-            naemetel: String(danni.get('naemetel')).trim(),
-            telefon: String(danni.get('telefon') ?? '').trim(),
-            imeyl: String(danni.get('imeyl') ?? '').trim(),
-            naem_st,
-            padezhDen: Number(danni.get('padezhDen')),
-            ot,
+            ...poletataNaNaemaOtFormata(danni, { naem_st, depozit_st, ot }),
             do: star.do,
-            depozit_st,
-            sektor: String(danni.get('sektor')),
             prichina: String(danni.get('prichina') ?? '').trim(),
           },
           { opId: opIdDeystvie },
@@ -550,15 +542,8 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           `N:${crypto.randomUUID()}`,
           {
             imotId: String(danni.get('imotId')),
-            naemetel: String(danni.get('naemetel')).trim(),
-            telefon: String(danni.get('telefon') ?? '').trim(),
-            imeyl: String(danni.get('imeyl') ?? '').trim(),
-            naem_st,
-            padezhDen: Number(danni.get('padezhDen')),
-            ot,
+            ...poletataNaNaemaOtFormata(danni, { naem_st, depozit_st, ot }),
             do: '',
-            depozit_st,
-            sektor: String(danni.get('sektor')),
           },
           { opId: opIdNaem },
         );
@@ -587,7 +572,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     try {
       kraj = otData(String(danni.get('kraj') ?? ''), 'Датата на края');
     } catch (e) {
-      greshka.textContent = e instanceof GreshkaData ? e.message : String(e);
+      greshka.textContent = dumiZaGreshka(e);
       return;
     }
 
@@ -648,6 +633,45 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       await prerisuvay();
     },
   );
+}
+
+/**
+ * ПОЛЕТАТА НА НАЕМА, прочетени от ФОРМАТА · един път за двата пътя.
+ *
+ * Добавянето и поправката четат едни и същи полета. Написани поотделно, те
+ * се разминават при първото ново поле — и наемът тихо губи стойност всеки
+ * път, щом някой го поправи. Същият капан стоеше и в Огледалото; там е
+ * затворен с `poletataNaNaema`, тук — с това.
+ *
+ * Числата идват ГОТОВИ отвън: те са разчетени по-рано, за да може отказът
+ * при сгрешена сума да се каже, преди изобщо да се стигне до Вратата.
+ *
+ * Отвън остават само разликите: добавянето носи `imotId` и празен край,
+ * поправката — `naemId`, СТАРИЯ край и причината.
+ */
+function poletataNaNaemaOtFormata(
+  danni: FormData,
+  chisla: { naem_st: number; depozit_st: number; ot: string },
+): {
+  naemetel: string;
+  telefon: string;
+  imeyl: string;
+  naem_st: number;
+  padezhDen: number;
+  ot: string;
+  depozit_st: number;
+  sektor: string;
+} {
+  return {
+    naemetel: String(danni.get('naemetel')).trim(),
+    telefon: String(danni.get('telefon') ?? '').trim(),
+    imeyl: String(danni.get('imeyl') ?? '').trim(),
+    naem_st: chisla.naem_st,
+    padezhDen: Number(danni.get('padezhDen')),
+    ot: chisla.ot,
+    depozit_st: chisla.depozit_st,
+    sektor: String(danni.get('sektor')),
+  };
 }
 
 function dnes(): string {

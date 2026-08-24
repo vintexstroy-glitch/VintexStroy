@@ -37,7 +37,7 @@ import {
   type Pole,
 } from '../src/domein/otcheti.js';
 import { sboratZaKapitala } from './stoynost.js';
-import { VID } from '../src/domein/sabitiya.js';
+import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 import { podredi } from '../src/domein/dela.js';
 import { obobshtenRed, reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
@@ -103,6 +103,26 @@ const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
     vzemi: (r) => ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st,
   },
 ];
+
+/**
+ * ГЛАВАТА и ЗНАЧКАТА на сверителната таблица · ЕДИН надпис за двете.
+ *
+ * Екранът носи две сверителни таблици — изчислената за месеца и тази на
+ * Капитала по два пътя. Различни данни, еднакъв надпис. Написан два пъти,
+ * той се разминава: едната казва „затваря", другата утре ще каже „наред",
+ * и човекът ще търси разликата между двете думи, каквато няма.
+ */
+const GLAVA_NA_SVERKATA = `
+        <div class="glava sverka">
+          <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
+          <span class="suma">Разлика</span><span></span>
+        </div>`;
+
+function znachkaNaSverkata(zatvarya: boolean): string {
+  return `<span class="znachka ${zatvarya ? 'dobre' : 'trevoga'}">${
+    zatvarya ? 'затваря' : 'НЕ затваря'
+  }</span>`;
+}
 
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const mesets = period ?? dnes.slice(0, 7);
@@ -203,10 +223,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     <section>
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
-        <div class="glava sverka">
-          <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
-          <span class="suma">Разлика</span><span></span>
-        </div>
+        ${GLAVA_NA_SVERKATA}
         ${s.sverki
           .map(
             (x) => `
@@ -215,9 +232,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
             <span class="suma"${vStotinki(x.belezhka, x.vhod)}>${merka(x.belezhka, x.vhod)}</span>
             <span class="suma"${vStotinki(x.belezhka, x.izhod)}>${merka(x.belezhka, x.izhod)}</span>
             <span class="suma${x.nared ? '' : ' duljimo'}"${vStotinki(x.belezhka, x.razlika)}>${merka(x.belezhka, x.razlika)}</span>
-            <span><span class="znachka ${x.nared ? 'dobre' : 'trevoga'}">${
-              x.nared ? 'затваря' : 'НЕ затваря'
-            }</span></span>
+            <span>${znachkaNaSverkata(x.nared)}</span>
           </div>`,
           )
           .join('')}
@@ -329,18 +344,13 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
       </div>
       ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
       <div class="tablitsa">
-        <div class="glava sverka">
-          <span>Какво</span><span class="suma">Вход</span><span class="suma">Изход</span>
-          <span class="suma">Разлика</span><span></span>
-        </div>
+        ${GLAVA_NA_SVERKATA}
         <div class="red sverka otchet-sverka" translate="no">
           <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
           <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
           <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
           <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
-          <span><span class="znachka ${r.sverka.razlika_st === 0 ? 'dobre' : 'trevoga'}">${
-            r.sverka.razlika_st === 0 ? 'затваря' : 'НЕ затваря'
-          }</span></span>
+          <span>${znachkaNaSverkata(r.sverka.razlika_st === 0)}</span>
         </div>
       </div>
       <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
@@ -457,8 +467,7 @@ function formaRazhod(mesets: string): string {
           <div class="pole">
             <label for="razhod-nachin">Платено</label>
             <select translate="no" id="razhod-nachin" name="nachin">
-              <option value="банка">по банка</option>
-              <option value="в брой">в брой</option>
+              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
@@ -584,8 +593,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
           <div class="pole">
             <label for="dds-nachin">Начин</label>
             <select translate="no" id="dds-nachin" name="nachin">
-              <option value="банка">по банка</option>
-              <option value="в брой">в брой</option>
+              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
             </select>
           </div>
         </div>
@@ -937,7 +945,7 @@ export function zakachiSmetki(
           opis: String(danni.get('opis')).trim(),
           suma_st,
           sektor,
-          nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
+          nachin: String(danni.get('nachin')) as NachinNaPlashtane,
           data,
           dokument: String(danni.get('dokument') ?? '').trim(),
           stavka,
@@ -995,7 +1003,7 @@ export function zakachiSmetki(
           period: mesets,
           suma_st: otLeva(String(danni.get('suma'))),
           data,
-          nachin: String(danni.get('nachin')) as 'банка' | 'в брой',
+          nachin: String(danni.get('nachin')) as NachinNaPlashtane,
         },
         { opId: `dds-plateno:${crypto.randomUUID()}` },
       );

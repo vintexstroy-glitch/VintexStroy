@@ -163,7 +163,7 @@ export interface PayloadVzemaneNachisleno {
 export interface PayloadPlashtanePrieto {
   readonly vzemaneId: string;
   readonly suma_st: number;
-  readonly nachin: 'банка' | 'в брой';
+  readonly nachin: NachinNaPlashtane;
   readonly data: string;
 }
 
@@ -182,7 +182,7 @@ export interface PayloadRazhodZapisan {
   readonly suma_st: number;
   /** ключ на акумулатор от `dds.ts` */
   readonly sektor: string;
-  readonly nachin: 'банка' | 'в брой';
+  readonly nachin: NachinNaPlashtane;
   readonly data: string;
   /** номер на фактура или документ; празно, ако няма */
   readonly dokument: string;
@@ -232,7 +232,7 @@ export interface PayloadDDSPlateno {
   readonly period: string;
   readonly suma_st: number;
   readonly data: string;
-  readonly nachin: 'банка' | 'в брой';
+  readonly nachin: NachinNaPlashtane;
 }
 
 /**
@@ -461,6 +461,24 @@ export type PayloadPredlozhenieZapisano = Predlozhenie;
  * (`potvarzhdenie.ts`).
  */
 export type PayloadZadachaZapisana = Zadacha;
+
+/**
+ * КАК СА МИНАЛИ ПАРИТЕ · изброено ПОИМЕННО, с надписа си.
+ *
+ * Четири форми рисуваха този избор поотделно — и вече се бяха разминали:
+ * три казваха „по банка", четвъртата „банка". Стойността е една и съща, тъй
+ * че нищо не се чупеше; разминаваше се само онова, което човекът ЧЕТЕ, а
+ * точно него никой тест не гледа.
+ *
+ * Ключът е СТОЙНОСТТА в Журнала и не се мени — стар запис не се преписва
+ * (правило 1). Надписът е за екрана и може да се пипа тук, на едно място.
+ */
+export const NACHINI_NA_PLASHTANE = [
+  { klyuch: 'банка', ime: 'по банка' },
+  { klyuch: 'в брой', ime: 'в брой' },
+] as const;
+
+export type NachinNaPlashtane = (typeof NACHINI_NA_PLASHTANE)[number]['klyuch'];
 
 export function sashtnost(vid: Vid, id: string): Sashtnost {
   return { vid, id };
