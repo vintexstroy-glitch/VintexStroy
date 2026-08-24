@@ -15,6 +15,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   filtriray,
+  grupiraj,
+  sboroveNaGrupata,
   smeniPodredba,
   sravnitel,
   tarsi,
@@ -156,6 +158,49 @@ describe('сметката на избора', () => {
     const s = smetniIzbora([{ tekst: 'текст', st: null }]);
     expect(s.broyPari).toBe(0);
     expect(s.sbor_st).toBe(0);
+  });
+});
+
+// ── групирането със сбор (вълна 2 · предложение 12) ────────────────────────
+describe('групирането по колона', () => {
+  interface RedNaem {
+    imot: string;
+    naem_st: number;
+  }
+  const KOL: KolonaSFiltar<RedNaem>[] = [
+    { klyuch: 'imot', ime: 'Имот', vid: 'tekst', vzemi: (r) => r.imot },
+    { klyuch: 'naem', ime: 'Наем', vid: 'evro', vzemi: (r) => r.naem_st },
+  ];
+  const NAEMI: RedNaem[] = [
+    { imot: 'Малинова', naem_st: 500_00 },
+    { imot: 'Дианабад', naem_st: 1200_00 },
+    { imot: 'Малинова', naem_st: 300_00 },
+  ];
+
+  it('дели по стойност и пази реда ВЪТРЕ в групата', () => {
+    const g = grupiraj(NAEMI, KOL[0]!, '2026-08-24');
+    expect(g.map((x) => x.ime)).toEqual(['Дианабад', 'Малинова']); // българска азбука
+    expect(g[1]!.redove.map((r) => r.naem_st)).toEqual([500_00, 300_00]); // както дойдоха
+  });
+
+  it('групата СУМИРА — само евро колоните, в цели стотинки', () => {
+    const g = grupiraj(NAEMI, KOL[0]!, '2026-08-24');
+    expect(sboroveNaGrupata(g[1]!.redove, KOL)).toEqual([{ ime: 'Наем', sbor_st: 800_00 }]);
+    // текстовата колона не ражда сбор — няма какво да значи
+    expect(sboroveNaGrupata(g[1]!.redove, [KOL[0]!])).toEqual([]);
+  });
+
+  it('празната стойност (напр. продаден обект) не влиза като нула по право', () => {
+    const s = sboroveNaGrupata(
+      [{ imot: 'х', naem_st: '' as unknown as number }, { imot: 'х', naem_st: 100 }],
+      KOL,
+    );
+    expect(s[0]!.sbor_st).toBe(100);
+  });
+
+  it('евро колоната се групира по праговете на филтъра, в реда на праговете', () => {
+    const g = grupiraj(NAEMI, KOL[1]!, '2026-08-24');
+    expect(g.map((x) => x.ime)).toEqual(['100 – 500 €', '500 – 1000 €', '1000 – 5000 €']);
   });
 });
 

@@ -41,7 +41,7 @@ import { VID } from '../src/domein/sabitiya.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glavaSFiltar, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
@@ -227,7 +227,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ${
           filtriraniRazhodi.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : filtriraniRazhodi.redove.map(redNaRazhod).join('')
+            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, redNaRazhod)
         }
       </div>
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}

@@ -788,8 +788,10 @@ async function main() {
     await p.waitForSelector('.filtar-menyu');
     const grupi = await p.$$eval('.otmetka span', (r) => r.map((x) => x.textContent));
     proveri('менюто изброява секторите', grupi.some((g) => g.includes('търговски')), true);
-    const targovskata = await p.$('.otmetka:has-text("търговски") input');
-    await targovskata.check();
+    // По селектор, не по хванат елемент: джобът може да съобщи „нова версия"
+    // и да прерисува точно между хващането и щракването — хванатият елемент
+    // тогава вече не е закачен. Селекторът се решава в мига на действието.
+    await p.check('.otmetka:has-text("търговски") input');
     await p.waitForFunction(() => document.querySelectorAll('.red.naem').length === 1);
     proveri('филтърът остави търговския наем', await p.$$eval('.red.naem', (r) => r.length), 1);
     proveri('и казва колко крие', (await tekstNa(p, '.filtar-skrito')).includes('крие 1'), true);
@@ -1867,6 +1869,48 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click(`[data-filtar-izchisti-vsichko="${tarsachkaPari}"]`));
     proveri('„покажи всичко" връща редовете',
       await broyDoTarsachkata(tarsachkaPari), broyPredi);
+
+    // ══ 33 · групирането по колона · групата СУМИРА ═════════════════════
+    razdel = '33 · групирането';
+    await naEkran(p, 'imoti', '#forma-imot');
+    const naemiPredi = await p.$$eval('.red.naem', (r) => r.length);
+
+    // менюто на колоната „Имот" → „Групирай по тази колона"
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="naemi:imot"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-grupiray="naemi:imot"]'));
+    proveri('групите се появиха', (await p.$$eval('.grupata', (r) => r.length)) > 0, true);
+    proveri('редовете са си всичките', await p.$$eval('.red.naem', (r) => r.length), naemiPredi);
+    proveri('групата носи сбор в евро', (await tekstNa(p, '.grupata')).includes('€'), true);
+
+    // СВЕРКА С НЕЗАВИСИМ ВТОРИ ПЪТ: сборът в шапката = сборът на data-st
+    // на редовете под нея (до следващата група).
+    const sverkaNaGrupa = await p.evaluate(() => {
+      const g = document.querySelector('.grupata');
+      let el = g.nextElementSibling;
+      let sbor = 0;
+      while (el && !el.classList.contains('grupata')) {
+        const st = el.querySelector('.suma[data-st]');
+        if (st) sbor += Number(st.dataset.st);
+        el = el.nextElementSibling;
+      }
+      return { sbor, pokazano: g.querySelector('.sborove')?.textContent ?? '' };
+    });
+    proveri('сборът на групата е сборът на редовете ѝ, стотинка по стотинка',
+      Number(sverkaNaGrupa.pokazano.replace(/[^\d,-]/g, '').replace(',', '.')),
+      sverkaNaGrupa.sbor / 100);
+
+    // сгъването крие РЕДОВЕТЕ, не сбора
+    await deystvieSPrerisuvane(p, () => p.click('.grupata'));
+    proveri('сгънатата група крие редовете си',
+      (await p.$$eval('.red.naem', (r) => r.length)) < naemiPredi, true);
+    proveri('но сборът ѝ остава на екрана', (await tekstNa(p, '.grupata')).includes('€'), true);
+    await deystvieSPrerisuvane(p, () => p.click('.grupata'));
+    proveri('разгъването ги връща', await p.$$eval('.red.naem', (r) => r.length), naemiPredi);
+
+    // махането връща таблицата както си беше
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="naemi:imot"]'));
+    await deystvieSPrerisuvane(p, () => p.click('[data-grupiray="naemi:imot"]'));
+    proveri('„Махни групирането" прибира групите', await p.$('.grupata'), null);
 
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });

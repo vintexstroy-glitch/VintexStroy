@@ -54,6 +54,7 @@ import { ekraniraj } from './imoti.js';
 import {
   filtriray,
   glavaSFiltar,
+  grupiranaTablitsa,
   poleZaTarsene,
   redZaSkritoto,
   type KolonaSFiltar,
@@ -197,7 +198,7 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         ${
           f.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : f.redove.map(redNaObekt).join('')
+            : grupiranaTablitsa('stoynost', f.redove, koloni, dnes, redNaObekt)
         }
         <div class="red stoynost sbor" translate="no">
           <span class="kletka"><b>Стойност на Състояние</b><span>без продаденото</span></span>

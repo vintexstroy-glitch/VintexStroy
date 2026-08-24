@@ -13,6 +13,7 @@
  */
 
 import { ekraniraj } from './imoti.js';
+import { pishi } from '../src/yadro/pari.js';
 import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
@@ -53,6 +54,12 @@ const podredbi = new Map<string, Podredba>();
 /** Търсеното в цялата таблица · по таблица. */
 const tarseno = new Map<string, string>();
 
+/** Групирането · по таблица, една колона (ADR-022 · вълна 2, предложение 12). */
+const grupirano = new Map<string, string>();
+
+/** Сгънатите групи · по таблица. Сгъната група крие редовете, не сбора си. */
+const sgunati = new Map<string, Set<string>>();
+
 /** Отвореното меню е моментно — то нарочно НЕ се помни. */
 let otvoreno: string | null = null;
 
@@ -68,6 +75,12 @@ for (const [k, v] of Object.entries(chetiEkranno<Record<string, Podredba>>('filt
 }
 for (const [k, v] of Object.entries(chetiEkranno<Record<string, string>>('filtri.tarseno', {}))) {
   tarseno.set(k, v);
+}
+for (const [k, v] of Object.entries(chetiEkranno<Record<string, string>>('filtri.grupirano', {}))) {
+  grupirano.set(k, v);
+}
+for (const [k, v] of Object.entries(chetiEkranno<Record<string, string[]>>('filtri.sgunati', {}))) {
+  sgunati.set(k, new Set(v));
 }
 
 /**
@@ -95,6 +108,8 @@ function zapomniFiltrite(): void {
   zapomniEkranno('filtri.izbrano', Object.fromEntries([...izbrano].map(([k, v]) => [k, [...v]])));
   zapomniEkranno('filtri.podredbi', Object.fromEntries(podredbi));
   zapomniEkranno('filtri.tarseno', Object.fromEntries(tarseno));
+  zapomniEkranno('filtri.grupirano', Object.fromEntries(grupirano));
+  zapomniEkranno('filtri.sgunati', Object.fromEntries([...sgunati].map(([k, v]) => [k, [...v]])));
 }
 
 function klyuchNa(tablitsa: string, kolona: string): string {
@@ -271,6 +286,91 @@ export function filtriray<T>(
   return { redove: ostanali, skriti: redove.length - ostanali.length };
 }
 
+// ── групирането · сборът се СМЯТА, не се записва (правило 20) ─────────────
+export interface Grupa<T> {
+  readonly ime: string;
+  readonly redove: readonly T[];
+}
+
+/**
+ * Дели редовете на групи по колоната и ги подрежда по реда на групите ѝ —
+ * същите групи като във филтърното меню: евро по прагове, дати по „Днес ·
+ * Вчера · месец", текст по стойност. Подредбата ВЪТРЕ в групата се пази —
+ * тя е дошла от сортирането и не се разбърква.
+ */
+export function grupiraj<T>(
+  redove: readonly T[],
+  k: KolonaSFiltar<T>,
+  dnes: string,
+): Grupa<T>[] {
+  const po = new Map<string, T[]>();
+  for (const red of redove) {
+    const g = grupaNa(k, red, dnes);
+    const spisak = po.get(g) ?? [];
+    spisak.push(red);
+    po.set(g, spisak);
+  }
+  const broyki = new Map([...po].map(([ime, r]) => [ime, r.length]));
+  return podrediGrupi(k.vid, broyki).map(([ime]) => ({ ime, redove: po.get(ime)! }));
+}
+
+/**
+ * Сборовете на една група · САМО колоните с вид `evro`, в цели стотинки.
+ * Airtable е упрекван точно за „групите не сумират" — тук групата сумира,
+ * а сборът никъде не се записва: той е поглед, не събитие.
+ */
+export function sboroveNaGrupata<T>(
+  redove: readonly T[],
+  koloni: readonly KolonaSFiltar<T>[],
+): { ime: string; sbor_st: number }[] {
+  return koloni
+    .filter((k) => k.vid === 'evro')
+    .map((k) => ({
+      ime: k.ime,
+      sbor_st: redove.reduce((sbor, red) => {
+        const surovo = k.vzemi(red);
+        // празното (напр. продаден обект) не е нула по право — то просто липсва
+        if (surovo === '') return sbor;
+        const st = Number(surovo);
+        return sbor + (Number.isSafeInteger(st) ? st : 0);
+      }, 0),
+    }));
+}
+
+/**
+ * Редовете на таблица, групирани ако човекът е поискал — иначе както са.
+ * Екраните подават само как се рисува ЕДИН ред; всичко друго е на двигателя.
+ */
+export function grupiranaTablitsa<T>(
+  tablitsa: string,
+  redove: readonly T[],
+  koloni: readonly KolonaSFiltar<T>[],
+  dnes: string,
+  red: (r: T) => string,
+): string {
+  const klyuch = grupirano.get(tablitsa);
+  const kolona = klyuch === undefined ? undefined : koloni.find((k) => k.klyuch === klyuch);
+  if (!kolona) return redove.map(red).join('');
+  const sgunatiTuk = sgunati.get(tablitsa) ?? new Set<string>();
+  return grupiraj(redove, kolona, dnes)
+    .map((g) => {
+      const sgunata = sgunatiTuk.has(g.ime);
+      const sborove = sboroveNaGrupata(g.redove, koloni)
+        .map((s) => `${ekraniraj(s.ime)}: <b>${pishi(s.sbor_st)}</b>`)
+        .join(' · ');
+      // Сгъването крие РЕДОВЕТЕ, не сбора — шапката на групата остава цяла.
+      return `<button type="button" class="grupata" translate="no"
+        data-grupa-sgani="${ekraniraj(tablitsa)}" data-grupa="${ekraniraj(g.ime)}"
+        aria-expanded="${sgunata ? 'false' : 'true'}">
+        <span class="strelchitsa">${sgunata ? '▸' : '▾'}</span>
+        <b>${ekraniraj(g.ime)}</b>
+        <span>${g.redove.length} ${g.redove.length === 1 ? 'ред' : 'реда'}</span>
+        ${sborove ? `<span class="sborove">${sborove}</span>` : ''}
+      </button>${sgunata ? '' : g.redove.map(red).join('')}`;
+    })
+    .join('');
+}
+
 // ── рисуването ────────────────────────────────────────────────────────────
 /** Заглавна клетка със стрелка — като колонна глава в Explorer. */
 export function glavaSFiltar<T>(
@@ -332,6 +432,9 @@ function menyu<T>(
         ? `<button type="button" class="izchisti-filtar" data-filtar-izchisti="${ekraniraj(pald)}">Изчисти филтъра</button>`
         : ''
     }
+    <button type="button" class="izchisti-filtar" data-grupiray="${ekraniraj(pald)}">${
+      grupirano.get(tablitsa) === k.klyuch ? 'Махни групирането' : 'Групирай по тази колона'
+    }</button>
   </span>`;
 }
 
@@ -420,6 +523,37 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar-izchisti]')) {
     b.addEventListener('click', async () => {
       izbrano.delete(b.dataset['filtarIzchisti']!);
+      zapomniFiltrite();
+      await prerisuvay();
+    });
+  }
+
+  // ── групирането: пали се от менюто на колоната, гаси се от същото място ──
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-grupiray]')) {
+    b.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const pald = b.dataset['grupiray']!;
+      const dvoetochie = pald.indexOf(':');
+      const tablitsa = pald.slice(0, dvoetochie);
+      const kolona = pald.slice(dvoetochie + 1);
+      if (grupirano.get(tablitsa) === kolona) grupirano.delete(tablitsa);
+      else grupirano.set(tablitsa, kolona);
+      // сгънатото е на СТАРОТО групиране — с новото няма какво да значи
+      sgunati.delete(tablitsa);
+      otvoreno = null;
+      zapomniFiltrite();
+      await prerisuvay();
+    });
+  }
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-grupa-sgani]')) {
+    b.addEventListener('click', async () => {
+      const tablitsa = b.dataset['grupaSgani']!;
+      const ime = b.dataset['grupa']!;
+      const s = sgunati.get(tablitsa) ?? new Set<string>();
+      if (s.has(ime)) s.delete(ime);
+      else s.add(ime);
+      sgunati.set(tablitsa, s);
       zapomniFiltrite();
       await prerisuvay();
     });

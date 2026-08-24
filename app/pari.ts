@@ -26,6 +26,7 @@ import { opitajStorno, vidOtAtribut } from './storno.js';
 import {
   filtriray,
   glavaSFiltar,
+  grupiranaTablitsa,
   poleZaTarsene,
   redZaSkritoto,
   type KolonaSFiltar,
@@ -169,7 +170,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
             ? '<p class="prazno">Нищо не е просрочено.</p>'
             : fZakasneli.redove.length === 0
               ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-              : fZakasneli.redove.map((v) => redVzemane(o, v, v.dniZakasnenie)).join('')
+              : grupiranaTablitsa('prosrocheni', fZakasneli.redove, koloniVz, dnes, (v) => redVzemane(o, v, v.dniZakasnenie))
         }
       </div>
       ${redZaSkritoto(fZakasneli, 'prosrocheni')}
@@ -188,7 +189,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
         ${
           fOtvoreni.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : fOtvoreni.redove.map((v) => redVzemane(o, v, 0)).join('')
+            : grupiranaTablitsa('vsrok', fOtvoreni.redove, koloniVz, dnes, (v) => redVzemane(o, v, 0))
         }
       </div>
       ${redZaSkritoto(fOtvoreni, 'vsrok')}
@@ -219,7 +220,7 @@ function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {
             ? '<p class="prazno">Още няма прието плащане.</p>'
             : f.redove.length === 0
               ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-              : f.redove.map((p) => redPlashtane(o, p)).join('')
+              : grupiranaTablitsa('plashtaniya', f.redove, koloni, dnes, (p) => redPlashtane(o, p))
         }
       </div>
       ${redZaSkritoto(f, 'plashtaniya')}

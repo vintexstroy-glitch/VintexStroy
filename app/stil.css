@@ -696,6 +696,23 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   padding: 8px; border-top: 1px solid var(--liniya); margin-top: 4px; cursor: pointer;
 }
 .filtar-skrito { margin-top: 6px; }
+
+/* ── групирането · шапка на група със сбор (ADR-022 · вълна 2) ──────────── */
+.grupata {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 8px 12px; box-sizing: border-box;
+  border: none; border-top: 1px solid var(--liniya);
+  background: var(--panel); color: var(--mastilo);
+  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+}
+.grupata:hover { background: #EFE9DE; }
+.grupata b { font-weight: 600; }
+.grupata .strelchitsa { color: var(--mastilo2); font-size: 10px; flex-shrink: 0; }
+.grupata .sborove {
+  margin-left: auto; color: var(--mastilo2);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.grupata .sborove b { color: var(--mastilo); }
 .vrazka {
   border: none; background: transparent; color: var(--aktsent);
   font-family: inherit; font-size: inherit; padding: 0; cursor: pointer;

@@ -14,7 +14,7 @@ import { GreshkaData, otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, vidOtAtribut } from './storno.js';
-import { filtriray, glavaSFiltar, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { filtriray, glavaSFiltar, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import type { Konteks } from './main.js';
@@ -307,7 +307,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-              : filtriraniImoti.redove.map((i) => redImot(i, naemiPoImot.get(i.id) ?? [])).join('')
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniNaImotite(naemiPoImot), dnesKato(), (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
@@ -335,7 +335,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         ${
           filtriraniNaemi.redove.length === 0
             ? '<p class="prazno">Филтърът не остави нито един ред.</p>'
-            : filtriraniNaemi.redove.map((n) => redNaem(n, ogledalo)).join('')
+            : grupiranaTablitsa('naemi', filtriraniNaemi.redove, koloniNaNaemite(ogledalo), dnesKato(), (n) => redNaem(n, ogledalo))
         }
       </div>
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
