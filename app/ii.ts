@@ -18,9 +18,11 @@
  */
 
 import {
+  broeviNaKartata,
   BROY_UMENIYA,
   dobaviUmenie,
   harakteristika,
+  kartaNaDostapa,
   IMENA_NA_OBHVATITE,
   IMENA_NA_PRISADITE,
   IMENA_NA_SASTOYANIYATA,
@@ -36,6 +38,8 @@ import {
   sglobiProtokol,
   sverkataZatvarya,
   vklyuchenite,
+  zakriy,
+  NEPROMENIMI,
   ZAKONITE,
   type Agent,
   type Obhvat,
@@ -44,6 +48,7 @@ import {
 } from '../src/domein/agenti.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
+import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
 import { dumiZaGreshka, ekraniraj } from './imoti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './main.js';
@@ -74,6 +79,7 @@ export function narisuvayII(o: Ogledalo, kontrol: TroyniyatKontrol, dnes: string
     kartaAgentite(agenti, izbran) +
     (dobavyam ? formaNaAgent() : '') +
     (izbran ? kartaProtokol(izbran, kontrol, dnes) : '') +
+    (izbran ? kartaNaDostapaBlok(o, izbran) : '') +
     (izbran ? kartaUmeniya(izbran) : '') +
     (izbran && pitamZaSaglasie ? kartaSaglasie(izbran) : '') +
     kartaZakonite() +
@@ -222,9 +228,16 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
       </details>
       <div class="deystviya">
         ${
-          a.sastoyanie === 'vklyuchen'
-            ? `<button type="button" class="vtorichen" id="spri-agenta">Спри агента</button>`
-            : `<button type="button" class="glaven" id="vklyuchi-agenta"${k.pravo && k.otmetka ? '' : ' disabled'}>Включи агента…</button>`
+          a.sastoyanie === 'zakrit'
+            ? '<span class="znachka tiha">ЗАКРИТ · следа, не запис за поправка</span>'
+            : a.sastoyanie === 'vklyuchen'
+              ? `<button type="button" class="vtorichen" id="spri-agenta">Спри агента</button>`
+              : `<button type="button" class="glaven" id="vklyuchi-agenta"${k.pravo && k.otmetka ? '' : ' disabled'}>Включи агента…</button>`
+        }
+        ${
+          a.sastoyanie === 'zakrit'
+            ? ''
+            : '<button type="button" class="vtorichen" id="zakriy-agenta">Закрий и направи нов…</button>'
         }
         <p class="drebno">${
           k.pravo && k.otmetka
@@ -232,7 +245,66 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
             : 'Планът или отметката не позволяват — двете се виждат горе, поотделно.'
         }</p>
       </div>
+      <p class="drebno">НЕПРОМЕНИМО след създаване: ${NEPROMENIMI.join(' · ')}.
+      Трябва ли промяна — агентът се ЗАКРИВА и се прави нов (И94 т.6). Закритият остава
+      като следа: предложенията му сочат него и трябва да си имат автор.</p>
       <p class="drebno" hidden>${ekraniraj(dnes)}</p>
+    </section>`;
+}
+
+/**
+ * КЪДЕ ВИЖДА · КЪДЕ РЕДАКТИРА (И94 т.6).
+ *
+ * „Се вижда след създаването къде вижда и къде редактира отделният агент."
+ * Картата не строи ново право — чете колонното (ADR-011) и вида на колоната,
+ * и то ПРЕЗ ИМЕЙЛА НА ОТГОВОРНИКА: агентът не вижда повече от човека, който
+ * отговаря за него. Колоната „редактира" е нула и стои като ЧИСЛО — числото,
+ * което не мърда, обещава повече от изречение, че няма да мърда.
+ */
+function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
+  const modeli = [...o.modeli.values()].map((m) => ({
+    klyuch: m.klyuch,
+    glavi: m.glavi,
+    zatvorena: (kolona: number) => vidNaKolona(m, kolona) === 'zatvorena',
+    vizhdaYa: (kolona: number) =>
+      pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona) === 'vizhda',
+  }));
+  const karta = kartaNaDostapa(a, { modeli });
+  const broi = broeviNaKartata(karta);
+
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Къде вижда · къде редактира</h2>
+        <span>чете се през правата на ${ekraniraj(a.otgovornik)} — агентът не вижда повече от отговорника си</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka"><span class="etiket">Колони общо</span><span class="chislo" translate="no">${broi.vsichki}</span><span class="pod">в хедърите от Настройки</span></div>
+        <div class="plochka"><span class="etiket">Вижда</span><span class="chislo" translate="no">${broi.vizhda}</span><span class="pod">незакрити за отговорника</span></div>
+        <div class="plochka"><span class="etiket">Може да ПРЕДЛОЖИ</span><span class="chislo" translate="no">${broi.predlaga}</span><span class="pod">променящи се · записва човекът</span></div>
+        <div class="plochka"><span class="etiket">РЕДАКТИРА</span><span class="chislo" data-redaktira translate="no">${broi.redaktira}</span><span class="pod">нула по устройство (правило 18)</span></div>
+      </div>
+      ${
+        karta.length === 0
+          ? '<p class="prazno">Още няма нито един хедър.<br>Картата се пълни, щом в Настройки има модели на таблици.</p>'
+          : `<div class="tablitsa" data-tablitsa="karta-dostap">
+        <div class="glava opis"><span>Таблица</span><span>Колона</span><span>Вижда</span><span>Защо</span></div>
+        ${karta
+          .map(
+            (r) => `<div class="red opis" translate="no">
+          <span>${ekraniraj(r.tablitsa)}</span>
+          <span><b>${ekraniraj(r.kolona)}</b></span>
+          <span><span class="znachka ${r.vizhda ? 'dobre' : 'tiha'}">${r.vizhda ? 'вижда' : 'скрито'}</span>${
+            r.predlaga ? '<span class="znachka tiha">може да предложи</span>' : ''
+          }</span>
+          <span>${ekraniraj(r.zashto)}</span>
+        </div>`,
+          )
+          .join('')}
+      </div>`
+      }
+      <p class="drebno">Колоната „редактира" я няма и няма да я има: агентът НЯМА път към Вратата.
+      Онова, което другаде е „редактира", тук е „може да предложи" — и записва човекът, с неговия имейл.</p>
     </section>`;
 }
 
@@ -625,6 +697,21 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
         await prerisuvay();
       }
     });
+
+  koren.querySelector<HTMLButtonElement>('#zakriy-agenta')?.addEventListener('click', async () => {
+    try {
+      const star = await agentSega();
+      if (!star) return;
+      await k.deystviya.zapishiAgent(zakriy(star), { opId: `agent:${crypto.randomUUID()}` });
+      dobavyam = true; // формата за нов се отваря веднага — това е пътят
+      greshka = '';
+      k.vest('dobre', `„${star.ime}" е ЗАКРИТ. Направи нов с новата характеристика.`);
+      await prerisuvay();
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+      await prerisuvay();
+    }
+  });
 
   koren.querySelector<HTMLButtonElement>('#spri-agenta')?.addEventListener('click', async () => {
     try {

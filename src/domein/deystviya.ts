@@ -14,6 +14,7 @@ import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
+import { proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import type {
   PayloadImotDobaven,
@@ -288,6 +289,11 @@ export class Deystviya {
    * човек — агентът няма достъп до Вратата и не може да си пише протокола.
    */
   async zapishiAgent(danni: PayloadAgentZapisan, z: Zayavka): Promise<Rezultat> {
+    // ВРАТАТА НА ПРОМЯНАТА (И94 т.6): протоколът е непроменим след
+    // създаване. Проверката стои ТУК, не на екрана — иначе вторият екран,
+    // който запише агент, ще я заобиколи, без да знае, че съществува.
+    const star = (await this.ogledalo()).agenti.get(danni.klyuch);
+    if (star) proveriPromyanata(star, danni);
     return this.#pusni('АгентЗаписан', VID.agent, `AGENT:${danni.klyuch}`, danni, z);
   }
 

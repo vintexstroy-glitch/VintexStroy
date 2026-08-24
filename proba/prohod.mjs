@@ -2487,6 +2487,48 @@ async function main() {
     proveri('и Управление го вижда — един механизъм, два екрана',
       (await p.evaluate(() => document.body.textContent)).includes('Проба от Сметки'), true);
 
+    // ══ 44 · непроменимият протокол и картата (И94 т.6) ══════════════════════
+    razdel = '44 · протоколът и картата';
+    await naEkran(p, 'ii', '#nov-agent');
+
+    // КАРТАТА · „къде вижда и къде редактира"
+    proveri('картата на достъпа се вижда след създаването',
+      (await p.evaluate(() => document.body.textContent)).includes('Къде вижда · къде редактира'), true);
+    proveri('РЕДАКТИРА е нула — и стои като ЧИСЛО',
+      await p.$eval('[data-redaktira]', (e) => e.textContent.trim()), '0');
+    proveri('картата брои колони от истинските хедъри',
+      (await p.$$eval('[data-tablitsa="karta-dostap"] .red', (r) => r.length)) > 0, true);
+    proveri('и казва през кой имейл се чете',
+      (await p.evaluate(() => document.body.textContent)).includes('не вижда повече от отговорника си'), true);
+
+    // ВТОРИЯТ ИМЕЙЛ · неговата проба
+    await deystvieSPrerisuvane(p, () => p.click('#nov-agent'));
+    await p.fill('#agent-ime', 'Пробният');
+    await p.fill('#agent-otgovornik', 'ivaylo85petkov@gmail.com');
+    await p.fill('#agent-rabota', 'Проба с втория имейл — чете Пари и предлага.');
+    await p.check('[data-obhvat="pari"]');
+    await p.fill('#agent-zabrani', 'не пише в Журнала');
+    await sSabitie(p, () => p.click('#forma-agent button[type=submit]'));
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.agent')].some((r) => r.textContent.includes('Пробният')));
+    proveri('вторият имейл е отговорник на пробния агент',
+      (await redove(p, '.red.agent')).some((r) => r.includes('ivaylo85petkov@gmail.com')), true);
+
+    // НЕПРОМЕНИМОТО · екранът го КАЗВА поименно
+    proveri('непроменимото е изброено поименно',
+      (await p.evaluate(() => document.body.textContent)).includes('НЕПРОМЕНИМО след създаване'), true);
+
+    // ЗАКРИВАНЕТО · „трие се агента и се прави нов"
+    const predZakrivane = await broySabitiya(p);
+    await sSabitie(p, () => p.click('#zakriy-agenta'));
+    proveri('закриването е събитие, не триене', await broySabitiya(p), predZakrivane + 1);
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('.red.agent')].some((r) => r.textContent.includes('ЗАКРИТ')));
+    proveri('закритият остава като СЛЕДА',
+      (await redove(p, '.red.agent')).some((r) => r.some((x) => x.includes('ЗАКРИТ'))), true);
+    proveri('и формата за нов се отваря веднага — това е пътят',
+      Boolean(await p.$('#forma-agent')), true);
+
   } catch (greshka) {
     nahodki.push({ razdel, kakvo: 'проходът се спъна', vidyano: String(greshka).split('\n')[0], ochakvano: 'да мине' });
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си

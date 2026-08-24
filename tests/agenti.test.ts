@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import {
+  broeviNaKartata,
   dobaviUmenie,
   GreshkaAgent,
   harakteristika,
@@ -21,8 +22,13 @@ import {
   pokazateli,
   premahniUmenie,
   prevklyuchiUmenie,
+  kartaNaDostapa,
+  NEPROMENIMI,
+  proveriPromyanata,
   proveriTriUmeniya,
   razlikaNaSverkata,
+  razlikaVProtokola,
+  zakriy,
   sglobiProtokol,
   sverkataZatvarya,
   vklyuchenite,
@@ -164,6 +170,109 @@ describe('уменията се добавят, махат, включват и 
 
     // характеристиката СЕ БРОИ за умение — тя е включена постоянно
     expect(proveriTriUmeniya(bez, ['harakteristika', 'matematika', 'masterbook-data']).length).toBe(3);
+  });
+});
+
+describe('непроменимият протокол (И94 т.6)', () => {
+  it('НЕПРОМЕНИМИТЕ са изброени ПОИМЕННО, не „всичко освен"', () => {
+    expect([...NEPROMENIMI]).toEqual([
+      'характеристиката',
+      'обхватът · къде вижда',
+      'забраните',
+      'отговорникът',
+    ]);
+  });
+
+  it('смяна на характеристиката се ОТКАЗВА — трие се агентът, прави се нов', () => {
+    const star = schetovoditelyat();
+    const nov = schetovoditelyat({ harakteristika: 'Друга работа.' });
+    expect(razlikaVProtokola(star, nov)).toEqual(['характеристиката']);
+    expect(() => proveriPromyanata(star, nov)).toThrow(/Закрий агента и направи нов/);
+  });
+
+  it('и обхватът, и забраните, и отговорникът са закови', () => {
+    const star = schetovoditelyat();
+    expect(() =>
+      proveriPromyanata(star, schetovoditelyat({ obhvat: ['smetki', 'pari'] })),
+    ).toThrow(/обхватът/);
+    expect(() =>
+      proveriPromyanata(star, schetovoditelyat({ zabrani: ['само това'] })),
+    ).toThrow(/забраните/);
+    expect(() =>
+      proveriPromyanata(star, schetovoditelyat({ otgovornik: 'ivaylo85petkov@gmail.com' })),
+    ).toThrow(/отговорникът/);
+  });
+
+  it('а УМЕНИЯТА и състоянието се менят свободно (И93 не пада)', () => {
+    const star = schetovoditelyat();
+    expect(() => proveriPromyanata(star, dobaviUmenie(star, { ime: 'ново', tekst: '' }))).not.toThrow();
+    expect(() => proveriPromyanata(star, prevklyuchiUmenie(star, 'refresh', false))).not.toThrow();
+    expect(() =>
+      proveriPromyanata(star, { ...star, sastoyanie: 'vklyuchen', ot: '2026-08-24' }),
+    ).not.toThrow();
+  });
+
+  it('ЗАКРИВАНЕТО не трие — Журналът е само за добавяне', () => {
+    const z = zakriy(schetovoditelyat());
+    expect(z.sastoyanie).toBe('zakrit');
+    // характеристиката му остава: предложенията му сочат него
+    expect(harakteristika(z)?.tekst).toContain('сверява ДДС');
+    // и закритият НЕ се съживява
+    expect(() => proveriPromyanata(z, { ...z, sastoyanie: 'vklyuchen' })).toThrow(/не се съживява/);
+    expect(zakriy(z)).toBe(z); // повторното закриване не е ново състояние
+  });
+
+  it('Вратата на промяната пази и от ДРУГ екран — тя е в Действията', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiAgent(schetovoditelyat(), { opId: 'op-1' });
+    await expect(
+      deystviya.zapishiAgent(schetovoditelyat({ harakteristika: 'Друго' }), { opId: 'op-2' }),
+    ).rejects.toThrow(/Закрий агента/);
+    // и нищо не е влязло втори път
+    expect((await deystviya.sabitiya()).length).toBe(1);
+  });
+});
+
+describe('картата · къде вижда, къде редактира (И94 т.6)', () => {
+  const dostap = (skriti: readonly number[] = []) => ({
+    modeli: [
+      {
+        klyuch: 'Банка',
+        glavi: ['Дата', 'Сума', 'Салдо'],
+        zatvorena: (k: number) => k === 2,
+        vizhdaYa: (k: number) => !skriti.includes(k),
+      },
+    ],
+  });
+
+  it('РЕДАКТИРА е нула · и стои като БРОЙ, не като изречение', () => {
+    const karta = kartaNaDostapa(schetovoditelyat(), dostap());
+    expect(karta.every((r) => r.redaktira === false)).toBe(true);
+    expect(broeviNaKartata(karta).redaktira).toBe(0);
+  });
+
+  it('затворената колона се вижда, но не се предлага — сметка не се пише', () => {
+    const karta = kartaNaDostapa(schetovoditelyat(), dostap());
+    const saldo = karta.find((r) => r.kolona === 'Салдо')!;
+    expect(saldo.vizhda).toBe(true);
+    expect(saldo.predlaga).toBe(false);
+    expect(saldo.zashto).toContain('затворена');
+  });
+
+  it('агентът НЕ вижда повече от отговорника си', () => {
+    const karta = kartaNaDostapa(schetovoditelyat(), dostap([1]));
+    const suma = karta.find((r) => r.kolona === 'Сума')!;
+    expect(suma.vizhda).toBe(false);
+    expect(suma.predlaga).toBe(false);
+    expect(suma.zashto).toContain(ACTOR);
+    expect(broeviNaKartata(karta)).toEqual({ vsichki: 3, vizhda: 2, predlaga: 1, redaktira: 0 });
+  });
+
+  it('вторият имейл като отговорник · пробата, която той поиска', () => {
+    const vtoriyat = 'ivaylo85petkov@gmail.com';
+    const a = schetovoditelyat({ otgovornik: vtoriyat });
+    const karta = kartaNaDostapa(a, dostap([0]));
+    expect(karta.find((r) => r.kolona === 'Дата')!.zashto).toContain(vtoriyat);
   });
 });
 

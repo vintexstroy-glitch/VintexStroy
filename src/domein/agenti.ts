@@ -34,7 +34,7 @@ export class GreshkaAgent extends Error {
 }
 
 /** Трите състояния на агента. Спрян ≠ изключен: кранът е трети контрол. */
-export const SASTOYANIYA_NA_AGENT = ['izklyuchen', 'vklyuchen', 'spryan'] as const;
+export const SASTOYANIYA_NA_AGENT = ['izklyuchen', 'vklyuchen', 'spryan', 'zakrit'] as const;
 
 export type SastoyanieNaAgent = (typeof SASTOYANIYA_NA_AGENT)[number];
 
@@ -42,6 +42,7 @@ export const IMENA_NA_SASTOYANIYATA: Readonly<Record<SastoyanieNaAgent, string>>
   izklyuchen: 'изключен',
   vklyuchen: 'включен',
   spryan: 'спрян с крана',
+  zakrit: 'ЗАКРИТ · протоколът му е бил сменен',
 });
 
 /**
@@ -223,17 +224,71 @@ export function prevklyuchiUmenie(a: Agent, klyuch: string, vklyucheno: boolean)
   });
 }
 
-/** ПРЕНАПИСВА характеристиката · тя не се маха, но се поправя. */
-export function smeniHarakteristikata(a: Agent, tekst: string): Agent {
-  if (tekst.trim() === '') {
-    throw new GreshkaAgent('Длъжностната характеристика не е украса — без нея агентът няма работа.');
+/**
+ * НЕПРОМЕНИМОТО след създаване · негова поръчка (И94 т.6), дословно:
+ *
+ *   „при създаване му даваш НЕПРОМЕНИМИ после, но ПРИ СЪЗДАВАНЕТО му ги
+ *    редактираш… Ако има нужда от редакция СЕ ТРИЕ АГЕНТА и се прави нов с
+ *    промяната на длъжностната характеристика."
+ *
+ * Затова тук няма `smeniHarakteristikata` — имаше я, никой не я викаше, и
+ * тя противоречеше на това правило. Пътят е друг: `zakriy` + нов агент.
+ *
+ * КОЕ Е НЕПРОМЕНИМО — изброено ПОИМЕННО, не „всичко освен":
+ */
+export const NEPROMENIMI = [
+  'характеристиката',
+  'обхватът · къде вижда',
+  'забраните',
+  'отговорникът',
+] as const;
+
+/**
+ * Кое се мени СЛЕД създаване (И93): уменията се добавят, махат, включват и
+ * изключват; състоянието се превключва; задачите се възлагат. Двете
+ * поръчки не се бият — И93 говори за УМЕНИЯТА, И94 т.6 за ПРОТОКОЛА.
+ */
+export function razlikaVProtokola(star: Agent, nov: Agent): readonly string[] {
+  const nahodki: string[] = [];
+  const hStar = harakteristika(star)?.tekst ?? '';
+  const hNov = harakteristika(nov)?.tekst ?? '';
+  if (hStar !== hNov) nahodki.push('характеристиката');
+  if (star.obhvat.join('|') !== nov.obhvat.join('|')) nahodki.push('обхватът · къде вижда');
+  if (star.zabrani.join('|') !== nov.zabrani.join('|')) nahodki.push('забраните');
+  if (star.otgovornik !== nov.otgovornik) nahodki.push('отговорникът');
+  return Object.freeze(nahodki);
+}
+
+/**
+ * ВРАТАТА НА ПРОМЯНАТА · отказва тихата редакция на непроменимото.
+ *
+ * Закритият агент не се съживява и не се пипа: той е следа, не запис за
+ * поправка. Живият приема само промени по уменията, състоянието и датата.
+ */
+export function proveriPromyanata(star: Agent, nov: Agent): void {
+  if (star.sastoyanie === 'zakrit' && nov.sastoyanie === 'zakrit') return;
+  if (star.sastoyanie === 'zakrit') {
+    throw new GreshkaAgent(
+      `„${star.ime}" е ЗАКРИТ — закритият агент не се съживява. Направи нов.`,
+    );
   }
-  return Object.freeze({
-    ...a,
-    umeniya: Object.freeze(
-      a.umeniya.map((u) => (u.postoyanno ? Object.freeze({ ...u, tekst: tekst.trim() }) : u)),
-    ),
-  });
+  const promeneni = razlikaVProtokola(star, nov);
+  if (promeneni.length > 0) {
+    throw new GreshkaAgent(
+      `След създаване това не се мени: ${promeneni.join(' · ')}. ` +
+        'Закрий агента и направи нов с новата характеристика (И94 т.6).',
+    );
+  }
+}
+
+/**
+ * ЗАКРИВА агента · „трие се агента" по неговите думи, но БЕЗ триене:
+ * Журналът е само за добавяне (правило 1). Закритият остава видим като
+ * следа — предложенията му сочат него и трябва да си имат автор.
+ */
+export function zakriy(a: Agent): Agent {
+  if (a.sastoyanie === 'zakrit') return a;
+  return Object.freeze({ ...a, sastoyanie: 'zakrit' as const });
 }
 
 /**
@@ -449,5 +504,88 @@ export function pokazateli(predlozheniya: readonly Predlozhenie[]): BroyeniPokaz
     prieti: predlozheniya.filter((p) => p.prisada === 'prieto' || p.prisada === 'popraveno').length,
     othvarleni: predlozheniya.filter((p) => p.prisada === 'othvarleno').length,
     razminavaniya: predlozheniya.filter((p) => !sverkataZatvarya(p)).length,
+  };
+}
+
+/**
+ * КАРТАТА НА ДОСТЪПА · „да се вижда КЪДЕ ВИЖДА и КЪДЕ РЕДАКТИРА отделният
+ * агент" (И94 т.6).
+ *
+ * Тя не строи ново право — ЧЕТЕ двете вече построени: колонното право
+ * (ADR-011 · `pravoNaKolona`) и вида на колоната (`vidNaKolona`). Плюс
+ * едно правило, което прави агента безопасен по устройство:
+ *
+ *   **АГЕНТЪТ НЕ ВИЖДА ПОВЕЧЕ ОТ ОТГОВОРНИКА СИ.** Правата се четат по
+ *   ИМЕЙЛА НА ОТГОВОРНИКА, не по име на агента. Затова агент не може да
+ *   стане врата към скрити колони: човекът, който отговаря за него, вече
+ *   не ги вижда.
+ *
+ * И затова колоната „редактира" е ЧЕСТНА и къса: **никъде**. Агентът чете,
+ * смята и ПРЕДЛАГА (правило 18); онова, което иначе би било „редактира",
+ * тук е „може да предложи промяна" — и само в променящите се колони, никога
+ * в затворените (правило 23).
+ */
+export interface RedVKartata {
+  readonly tablitsa: string;
+  readonly kolona: string;
+  /** вижда ли я агентът — през правата на ОТГОВОРНИКА си */
+  readonly vizhda: boolean;
+  /** редактира ли · ВИНАГИ false — агентът няма път към Вратата */
+  readonly redaktira: false;
+  /** може ли да ПРЕДЛОЖИ промяна в нея (променяща се и видима) */
+  readonly predlaga: boolean;
+  /** с думи: защо е така */
+  readonly zashto: string;
+}
+
+export interface DostapZaKartata {
+  /** имената на моделите (хедърите), които влизат в обхвата на агента */
+  readonly modeli: readonly {
+    readonly klyuch: string;
+    readonly glavi: readonly string[];
+    /** true, ако колоната е ЗАТВОРЕНА (сметка или пренесен текст) */
+    readonly zatvorena: (kolona: number) => boolean;
+    /** true, ако ОТГОВОРНИКЪТ вижда колоната */
+    readonly vizhdaYa: (kolona: number) => boolean;
+  }[];
+}
+
+export function kartaNaDostapa(a: Agent, dostap: DostapZaKartata): readonly RedVKartata[] {
+  const redove: RedVKartata[] = [];
+  for (const m of dostap.modeli) {
+    m.glavi.forEach((ime, kolona) => {
+      const vizhda = m.vizhdaYa(kolona);
+      const zatvorena = m.zatvorena(kolona);
+      redove.push({
+        tablitsa: m.klyuch,
+        kolona: ime,
+        vizhda,
+        redaktira: false,
+        predlaga: vizhda && !zatvorena,
+        zashto: !vizhda
+          ? `скрита за ${a.otgovornik} — агентът не вижда повече от отговорника си`
+          : zatvorena
+            ? 'затворена колона — сметка не се предлага, тя се смята'
+            : 'вижда я и може да предложи промяна; записва човекът',
+      });
+    });
+  }
+  return Object.freeze(redove);
+}
+
+/** Броените показатели на картата — за екрана; числа, не усещане. */
+export function broeviNaKartata(karta: readonly RedVKartata[]): {
+  readonly vsichki: number;
+  readonly vizhda: number;
+  readonly predlaga: number;
+  readonly redaktira: number;
+} {
+  return {
+    vsichki: karta.length,
+    vizhda: karta.filter((r) => r.vizhda).length,
+    predlaga: karta.filter((r) => r.predlaga).length,
+    // ВИНАГИ нула. Стои като БРОЙ нарочно: числото, което не мърда, е
+    // по-силно обещание от изречение, че няма да мърда.
+    redaktira: karta.filter((r) => r.redaktira).length,
   };
 }
