@@ -49,6 +49,7 @@ import type {
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
+  PayloadStopaninZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
@@ -473,6 +474,22 @@ export class Deystviya {
   ): Promise<Rezultat> {
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА СТОПАНИНА · първото събитие в Журнала на наемателя (И97 т.8).
+   *
+   * Тук няма проверка „има ли вече" — тя е при ВРАТАТА (ADR-043), защото
+   * правилото трябва да важи за всеки писач, не само за този. Действието само
+   * подава `expectedRev: 0`: Стопанинът е една същност и има точно едно
+   * събитие. Двете проверки се повтарят нарочно — една от тях е на пътя, по
+   * който се пише днес, другата е на пътя, по който ще се пише утре.
+   */
+  async zapishiStopanina(danni: PayloadStopaninZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('СтопанинЗаписан', VID.stopanin, danni.imeyl, danni, {
+      ...z,
+      expectedRev: 0,
+    });
   }
 
   /**

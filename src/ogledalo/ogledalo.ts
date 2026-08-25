@@ -44,6 +44,7 @@ import type {
   PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSpravkaPodadena,
+  PayloadStopaninZapisan,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
@@ -172,6 +173,14 @@ export interface ZapisanaSverka {
 }
 
 export interface Ogledalo {
+  /**
+   * СТОПАНИНЪТ · главният имейл на този Журнал (И97 т.5 · т.8 · ADR-043).
+   *
+   * Празен низ значи Журнал от преди резена, който още не си е дописал
+   * Стопанина — и това е ВИДИМО състояние, не мълчание: екранът го казва и
+   * предлага дописването на онзи, който има право на него.
+   */
+  readonly stopanin: string;
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
   readonly vzemaniya: ReadonlyMap<string, Vzemane>;
@@ -373,6 +382,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const modeli = new Map<string, ModelNaTablitsa>();
   const butoni = new Map<string, Buton>();
   const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
+  // ПЪРВИЯТ печели: втори „СтопанинЗаписан" Вратата не пуска, но Огледалото
+  // не разчита на това — четенето остава вярно и върху пипнат отвън Журнал.
+  let stopanin = '';
   const prava = new Map<string, PravaZaModel>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
@@ -712,6 +724,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'СтопанинЗаписан': {
+        const p = s.payload as unknown as PayloadStopaninZapisan;
+        if (stopanin === '') stopanin = p.imeyl;
+        break;
+      }
+
       case 'СправкаПодадена': {
         const p = s.payload as unknown as PayloadSpravkaPodadena;
         spravki.set(p.period, {
@@ -831,6 +849,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   }
 
   return {
+    stopanin,
     imoti,
     naemi,
     vzemaniya,

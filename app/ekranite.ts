@@ -25,6 +25,7 @@ import { narisuvayII, zakachiII } from './ii.js';
 import { narisuvayTabove, zakachiTabove } from './tabove.js';
 import { narisuvayLichno, pokanaZaLichno, zakachiLichno } from './lichno.js';
 import { mozhe, type Izbor, type Vazmozhnost } from '../src/domein/planove.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
 import type { DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
@@ -270,7 +271,17 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     // връща изключеното и там стои ключът на личното. Екран, който може да се
     // самозаключи, заключва и пътя обратно.
     narisuvay: (r) =>
-      narisuvayTablo(r.kojSam, r.izbor, r.akaunt, r.lichnoOgledalo?.lichnoVklyucheno ?? false, r.lichnoOgledalo !== null),
+      narisuvayTablo(
+        r.kojSam,
+        r.izbor,
+        r.akaunt,
+        r.lichnoOgledalo?.lichnoVklyucheno ?? false,
+        r.lichnoOgledalo !== null,
+        // СТОПАНИНЪТ и СМЯТАНАТА роля идват от ЖУРНАЛА, не от самоличността
+        // (ADR-043): доставчикът казва КОЙ си, Журналът — какво можеш в него.
+        r.ogledalo.stopanin,
+        rolyataNa(r.kojSam.imeyl, r.ogledalo),
+      ),
     zakachi: (z) => z.zakachiTabloto(),
   },
 };

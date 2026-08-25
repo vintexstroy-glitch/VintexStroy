@@ -75,6 +75,18 @@ export interface NastroykiVrata {
    * без нея сблъсъкът се оправя с повторение (виж #zapishi).
    */
   readonly klyuchalka?: <T>(naematel: string, rabota: () => Promise<T>) => Promise<T>;
+  /**
+   * ОТКРИВАЩОТО СЪБИТИЕ · кой тип трябва да стои ПЪРВИ в Журнала.
+   *
+   * Стопанинът е първото събитие в Журнала на наемателя (И97 т.8 · ADR-043), но
+   * ядрото не знае имената на домейна — `type` тук е низ и това е нарочно
+   * (`sabitie.ts`). Затова правилото е ОБЩО, а името се ПОДАВА: „в празен
+   * Журнал влиза само това; и то влиза само веднъж".
+   *
+   * По избор, като котвата и ключалката: ядрото не измисля правила на домейна.
+   * Приложението го подава винаги, а тест го пази (ADR-043).
+   */
+  readonly parvoto?: string;
 }
 
 export class Vrata {
@@ -83,6 +95,7 @@ export class Vrata {
   readonly #sha: Sha256;
   readonly #kotva: DrajkaNaKotva | undefined;
   readonly #klyuchalka: (<T>(naematel: string, rabota: () => Promise<T>) => Promise<T>) | undefined;
+  readonly #parvoto: string | undefined;
 
   /** Спирателен кран (П1.4): спира записа, без да събаря приложението. */
   #zatvorena = false;
@@ -97,6 +110,7 @@ export class Vrata {
     this.#sha = n.sha;
     this.#kotva = n.kotva;
     this.#klyuchalka = n.klyuchalka;
+    this.#parvoto = n.parvoto;
   }
 
   get zatvorena(): boolean {
@@ -282,6 +296,67 @@ export class Vrata {
     return sled;
   }
 
+  /**
+   * ОТКРИВАЩОТО СЪБИТИЕ · три правила, и трите за едно и също нещо.
+   *
+   * Негови думи: „Той е **първото събитие в Журнала** на този наемател."
+   * Оттам следва повече, отколкото изглежда:
+   *
+   *   1. **ПРАЗЕН Журнал** приема само откриващото събитие. Иначе Журнал може
+   *      да се роди без стопанин — и после всеки, който го отвори пръв, да си
+   *      го присвои.
+   *   2. **Втори път не влиза.** Това е първата от двете му забрани: „не може
+   *      да назначи друг имейл за главен". Смяната иска трета страна и НЕ се
+   *      строи като бутон (правило 18: подразбраната забрана е забрана).
+   *   3. **Започнат Журнал** (от преди този резен) приема ЕДНО дописване, и то
+   *      само от АВТОРА НА ПЪРВОТО СЪБИТИЕ. Тоест стопанинът на стар Журнал не
+   *      се избира — ИЗВЕЖДА се от самата верига. Иначе всеки, който отвори
+   *      чужд износ, би могъл да се впише за стопанин на чужда история.
+   *
+   * ВЪЗСТАНОВЯВАНЕТО минава по друг път (`vazstanovi`) и нарочно НЕ пита тук:
+   * износ, направен преди този резен, започва с каквото е започвал тогава. Да
+   * му се откаже връщането значи да се загубят данни заради правило, което не
+   * е важало, когато файлът е бил направен.
+   */
+  async #proveriOtkrivashtoto(op: Operatsiya): Promise<void> {
+    if (this.#parvoto === undefined) return;
+    const otkrivashto = op.type === this.#parvoto;
+    const parvo = await this.#dnevnik.parvo(op.naematel);
+
+    if (!parvo) {
+      if (otkrivashto) return;
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `Празен Журнал се открива с „${this.#parvoto}" — то е първото събитие ` +
+          `на наемателя. Опитът да влезе „${op.type}" преди него е отказан.`,
+      );
+    }
+    if (!otkrivashto) return;
+
+    if (parvo.type === this.#parvoto) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `„${this.#parvoto}" се записва ВЕДНЪЖ и вече стои като първо събитие ` +
+          `на ${op.naematel}. Смяната не минава оттук.`,
+      );
+    }
+    if (op.actor !== parvo.actor) {
+      throw new GreshkaVrata(
+        'BEZ_PRAVO',
+        `Журналът е започнат преди „${this.#parvoto}". Дописва го само авторът ` +
+          `на първото събитие (${parvo.actor}), не ${op.actor}.`,
+      );
+    }
+    // И в стария Журнал влиза ЕДНО дописване: първото стои не като първо
+    // събитие, а като първо на СЪЩНОСТТА, и оттам се брои.
+    if ((await this.#dnevnik.tekushtRev(op.naematel, op.sashtnost)) > 0) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `„${this.#parvoto}" вече е дописано при ${op.naematel}. Влиза веднъж.`,
+      );
+    }
+  }
+
   async #zapishi(op: Operatsiya): Promise<Rezultat> {
     // Друг раздел може да пише в същия Журнал. Опашката в паметта не го
     // вижда; носителят обаче отказва сгрешен seq в своята транзакция.
@@ -295,6 +370,9 @@ export class Vrata {
       if (veche) {
         return { seq: veche.seq, hash: veche.hash, povtoreno: true };
       }
+
+      // 3б · ОТКРИВАЩОТО СЪБИТИЕ · Стопанинът е първи и е един (ADR-043)
+      await this.#proveriOtkrivashtoto(op);
 
       // 4 · rev-предпазител
       if (op.expectedRev !== undefined) {

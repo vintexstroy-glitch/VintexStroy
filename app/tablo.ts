@@ -23,6 +23,7 @@
 import {
   IMENA_NA_DOSTAVCHITSITE,
   IMENA_NA_ROLITE,
+  type Rolya,
   type Samolichnost,
 } from '../src/yadro/samolichnost.js';
 import {
@@ -98,7 +99,7 @@ const RED: readonly Vazmozhnost[] = [
   'svarzhi-ii',
 ];
 
-function kartaKoySam(koj: Samolichnost, akaunt: string): string {
+function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya: Rolya): string {
   const vrazki = koj.svarzani.length
     ? koj.svarzani.map((d) => IMENA_NA_DOSTAVCHITSITE[d]).join(' · ')
     : 'няма вързани';
@@ -129,8 +130,21 @@ function kartaKoySam(koj: Samolichnost, akaunt: string): string {
         </div>
         <div class="plochka">
           <div class="etiket">Роля</div>
-          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[koj.rolya]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[rolya]}</div>
           <div class="pod">вързани акаунти: ${ekraniraj(vrazki)}</div>
+        </div>
+        <div class="plochka" data-pole="stopanin">
+          <div class="etiket">Стопанин</div>
+          <div class="chislo malak" translate="no">${
+            stopanin === '' ? '—' : ekraniraj(stopanin)
+          }</div>
+          <div class="pod">${
+            stopanin === ''
+              ? 'този Журнал е започнат, преди Стопанинът да се записва'
+              : stopanin === koj.imeyl
+                ? 'това си ти · първото събитие в Журнала'
+                : 'главният имейл на този Журнал'
+          }</div>
         </div>
         <div class="plochka">
           <div class="etiket">Кой Журнал</div>
@@ -271,9 +285,18 @@ export function narisuvayTablo(
   akaunt: string,
   lichnoVklyucheno = false,
   lichnoPipnato = false,
+  /**
+   * СТОПАНИНЪТ и СМЯТАНАТА роля (ADR-043).
+   *
+   * Ролята се ПОДАВА, а не се чете от `koj.rolya`: самоличността носи каквото
+   * е казал доставчикът, а какво може човекът в ТОЗИ Журнал решава Журналът.
+   * Дотук екранът показваше първото и то изглеждаше като второто.
+   */
+  stopanin = '',
+  rolya: Rolya = koj.rolya,
 ): string {
   return (
-    kartaKoySam(koj, akaunt) +
+    kartaKoySam(koj, akaunt, stopanin, rolya) +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
     kartaOtmetki(izbor) +
     kartaSravnenie(izbor, koj)

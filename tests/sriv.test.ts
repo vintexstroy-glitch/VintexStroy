@@ -55,6 +55,9 @@ class DnevnikSasSpirashtTok implements Dnevnik {
   posledno(n: string) {
     return this.istinski.posledno(n);
   }
+  parvo(n: string) {
+    return this.istinski.parvo(n);
+  }
   poOpId(n: string, o: string) {
     return this.istinski.poOpId(n, o);
   }

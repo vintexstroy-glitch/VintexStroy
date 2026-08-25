@@ -75,6 +75,13 @@ export class DnevnikVIndexedDB implements Dnevnik {
     return kursor?.value as Sabitie | undefined;
   }
 
+  /** ПЪРВОТО · същият обхват, но напред. Оттам се чете Стопанинът (ADR-043). */
+  async parvo(naematel: string): Promise<Sabitie | undefined> {
+    const hranilishte = this.#chete();
+    const kursor = await naiPurviyat(hranilishte.openCursor(obhvat(naematel), 'next'));
+    return kursor?.value as Sabitie | undefined;
+  }
+
   async poOpId(naematel: string, opId: string): Promise<Sabitie | undefined> {
     const indeks = this.#chete().index(INDEKS_OPID);
     return (await obeshtay(indeks.get([naematel, opId]))) as Sabitie | undefined;

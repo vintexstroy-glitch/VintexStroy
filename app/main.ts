@@ -65,6 +65,11 @@ import {
   sDumiZaAkaunta,
   svediImeyl,
 } from '../src/domein/akaunt.js';
+import {
+  kakvoSStopanina,
+  OTKRIVASHTO_SABITIE,
+  rolyataNa,
+} from '../src/domein/stopanin.js';
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { zabraviIzbora } from './lichno.js';
 import { dostapenLiE, EKRANI, type Konteks, type KoyEkran } from './ekranite.js';
@@ -247,6 +252,10 @@ async function trugvay(): Promise<void> {
     pravata,
     sha: sha256Web,
     kotva,
+    // ПЪРВОТО СЪБИТИЕ В ЖУРНАЛА Е СТОПАНИНЪТ (И97 т.8 · ADR-043). Ядрото не
+    // знае имената на домейна — затова името се ПОДАВА оттук, от единствения
+    // си дом (`stopanin.ts`), вместо да се преписва като низ.
+    parvoto: OTKRIVASHTO_SABITIE,
     ...(klyuchalka ? { klyuchalka } : {}),
   });
 
@@ -319,6 +328,34 @@ async function trugvay(): Promise<void> {
   };
 
   /**
+   * ОСИГУРЯВА СТОПАНИНА на един Журнал · ЕДИН дом за двата Журнала.
+   *
+   * Вратата отказва всичко друго в празен Журнал (ADR-043), тъй че това не е
+   * удобство, а условието, при което приложението изобщо може да пише.
+   *
+   * `opId` е СТАБИЛЕН и това е нарочно. Правило 20 забранява ключ от
+   * СЪДЪРЖАНИЕТО, защото връщането към предишно състояние тогава връща стария
+   * резултат — тук такова връщане няма: „откриването на този Журнал" се случва
+   * веднъж по определение. Стабилният ключ пази точно случая с два отворени
+   * раздела: вторият получава същия резултат, вместо отказ.
+   */
+  async function osiguriStopanina(d: Deystviya, naematel: string): Promise<void> {
+    const o = await d.ogledalo();
+    const parvo = await dnevnik.parvo(naematel);
+    const kakvo = kakvoSStopanina(kojSam.imeyl, o, parvo?.actor);
+    if (kakvo.sastoyanie === 'ima' || !kakvo.mozheDaZapishe) return;
+    await d.zapishiStopanina(
+      {
+        imeyl: svediImeyl(kojSam.imeyl),
+        ime: kojSam.ime,
+        dostavchik: kojSam.dostavchik,
+        ...(kakvo.sastoyanie === 'chaka-dopisvane' ? { dopisan: true } : {}),
+      },
+      { opId: `stopanin:${naematel}` },
+    );
+  }
+
+  /**
    * ПРЕВКЛЮЧВА личното · едно събитие в ЛИЧНИЯ Журнал (И98).
    *
    * Пускането е ПЪРВОТО събитие на този Журнал — съществуването му Е
@@ -330,6 +367,10 @@ async function trugvay(): Promise<void> {
       const buton = e.target as HTMLButtonElement;
       buton.disabled = true;
       try {
+        // СТОПАНИНЪТ Е ПЪРВОТО СЪБИТИЕ И В ЛИЧНИЯ ЖУРНАЛ (ADR-043). Пише се
+        // тук, а не при тръгване: личен Журнал, създаден предварително,
+        // престава да е „не е пипано" — а трите състояния са различни (И99).
+        if (vklyucheno) await osiguriStopanina(lichen.deystviya, lichen.akaunt);
         // МЯСТОТО · при пускане се чете от полето; при прибиране не трябва.
         const poleto = koren.querySelector<HTMLInputElement>('#lichno-myasto');
         await lichen.deystviya.prevklyuchiLichno(
@@ -375,7 +416,7 @@ async function trugvay(): Promise<void> {
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
-      ${strana(ogledalo, dnes, lichnoVklyucheno, kojSam.rolya, lichnoOgledalo !== null)}
+      ${strana(ogledalo, dnes, lichnoVklyucheno, rolyataNa(kojSam.imeyl, ogledalo), lichnoOgledalo !== null)}
       <main class="glavno">
         <header class="shapka">
           <div>
@@ -493,6 +534,22 @@ async function trugvay(): Promise<void> {
     zakachiChernovata(koren);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
+  }
+
+  /**
+   * СТОПАНИНЪТ ПРЕДИ ПЪРВОТО РИСУВАНЕ · иначе първият запис ще бъде отказан.
+   *
+   * Отказът тук НЕ спира тръгването: дръпнат кран (котвата не съвпада) е
+   * точно случаят, в който Журналът не се пипа (правило 8), а човекът трябва
+   * да види екрана и думите защо. Затова причината се КАЗВА и се продължава.
+   */
+  try {
+    await osiguriStopanina(deystviya, akaunt);
+  } catch (greshka) {
+    poslednaVest = {
+      vid: 'zle',
+      tekst: `Стопанинът не можа да се запише: ${dumiZaGreshka(greshka)}`,
+    };
   }
 
   await prerisuvay();

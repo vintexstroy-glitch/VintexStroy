@@ -13,6 +13,15 @@ export interface Dnevnik {
   /** Последното събитие на наемателя — дава prevHash и следващия seq. */
   posledno(naematel: string): Promise<Sabitie | undefined>;
 
+  /**
+   * ПЪРВОТО събитие на наемателя · симетрично на `posledno`.
+   *
+   * Появи се за Стопанина (ADR-043): той Е първото събитие, и трите правила на
+   * Вратата се четат оттук — има ли изобщо Журнал, има ли вече Стопанин, и кой
+   * е авторът, от когото се извежда Стопанинът на стар Журнал.
+   */
+  parvo(naematel: string): Promise<Sabitie | undefined>;
+
   /** Търси по opId — основата на идемпотентността. */
   poOpId(naematel: string, opId: string): Promise<Sabitie | undefined>;
 
@@ -44,6 +53,10 @@ export class DnevnikVPametta implements Dnevnik {
   async posledno(naematel: string): Promise<Sabitie | undefined> {
     const redica = this.#poNaematel.get(naematel);
     return redica?.[redica.length - 1];
+  }
+
+  async parvo(naematel: string): Promise<Sabitie | undefined> {
+    return this.#poNaematel.get(naematel)?.[0];
   }
 
   async poOpId(naematel: string, opId: string): Promise<Sabitie | undefined> {
