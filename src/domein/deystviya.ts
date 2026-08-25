@@ -18,6 +18,13 @@ import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
+import {
+  GreshkaLichniPari,
+  napraviTema,
+  proveriChastite,
+  VIDOVE_KREDIT,
+} from './lichni-pari.js';
+import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch } from './akaunt.js';
 import type {
   PayloadImotDobaven,
@@ -29,6 +36,11 @@ import type {
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
+  PayloadLichnaTemaZapisana,
+  PayloadLichnoDvizhenieZapisano,
+  PayloadLichenRedIzklyuchen,
+  PayloadLichenKreditZapisan,
+  PayloadLichnoIzvlechenieprieto,
   PayloadDeloPrehvarleno,
   PayloadPrenosOtcheten,
   PayloadNaemPopraven,
@@ -287,6 +299,154 @@ export class Deystviya {
     });
     proveriNeSamSiAz(dostap, this.#actor);
     return this.#pusni('ЛиченДостъпЗаписан', VID.dostap, `DOSTAP:${dostap.imeyl}`, dostap, z);
+  }
+
+  // ═══ ЛИЧНИТЕ ПАРИ (И96 т.10) ═══════════════════════════════════════════
+  //
+  // И ЧЕТИРИТЕ почват с един и същ вратар и НИТО ЕДНО не вика
+  // `proveriZamrazen`. Двете са нарочни и се обясняват веднъж тук:
+  //
+  // ВРАТАРЯТ: „Кредит", „Лечение", „Развод" не бива да влязат в СЛУЖЕБНИЯ
+  // Журнал от сгрешен екран. Разделянето на ДАННИТЕ не спасява ИМЕНАТА
+  // (ADR-036 §8) — служебният се изнася и минава пред служители.
+  //
+  // ЗАМРАЗЯВАНЕТО: правило 9 заключва месец, за който е подадена ДДС-справка.
+  // В личния Журнал `СправкаПодадена` няма и не бива да има — личният разход
+  // не се облага. Тоест правило 9 не важи тук ПО КОНСТРУКЦИЯ, а не защото
+  // някой го е изключил; нова забрана тук би изглеждала като че важи.
+
+  #samoLichno(kakvo: string): void {
+    if (!eLichenKlyuch(this.#naematel)) {
+      throw new GreshkaLichniPari(
+        `${kakvo} се записва само в ЛИЧНИЯ Журнал. В служебния такъв запис не влиза — ` +
+          'имената на личните теми не бива да минават пред служители.',
+      );
+    }
+  }
+
+  /**
+   * ЗАПИСВА ТЕМА · и преименуването, и спирането са това действие.
+   *
+   * Последният запис за същия номер ПОПРАВЯ. Затова номерът се пази стабилен
+   * при преименуване: редовете сочат него, не името, и една смяна на етикет
+   * не поражда запис за всеки ред, който го носи.
+   */
+  async zapishiLichnaTema(danni: PayloadLichnaTemaZapisana, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Лична тема');
+    const tema = napraviTema(danni);
+    return this.#pusni(
+      'ЛичнаТемаЗаписана',
+      VID.lichnaTema,
+      `LTEMA:${tema.temaId}`,
+      { ...tema },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ДВИЖЕНИЕ · приход, разход или вноска по кредит.
+   *
+   * Поправката е ПАК това действие върху същия номер — движението няма
+   * отделно събитие „Поправено", точно както делото. Огледалото пази срещу
+   * възкресяване на сторнирано (ADR-036 §9).
+   */
+  async zapishiLichnoDvizhenie(
+    danni: PayloadLichnoDvizhenieZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    this.#samoLichno('Лично движение');
+    if (danni.suma_st <= 0) {
+      throw new GreshkaLichniPari(
+        `${SUMATA_NAD_NULA} Посоката казва приход ли е, или разход — знакът не е в цифрата.`,
+      );
+    }
+    if (danni.posoka !== 'prihod' && danni.posoka !== 'razhod') {
+      throw new GreshkaLichniPari(`Непозната посока „${String(danni.posoka)}".`);
+    }
+    proveriChastite(danni);
+    return this.#pusni(
+      'ЛичноДвижениеЗаписано',
+      VID.lichnoDvizhenie,
+      `LDV:${danni.dvizhenieId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ИЗКЛЮЧВА или ВРЪЩА един ред · „ред се ИЗКЛЮЧВА" (правило 23).
+   *
+   * СВОЕ събитие, не поле в движението: повторният внос пренаписва реда от
+   * файла и би изтрил решението на човека, ако то живееше там.
+   */
+  async izklyuchiLichenRed(danni: PayloadLichenRedIzklyuchen, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Изключване на ред');
+    if (danni.izklyuchen && danni.prichina.trim() === '') {
+      throw new GreshkaLichniPari(
+        'Изключеният ред иска ПРИЧИНА. Следа без причина не обяснява нищо след половин година.',
+      );
+    }
+    return this.#pusni(
+      'ЛиченРедИзключен',
+      VID.lichnoDvizhenie,
+      `LDV:${danni.dvizhenieId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА КРЕДИТ · началният остатък и условията. Остатъкът се СМЯТА после.
+   */
+  async zapishiLichenKredit(danni: PayloadLichenKreditZapisan, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Личен кредит');
+    if (danni.ime.trim() === '') {
+      throw new GreshkaLichniPari('Кредитът иска име — „Ипотека · Пощенска", за да се различава.');
+    }
+    if (!VIDOVE_KREDIT.includes(danni.vid)) {
+      throw new GreshkaLichniPari(`Непознат вид кредит „${String(danni.vid)}".`);
+    }
+    if (danni.ostatak_st <= 0) {
+      throw new GreshkaLichniPari('Остатъкът по кредита трябва да е повече от нула.');
+    }
+    if (danni.vnoska_st <= 0) {
+      throw new GreshkaLichniPari('Вноската трябва да е повече от нула.');
+    }
+    if (!Number.isSafeInteger(danni.lihva_bp) || danni.lihva_bp < 0 || danni.lihva_bp > 10_000) {
+      throw new GreshkaLichniPari(
+        'Лихвата е в ЦЕЛИ базисни пунктове: 3,45 % се пише 345. Приема се от 0 до 10 000.',
+      );
+    }
+    if (!Number.isSafeInteger(danni.den) || danni.den < 1 || danni.den > 31) {
+      throw new GreshkaLichniPari('Денят на вноската е между 1 и 31.');
+    }
+    return this.#pusni(
+      'ЛиченКредитЗаписан',
+      VID.lichenKredit,
+      `LKRED:${danni.kreditId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * РАЗПИСКАТА НА ЕДНА ПАРТИДА ОТ ИЗВЛЕЧЕНИЕ (правило 7).
+   *
+   * Записва се и когато разликата е НУЛА: „няма разлика" иначе е неразличимо
+   * от „не е сверявано".
+   */
+  async zapishiLichnaPartida(
+    danni: PayloadLichnoIzvlechenieprieto,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    this.#samoLichno('Разписка на партида');
+    return this.#pusni(
+      'ЛичноИзвлечениеПрието',
+      VID.lichnoIzvlechenie,
+      `LPART:${danni.partidaId}`,
+      danni,
+      z,
+    );
   }
 
   /**

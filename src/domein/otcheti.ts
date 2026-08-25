@@ -31,6 +31,7 @@ import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import { duljimo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 import { smetki } from './smetki.js';
+import { prihodnaChast, razhodnaChast } from './lichni-pari.js';
 
 /** Двата джоба, назовани от него: „Банка — салдо, Трезор — салдо". */
 export type Dzhob = 'banka' | 'trezor';
@@ -344,6 +345,29 @@ function poDni(o: Ogledalo, vlizaLi: (data: string) => boolean): readonly DenSPa
   }
   for (const r of o.razhodi.values()) {
     if (vlizaLi(r.data)) vzemi(r.data).razhod_st += r.suma_st;
+  }
+  /**
+   * ТРЕТИЯТ ЦИКЪЛ · ЛИЧНИТЕ ПАРИ (И96 т.10).
+   *
+   * Тук, а не в близнак `poDniLichno`. Файлът го забранява с думи четири реда
+   * по-горе, и има втора цена: решетката на Ганта вика `sumiZaObhvat`, тоест
+   * ТАЗИ функция. Близнак в `lichni-pari.ts` никога нямаше да бъде извикан от
+   * нея и обобщеният ред под ЛИЧНАТА таблица щеше да остане вечна нула — а
+   * нула на екран за пари изглежда като „няма движение", не като „не е питано".
+   *
+   * БЕЗОПАСНО И В ДВЕТЕ ПОСОКИ: служебното Огледало няма `lichniDvizheniya`,
+   * личното няма `plashtaniya` и `razhodi`. Всеки цикъл върти празна карта в
+   * чуждия Журнал.
+   *
+   * Разходната част минава през `razhodnaChast`, значи вноската по кредит
+   * влиза с ЛИХВАТА си, не с цялата вноска: главницата е движение между
+   * джобове, не разход.
+   */
+  for (const d of o.lichniDvizheniya.values()) {
+    if (d.izklyuchen || !vlizaLi(d.data)) continue;
+    const v = vzemi(d.data);
+    v.prihod_st += prihodnaChast(d);
+    v.razhod_st += razhodnaChast(d);
   }
 
   return [...po.entries()]

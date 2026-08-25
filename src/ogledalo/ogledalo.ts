@@ -24,11 +24,13 @@ import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
 import type { LichenDostap } from '../domein/lichen-dostap.js';
+import type { LichenKredit, LichnaTema, LichnoDvizhenie } from '../domein/lichni-pari.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
+  TipSabitie,
 } from '../domein/sabitiya.js';
 import type {
   PayloadImotDobaven,
@@ -46,6 +48,11 @@ import type {
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
+  PayloadLichnaTemaZapisana,
+  PayloadLichnoDvizhenieZapisano,
+  PayloadLichenRedIzklyuchen,
+  PayloadLichenKreditZapisan,
+  PayloadLichnoIzvlechenieprieto,
   PayloadDeloPrehvarleno,
   PayloadPrenosOtcheten,
   PayloadStorno,
@@ -254,6 +261,19 @@ export interface Ogledalo {
    * Ключът е имейлът; отнетите СТОЯТ в картата с `otnet: true` (правило 1).
    */
   readonly lichniDostapi: ReadonlyMap<string, LichenDostap>;
+  /**
+   * ЛИЧНИТЕ ПАРИ (И96 т.10) · три карти, всичките празни в служебен Журнал.
+   *
+   * `temaId` → темата; спрените ОСТАВАТ в картата с `spryana: true`, защото
+   * редовете, които вече ги носят, не се пипат (И97 т.12).
+   */
+  readonly lichniTemi: ReadonlyMap<string, LichnaTema>;
+  /** `dvizhenieId` → движението · последният запис за същия id е ПОПРАВКА */
+  readonly lichniDvizheniya: ReadonlyMap<string, LichnoDvizhenie>;
+  /** `kreditId` → кредитът · остатъкът НЕ е тук, той се смята */
+  readonly lichniKrediti: ReadonlyMap<string, LichenKredit>;
+  /** разписките на партидите от извлечение · `partidaId` → разписката */
+  readonly lichniPartidi: ReadonlyMap<string, PayloadLichnoIzvlechenieprieto>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -319,16 +339,29 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
    * ПЪРВОТО `ДелоЗаписано` за един id е СЪЗДАВАНЕТО; погасне ли то, делото не
    * се брои — каквото и да пише след него.
    */
-  const sazdadenoNaSeq = new Map<string, number>();
-  for (const s of sabitiya) {
-    if (s.type === 'ДелоЗаписано' && !sazdadenoNaSeq.has(s.sashtnost.id)) {
-      sazdadenoNaSeq.set(s.sashtnost.id, s.seq);
+  const storniranite = (tip: TipSabitie): ReadonlySet<string> => {
+    const sazdadenoNaSeq = new Map<string, number>();
+    for (const s of sabitiya) {
+      if (s.type === tip && !sazdadenoNaSeq.has(s.sashtnost.id)) {
+        sazdadenoNaSeq.set(s.sashtnost.id, s.seq);
+      }
     }
-  }
-  const stornirianiDela = new Set<string>();
-  for (const [id, seq] of sazdadenoNaSeq) {
-    if (pogaseni.has(seq)) stornirianiDela.add(id);
-  }
+    const mrtvi = new Set<string>();
+    for (const [id, seq] of sazdadenoNaSeq) {
+      if (pogaseni.has(seq)) mrtvi.add(id);
+    }
+    return mrtvi;
+  };
+
+  const stornirianiDela = storniranite('ДелоЗаписано');
+  /**
+   * Същата дупка, същото лечение · личното движение (И96 т.10).
+   *
+   * И то няма отделно събитие „Поправено": поправката е пак
+   * `ЛичноДвижениеЗаписано` върху същия id. Не се преписва разсъждението, а се
+   * ВИКА същата функция — правило 17 важи и за логиката, не само за числата.
+   */
+  const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -354,6 +387,10 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
+  const lichniTemi = new Map<string, LichnaTema>();
+  const lichniDvizheniya = new Map<string, LichnoDvizhenie>();
+  const lichniKrediti = new Map<string, LichenKredit>();
+  const lichniPartidi = new Map<string, PayloadLichnoIzvlechenieprieto>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -495,6 +532,90 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           kakav: p.kakav as LichenDostap['kakav'],
           otnet: p.otnet,
         });
+        break;
+      }
+
+      // ═══ ЛИЧНИТЕ ПАРИ (И96 т.10) ═══════════════════════════════════════
+      case 'ЛичнаТемаЗаписана': {
+        const p = s.payload as unknown as PayloadLichnaTemaZapisana;
+        // Последният запис за същия номер ПОПРАВЯ — преименуване и спиране са
+        // едно и също действие с различни полета. Спряната ОСТАВА в картата:
+        // редовете, които вече я носят, трябва да могат да я покажат.
+        lichniTemi.set(p.temaId, {
+          temaId: p.temaId,
+          ime: p.ime,
+          grupa: p.grupa,
+          spryana: p.spryana,
+        });
+        break;
+      }
+
+      case 'ЛичноДвижениеЗаписано': {
+        const p = s.payload as unknown as PayloadLichnoDvizhenieZapisano;
+        // Сторнираното движение не се връща от собствената си поправка —
+        // същата дупка и същото лечение като при делото (ADR-036 §9).
+        // Гаси се по СЪЩНОСТТА (`LDV:…`), а картата се ключира по ГОЛИЯ номер:
+        // изключването и вноската сочат него, не украсения ключ на Журнала.
+        if (stornianiDvizheniya.has(s.sashtnost.id)) break;
+        const id = p.dvizhenieId;
+        const staro = lichniDvizheniya.get(id);
+        lichniDvizheniya.set(id, {
+          dvizhenieId: id,
+          data: p.data,
+          posoka: p.posoka,
+          suma_st: p.suma_st,
+          temaId: p.temaId,
+          koy: p.koy,
+          opis: p.opis,
+          dokument: p.dokument,
+          klyuch: p.klyuch,
+          izvor: p.izvor,
+          kreditId: p.kreditId ?? '',
+          glavnitsa_st: p.glavnitsa_st ?? 0,
+          lihva_st: p.lihva_st ?? 0,
+          taksa_st: p.taksa_st ?? 0,
+          // ИЗКЛЮЧВАНЕТО ПРЕЖИВЯВА ПОПРАВКАТА. То е СВОЕ събитие и решение на
+          // ЧОВЕК; повторният внос пренаписва реда от файла и би го изтрил,
+          // ако се четеше оттук. Затова се носи от стария запис.
+          izklyuchen: staro?.izklyuchen ?? false,
+          prichina: staro?.prichina ?? '',
+        });
+        break;
+      }
+
+      case 'ЛиченРедИзключен': {
+        const p = s.payload as unknown as PayloadLichenRedIzklyuchen;
+        const d = lichniDvizheniya.get(p.dvizhenieId);
+        // „Изключване на несъществуващ ред не създава ред от нищото" —
+        // същият пазач като при поправката на имот.
+        if (!d) break;
+        lichniDvizheniya.set(p.dvizhenieId, {
+          ...d,
+          izklyuchen: p.izklyuchen,
+          prichina: p.prichina,
+        });
+        break;
+      }
+
+      case 'ЛиченКредитЗаписан': {
+        const p = s.payload as unknown as PayloadLichenKreditZapisan;
+        lichniKrediti.set(p.kreditId, {
+          kreditId: p.kreditId,
+          ime: p.ime,
+          vid: p.vid,
+          ostatak_st: p.ostatak_st,
+          ot: p.ot,
+          lihva_bp: p.lihva_bp,
+          vnoska_st: p.vnoska_st,
+          den: p.den,
+          temaId: p.temaId,
+        });
+        break;
+      }
+
+      case 'ЛичноИзвлечениеПрието': {
+        const p = s.payload as unknown as PayloadLichnoIzvlechenieprieto;
+        lichniPartidi.set(p.partidaId, p);
         break;
       }
 
@@ -734,6 +855,10 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     lichnoVklyucheno,
     lichnoMyasto,
     lichniDostapi,
+    lichniTemi,
+    lichniDvizheniya,
+    lichniKrediti,
+    lichniPartidi,
     sverki,
     prilozheni,
     pogaseni,
