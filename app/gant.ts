@@ -51,6 +51,9 @@ import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
+import { menyuOtZhivi, novoteVSpisatsite, poleSMenyu, sDumiZaNovite, zakachiMenyuta } from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
+
 import type { Konteks } from './main.js';
 
 /**
@@ -73,6 +76,46 @@ export interface PogledNaGanta {
   filtarObekt: string;
   filtarOtsenka: string;
 }
+
+/** Четирите полета на делото, чиито речници живеят в самите дела. */
+export type KlyuchNaMenyu = 'myasto' | 'obekt' | 'ime' | 'otgovornik';
+
+/**
+ * РЕЧНИКЪТ НА ЕДНО ПОЛЕ · изведен от живите дела, без нито едно ново събитие.
+ *
+ * Втори списък, пазен отделно, би трябвало да се държи синхронен с Журнала — и
+ * щеше да се разминава точно в деня, в който някой сторнира дело.
+ */
+export function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu {
+  return menyuOtZhivi(
+    klyuch,
+    ime,
+    [...o.dela.values()].map((d) => d[klyuch]),
+  );
+}
+
+/** Четирите менюта наведнъж · за закачането след рисуване. */
+export function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
+  const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място';
+  return new Map<string, Menyu>([
+    ['myasto', menyutoNaDelata(o, 'myasto', parvata)],
+    ['obekt', menyutoNaDelata(o, 'obekt', 'Обект')],
+    ['ime', menyutoNaDelata(o, 'ime', 'Дело')],
+    ['otgovornik', menyutoNaDelata(o, 'otgovornik', 'Отговорник')],
+  ]);
+}
+
+/**
+ * РЕЧНИЦИТЕ НА ФОРМАТА · по представка, точно както `POGLEDI` са по ключ.
+ *
+ * Пълнят се при РИСУВАНЕ (там е Огледалото) и се четат при ЗАКАЧАНЕ (там е
+ * DOM-ът). Двете не могат да се слеят: `zakachiGant` няма Огледало и не бива
+ * да го чака — то е асинхронно, а закачането трябва да стане в същия кадър.
+ *
+ * По представка, а не модулно: личната форма (`l-`) и служебната (`d-`) имат
+ * РАЗЛИЧНИ речници — служебните дела и личните не се смесват (И98).
+ */
+const RECHNITSI = new Map<string, ReadonlyMap<string, Menyu>>();
 
 const POGLEDI = new Map<string, PogledNaGanta>();
 
@@ -430,27 +473,42 @@ export function formaDelo(
   nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
 ): string {
   const id = (kratko: string) => `${predstavka}${kratko}`;
+  const menyutata = menyutataNaFormata(o, nadpisi);
+  RECHNITSI.set(predstavka, menyutata);
   return `
     <section class="karta">
       <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
       <form id="${id('forma-delo')}">
         <div class="poleta">
-          <div class="pole">
-            <label for="${id('myasto')}">Място</label>
-            <input id="${id('myasto')}" name="myasto" required placeholder="Малинова">
-          </div>
-          <div class="pole">
-            <label for="${id('obekt')}">Обект</label>
-            <input id="${id('obekt')}" name="obekt" placeholder="може да е празно">
-          </div>
-          <div class="pole">
-            <label for="${id('ime')}">Дело</label>
-            <input id="${id('ime')}" name="ime" required placeholder="Акт 15">
-          </div>
-          <div class="pole">
-            <label for="${id('otgovornik')}">Отговорник</label>
-            <input id="${id('otgovornik')}" name="otgovornik" required placeholder="Николай Петков">
-          </div>
+          ${
+            /**
+             * ЧЕТИРИТЕ ЖИВИ МЕНЮТА (И97 · ADR-040).
+             *
+             * Речникът им НЕ се пази отделно — той Е онова, което вече стои в
+             * делата. Всичките четири ОПИСВАТ (системата не смята върху тях),
+             * значи растат свободно от полето: „нищо не спира човека".
+             *
+             * Първата колона носи надписа на погледа: „Място" в служебния,
+             * „Тема" в личния — същото поле, същият речник, друга дума.
+             */
+            [
+              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място', z: true, m: 'Малинова' },
+              { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно' },
+              { k: 'ime', e: 'Дело', z: true, m: 'Акт 15' },
+              { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков' },
+            ]
+              .map((p) =>
+                poleSMenyu({
+                  id: id(p.k),
+                  ime: p.k,
+                  etiket: p.e,
+                  menyu: menyutata.get(p.k)!,
+                  zadalzhitelno: p.z,
+                  mestodarzhatel: p.m,
+                }),
+              )
+              .join('')
+          }
           <div class="pole">
             <label for="${id('ot')}">От</label>
             <input translate="no" id="${id('ot')}" name="ot" type="date" value="${dnes}" required>
@@ -523,6 +581,10 @@ export function zakachiGant(
 ): void {
   slozhiShirinite(koren);
   const p = pogled(klyuch);
+  // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040) · четирите живи полета на формата.
+  // Речниците се четат при закачане, значи всяко ново дело ги обогатява само.
+  const menyutata = RECHNITSI.get(predstavka) ?? new Map<string, Menyu>();
+  zakachiMenyuta(koren, menyutata);
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {
@@ -629,6 +691,10 @@ export function zakachiFormataNaDelo(
       return;
     }
 
+    // Кои стойности ще влязат НОВИ · брои се ПРЕДИ записа, защото после
+    // речникът вече ги съдържа и отговорът би бил „нищо ново".
+    const novite = novoteVSpisatsite(koren, RECHNITSI.get(predstavka) ?? new Map<string, Menyu>());
+
     buton.disabled = true;
     try {
       await k.deystviya.zapishiDelo(
@@ -648,7 +714,9 @@ export function zakachiFormataNaDelo(
         { opId: opIdDelo },
       );
       opIdDelo = crypto.randomUUID();
-      k.vest('dobre', 'Делото е записано.');
+      // „Нищо не спира човека" — но СЛЕД записа му се казва какво е направил.
+      // Преди записа това би било въпрос; след него е следа.
+      k.vest('dobre', `Делото е записано.${sDumiZaNovite(novite)}`);
       await prerisuvay();
     } catch (err) {
       izhod.textContent = dumiZaGreshka(err);

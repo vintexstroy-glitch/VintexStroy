@@ -1513,6 +1513,62 @@ async function main() {
       (await p.$$eval('.gant-delo .drebno', (e) => e.map((x) => x.textContent)))
         .some((t) => t.startsWith('—')), true);
 
+    // ══ 57 · ЗАКОНЪТ ЗА МЕНЮТАТА · живите речници (И97 · ADR-040) ══════════
+    //
+    // Речникът НЕ се пази отделно — той Е онова, което вече стои в делата.
+    // Трите записани дела току-що го напълниха, без нито едно ново събитие.
+    razdel = '57 · Менютата · речникът е от Журнала';
+    proveri('полето „Място" носи СПИСЪК, а не само текст',
+      await p.$eval('#d-myasto', (e) => e.getAttribute('list')), 'd-myasto-spisak');
+    const mestaVSpisaka = await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => x.value));
+    proveri('и в списъка стоят ЖИВИТЕ места, най-писаното горе',
+      mestaVSpisaka, ['Малинова', 'Хисаря']);
+    proveri('отговорниците също · речникът е на всяко поле',
+      (await p.$$eval('#d-otgovornik-spisak option', (o) => o.map((x) => x.value))).length, 3);
+    proveri('и НИЩО ново не е записано за речниците',
+      await p.$$eval('#d-myasto-spisak option', (o) => o.length) > 0, true);
+
+    razdel = '57 · Менютата · четирите състояния';
+    // ПРАЗНО · нито цвят, нито дума
+    await p.fill('#d-myasto', '');
+    proveri('празното поле мълчи',
+      await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '');
+
+    // ПИСАНО НА РЪКА, ново → ЧЕРНО и „＋ нова стойност"
+    await p.fill('#d-myasto', 'Банишора');
+    proveri('писаното на ръка ПОЧЕРНЯВА',
+      await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
+    proveri('и ДУМАТА го казва · вторият носител до цвета',
+      await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '＋ нова стойност');
+    proveri('нищо не го спира · полето е валидно',
+      await p.$eval('#d-myasto', (e) => e.checkValidity()), true);
+
+    // ПИСАНО НА РЪКА, СЛУЧАЙНО съвпадащо → пак ЧЕРНО, но друга дума
+    await p.fill('#d-myasto', 'Малинова');
+    proveri('случайното съвпадение ОСТАВА черно · „ти не си избирал"',
+      await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
+    proveri('но думата казва, че дубликат няма да се създаде',
+      await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '= съществуваща');
+
+    // ИЗБРАНО ОТ СПИСЪКА → СИНЬО. Playwright не може да натисне ред от
+    // `datalist` (той се рисува от самия браузър, извън документа), затова
+    // събитието се подава така, както го подава браузърът при избор.
+    await p.$eval('#d-myasto', (e) => {
+      e.value = 'Хисаря';
+      e.dispatchEvent(new InputEvent('input', { inputType: 'insertReplacementText', bubbles: true }));
+    });
+    proveri('изборът от списъка е СИН',
+      await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-sinio')), true);
+    proveri('и не обещава нищо ново',
+      await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '');
+
+    // РЕДАКЦИЯ СЛЕД ИЗБОР → ПОЧЕРНЯВА „в мига, в който се различи"
+    await p.fill('#d-myasto', 'Хисаря 2');
+    proveri('редактираното след избор ПОЧЕРНЯВА',
+      await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
+    proveri('и синьото си отива',
+      await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-sinio')), false);
+
     // ПОДРЕДБАТА · спешно и важно горе.
     proveri('спешното и важно е първо',
       await p.$eval('.gant-delo b', (e) => e.textContent), 'Акт 15');
@@ -1598,6 +1654,22 @@ async function main() {
     proveri('СЕГА не пипа нито едно дело', await broySabitiya(p), predSega);
     proveri('СЕГА филтрира по спешно и важно',
       await p.$eval('#f-otsenka', (e) => e.value), 'спешно-важно');
+
+    // ══ 57б · СЛЕДАТА СЛЕД ЗАПИСА · тук, защото пише ЧЕТВЪРТО дело ════════
+    //
+    // Всички проверки на §24 броят ТРИ дела; записът стои след тях нарочно.
+    razdel = '57 · Менютата · следата СЛЕД записа';
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-otsenka', ''));
+    await zapishiDelo(p, { myasto: 'Банишора', obekt: '', ime: 'Акт 16',
+      otgovornik: 'Николай Петков', ot: denOtDnes(0), do: denOtDnes(5), otsenka: 'важно-неспешно' });
+    const vestZaMenyuta = await tekstNa(p, '.vest');
+    proveri('след записа КАЗВА какво е влязло ново',
+      vestZaMenyuta.includes('Нови стойности') && vestZaMenyuta.includes('Банишора')
+        && vestZaMenyuta.includes('Акт 16'), true);
+    proveri('а познатият отговорник НЕ се брои за нов',
+      vestZaMenyuta.includes('Николай Петков'), false);
+    proveri('и речникът вече го носи',
+      (await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => x.value))).includes('Банишора'), true);
 
     // ══ 25 · контактите и писмото при закъснение ═════════════════════════
     razdel = '25 · писмото при закъснение';

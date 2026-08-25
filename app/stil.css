@@ -287,6 +287,13 @@
   --srok-prosrocheno: #8E2A16;
   /* „всички проекти с един цвят тъмно графитено" (р52·[221]) */
   --grafiteno: #3A3632;
+
+  /* ЗАКОНЪТ ЗА МЕНЮТАТА · неговите два цвята (И97 · ADR-040):
+     „СИН — избрал си съществуваща; ЧЕРЕН — написал си своя."
+     Синьото е ЕДИНСТВЕНОТО синьо в темата и стои само тук — ако утре потрябва
+     втори син, той се кръщава отделно, вместо този да се преизползва. */
+  --menyu-sinio: #2C5F8A;
+  --menyu-cherno: #1A1714;
 }
 
 * { box-sizing: border-box; }
@@ -1197,3 +1204,20 @@ table.razbivka .drebno { font-size: 10.5px; }
   font-size: 12.5px; color: var(--mastilo);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+
+/* ── Живите падащи менюта (И97 · ADR-040) ────────────────────────────────
+   Цветът е негов закон и стои непокътнат. Думата до него е ВТОРИЯТ носител:
+   онзи, който не различава синьо от черно, чете „＋ нова стойност" (ADR-032 —
+   цветът намира, думата обяснява). */
+.menyu-sinio { color: var(--menyu-sinio); }
+.menyu-cherno { color: var(--menyu-cherno); font-weight: 600; }
+.menyu-otkazano { border-color: var(--srok-cherveno); }
+
+.znak-menyu {
+  display: block;
+  margin-top: 2px;
+  min-height: 1em;          /* мястото стои празно, за да не подскача полето */
+  font-size: 11px;
+  color: var(--mastilo2);
+}
+.znak-menyu.trevoga { color: var(--srok-cherveno); font-weight: 600; }
