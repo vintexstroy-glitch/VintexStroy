@@ -89,6 +89,54 @@ describe('валидност', () => {
     expect(dobar.seq).toBe(1);
   });
 
+  /**
+   * СЛЯПОТО ПЕТНО НА ПАЗАЧА · намерено при проектирането на разделения ред.
+   *
+   * Проверката слизаше във вложен ОБЕКТ, но нарочно прескачаше МАСИВ — от
+   * първия коммит на ядрото. Дефект не е имало, защото нито едно събитие не
+   * носеше пари в масив. Но „един ред от картата, разделен на две теми" носи
+   * точно това, и дробната стотинка щеше да мине като валиден запис.
+   */
+  it('проверява парите и в МАСИВ — там, където дотук не влизаше', async () => {
+    const { vrata } = novaVrata();
+
+    // масив от ОБЕКТИ, всеки със своя сума
+    await expect(
+      vrata.dobavi(
+        operatsiya({ opId: 'op-1', payload: { chasti: [{ suma_st: 10_00 }, { suma_st: 5.5 }] } }),
+      ),
+    ).rejects.toMatchObject({ kod: 'NEVALIDNO' });
+
+    // и отказът КАЗВА коя част е сгрешена, не само че някоя е
+    await expect(
+      vrata.dobavi(
+        operatsiya({ opId: 'op-2', payload: { chasti: [{ suma_st: 10_00 }, { suma_st: 5.5 }] } }),
+      ),
+    ).rejects.toThrow(/chasti\[1\]\.suma_st/);
+
+    // масив ОТ СУМИ · ключът се носи надолу, наставката важи за всеки член
+    await expect(
+      vrata.dobavi(operatsiya({ opId: 'op-3', payload: { vnoski_st: [100, 200.5] } })),
+    ).rejects.toThrow(/vnoski_st\[1\]/);
+
+    // а верните минават — и двата вида масив
+    const dobar = await vrata.dobavi(
+      operatsiya({
+        opId: 'op-4',
+        payload: { chasti: [{ suma_st: 10_00 }, { suma_st: 5_50 }], vnoski_st: [100, 200] },
+      }),
+    );
+    expect(dobar.seq).toBe(1);
+  });
+
+  it('масив от текст не се бърка с пари', async () => {
+    const { vrata } = novaVrata();
+    const r = await vrata.dobavi(
+      operatsiya({ opId: 'op-1', payload: { izvori: ['файл-а', 'файл-б'], suma_st: 1_00 } }),
+    );
+    expect(r.seq).toBe(1);
+  });
+
   it('пропуска полета без наставката за пари', async () => {
     const { vrata } = novaVrata();
     const r = await vrata.dobavi(

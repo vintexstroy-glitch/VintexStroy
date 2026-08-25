@@ -413,19 +413,45 @@ export function proveriValidnost(op: Operatsiya): void {
   proveriParite(op.payload, 'payload');
 }
 
+/**
+ * ПАРИТЕ В PAYLOAD-А · всяко поле на `_st` е цели най-малки единици (правило 3).
+ *
+ * ВЛИЗА И В МАСИВИ. Дотук не влизаше — `!Array.isArray(...)` спираше слизането
+ * нарочно, от първия коммит на ядрото. Днес нито едно събитие не носи пари в
+ * масив, значи дефект не е имало; но правило 3 казва „Вратата ги проверява"
+ * БЕЗ уговорка, а проверка със сляпо петно е по-лоша от липсваща: тя изглежда
+ * като гаранция. Първият разделен ред („един ред от картата на две теми")
+ * щеше да мине с дробна стотинка и никой нямаше да разбере откъде идва.
+ *
+ * Индексът влиза в пътеката (`payload.chasti[1].suma_st`), за да казва
+ * отказът КОЯ част е сгрешена, а не само че някоя е.
+ */
 function proveriParite(v: Readonly<Record<string, unknown>>, pat: string): void {
   for (const [klyuch, stoynost] of Object.entries(v)) {
-    const pale = `${pat}.${klyuch}`;
-    if (klyuch.endsWith(NASTAVKA_PARI)) {
-      if (!eStotinki(stoynost)) {
-        throw new GreshkaVrata(
-          'NEVALIDNO',
-          `${pale} е поле за пари и трябва да е цели стотинки; получено: ${String(stoynost)}`,
-        );
-      }
-    } else if (stoynost !== null && typeof stoynost === 'object' && !Array.isArray(stoynost)) {
-      proveriParite(stoynost as Record<string, unknown>, pale);
+    proveriEdno(klyuch, stoynost, `${pat}.${klyuch}`);
+  }
+}
+
+function proveriEdno(klyuch: string, stoynost: unknown, pale: string): void {
+  // МАСИВЪТ СЕ ГЛЕДА ПРЪВ, и редът не е вкус. Гледа ли се пръв ключът, поле
+  // `sumi_st: [100, 200]` пада като „не е цели стотинки" — вярно за масива,
+  // безсмислено за човека. Ключът се НОСИ надолу към всеки член: така масив с
+  // наставка е масив ОТ СУМИ, а масив от обекти се обхожда по полетата им.
+  if (Array.isArray(stoynost)) {
+    stoynost.forEach((chlen, i) => proveriEdno(klyuch, chlen, `${pale}[${i}]`));
+    return;
+  }
+  if (klyuch.endsWith(NASTAVKA_PARI)) {
+    if (!eStotinki(stoynost)) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `${pale} е поле за пари и трябва да е цели стотинки; получено: ${String(stoynost)}`,
+      );
     }
+    return;
+  }
+  if (stoynost !== null && typeof stoynost === 'object') {
+    proveriParite(stoynost as Record<string, unknown>, pale);
   }
 }
 

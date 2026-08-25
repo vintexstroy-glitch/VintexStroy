@@ -13,7 +13,7 @@
  * там се губи стотинката.
  */
 
-import { stotinki, type Stotinki } from '../yadro/pari.js';
+import { deliZakragleno, stotinki, type Stotinki } from '../yadro/pari.js';
 
 export class GreshkaDDS extends Error {
   constructor(message: string) {
@@ -142,9 +142,3 @@ export function ddsOtObshta(obshta_st: number, stavka: number): RazbivkaDDS {
   };
 }
 
-/** Целочислено делене със закръгляне на половинката нагоре. И двете положителни. */
-function deliZakragleno(chislitel: number, znamenatel: number): number {
-  const chastno = Math.floor(chislitel / znamenatel);
-  const ostatak = chislitel - chastno * znamenatel;
-  return 2 * ostatak >= znamenatel ? chastno + 1 : chastno;
-}

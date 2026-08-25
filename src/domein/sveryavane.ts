@@ -27,7 +27,14 @@
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import { razchetiPoModel, periodPoModel } from '../iztochnik/razchitane.js';
-import { sborNaSnimka, type Izvor, type Propusnat, type RedOtSnimka, type Snimka } from '../iztochnik/snimka.js';
+import {
+  sborNaSnimka,
+  type Izvor,
+  type Povtoren,
+  type Propusnat,
+  type RedOtSnimka,
+  type Snimka,
+} from '../iztochnik/snimka.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Tablitsa } from '../iztochnik/tablitsa.js';
 import type { Sha256 } from '../yadro/index.js';
@@ -142,9 +149,29 @@ export async function sgloviPartida(n: {
 /**
  * Слепва няколко снимки в една · ЕДНА партида, едно число.
  *
- * Ключовете се сверяват през всички листове наведнъж: два файла с един и същ
- * ред (например препокриващи се извлечения) не пишат два записа — вторият
- * получава свой ключ, точно както прави `razchetiPoModel` вътре в един лист.
+ * ЕДИН И СЪЩ КЛЮЧ ЗНАЧИ ДВЕ РАЗЛИЧНИ НЕЩА, и разликата е ФАЙЛЪТ:
+ *
+ * | къде се повтаря | какво е | какво става |
+ * | :---- | :---- | :---- |
+ * | в СЪЩИЯ файл (втори лист) | два истински реда — две кафета за 3,50 в един ден | вторият получава свой ключ (`#2`) |
+ * | в ДРУГ файл | ЕДИН ред, донесен два пъти — препокриващи се извлечения | брои се ВЕДНЪЖ и се КАЗВА |
+ *
+ * ДЕФЕКТ, ЗАТВОРЕН ТУК. Дотук двата случая се смесваха: един брояч се въртеше
+ * през всички снимки и даваше `#2` и на двата. Два еднакви файла за един месец
+ * правеха от 2 разхода — 4, а сборът се удвояваше. Сверката ЗАТВАРЯШЕ на нула,
+ * защото удвояването беше и от двете ѝ страни: вход 14,00 срещу изход 14,00,
+ * при истина 7,00. Правило 7, спазено буквално и нарушено по смисъл.
+ *
+ * И по-лошо: ако файлът вече носеше `X#2` от `razchetiPoModel`, преномерирането
+ * раждаше ВТОРИ ред със същия ключ `X#2` в една снимка. Затова номерът тук се
+ * търси, докато е свободен, вместо да се брои.
+ *
+ * ЗАЩО СЕ КАЗВА, А НЕ СЕ ПРЕГЛЪЩА (правило 18). Два реда с един ключ в два
+ * файла МОЖЕ да са и два истински разхода — еднаква сума, еднакъв ден, еднакъв
+ * търговец, всеки описан в своя файл. От данните това е неразличимо. Затова
+ * повторените се броят поименно и се показват: човекът вижда „три реда дойдоха
+ * от два файла и се броят веднъж" и решава. Мълчаливото сливане и мълчаливото
+ * удвояване са еднакво лоши — и двете решават вместо него.
  */
 export async function sleiSnimki(
   snimki: readonly Snimka[],
@@ -153,13 +180,29 @@ export async function sleiSnimki(
   const parva = snimki[0]!;
   const redove: RedOtSnimka[] = [];
   const propusnati: Propusnat[] = [];
-  const vidyani = new Map<string, number>();
+  const povtoreni: Povtoren[] = [];
+  /** ключ → отпечатъкът на ФАЙЛА, който го е донесъл пръв */
+  const vidyani = new Map<string, string>();
 
   for (const s of snimki) {
+    const fayl = s.izvor.otpechatak;
     for (const r of s.redove) {
-      const povtoreno = (vidyani.get(r.klyuch) ?? 0) + 1;
-      vidyani.set(r.klyuch, povtoreno);
-      redove.push(povtoreno === 1 ? r : { ...r, klyuch: `${r.klyuch}#${povtoreno}` });
+      const otKoyFayl = vidyani.get(r.klyuch);
+      if (otKoyFayl === undefined) {
+        vidyani.set(r.klyuch, fayl);
+        redove.push(r);
+      } else if (otKoyFayl !== fayl) {
+        // ДРУГ файл · същият ред. Един разход, не два.
+        povtoreni.push({ klyuch: r.klyuch, fayl: s.izvor.ime, suma_st: r.suma_st });
+      } else {
+        // СЪЩИЯТ файл · втори истински ред. Номерът се търси, докато е свободен —
+        // броенето би се блъснало в `#2`, което четецът вече е раздал.
+        let n = 2;
+        while (vidyani.has(`${r.klyuch}#${n}`)) n++;
+        const nov = `${r.klyuch}#${n}`;
+        vidyani.set(nov, fayl);
+        redove.push({ ...r, klyuch: nov });
+      }
     }
     propusnati.push(...s.propusnati);
   }
@@ -179,6 +222,7 @@ export async function sleiSnimki(
     },
     redove,
     propusnati,
+    povtoreni,
   };
 }
 

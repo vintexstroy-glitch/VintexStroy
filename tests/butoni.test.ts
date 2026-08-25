@@ -190,6 +190,62 @@ describe('партидата · няколко файла, едно число',
     expect(partida.plan.snimka.izvor.otpechatak).not.toBe('aaa');
   });
 
+  /**
+   * ПРЕПОКРИВАЩИ СЕ ФАЙЛОВЕ · дефект, намерен при проектирането на личните пари.
+   *
+   * Дотук един брояч се въртеше през ВСИЧКИ снимки и даваше `#2` еднакво на
+   * два случая, които не са един и същ: втори еднакъв ред в СЪЩИЯ файл (две
+   * кафета) и същият ред, донесен от ДРУГ файл (препокриващи се извлечения).
+   *
+   * Цената беше измерена: два файла × два реда даваха 4 реда вместо 2 и сбор
+   * 14,00 € вместо 7,00 €. Сверката ЗАТВАРЯШЕ на нула, защото удвояването беше
+   * и от двете ѝ страни — правило 7, спазено буквално и нарушено по смисъл.
+   */
+  it('един и същ ред от ДВА файла се брои ВЕДНЪЖ и се КАЗВА', async () => {
+    const red = '05.04.2026;цимент;Материали ООД;600,00;4001;20';
+    const partida = await sgloviPartida({
+      buton: BUTON,
+      modeli,
+      ogledalo: await ogl(),
+      sha: SHA,
+      faylove: [
+        { izvor: izvor('обб-юли.csv', 'aaa'), tablitsi: [tablitsaOBB(red)] },
+        // същият ред, донесен пак — препокрити периоди
+        { izvor: izvor('обб-юли-и-август.csv', 'bbb'), tablitsi: [tablitsaOBB(red)] },
+      ],
+    });
+
+    expect(partida.plan.snimka.redove).toHaveLength(1);
+    expect(partida.plan.sled_st).toBe(600_00); // НЕ 1 200,00
+    // и не се преглъща: човекът вижда КОЙ файл го е донесъл втори път
+    expect(partida.plan.snimka.povtoreni).toHaveLength(1);
+    expect(partida.plan.snimka.povtoreni?.[0]?.fayl).toBe('обб-юли-и-август.csv');
+    expect(partida.plan.snimka.povtoreni?.[0]?.suma_st).toBe(600_00);
+  });
+
+  it('два еднакви реда в СЪЩИЯ файл ОСТАВАТ два · и ключовете им не се сблъскват', async () => {
+    // Два реда без документ и с еднакви данни са две истински плащания.
+    const bezDokument = '05.04.2026;кафе;ЛИДЛ;3,50;;20';
+    const partida = await sgloviPartida({
+      buton: BUTON,
+      modeli,
+      ogledalo: await ogl(),
+      sha: SHA,
+      faylove: [
+        {
+          izvor: izvor('един.csv', 'aaa'),
+          tablitsi: [tablitsaOBB(`${bezDokument}\n${bezDokument}`)],
+        },
+      ],
+    });
+
+    expect(partida.plan.snimka.redove).toHaveLength(2);
+    expect(partida.plan.sled_st).toBe(7_00);
+    const klyuchove = partida.plan.snimka.redove.map((r) => r.klyuch);
+    expect(new Set(klyuchove).size).toBe(2); // ДВА РАЗЛИЧНИ ключа
+    expect(partida.plan.snimka.povtoreni ?? []).toHaveLength(0);
+  });
+
   it('един файл с ДВА листа минава и по двата', async () => {
     const partida = await sgloviPartida({
       buton: BUTON,

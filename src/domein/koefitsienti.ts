@@ -41,6 +41,7 @@
  * със закръгляне на половинката, както при ДДС-то.
  */
 
+import { deliZakragleno } from '../yadro/pari.js';
 import { razhodiZaPerioda, smetki } from './smetki.js';
 import { saldoNa, sumiZaObhvat } from './otcheti.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
@@ -319,15 +320,6 @@ export function razbiyNaStapki(ot: string, doo: string, stapka: Stapka): readonl
   return Object.freeze(parcheta);
 }
 
-/** Целочислено делене със закръгляне на половинката нагоре · и двете положителни. */
-function deliZakragleno(chislitel: number, znamenatel: number): number {
-  const znak = chislitel < 0 !== znamenatel < 0 ? -1 : 1;
-  const ch = Math.abs(chislitel);
-  const zn = Math.abs(znamenatel);
-  const chastno = Math.floor(ch / zn);
-  const ostatak = ch - chastno * zn;
-  return znak * (2 * ostatak >= zn ? chastno + 1 : chastno);
-}
 
 /** Един параметър, влязъл в сметката · показва се ПОД формулата (т.5). */
 export interface Parametar {

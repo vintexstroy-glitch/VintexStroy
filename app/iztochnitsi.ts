@@ -211,7 +211,32 @@ export function narisuvayPlana(): string {
           <span class="chislo" translate="no">${p.snimka.propusnati.length}</span>
           <span class="pod">${p.snimka.propusnati.length ? 'виж долу' : 'нищо не е пропуснато'}</span>
         </div>
+        ${
+          // ПОВТОРЕНИТЕ се показват само когато ги ИМА. Плочка с вечна нула
+          // учи окото да я прескача — а точно тя носи числото, което е
+          // най-важно при препокрити извлечения (`sleiSnimki`).
+          (p.snimka.povtoreni?.length ?? 0) > 0
+            ? `<div class="plochka">
+                 <span class="etiket">Дошли два пъти</span>
+                 <span class="chislo" translate="no">${p.snimka.povtoreni!.length}</span>
+                 <span class="pod">броят се ВЕДНЪЖ · ${ekraniraj(
+                   [...new Set(p.snimka.povtoreni!.map((x) => x.fayl))].join(' · '),
+                 )}</span>
+               </div>`
+            : ''
+        }
       </div>
+
+      ${
+        (p.snimka.povtoreni?.length ?? 0) > 0
+          ? `<p class="drebno"><b>${p.snimka.povtoreni!.length}</b> ${
+              p.snimka.povtoreni!.length === 1 ? 'ред е дошъл' : 'реда са дошли'
+            } и от друг файл в тази партида — препокрити периоди. Броят се <b>веднъж</b>,
+            общо ${ekraniraj(pishi(p.snimka.povtoreni!.reduce((s, x) => s + x.suma_st, 0)))}.
+            Ако това наистина са <b>отделни</b> плащания с еднаква сума на еднакъв ден,
+            въведи второто на ръка — от данните двете са неразличими.</p>`
+          : ''
+      }
 
       <div class="poleta">
         <div class="pole">
