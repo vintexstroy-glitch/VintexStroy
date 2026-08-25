@@ -28,9 +28,13 @@
  */
 
 import type { VidObekt } from './chetene.js';
+import { EDINITSA_BT, PO_PODRAZBIRANE, matritsaOtNastroyki } from './nastroyki.js';
 
-/** Една базисна точка е 1/10 000. Коефициент 1,00 = 10 000 б.т. */
-export const EDINITSA_BT = 10_000;
+/**
+ * Мерната единица идва от `nastroyki.ts` — там живеят коефициентите, значи там
+ * е и домът ѝ (правило 17). Преизнася се тук, за да не се чупи стар внос.
+ */
+export { EDINITSA_BT };
 
 export class GreshkaMatritsa extends Error {
   constructor(message: string) {
@@ -77,59 +81,33 @@ export interface Matritsa {
   readonly nezaetost_bt: number;
   /** оперативни разходи в б.т. ОТ НАЕМА — поддръжка, данъци, такси */
   readonly operativni_bt: number;
+  /**
+   * ОБЩИЯТ множител на партидата, в базисни точки.
+   *
+   * Тук се събират коефициентите, които неговият файл НЕ носи и които важат за
+   * цялата сграда наведнъж: **състояние · възраст · асансьор**. „Малинова
+   * Долина" е ЕДНА сграда — тя е нова, с асансьор, и това важи за всеки обект
+   * в нея, не за някой поотделно.
+   *
+   * Държи се като ОТДЕЛНО число, а не сгънато в базата, за да остане делението
+   * едно: сгъната база трябва да се закръгли, и закръглянето влиза във всеки
+   * обект (правило 3).
+   */
+  readonly obshti_bt: number;
 }
 
 /**
- * МАТРИЦАТА ЗА РАЗРАБОТКА. Всяко число тук чака него.
+ * МАТРИЦАТА ЗА РАЗРАБОТКА · СТРОИ СЕ, не се пише.
  *
- * Коефициентите на етажа следват занаята: партерът и последният етаж се
- * търгуват под средното, средните етажи — над него. Изложението: юг и изток
- * над север и запад. Всички са в базисни точки.
+ * Дотук числата ѝ стояха написани тук на ръка — и се бяха разминали с
+ * проучването: изложение „Ю" беше 1,05 тук и 1,03 там. Разминаването не се
+ * забелязва, докато някой не сравни двете файла (правило 17).
+ *
+ * Затова домът на коефициентите вече е ЕДИН — `nastroyki.ts`, секция
+ * „Калкулатор" — а матрицата се СГЛОБЯВА оттам. Смяна на число се прави на
+ * едно място и стига навсякъде.
  */
-export const MATRITSA_ZA_RAZRABOTKA: Matritsa = Object.freeze({
-  rayon: 'Малинова долина',
-  baza_st: Object.freeze({
-    apartament: 300_000, // 3 000 € · неговото число за разработка и тестове
-    garazh: 100_000, // 1 000 €/м² · средно от неговата листа
-    parkomyasto: 190_000, // 1 900 €/м² · открито и закрито, средно
-    sklad: 133_000, // 1 330 €/м²
-    drug: 300_000,
-  }),
-  etazhi: Object.freeze({
-    подземен: 10_000,
-    партер: 9_500,
-    първи: 9_700,
-    втори: 10_000,
-    трети: 10_200,
-    четвърти: 10_200,
-    пети: 10_100,
-    шести: 10_000,
-    терен: 10_000,
-  }),
-  izlozheniya: Object.freeze({
-    Ю: 10_500,
-    ЮИ: 10_400,
-    ЮЗ: 10_300,
-    И: 10_200,
-    З: 10_000,
-    СИ: 9_800,
-    СЗ: 9_700,
-    С: 9_600,
-  }),
-  // Наемите за разработка: нов апартамент в София върви по 8–9 €/м²/месец.
-  naem_st_kvm: Object.freeze({
-    apartament: 850, // 8,50 €
-    garazh: 120,
-    parkomyasto: 80,
-    sklad: 100,
-    drug: 850,
-  }),
-  // Брутната доходност на жилища в София се движи около 3 %. Числото е негово
-  // решение („негов апетит за риск") — тук стои само за да работи сметката.
-  dohodnost_bt: 320, // 3,20 %
-  nezaetost_bt: 800, // 8,00 % — един месец на година празен
-  operativni_bt: 1_500, // 15,00 % от наема — поддръжка, данъци, такси
-});
+export const MATRITSA_ZA_RAZRABOTKA: Matritsa = matritsaOtNastroyki(PO_PODRAZBIRANE);
 
 /** Коефициент по ключ; липсващият е 1,00 — не се измисля, не се отказва. */
 export function koefitsient(karta: Readonly<Record<string, number>>, klyuch: string): number {
@@ -160,20 +138,60 @@ export function tsenaTochno(n: {
   if (baza_st === undefined) {
     throw new GreshkaMatritsa(`Матрицата няма база за вид „${n.vid}".`);
   }
+  return tsenaOtChasti({
+    obshta_kvsm: n.obshta_kvsm,
+    baza_st,
+    koefitsienti_bt: [
+      koefitsient(m.etazhi, n.etazh),
+      koefitsient(m.izlozheniya, n.izlozhenie),
+      m.obshti_bt ?? EDINITSA_BT,
+    ],
+  });
+}
+
+/**
+ * ЕДНАТА СМЕТКА · площ × база × коефициенти + добавка.
+ *
+ * Тук се смята Графа А, и НИКЪДЕ другаде. Партидата (`tsenaTochno`) ползва
+ * двата коефициента, които неговият файл носи; секция „Калкулатор" ползва
+ * петте, които човекът избира. Двата пътя влизат в ЕДНА сметка — иначе
+ * екранът и износът почват да дават различни числа за един и същи обект.
+ *
+ * КОЛКО КОЕФИЦИЕНТА · без значение. Списъкът се умножава цял, преди да се
+ * дели: 1,05 × 0,97 във float дава 1,0184999999999998, а в базисни точки —
+ * 10 185, и това число не мърда (умението `matematika` §1).
+ *
+ * ДОБАВКАТА ВЛИЗА НАКРАЯ и не се умножава по нищо: коефициентът за изложение
+ * не мени цената на едно паркомясто.
+ */
+export function tsenaOtChasti(n: {
+  readonly obshta_kvsm: number;
+  /** базата в цели центове за квадратен метър */
+  readonly baza_st: number;
+  readonly koefitsienti_bt: readonly number[];
+  /** абсолютна добавка в цели центове · гараж, паркомясто, мазе */
+  readonly dobavka_st?: number;
+}): number {
   if (!Number.isSafeInteger(n.obshta_kvsm) || n.obshta_kvsm < 0) {
-    throw new GreshkaMatritsa(`Площта се дава в цели квадратни сантиметри; получено: ${n.obshta_kvsm}`);
+    throw new GreshkaMatritsa(
+      `Площта се дава в цели квадратни сантиметри; получено: ${n.obshta_kvsm}`,
+    );
+  }
+  if (!Number.isSafeInteger(n.baza_st) || n.baza_st < 0) {
+    throw new GreshkaMatritsa(`Базата се дава в цели центове; получено: ${n.baza_st}`);
   }
 
-  const kEtazh = koefitsient(m.etazhi, n.etazh);
-  const kIzlozhenie = koefitsient(m.izlozheniya, n.izlozhenie);
-
-  // площ (кв.см) × база (ст./м²) → ст. × 10 000, после двата коефициента
-  // → ст. × 10 000 × 10 000 × 10 000. Делим веднъж, накрая.
-  const gore = BigInt(n.obshta_kvsm) * BigInt(baza_st) * BigInt(kEtazh) * BigInt(kIzlozhenie);
-  const dolu = BigInt(10_000) * BigInt(EDINITSA_BT) * BigInt(EDINITSA_BT);
+  // площ (кв.см) × база (ст./м²) → ст. × 10 000; всеки коефициент добавя
+  // още един множител от 10 000. Делим ВЕДНЪЖ, накрая.
+  let gore = BigInt(n.obshta_kvsm) * BigInt(n.baza_st);
+  let dolu = 10_000n;
+  for (const bt of n.koefitsienti_bt) {
+    gore *= BigInt(bt);
+    dolu *= BigInt(EDINITSA_BT);
+  }
   // към най-близкото — точната среда отива нагоре, както човек смята на ръка
-  const rezultat = (gore * 2n + dolu) / (dolu * 2n);
-  return Number(rezultat);
+  const tsena = Number((gore * 2n + dolu) / (dolu * 2n));
+  return tsena + (n.dobavka_st ?? 0);
 }
 
 /**

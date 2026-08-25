@@ -3005,6 +3005,84 @@ async function main() {
     await p.fill('#razhod-dostavchik', 'Материали ООД');
     proveri('светенето не пише нищо в Журнала', await broySabitiya(p), predSvetene);
 
+    // ══ 51 · двете секции на Калкулатора (И96 т.2) ══════════════════════════
+    //
+    // Негово: „Аз не разбирам как се смята… с разлика в цената в 2 графи КАК СЕ
+    // СМЯТА и какви стойности ти трябват… с легенда и пример за коефициент…
+    // Ако се налага направи секция Калкулатор и секция Ценова листа."
+    razdel = '51 · двете секции на Калкулатора';
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+
+    proveri('секция „Калкулатор" стои горе',
+      Boolean(await p.$('[data-sektsiya=kalkulator]')), true);
+    proveri('секция „Ценова листа" стои под нея',
+      Boolean(await p.$('[data-sektsiya="tsenova-lista"]')), true);
+
+    // ПЕТТЕ КОЕФИЦИЕНТА · меню от ДУМИ, не свободно число („аз не знам")
+    proveri('петте коефициента са менюта',
+      await p.$$eval('.red.kalk-koef select[data-koef]', (r) => r.length), 5);
+    proveri('и всяко е меню от думи, не поле за число',
+      await p.$$eval('.red.kalk-koef select[data-koef] option',
+        (o) => o.every((x) => /[А-Яа-я]/.test(x.textContent))), true);
+
+    // КАК СЕ СМЯТА · двете графи, ред по ред
+    proveri('двете графи стоят една до друга',
+      await p.$$eval('.dve-grafi .grafa', (r) => r.length), 2);
+    const grafaA = await p.$eval('.dve-grafi .grafa:first-child', (e) => e.textContent);
+    proveri('Графа А тръгва от площ × база', grafaA.includes('площ × база'), true);
+    proveri('и всеки от петте коефициента е СВОЙ ред',
+      ['етаж', 'състояние', 'изложение', 'възраст', 'асансьор']
+        .every((d) => grafaA.includes(d)), true);
+    const grafaB = await p.$eval('.dve-grafi .grafa:last-child', (e) => e.textContent);
+    proveri('Графа Б показва четирите си стъпки',
+      ['годишен наем', 'заетост', 'нетен оперативен доход', 'доходност']
+        .every((d) => grafaB.includes(d)), true);
+
+    // ПРИМЕРЪТ ЗА КОЕФИЦИЕНТ · негово изрично искане · разгъва се ПОД реда
+    proveri('примерът е прибран, докато не се поиска',
+      Boolean(await p.$('.red.kalk-primer')), false);
+    await deystvieSPrerisuvane(p, () => p.click('[data-primer=etazh]'));
+    proveri('примерът се разгъва под реда, без изскачащ прозорец',
+      Boolean(await p.$('.red.kalk-primer')), true);
+    const parterat = await p.$eval('.red.kalk-primer tr[data-stapka=parter]', (r) => ({
+      mnozhitel: r.querySelector('[data-mnozhitel]').textContent.trim(),
+      meni: r.querySelector('[data-meni]').textContent.trim(),
+      pari: r.querySelector('[data-meni-pari]').textContent.trim(),
+    }));
+    proveri('множителят стои с три знака', parterat.mnozhitel, '0,920');
+    proveri('и до него — с колко процента мени', parterat.meni, '−8,00 %');
+    // Числото зависи от обекта, който се разбива; проверява се, че процентът е
+    // ПРЕВЕДЕН В ПАРИ и е отрицателен — „0,92" само по себе си не е пример.
+    proveri('процентът е преведен в ПАРИ, не оставен сам',
+      parterat.pari.startsWith('−') && parterat.pari !== '0,00', true);
+    proveri('избраната стъпка е назована с ДУМА, не само с цвят',
+      (await p.$eval('.red.kalk-primer', (e) => e.textContent)).includes('избрано'), true);
+
+    // РАЗЛИКАТА · и числото, което свързва двете графи
+    const razlikata = await p.$$eval('.plochka .etiket', (e) => e.map((x) => x.textContent));
+    proveri('разликата Б − А е показана', razlikata.includes('Разлика · Б − А'), true);
+    proveri('и подразбиращата се доходност също',
+      razlikata.includes('Подразбираща се доходност'), true);
+
+    // ВРЪЗКАТА МЕЖДУ ДВЕТЕ СЕКЦИИ · смяна горе мени числата долу
+    await p.setInputFiles('#fayl-ploshti', new URL('../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
+    const predSmyana = await chisloNaPoleto(p, 'stoynost-a');
+    await deystvieSPrerisuvane(p, () =>
+      p.selectOption('select[data-koef=sastoyanie]', 'novo-luks'));
+    const sledSmyana = await chisloNaPoleto(p, 'stoynost-a');
+    proveri('коефициент, сменен ГОРЕ, мени листата ДОЛУ', sledSmyana > predSmyana, true);
+
+    // и обратно · връщането връща числото точно, без утайка от закръгляне
+    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=sastoyanie]', 'dobro'));
+    proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predSmyana);
+
+    // И НИЩО ОТ ТОВА НЕ ПИША В ЖУРНАЛА · „няма редакция оттам, а само изчисляване"
+    const predKalk = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=izlozhenie]', 'yug'));
+    proveri('Калкулаторът не пише нищо в Журнала', await broySabitiya(p), predKalk);
+    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=izlozhenie]', 'iztok-zapad'));
+
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
     // §16 гледа джоба РАНО — а знак от чужда азбука, сложен на екран, който се

@@ -586,6 +586,42 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   grid-template-columns: minmax(0, 1.6fr) 130px 84px 84px 96px 118px 128px 128px 78px;
   min-width: 1040px;
 }
+
+/* ── секция „Калкулатор" · входът, легендата и разбивката (И96 т.2) ──── */
+.glava.kalk-koef, .red.kalk-koef {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 100px 140px 110px;
+  min-width: 700px;
+}
+.red.kalk-koef select {
+  font-family: inherit; font-size: 13.5px; color: var(--mastilo);
+  border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 9px;
+  min-height: 34px; background: #FFFFFF; width: 100%;
+}
+/* Примерът за коефициент · разгъва се ПОД реда, не в изскачащ прозорец */
+.red.kalk-primer { display: block; background: var(--panel); padding: 0; }
+.primerblok { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+table.primer, table.razbivka { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.primer th {
+  text-align: left; font-size: 11.5px; font-weight: 600; color: var(--mastilo2);
+  padding: 4px 8px; border-bottom: 1px solid var(--liniya);
+}
+table.primer td { padding: 5px 8px; border-bottom: 1px solid var(--liniya); }
+table.primer tr.izbran td { background: var(--toplo); }
+table.primer th.suma, table.primer td.suma { text-align: right; }
+
+/* Двете графи · една до друга, а на тесен екран — една под друга */
+.dve-grafi { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1000px) { .dve-grafi { grid-template-columns: minmax(0, 1fr); } }
+.grafa {
+  border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
+  padding: 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.grafaglava { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+table.razbivka td { padding: 6px 6px; border-bottom: 1px solid var(--liniya); vertical-align: top; }
+table.razbivka td.znak { width: 18px; color: var(--mastilo2); font-size: 15px; }
+table.razbivka td.suma { text-align: right; white-space: nowrap; }
+table.razbivka .drebno { font-size: 10.5px; }
+.suma.zle { color: var(--aktsent); }
 .pole.tyasno { min-width: 210px; }
 .pole.tyasno select { font-size: 13px; }
 .plochka.golyama .chislo { font-size: 30px; }
