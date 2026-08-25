@@ -597,6 +597,32 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 780px;
 }
 
+/* ── Личните ПАРИ · теми, редове, кредити, план, партиди (И96 т.10) ─── */
+.glava.tema, .red.tema {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 130px 130px 90px;
+  min-width: 700px;
+}
+.glava.tema-opis, .red.tema-opis {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 190px;
+  min-width: 560px;
+}
+.glava.dvizhenie, .red.dvizhenie {
+  grid-template-columns: 110px minmax(0, 1.8fr) 190px minmax(0, 1.4fr) 110px;
+  min-width: 820px;
+}
+.glava.kredit, .red.kredit {
+  grid-template-columns: minmax(0, 1.6fr) 130px 90px 130px 140px 140px;
+  min-width: 820px;
+}
+.glava.plan, .red.plan {
+  grid-template-columns: 150px 110px minmax(0, 1.6fr) 150px minmax(0, 1.4fr);
+  min-width: 820px;
+}
+.glava.partida, .red.partida {
+  grid-template-columns: minmax(0, 1.6fr) 90px 90px 130px 130px 130px;
+  min-width: 780px;
+}
+
 /* ── Журналът от таблица · промените и свръзките (И96 т.8) ──────────── */
 .glava.zhurnal-promyana, .red.zhurnal-promyana {
   grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);

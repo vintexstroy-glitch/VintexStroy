@@ -44,6 +44,7 @@ import {
   dopusnati,
 } from '../src/domein/lichen-dostap.js';
 import { IMENA_NA_ROLITE, type Rolya } from '../src/yadro/samolichnost.js';
+import { sektsiyaPari, zabraviPlana, zakachiLichniPari } from './lichni-pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './main.js';
 
@@ -62,6 +63,9 @@ export function zabraviIzbora(): void {
   izbrani.clear();
   prichinaZaPrenos = '';
   greshka = '';
+  // Прибереш ли личното, недовършеният план за внос не бива да те чака при
+  // връщането — той сочи Огледало, което междувременно може да се е сменило.
+  zabraviPlana();
 }
 
 /**
@@ -113,6 +117,7 @@ export function narisuvayLichno(
   return `
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
     ${narisuvayGant(lichnoOgledalo, dnes, KLYUCH_POGLED, NADPISI_LICHNI, PREDSTAVKA)}
+    ${sektsiyaPari(lichnoOgledalo, dnes)}
     ${sektsiyaPrenos(lichnoOgledalo, sluzhebnoOgledalo)}
     ${sektsiyaDostapi(lichnoOgledalo)}
     <section>
@@ -284,6 +289,9 @@ export function zakachiLichno(
 ): void {
   // СЪЩИЯТ Гант · само с друг ключ, друга представка и ЛИЧНИЯ контекст.
   zakachiGant(koren, lichen, prerisuvay, KLYUCH_POGLED, PREDSTAVKA);
+  // ПАРИТЕ · също с ЛИЧНИЯ контекст. Подаден `k` тук би писал разходите на
+  // човека в служебния Журнал — точно грешката, срещу която стои ADR-036 §8.
+  zakachiLichniPari(koren, lichen, prerisuvay);
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-posoka]')) {
     b.addEventListener('click', async () => {

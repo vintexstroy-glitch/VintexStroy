@@ -543,7 +543,23 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
-            ${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
+            ${
+              /**
+               * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
+               *
+               * Всеки от тях чете или пише `akaunt` — СЛУЖЕБНИЯ ключ. Дотук
+               * това беше само излишно: личният екран носеше дела и никой не
+               * търсеше „Изнеси" оттам. Отсега носи ПАРИ, и бутон „Изнеси
+               * Журнала" на екран със заглавие „Лично" обещава нещо, което не
+               * прави: изнася СЛУЖЕБНИЯ Журнал.
+               *
+               * Да ги скриеш е по-честно от това да ги оставиш видими и мъртви.
+               * Личният износ е СВОЙ резен и се обявява поименно долу, вместо
+               * да се открие при инцидент.
+               */
+              ekran === 'lichno'
+                ? '<span class="drebno">Личният Журнал се изнася и проверява отделно — това още не е построено.</span>'
+                : `${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             ${
               mozhe(izbor, 'iznos-vnos')
@@ -560,12 +576,13 @@ async function trugvay(): Promise<void> {
                 ? '<button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>'
                 : ''
             }
-            <input translate="no" type="file" id="fayl" accept="application/json,.json" hidden>
+            <input translate="no" type="file" id="fayl" accept="application/json,.json" hidden>`
+            }
           </div>
         </header>
         <div class="telo">
           ${vestHTML()}
-          ${mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
+          ${ekran !== 'lichno' && mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
           ${
             ekran === 'imoti'
               ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length })
@@ -634,13 +651,30 @@ async function trugvay(): Promise<void> {
         location.reload();
       });
     }
-    if (mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
+    /**
+     * СЛУЖЕБНИТЕ ПЪТИЩА НЕ ВИСЯТ НА ЛИЧНИЯ ЕКРАН.
+     *
+     * Тези шест се закачат на ВСЕКИ екран със СЛУЖЕБНИЯ контекст `k`. Дотук
+     * това беше безобидно — личният екран носеше само дела. Отсега носи ПАРИ
+     * и ИЗВЛЕЧЕНИЯ, а „Прочети извлечение" на служебния пункт би записало
+     * личната карта на човека в СЛУЖЕБНИЯ Журнал.
+     *
+     * Представка `lp-` не решава това: рискът не е сблъсък на id, а видим
+     * бутон, който пише в грешния Журнал (правило 2 — Вратата е единственият
+     * вход, и той трябва да е ПРАВИЛНАТА врата).
+     *
+     * Личният екран си има свои закачания в `zakachiLichno`, с личния контекст.
+     */
+    const sluzhebenEkran = ekran !== 'lichno';
+    if (sluzhebenEkran && mozhe(izbor, 'iztochnitsi')) zakachiIztochnitsi(koren, k, prerisuvay);
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
-    zakachiIstoriya(koren, k);
-    zakachiKontekstnoMenyu(koren, k);
-    zakachiKlaviatura(koren, k, prerisuvay);
+    if (sluzhebenEkran) {
+      zakachiIstoriya(koren, k);
+      zakachiKontekstnoMenyu(koren, k);
+      zakachiKlaviatura(koren, k, prerisuvay);
+      zakachiRedaktsiya(koren, k, prerisuvay);
+    }
     zakachiChernovata(koren);
-    zakachiRedaktsiya(koren, k, prerisuvay);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }

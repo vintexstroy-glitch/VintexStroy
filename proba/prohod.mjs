@@ -3350,6 +3350,144 @@ async function main() {
     proveri('и вече няма кой да отнема',
       Boolean(await p.$('[data-otnemi]')), false);
 
+    // ══ 55 · ЛИЧНИТЕ ПАРИ · кредит, приход, разход на едно място (И96 т.10) ══
+    razdel = '55 · Личните пари · деликатно';
+    await naEkran(p, 'lichno', '[data-sektsiya=lichni-pari]');
+    proveri('числата тръгват СКРИТИ · спирачка за случайния поглед',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('•••'), true);
+    proveri('и екранът КАЗВА, че това не е сигурност',
+      (await p.$eval('[data-sektsiya=lichni-pari]', (e) => e.textContent)).includes('не ключалка'), true);
+    proveri('празно е НАРОЧНО · нищо не е попълнено вместо него',
+      (await p.$eval('[data-sektsiya=lichni-pari]', (e) => e.textContent)).includes('нищо не е попълнено вместо теб'), true);
+    proveri('и НЯМА нито един ред', await p.$$eval('.red.dvizhenie', (r) => r.length), 0);
+
+    await deystvieSPrerisuvane(p, () => p.click(`#${'lp-'}pokazhi`));
+    proveri('числата се показват с натискане',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('•••'), false);
+
+    // ТЕМАТА · менюто, което ОПИСВА, расте свободно
+    razdel = '55 · Личните пари · темата';
+    const predTema = await broySabitiya(p);
+    await p.click('[data-forma="lp-tema"] summary');
+    await p.fill('#lp-t-ime', 'Храна');
+    await p.fill('#lp-t-grupa', 'Дом');
+    await deystvieSPrerisuvane(p, () => p.click('#lp-t-zapishi'));
+    proveri('темата се записа', await p.$$eval('.red.tema-opis', (r) => r.length), 1);
+    proveri('служебният Журнал НЕ е помръднал', await broySabitiya(p), predTema);
+
+    // РЪЧНИЯТ РЕД · „да може да се добавя лично"
+    razdel = '55 · Личните пари · ръчният ред';
+    await p.click('[data-forma="lp-red"] summary');
+    await p.fill('#lp-r-suma', '35,00');
+    await p.fill('#lp-r-koy', 'ЛИДЛ');
+    await p.selectOption('#lp-r-tema', { label: 'Храна' });
+    await deystvieSPrerisuvane(p, () => p.click('#lp-r-zapishi'));
+    proveri('редът се вижда', await p.$$eval('.red.dvizhenie', (r) => r.length), 1);
+    proveri('и влиза в сбора по ТЕМИ',
+      (await p.$eval('[data-tablitsa=lichni-temi]', (e) => e.textContent)).includes('Храна'), true);
+    proveri('разходът е 35,00 €',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('35,00'), true);
+
+    // ИЗКЛЮЧВАНЕТО · ред се ИЗКЛЮЧВА, не се трие (правило 23)
+    razdel = '55 · Личните пари · изключеният ред';
+    // причината е ЗАДЪЛЖИТЕЛНА · без нея действието отказва с думи
+    await deystvieSPrerisuvane(p, () => p.click('[data-izklyuchi]'));
+    proveri('без причина изключването НЕ минава',
+      (await p.evaluate(() => document.body.textContent)).includes('иска ПРИЧИНА'), true);
+    proveri('и редът си остава в сборовете',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('нищо не е изключено'), true);
+
+    await p.fill('#lp-prichina', 'върнати пари');
+    await deystvieSPrerisuvane(p, () => p.click('[data-izklyuchi]'));
+    proveri('редът ОСТАНА в таблицата', await p.$$eval('.red.dvizhenie', (r) => r.length), 1);
+    proveri('но е белязан с причината си',
+      (await p.$eval('.red.dvizhenie', (e) => e.textContent)).includes('върнати пари'), true);
+    proveri('и падна от сборовете',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('1 изключени реда не влизат'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-vurni]'));
+    proveri('връщането го брои пак',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).includes('нищо не е изключено'), true);
+
+    // КРЕДИТЪТ · третото нещо · главницата НЕ е разход
+    razdel = '55 · Личните пари · кредитът';
+    await p.click('[data-forma="lp-kredit"] summary');
+    await p.fill('#lp-k-ime', 'Ипотека · Пощенска');
+    await p.fill('#lp-k-ostatak', '100000,00');
+    await p.fill('#lp-k-lihva', '345');
+    await p.fill('#lp-k-vnoska', '612,34');
+    await deystvieSPrerisuvane(p, () => p.click('#lp-k-zapishi'));
+    proveri('кредитът се вписа', await p.$$eval('.red.kredit', (r) => r.length), 1);
+    proveri('лихвата се изписва като процент',
+      (await p.$eval('.red.kredit', (e) => e.textContent)).includes('3,45 %'), true);
+    proveri('и остатъкът е СМЕТНАТ, не поле',
+      (await p.$eval('.red.kredit', (e) => e.textContent)).replace(/[\s\u202f\u00a0]/g, '').includes('100000,00'), true);
+
+    const predVnoska = Number(
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).match(/Разход\s*([\d\s ]+),/)?.[1]
+        ?.replace(/[\s ]/g, '') ?? '0',
+    );
+    await deystvieSPrerisuvane(p, () => p.click('[data-vnoska]'));
+    const sledVnoska = Number(
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).match(/Разход\s*([\d\s ]+),/)?.[1]
+        ?.replace(/[\s ]/g, '') ?? '0',
+    );
+    proveri('вноската влезе като ЛИХВА (287 €), не като цялата вноска (612 €)',
+      sledVnoska - predVnoska, 287);
+    proveri('а остатъкът по кредита ПАДНА с главницата',
+      (await p.$eval('.red.kredit', (e) => e.textContent)).replace(/[\s\u202f\u00a0]/g, '').includes('100000,00'), false);
+
+    // ИЗВЛЕЧЕНИЕТО · планът се ПОКАЗВА, нищо не се пише без натискане
+    razdel = '55 · Личните пари · извлечението';
+    const IZVLECHENIE =
+      'Дата;Описание;Сума;Референция;Салдо\n' +
+      '05.07.2026;ОМВ;-80,00;R-1;920,00\n' +
+      '31.07.2026;Заплата;2000,00;R-2;2920,00';
+    await p.setInputFiles('#lp-fayl', {
+      name: 'karta-yuli.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(IZVLECHENIE, 'utf8'),
+    });
+    await p.waitForSelector('[data-tablitsa=lichni-plan]');
+    proveri('планът се ПОКАЗВА, преди да се пише',
+      await p.$$eval('.red.plan', (r) => r.length), 2);
+    proveri('обхватът се КАЗВА · гледа се само в него',
+      (await p.$eval('[data-sektsiya=lichni-pari]', (e) => e.textContent)).includes('2026-07-05 … 2026-07-31'), true);
+
+    const predVnos = await broyLichni(p);
+    await deystvieSPrerisuvane(p, () => p.click('#lp-pusni'));
+    proveri('двата реда влязоха', (await broyLichni(p)) > predVnos, true);
+    proveri('и разписката на партидата е записана',
+      await p.$$eval('.red.partida', (r) => r.length), 1);
+    proveri('заплатата се брои като ПРИХОД',
+      (await p.$eval('[data-tablitsa=lichni-sborove]', (e) => e.textContent)).replace(/[\s\u202f\u00a0]/g, '').includes('2000,00'), true);
+
+    // ВТОРИЯТ ВНОС · същият файл, нула нови · и НИЩО не се гаси
+    razdel = '55 · Личните пари · вторият внос';
+    const predVtori = await broyLichni(p);
+    await p.setInputFiles('#lp-fayl', {
+      name: 'karta-yuli-pak.csv',
+      mimeType: 'text/csv',
+      buffer: Buffer.from(IZVLECHENIE, 'utf8'),
+    });
+    await p.waitForSelector('[data-tablitsa=lichni-plan]');
+    proveri('всичко е познато · нищо ново',
+      (await p.$eval('[data-tablitsa=lichni-plan]', (e) => e.textContent)).includes('вече го има'), true);
+    proveri('бутонът за писане е ИЗКЛЮЧЕН — няма какво да влиза',
+      await p.$eval('#lp-pusni', (e) => e.disabled), true);
+    proveri('и НИТО ЕДНО събитие не е добавено', await broyLichni(p), predVtori);
+    await deystvieSPrerisuvane(p, () => p.click('#lp-otkazhi'));
+
+    // СЛУЖЕБНИЯТ ПЪТ НЕ ВИСИ ТУК · личната карта не влиза в служебния Журнал
+    razdel = '55 · Личните пари · служебният пункт е скрит';
+    proveri('на личния екран НЯМА служебен пункт за източници',
+      Boolean(await p.$('#fayl-iztochnik')), false);
+    proveri('нито „Изнеси Журнала" · той изнася СЛУЖЕБНИЯ',
+      Boolean(await p.$('#iznesi')), false);
+    proveri('нито „Провери веригата" · тя проверява СЛУЖЕБНАТА',
+      Boolean(await p.$('#proveri')), false);
+    proveri('но екранът КАЗВА защо ги няма',
+      (await p.evaluate(() => document.body.textContent)).includes('изнася и проверява отделно'), true);
+
     // ПРИБИРАНЕТО · пунктът пада, Журналът остава
     razdel = '53 · Личното · прибирането';
     const predPribirane = lichniyat.broy;
@@ -3459,6 +3597,21 @@ async function dobaviNaem(p, { imot, koy, suma, sektor, padezh, telefon, imeyl }
   await p.waitForFunction((n) => {
     return Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) === n + 1;
   }, predi);
+}
+
+/** Колко събития стоят в ЛИЧНИЯ Журнал · служебният брояч не ги вижда. */
+async function broyLichni(p) {
+  return p.evaluate(async () => {
+    const db = await new Promise((da) => {
+      const z = indexedDB.open('masterbook');
+      z.onsuccess = () => da(z.result);
+    });
+    const vsichki = await new Promise((da) => {
+      const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+      z.onsuccess = () => da(z.result);
+    });
+    return vsichki.filter((s) => s.naematel.endsWith('#lichen')).length;
+  });
 }
 
 /** Действие, което прерисува екрана, но не добавя събитие (бутон, отказ). */
