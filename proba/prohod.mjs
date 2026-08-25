@@ -3828,6 +3828,65 @@ async function main() {
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
         .includes('Нов Доставчик ООД'), true);
 
+    // ══ 66 · ОДИТНИЯТ ФАЙЛ · SAF-T и контрагентите (И96 т.11) ═════════════
+    //
+    // Проверява се онова, което ТЕСТЪТ не може: че Главната книга стига до
+    // ЕКРАНА, че пречките се четат с думи и че вписаните данни МАХАТ своята
+    // пречка — тоест че екранът и домейнът гледат едно и също число.
+    razdel = '66 · Одитният файл · пречките се четат';
+    await naEkran(p, 'smetki', '[data-sektsiya=saf-t]');
+    proveri('секцията е на екрана с версията на схемата',
+      (await p.$eval('[data-sektsiya=saf-t] .dyalglava span', (e) => e.textContent)).includes('1.0.2'),
+      true);
+    const prechkiPredi = await p.$$eval('[data-sektsiya=saf-t] .prechki li', (e) => e.length);
+    proveri('пречките се ИЗБРОЯВАТ, а не се мълчи за тях', prechkiPredi > 0, true);
+    proveri('и се казват с ДУМИ · фирмата липсва поименно',
+      (await p.$eval('[data-sektsiya=saf-t] .prechki', (e) => e.textContent)).includes('фирмата'),
+      true);
+
+    // ОБОРОТНАТА ВЕДОМОСТ · дебит = кредит на самия екран, не само в теста.
+    const sboratNaKnigata = await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor', (e) => {
+      const sumi = [...e.querySelectorAll('.suma')].map((s) => Number(s.dataset.st));
+      return { debit: sumi[0], kredit: sumi[1] };
+    });
+    proveri('дебит = кредит на ЕКРАНА', sboratNaKnigata.debit === sboratNaKnigata.kredit, true);
+    proveri('и книгата НЕ е празна за този месец', sboratNaKnigata.debit > 0, true);
+    proveri('немапнатите сметки се ВИЖДАТ, а не се мълчат',
+      (await p.$$eval('[data-sektsiya=saf-t] .red.saft em', (e) => e.length)) > 0, true);
+
+    // ВПИСВАНЕТО МАХА СВОЯТА ПРЕЧКА · екранът и домейнът гледат едно число.
+    razdel = '66 · Контрагентът · сбърканият ЕИК пада ТУК';
+    await naEkran(p, 'nastroyki', '#forma-kontragent');
+    await p.selectOption('#kontragent-vid', 'firma');
+    await p.fill('#kontragent-ime', 'ВинтексСтрой ЕООД');
+    // Сменена ПОСЛЕДНА цифра: точно грешката при преписване, която контролната
+    // цифра лови. Ако минеше, файлът щеше да падне чак при НАП.
+    await p.fill('#kontragent-eik', '131071588');
+    await p.click('#forma-kontragent button[type=submit]');
+    await p.waitForFunction(() => document.querySelector('#greshka-kontragent')?.textContent !== '');
+    proveri('сбърканата контролна цифра се КАЗВА в полето',
+      (await p.$eval('#greshka-kontragent', (e) => e.textContent)).includes('контролната цифра'),
+      true);
+
+    razdel = '66 · Контрагентът · вписаното маха пречката';
+    const predKontragenta = await broySabitiya(p);
+    await p.fill('#kontragent-eik', '131071587');
+    await p.fill('#kontragent-dds', 'BG131071587');
+    await p.fill('#kontragent-adres', 'ул. Първа 1');
+    await p.fill('#kontragent-grad', 'София');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-kontragent button[type=submit]'));
+    proveri('записът влиза в ЖУРНАЛА', await broySabitiya(p), predKontragenta + 1);
+    proveri('и редът се появява като ПЪЛЕН',
+      (await p.$eval('.red.kontragent .znachka', (e) => e.textContent)).trim(), 'пълен');
+
+    await naEkran(p, 'smetki', '[data-sektsiya=saf-t]');
+    proveri('пречките са с ЕДНА по-малко',
+      (await p.$$eval('[data-sektsiya=saf-t] .prechki li', (e) => e.length)) < prechkiPredi, true);
+    proveri('и вече не пише, че фирмата липсва',
+      (await p.$eval('[data-sektsiya=saf-t]', (e) => e.textContent)).includes('фирмата няма'),
+      false);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 65 · ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · параметри по бизнес (И96 т.1) ══════
     //
     // Дотук `nastroykiteNaVhoda` и `smeniNastroykiteNaVhoda` бяха построени и

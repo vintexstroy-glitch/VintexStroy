@@ -10,6 +10,8 @@
  * в Excel и стрелките за филтриране са вече там.
  */
 
+import { ekvXML } from './xml.js';
+
 export interface KolonaNaLista {
   readonly ime: string;
   /** широчина в знаци; по подразбиране 14 */
@@ -107,15 +109,6 @@ function zip(faylove: readonly { ime: string; tekst: string }[]): Uint8Array {
 }
 
 // ── XML ───────────────────────────────────────────────────────────────────
-function ekvXML(t: string): string {
-  return t
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    // Управляващите знаци са невалидни в XML — по-добре видим белег от счупен файл.
-    .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '·');
-}
 
 function bukvaNaKolona(n: number): string {
   let ime = '';

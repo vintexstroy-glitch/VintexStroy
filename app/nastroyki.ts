@@ -23,6 +23,15 @@ import {
   type VidProblem,
 } from '../src/domein/vhodni-problemi.js';
 import { butonSIkona } from './ikoni.js';
+import {
+  // ПСЕВДОНИМ. „Видове" има и `vid-stoynost.ts` (евро · процент · число), и
+  // двете имена са верни в своя дом. Кръстени еднакво ТУК, те се бият — затова
+  // се различават на мястото, където се срещат, а не в домовете си.
+  IMENA_NA_VIDOVETE as IMENA_NA_KONTRAGENTITE,
+  kakvoLipsva,
+  VIDOVE_KONTRAGENT,
+  type Kontragent,
+} from '../src/domein/kontragenti.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
@@ -159,6 +168,7 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izb
       mozhe(izbor, 'drugi-imeyli') ? blokNaPravata(o, modeli, izbor) : ''
     }
     ${blokNaParametrite(o)}
+    ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
     ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}`;
@@ -826,6 +836,114 @@ function redNaParametar(opis: OpisNaProblem, n: NastroykaNaProblem): string {
     </div>`;
 }
 
+/**
+ * КОНТРАГЕНТИТЕ · номерата, които одитният файл иска (И96 т.11 · ADR-047).
+ *
+ * ЕДНА ФОРМА, ТРИ ВИДА. Собствената фирма отива в `Header` на файла, клиентите
+ * и доставчиците — в `MasterFiles`. Полетата им са едни и същи; три отделни
+ * форми щяха да са три места, които се разминават при първото ново поле.
+ *
+ * ИМЕТО Е ВРЪЗКАТА. Наемът и разходът вече сочат контрагента по име — затова
+ * тук се вписва СЪЩОТО име, а сведеното му изписване ги слива. Нов ключ щеше
+ * да иска втора връзка, която никой не поддържа.
+ */
+function blokNaKontragentite(o: Ogledalo): string {
+  const spisak = [...o.kontragenti.values()].sort(
+    (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
+  );
+  return `
+    <section data-sektsiya="kontragenti">
+      <div class="dyalglava">
+        <h2>Контрагенти</h2>
+        <span>моята фирма · клиенти · доставчици — ЕИК и адрес за одитния файл</span>
+      </div>
+
+      <form id="forma-kontragent">
+        <div class="poleta">
+          <div class="pole">
+            <label for="kontragent-vid">Вид</label>
+            <select translate="no" id="kontragent-vid" name="vid">
+              ${VIDOVE_KONTRAGENT.map(
+                (v) => `<option value="${v}">${ekraniraj(IMENA_NA_KONTRAGENTITE[v])}</option>`,
+              ).join('')}
+            </select>
+          </div>
+          <div class="pole">
+            <label for="kontragent-ime">Име</label>
+            <input translate="no" id="kontragent-ime" name="ime" required maxlength="120"
+              placeholder="както е в наема или разхода" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-eik">ЕИК</label>
+            <input translate="no" id="kontragent-eik" name="eik" maxlength="13"
+              inputmode="numeric" placeholder="9 или 13 цифри" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-dds">Номер по ДДС</label>
+            <input translate="no" id="kontragent-dds" name="ddsNomer" maxlength="14"
+              placeholder="BG…" autocomplete="off">
+          </div>
+        </div>
+        <div class="poleta">
+          <div class="pole">
+            <label for="kontragent-adres">Адрес</label>
+            <input translate="no" id="kontragent-adres" name="adres" maxlength="160"
+              placeholder="улица и номер" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-grad">Град</label>
+            <input translate="no" id="kontragent-grad" name="grad" maxlength="80" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-kod">Пощенски код</label>
+            <input translate="no" id="kontragent-kod" name="poshtenskiKod" maxlength="12" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-darzhava">Държава</label>
+            <input translate="no" id="kontragent-darzhava" name="darzhava" maxlength="2"
+              value="BG" placeholder="BG" autocomplete="off">
+          </div>
+        </div>
+        <p class="greshka" id="greshka-kontragent"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Запиши контрагента</button>
+          <p class="drebno">Контролната цифра на ЕИК се СМЯТА, не се брои — сбъркана при
+          преписване цифра пада тук, вместо в НАП. Празно поле минава: то значи „още не е
+          вписано" и одитният файл го брои като пречка с думи.</p>
+        </div>
+      </form>
+
+      ${
+        spisak.length === 0
+          ? '<p class="prazno">Още няма вписан контрагент.<br>Без данните на фирмата одитният файл няма кой да го подава.</p>'
+          : `<div class="tablitsa" data-tablitsa="kontragenti">
+        <div class="glava kontragent">
+          <span>Име</span><span>Вид</span><span>ЕИК</span><span>По ДДС</span><span>Липсва</span>
+        </div>
+        ${spisak.map(redNaKontragent).join('')}
+      </div>`
+      }
+    </section>`;
+}
+
+function redNaKontragent(kt: Kontragent): string {
+  const lipsva = kakvoLipsva(kt);
+  return `
+    <div class="red kontragent" translate="no">
+      <span class="kletka"><b>${ekraniraj(kt.ime)}</b><span>${ekraniraj(
+        [kt.adres, kt.grad, kt.darzhava].filter(Boolean).join(', ') || 'без адрес',
+      )}</span></span>
+      <span>${ekraniraj(IMENA_NA_KONTRAGENTITE[kt.vid] ?? kt.vid)}</span>
+      <span>${kt.eik === '' ? '—' : ekraniraj(kt.eik)}</span>
+      <span>${kt.ddsNomer === '' ? '—' : ekraniraj(kt.ddsNomer)}</span>
+      <span>${
+        lipsva.length === 0
+          ? '<span class="znachka dobre">пълен</span>'
+          : `<span class="znachka trevoga">${ekraniraj(lipsva.join(' · '))}</span>`
+      }</span>
+    </div>`;
+}
+
 function blokNaSverkite(o: Ogledalo): string {
   const posledni = [...o.sverki].reverse().slice(0, 12);
   return `
@@ -930,6 +1048,46 @@ export function zakachiNastroyki(
       await prerisuvay();
     });
   }
+
+  /**
+   * КОНТРАГЕНТЪТ (И96 т.11) · вписва се от форма, записва се през Вратата.
+   *
+   * Отказът се ПОКАЗВА в полето за грешка, а не се преглъща: сбъркан ЕИК е
+   * точно онова, което човекът трябва да поправи веднага, докато номерът му
+   * е още пред очите му.
+   */
+  const formaKontragent = koren.querySelector<HTMLFormElement>('#forma-kontragent');
+  formaKontragent?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const izhod = koren.querySelector<HTMLElement>('#greshka-kontragent')!;
+    izhod.textContent = '';
+    const d = new FormData(formaKontragent);
+    const vzemi = (ime: string) => String(d.get(ime) ?? '').trim();
+    const buton = formaKontragent.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    buton.disabled = true;
+    try {
+      await k.deystviya.zapishiKontragent(
+        {
+          vid: vzemi('vid'),
+          ime: vzemi('ime'),
+          eik: vzemi('eik'),
+          ddsNomer: vzemi('ddsNomer').toUpperCase(),
+          adres: vzemi('adres'),
+          grad: vzemi('grad'),
+          poshtenskiKod: vzemi('poshtenskiKod'),
+          darzhava: vzemi('darzhava').toUpperCase(),
+        },
+        { opId: crypto.randomUUID() },
+      );
+      formaKontragent.reset();
+      k.vest('dobre', `Контрагентът „${vzemi('ime')}" е записан.`);
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = dumiZaGreshka(err);
+    } finally {
+      buton.disabled = false;
+    }
+  });
 
   koren.querySelector<HTMLButtonElement>('#nov-buton')?.addEventListener('click', async () => {
     dobavyam = true;

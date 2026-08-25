@@ -98,6 +98,10 @@ export const IKONI: Readonly<Record<string, string>> = Object.freeze({
   'ekran-tablo': '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
 
   sigurnost: '<path d="M12 3.5 19.5 6.5v6c0 4.4-3.1 7.6-7.5 9-4.4-1.4-7.5-4.6-7.5-9v-6z"></path><path d="M9 12.2l2.2 2.2 4-4.3"></path>',
+
+  // ── счетоводството пред държавата (И96 т.11) ───────────────────────────
+  kniga: '<path d="M4 5a2 2 0 0 1 2-2h5v18H6a2 2 0 0 1-2-2z"></path><path d="M20 5a2 2 0 0 0-2-2h-5v18h5a2 2 0 0 0 2-2z"></path>',
+  kontragent: '<path d="M4 20.5V6a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v14.5"></path><path d="M13 10h6a1 1 0 0 1 1 1v9.5"></path><path d="M2.5 20.5h19"></path><path d="M7 9h3M7 13h3M16 14h1"></path>',
 });
 
 export type ImeNaIkona = keyof typeof IKONI;

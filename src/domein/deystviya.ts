@@ -28,6 +28,12 @@ import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
+import {
+  GreshkaKontragent,
+  klyuchNaKontragent,
+  proveriKontragent,
+  type VidKontragent,
+} from './kontragenti.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -52,6 +58,7 @@ import type {
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
+  PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -589,6 +596,44 @@ export class Deystviya {
       belezhka: danni.belezhka,
     });
     return this.#pusni('ПараметърНаВходаЗаписан', VID.parametar, danni.vid, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА КОНТРАГЕНТ · номерата, които одитният файл иска (И96 т.11).
+   *
+   * Само Стопанинът: ЕИК-ът и номерът по ДДС на собствената фирма отиват в
+   * `Header` на файла за НАП, а чуждите — в `MasterFiles`. Сбъркан номер там е
+   * отхвърлен файл и глоба по чл. 277а — това не е поле за всеки служител.
+   *
+   * Същността е СВЕДЕНОТО ИМЕ: втори запис за същия човек го ДОПЪЛВА, вместо
+   * да го удвои. Затова ключът минава през `klyuchNaKontragent`, а не през
+   * името както е написано — иначе „ЕООД Иван" и „еоод иван" стават двама.
+   */
+  async zapishiKontragent(danni: PayloadKontragentZapisan, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o) && o.stopanin !== '') {
+      throw new GreshkaKontragent(
+        'Контрагентите се вписват само от Стопанина — техните номера отиват в ' +
+          'одитния файл за НАП.',
+      );
+    }
+    proveriKontragent({
+      vid: danni.vid as VidKontragent,
+      ime: danni.ime,
+      eik: danni.eik,
+      ddsNomer: danni.ddsNomer,
+      adres: danni.adres,
+      grad: danni.grad,
+      poshtenskiKod: danni.poshtenskiKod,
+      darzhava: danni.darzhava,
+    });
+    return this.#pusni(
+      'КонтрагентЗаписан',
+      VID.kontragent,
+      klyuchNaKontragent(danni.ime),
+      danni,
+      z,
+    );
   }
 
   /**

@@ -161,6 +161,22 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     za: SAMO_STOPANINAT,
   },
   {
+    klyuch: 'kontragenti',
+    ime: 'Контрагенти',
+    opis: 'моята фирма · клиенти · доставчици · ЕИК и адрес за одитния файл',
+    ikona: 'kontragent',
+    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'kontragenti' },
+    za: SAMO_STOPANINAT,
+  },
+  {
+    klyuch: 'saf-t',
+    ime: 'Одитен файл (SAF-T)',
+    opis: 'главната книга и месечният XML за НАП · и какво още го спира',
+    ikona: 'kniga',
+    kade: { vid: 'sektsiya', ekran: 'smetki', sektsiya: 'saf-t' },
+    za: RABOTESHTITE,
+  },
+  {
     klyuch: 'sverki',
     ime: 'Записани сверки',
     opis: 'вход↔изход на всяка партида · и разликата, дори когато е нула',
