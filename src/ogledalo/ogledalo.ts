@@ -11,6 +11,13 @@
  * и самото сторно не се прилага. Нищо не се трие; просто не се брои.
  */
 
+import {
+  nastroykiPoPodrazbirane,
+  sPromenenaNastroyka,
+  type NastroykiNaVhoda,
+  type Sila,
+  type VidProblem,
+} from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
@@ -44,6 +51,7 @@ import type {
   PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSpravkaPodadena,
+  PayloadParametarNaVhodaZapisan,
   PayloadStopaninSmenen,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -191,6 +199,14 @@ export interface Ogledalo {
    * го открие в деня, в който главният имейл вече го няма.
    */
   readonly zapasenKontakt: PayloadZapasenKontaktZapisan | null;
+  /**
+   * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ · настроени за ТОЗИ бизнес (И96 т.1 · ADR-046).
+   *
+   * Винаги пълна карта: почва от подразбирането и се пренаписва вид по вид.
+   * Празна тя никога не е — липсващият параметър значи „както казва занаятът",
+   * а не „няма проверка".
+   */
+  readonly parametriNaVhoda: NastroykiNaVhoda;
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
   readonly vzemaniya: ReadonlyMap<string, Vzemane>;
@@ -396,6 +412,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   // не разчита на това — четенето остава вярно и върху пипнат отвън Журнал.
   let stopanin = '';
   let zapasenKontakt: PayloadZapasenKontaktZapisan | null = null;
+  let parametriNaVhoda = nastroykiPoPodrazbirane();
   const prava = new Map<string, PravaZaModel>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
@@ -742,6 +759,20 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       }
 
       /**
+       * ПАРАМЕТЪРЪТ СЕ СЛИВА ПО ВИД, не подменя цялата карта: едно събитие
+       * носи един вид, а останалите седем си остават каквито са били.
+       */
+      case 'ПараметърНаВходаЗаписан': {
+        const p = s.payload as unknown as PayloadParametarNaVhodaZapisan;
+        parametriNaVhoda = sPromenenaNastroyka(parametriNaVhoda, p.vid as VidProblem, {
+          vklyuchen: p.vklyuchen,
+          sila: p.sila as Sila,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
+      /**
        * ПОСЛЕДНИЯТ ВПИСАН печели · запасният контакт се СМЕНЯ, не се трупа.
        * Старите записи си остават в Журнала (правило 1) — просто вече не важат.
        */
@@ -882,6 +913,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   return {
     stopanin,
     zapasenKontakt,
+    parametriNaVhoda,
     imoti,
     naemi,
     vzemaniya,

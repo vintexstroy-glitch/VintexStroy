@@ -3828,6 +3828,50 @@ async function main() {
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
         .includes('Нов Доставчик ООД'), true);
 
+    // ══ 65 · ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · параметри по бизнес (И96 т.1) ══════
+    //
+    // Дотук `nastroykiteNaVhoda` и `smeniNastroykiteNaVhoda` бяха построени и
+    // НИКОЙ не ги викаше — функция без екран (ADR-041). Ето го екрана, и ето
+    // го доказателството, че параметърът стига до ЖИВАТА проверка на полето.
+    razdel = '65 · Проверките при въвеждане';
+    await naEkran(p, 'nastroyki', '[data-sektsiya=parametri]');
+    proveri('осемте вида стоят на екрана',
+      await p.$$eval('.red.parametar', (e) => e.length), 8);
+    proveri('замразеният период е ЗАКОВАН · правило 9 не е параметър',
+      await p.$eval('[data-parametar="zamrazen-period"] [data-parametar-vklyuchen]', (e) => e.disabled),
+      true);
+
+    // ЖИВАТА ПРОМЯНА · „дублират" минава от „спира" на „предупреждава"
+    const predParametara = await broySabitiya(p);
+    await p.selectOption('[data-parametar="dublikat"] [data-parametar-sila]', 'preduprezhdava');
+    await p.fill('[data-parametar="dublikat"] [data-parametar-belezhka]', 'при нас се случва');
+    await deystvieSPrerisuvane(p, () =>
+      p.click('[data-parametar="dublikat"] [data-parametar-zapishi]'),
+    );
+    proveri('записът влиза в ЖУРНАЛА, не в паметта на екрана',
+      await broySabitiya(p), predParametara + 1);
+    proveri('и се вижда на екрана след прерисуване',
+      await p.$eval('[data-parametar="dublikat"] [data-parametar-sila]', (e) => e.value),
+      'preduprezhdava');
+    proveri('бележката на Стопанина също',
+      await p.$eval('[data-parametar="dublikat"] [data-parametar-belezhka]', (e) => e.value),
+      'при нас се случва');
+
+    // ОСТАНАЛИТЕ СЕДЕМ НЕ МЪРДАТ · едно събитие мени един вид.
+    proveri('останалите седем са непокътнати',
+      await p.$eval('[data-parametar="prazno"] [data-parametar-sila]', (e) => e.value), 'spira');
+
+    // И НАЙ-ВАЖНОТО · параметърът стига до ЖИВАТА проверка на полето.
+    razdel = '65 · Проверките · параметърът стига до полето';
+    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await p.fill('#razhod-dostavchik', '株式会社 ЕООД');
+    await p.waitForFunction(() =>
+      document.querySelector('#kazva-dostavchik')?.textContent !== '',
+    );
+    proveri('чуждата азбука пак свети',
+      await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-')), true);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 64 · ПОДРЕДБАТА · всеки сам мести секциите си (И101 т.2) ═══════════
     razdel = '64 · Подредбата на екрана';
     await naEkran(p, 'smetki', '#forma-period');

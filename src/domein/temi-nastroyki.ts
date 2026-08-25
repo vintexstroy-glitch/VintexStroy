@@ -153,6 +153,14 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     za: SAMO_STOPANINAT,
   },
   {
+    klyuch: 'parametri',
+    ime: 'Проверките при въвеждане',
+    opis: 'осем вида · своя сила и своя бележка · важат за целия бизнес',
+    ikona: 'sigurnost',
+    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'parametri' },
+    za: SAMO_STOPANINAT,
+  },
+  {
     klyuch: 'sverki',
     ime: 'Записани сверки',
     opis: 'вход↔изход на всяка партида · и разликата, дори когато е нула',

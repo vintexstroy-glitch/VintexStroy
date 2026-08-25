@@ -171,6 +171,51 @@ export interface NastroykaNaProblem {
 
 export type NastroykiNaVhoda = Readonly<Record<VidProblem, NastroykaNaProblem>>;
 
+/**
+ * ПРОВЕРЯВА една настройка, преди тя да стане запис (И96 т.1).
+ *
+ * Проверката е ТУК, а не в екрана: параметърът влиза в Журнала и оттам го
+ * четат всички. Екран, който сам решава кое е валидно, пуска в историята
+ * стойност, която домейнът после не разбира — а Журналът не се преписва.
+ */
+export function proveriNastroyka(vid: string, n: NastroykaNaProblem): void {
+  if (!(VIDOVE_PROBLEM as readonly string[]).includes(vid)) {
+    throw new GreshkaVhod(`Няма такъв вид проблем: „${vid}".`);
+  }
+  if (n.sila !== 'spira' && n.sila !== 'preduprezhdava') {
+    throw new GreshkaVhod('Силата е „спира" или „предупреждава" — трето няма.');
+  }
+  if (n.belezhka.length > 200) {
+    throw new GreshkaVhod(
+      'Бележката е твърде дълга — 200 знака стигат. Тя стои ПОД легендата, ' +
+        'а не на нейно място.',
+    );
+  }
+  // ЗАМРАЗЕНИЯТ ПЕРИОД не се разхлабва от Настройки. Правило 9 е закон, не
+  // параметър по бизнес: подадена справка заключва месеца, и това не е избор.
+  if (vid === 'zamrazen-period' && (!n.vklyuchen || n.sila !== 'spira')) {
+    throw new GreshkaVhod(
+      'Замразеният период СПИРА винаги — подадената справка заключва месеца ' +
+        '(правило 9). Този ред не е параметър по бизнес.',
+    );
+  }
+}
+
+/**
+ * СЛИВА една променена настройка · връща НОВА карта, не мени подадената.
+ *
+ * Огледалото навива събитията едно по едно; всяко носи ЕДИН вид. Затова
+ * сливането е по вид, а не подмяна на цялата карта — иначе последното събитие
+ * би изтрило всичко, което не е в него.
+ */
+export function sPromenenaNastroyka(
+  sega: NastroykiNaVhoda,
+  vid: VidProblem,
+  nova: NastroykaNaProblem,
+): NastroykiNaVhoda {
+  return Object.freeze({ ...sega, [vid]: Object.freeze({ ...nova }) });
+}
+
 /** По подразбиране: всички включени, със силата от занаята, без бележки. */
 export function nastroykiPoPodrazbirane(): NastroykiNaVhoda {
   const n = {} as Record<VidProblem, NastroykaNaProblem>;

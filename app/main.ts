@@ -34,6 +34,7 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, fold, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { pregledayIznos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { butonSIkona, ikona } from './ikoni.js';
+import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
@@ -569,6 +570,15 @@ async function trugvay(): Promise<void> {
     vizhdatLichnoto = dopusnatiImeyli(lichniDostapi);
     pishatVLichnoto = pishatImeyli(lichniDostapi);
     const dnes = dnesKato();
+    /**
+     * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ · от Журнала към живата проверка (ADR-046).
+     *
+     * `svetni` чете модулна карта, защото се вика при всяко натискане на
+     * клавиш и не може да чака Огледалото. Затова картата се ПОДАВА при всяко
+     * рисуване: източникът е Журналът, а модулната променлива е само нейният
+     * най-близък до полето препис.
+     */
+    smeniNastroykiteNaVhoda(ogledalo.parametriNaVhoda);
     // Изключен екран не се показва празен — връщаме се на Имоти.
     const iskanoto = EKRANI[ekran].iska;
     if (iskanoto && !mozhe(izbor, iskanoto)) ekran = 'imoti';

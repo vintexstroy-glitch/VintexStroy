@@ -16,6 +16,13 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import {
+  OPISI,
+  type NastroykaNaProblem,
+  type OpisNaProblem,
+  type VidProblem,
+} from '../src/domein/vhodni-problemi.js';
+import { butonSIkona } from './ikoni.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
@@ -151,6 +158,7 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izb
        */
       mozhe(izbor, 'drugi-imeyli') ? blokNaPravata(o, modeli, izbor) : ''
     }
+    ${blokNaParametrite(o)}
     ${blokNaSverkite(o)}
     ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}`;
@@ -746,6 +754,78 @@ function kletkaNaPravo(
     </label>`;
 }
 
+/**
+ * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ · осемте вида, настроени за ТОЗИ бизнес (И96 т.1).
+ *
+ * Негови думи: „Тези неща са **параметри при различни бизнеси** и да може да ги
+ * контролираш от Настройки, и дори стопанинът да дава **негова бележка**, когато
+ * се случи."
+ *
+ * Дотук `nastroykiteNaVhoda` и `smeniNastroykiteNaVhoda` бяха построени и НИКОЙ
+ * не ги викаше — същата болест като образеца в ADR-041: функция без екран.
+ * Одитът на И101 т.4 ги намери поименно; ето им екрана.
+ *
+ * ЗНАКЪТ И ЦВЕТЪТ стоят до всеки ред, за да се разпознае видът, без да се чете
+ * (ADR-032: цветът намира, знакът различава, думата обяснява).
+ */
+function blokNaParametrite(o: Ogledalo): string {
+  const n = o.parametriNaVhoda;
+  return `
+    <section data-sektsiya="parametri">
+      <div class="dyalglava">
+        <h2>Проверките при въвеждане</h2>
+        <span>осем вида · всеки със своя сила и своя бележка · важат за целия бизнес</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="parametri">
+        <div class="glava parametar">
+          <span>Вид</span><span>Включен</span><span>Сила</span><span>Твоята бележка</span><span></span>
+        </div>
+        ${OPISI.map((opis) => redNaParametar(opis, n[opis.vid])).join('')}
+      </div>
+      <p class="drebno">
+        <b>Силата</b> казва дали редът може изобщо да се запише: „спира" отказва при
+        Вратата, „предупреждава" оцветява и пуска. <b>Бележката</b> стои под легендата,
+        когато този вид се случи — тя не заменя обяснението, а го допълва с думи за
+        този бизнес. <b>Замразеният период</b> е единственият, който не се разхлабва:
+        подадената справка заключва месеца и това е закон, не параметър (правило 9).
+      </p>
+    </section>`;
+}
+
+function redNaParametar(opis: OpisNaProblem, n: NastroykaNaProblem): string {
+  const zakovan = opis.vid === 'zamrazen-period';
+  return `
+    <div class="red parametar" data-parametar="${ekraniraj(opis.vid)}" translate="no">
+      <span class="kletka">
+        <span class="znak-problem ${ekraniraj(opis.tsvyat)}">${ekraniraj(opis.znak)}</span>
+        <b>${ekraniraj(opis.ime)}</b>
+      </span>
+      <span>
+        <input type="checkbox" data-parametar-vklyuchen${n.vklyuchen ? ' checked' : ''}${
+          zakovan ? ' disabled' : ''
+        } aria-label="включен">
+      </span>
+      <span>
+        <select translate="no" data-parametar-sila${zakovan ? ' disabled' : ''} aria-label="сила">
+          <option value="spira"${n.sila === 'spira' ? ' selected' : ''}>спира</option>
+          <option value="preduprezhdava"${n.sila === 'preduprezhdava' ? ' selected' : ''}>предупреждава</option>
+        </select>
+      </span>
+      <span>
+        <input translate="no" data-parametar-belezhka value="${ekraniraj(n.belezhka)}"
+               maxlength="200" placeholder="${ekraniraj(opis.zashto)}" autocomplete="off">
+      </span>
+      <span class="butoni">
+        ${butonSIkona({
+          ikona: 'sverka',
+          tekst: 'Запиши',
+          title: 'Запиши параметъра в Журнала',
+          danni: { 'parametar-zapishi': opis.vid },
+        })}
+      </span>
+    </div>`;
+}
+
 function blokNaSverkite(o: Ogledalo): string {
   const posledni = [...o.sverki].reverse().slice(0, 12);
   return `
@@ -819,6 +899,37 @@ export function zakachiNastroyki(
 ): void {
   // Журналът от таблица (И96 т.8) · своя секция, свое закачане.
   zakachiZhurnalat(koren, k, prerisuvay);
+
+  /**
+   * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · ADR-046).
+   *
+   * Записва се РЕД ПО РЕД, с изричен бутон: осемте вида менят какво влиза през
+   * Вратата за целия бизнес, и промяна „в движение", докато човек само гледа
+   * списъка, би влязла в Журнала, без той да е решил.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-parametar-zapishi]')) {
+    b.addEventListener('click', async () => {
+      const vid = b.dataset['parametarZapishi']!;
+      const red = koren.querySelector<HTMLElement>(`[data-parametar="${CSS.escape(vid)}"]`);
+      if (!red) return;
+      const vklyuchen = red.querySelector<HTMLInputElement>('[data-parametar-vklyuchen]')!.checked;
+      const sila = red.querySelector<HTMLSelectElement>('[data-parametar-sila]')!.value;
+      const belezhka = red.querySelector<HTMLInputElement>('[data-parametar-belezhka]')!.value;
+      b.disabled = true;
+      try {
+        await k.deystviya.zapishiParametarNaVhoda(
+          { vid, vklyuchen, sila, belezhka: belezhka.trim() },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest('dobre', `Проверката „${vid}" е записана. Важи за целия бизнес.`);
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      } finally {
+        b.disabled = false;
+      }
+      await prerisuvay();
+    });
+  }
 
   koren.querySelector<HTMLButtonElement>('#nov-buton')?.addEventListener('click', async () => {
     dobavyam = true;

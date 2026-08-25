@@ -543,6 +543,19 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
    къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */
 .podchertana { outline: 2px solid var(--aktsent); outline-offset: 3px; border-radius: 5px; }
 
+/* ── ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · осемте параметъра (И96 т.1 · ADR-046) ──── */
+.glava.parametar, .red.parametar {
+  grid-template-columns: minmax(0, 1.4fr) 84px 150px minmax(0, 2fr) 120px;
+  min-width: 760px;
+}
+.red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
+.red.parametar input[type="text"], .red.parametar input:not([type]) {
+  width: 100%; font-family: inherit; font-size: 12.5px;
+  border: 1px solid var(--liniya); border-radius: 4px; padding: 5px 8px; min-height: 30px;
+}
+.red.parametar select { font-family: inherit; font-size: 12.5px; padding: 5px 6px; min-height: 30px; }
+.znak-problem { font-size: 15px; line-height: 1; }
+
 /* ── ПОДРЕДБАТА · дребните бутончета до главата (И101 т.2 · ADR-045) ──── */
 .premestvane { margin-left: auto; display: inline-flex; gap: 2px; align-items: center; }
 .premestvach {

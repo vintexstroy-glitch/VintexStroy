@@ -27,6 +27,7 @@ import {
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
+import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -50,6 +51,7 @@ import type {
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
+  PayloadParametarNaVhodaZapisan,
   PayloadStopaninSmenen,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -555,6 +557,38 @@ export class Deystviya {
       prichina: danni.prichina.trim(),
     };
     return this.#pusni('СтопанинСменен', VID.stopanin, payload.kam, payload, z);
+  }
+
+  /**
+   * ЗАПИСВА ПАРАМЕТЪР ПРИ ВЪВЕЖДАНЕ · само Стопанинът (И96 т.1 · ADR-046).
+   *
+   * Негови думи: „да може да ги контролираш от Настройки, и дори стопанинът да
+   * дава негова бележка, когато се случи."
+   *
+   * Правото е ТУК, както при запасния контакт: Вратата не чете Огледалото и не
+   * бива да го научава. Параметърът мени какво влиза през нея за ВСИЧКИ в
+   * бизнеса — това не е предпочитание на един служител.
+   *
+   * `opId` носи ДЕЙСТВИЕТО (правило 20), а същността е ВИДЪТ: повторното
+   * записване на същия вид ПОПРАВЯ реда, вместо да ражда втори.
+   */
+  async zapishiParametarNaVhoda(
+    danni: PayloadParametarNaVhodaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o) && o.stopanin !== '') {
+      throw new GreshkaVhod(
+        'Параметрите при въвеждане се менят само от Стопанина — те важат за ' +
+          'целия бизнес, не за един екран.',
+      );
+    }
+    proveriNastroyka(danni.vid, {
+      vklyuchen: danni.vklyuchen,
+      sila: danni.sila as Sila,
+      belezhka: danni.belezhka,
+    });
+    return this.#pusni('ПараметърНаВходаЗаписан', VID.parametar, danni.vid, danni, z);
   }
 
   /**
