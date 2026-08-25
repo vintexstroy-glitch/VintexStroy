@@ -3068,20 +3068,141 @@ async function main() {
     await p.setInputFiles('#fayl-ploshti', new URL('../primeri/tseni-md.csv', import.meta.url).pathname);
     await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
     const predSmyana = await chisloNaPoleto(p, 'stoynost-a');
-    await deystvieSPrerisuvane(p, () =>
-      p.selectOption('select[data-koef=sastoyanie]', 'novo-luks'));
+    // ЧАКА СЕ ЧИСЛОТО, не прерисуването. Обработчикът е асинхронен и прави ДВЕ
+    // неща — пресмята листата и прерисува; шапката се отбелязва при второто,
+    // тъй че „шапката е нова" не значи „числото е новото". Платено с находка:
+    // проверката минаваше през път и падаше през път, което е по-лошо от
+    // проверка, която пада винаги.
+    await smeniKoefitsient(p, 'sastoyanie', 'novo-luks');
     const sledSmyana = await chisloNaPoleto(p, 'stoynost-a');
     proveri('коефициент, сменен ГОРЕ, мени листата ДОЛУ', sledSmyana > predSmyana, true);
 
     // и обратно · връщането връща числото точно, без утайка от закръгляне
-    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=sastoyanie]', 'dobro'));
+    await smeniKoefitsient(p, 'sastoyanie', 'dobro');
     proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predSmyana);
 
     // И НИЩО ОТ ТОВА НЕ ПИША В ЖУРНАЛА · „няма редакция оттам, а само изчисляване"
     const predKalk = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=izlozhenie]', 'yug'));
+    await smeniKoefitsient(p, 'izlozhenie', 'yug');
     proveri('Калкулаторът не пише нищо в Журнала', await broySabitiya(p), predKalk);
-    await deystvieSPrerisuvane(p, () => p.selectOption('select[data-koef=izlozhenie]', 'iztok-zapad'));
+    await smeniKoefitsient(p, 'izlozhenie', 'iztok-zapad');
+
+    // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
+    //
+    // Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ в журнала… скачени с
+    // ТРЕТИ НОМЕР обединяващ и двата… извън графата на нормалния ред."
+    razdel = '52 · Журналът от таблица';
+    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+
+    proveri('секцията стои в Настройки, не при Журнала',
+      Boolean(await p.$('[data-sektsiya=zhurnalat]')), true);
+
+    // Таблицата се строи от ИСТИНСКИТЕ събития: изнесеният файл носи ключа и
+    // отпечатъка, а без тях върнатият ред не може да се свърже с Журнала.
+    razdel = '52 · Журналът · четене на Журнала';
+    const zhurnalat = await p.evaluate(async () => {
+      const db = await new Promise((da, ne) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      return await new Promise((da, ne) => {
+        const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+        z.onsuccess = () => da(z.result.sort((a, b) => a.seq - b.seq));
+        z.onerror = () => ne(z.error);
+      });
+    });
+    const zhertva = zhurnalat.find((s) => s.type === 'ПлащанеПрието');
+    proveri('в Журнала има прието плащане, което да се поправи', Boolean(zhertva), true);
+
+    const glava = ['№', 'Кога', 'Кой', 'Какво', 'Същност', 'Описание', 'Сума', 'Ключ', 'Отпечатък'];
+    const kletka = (s, novaSuma) => {
+      const suma = Object.keys(s.payload).find((k) => k.endsWith('_st') && typeof s.payload[k] === 'number');
+      const opis = ['opis', 'prichina', 'ime', 'adres'].find((k) => typeof s.payload[k] === 'string');
+      const st = suma ? s.payload[suma] : undefined;
+      const pishiSuma = (v) =>
+        `${Math.floor(v / 100).toLocaleString('bg-BG').replace(/ /g, ' ')},${String(v % 100).padStart(2, '0')}`;
+      return [
+        s.seq,
+        s.ts,
+        s.actor,
+        s.type,
+        `${s.sashtnost.vid}:${s.sashtnost.id}`,
+        opis ? s.payload[opis] : '',
+        st === undefined ? '' : pishiSuma(s.seq === zhertva.seq && novaSuma !== undefined ? novaSuma : st),
+        s.opId,
+        s.hash.slice(0, 16),
+      ].join(';');
+    };
+
+    // НЕПИПНАТАТА таблица · нула промени, и сверката излиза
+    const patBez = join(tmpdir(), 'zhurnal-bez-promyana.csv');
+    await writeFile(patBez, [glava.join(';'), ...zhurnalat.map((s) => kletka(s))].join('\n'), 'utf8');
+    razdel = '52 · Журналът · непипнатата таблица';
+    await p.setInputFiles('#zhurnal-fayl', patBez);
+    await p.waitForFunction(() => document.body.textContent.includes('Какво ще стане'));
+    proveri('непипнатата таблица дава НУЛА промени',
+      await chisloNaPoleto2(p, 'zhurnal-promeni'), 0);
+    proveri('и не предлага запис за файл, който не поправя нищо',
+      Boolean(await p.$('#zhurnal-zapishi')), false);
+
+    // ПОПРАВЕНА СУМА · сторно + нов запис + свръзка
+    const predPopravka = await broySabitiya(p);
+    const novaSuma = zhertva.payload.suma_st + 10_00;
+    const patS = join(tmpdir(), 'zhurnal-s-promyana.csv');
+    await writeFile(patS, [glava.join(';'), ...zhurnalat.map((s) => kletka(s, novaSuma))].join('\n'), 'utf8');
+    razdel = '52 · Журналът · поправената сума';
+    await p.setInputFiles('#zhurnal-fayl', patS);
+    await p.waitForFunction(() => Boolean(document.getElementById('zhurnal-zapishi')));
+    proveri('поправената сума се хваща', await chisloNaPoleto2(p, 'zhurnal-promeni'), 1);
+    proveri('и се показва „било → става", преди да е записано нещо',
+      (await p.$eval('.red.zhurnal-promyana', (e) => e.textContent)).includes('Сума'), true);
+    proveri('нищо не е влязло в Журнала още', await broySabitiya(p), predPopravka);
+
+    // СЛУЧАЯТ Е ЗАДЪЛЖИТЕЛЕН · следа, която не обяснява нищо, е по-лоша от липсваща
+    razdel = '52 · Журналът · случаят е задължителен';
+    await p.click('#zhurnal-zapishi');
+    await p.waitForFunction(() => document.body.textContent.includes('Кажи СЛУЧАЯ'));
+    proveri('свръзка без СЛУЧАЙ се отказва С ДУМИ', await broySabitiya(p), predPopravka);
+
+    razdel = '52 · Журналът · записът и свръзката';
+    await p.fill('#zhurnal-data', '2026-08-20');
+    await p.fill('#zhurnal-sluchay', 'сгрешена сума при въвеждане');
+    await p.click('#zhurnal-zapishi');
+    await p.waitForFunction(() => document.body.textContent.includes('свръзка С'));
+
+    // ТРИ събития: сторно + нов запис + свръзка. Старото стои непокътнато.
+    proveri('сторно + нов запис + свръзка · три събития',
+      await broySabitiya(p), predPopravka + 3);
+    const vestPopravka = await tekstNa(p, '.vest');
+    proveri('вестта казва свръзката', vestPopravka.includes('свръзка С'), true);
+    proveri('и че старите записи стоят', vestPopravka.includes('непокътнати'), true);
+
+    // СВРЪЗКАТА се вижда · с ДВЕТЕ дати, извън графата на нормалния ред
+    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+    const svrazkata = await p.$eval('.red.svrazka', (e) => e.textContent);
+    proveri('свръзката стои в таблицата си', svrazkata.includes('С1'), true);
+    proveri('с ДАТАТА НА ФАЙЛА, отделна от датата на записа',
+      svrazkata.includes('2026-08-20'), true);
+    proveri('и със случая на промяна',
+      svrazkata.includes('сгрешена сума при въвеждане'), true);
+
+    // РАЗБЪРКАНАТА таблица се отказва ЦЯЛА · пипнат № не е поправка
+    const patRazbarkan = join(tmpdir(), 'zhurnal-razbarkan.csv');
+    await writeFile(
+      patRazbarkan,
+      [glava.join(';'), ...zhurnalat.map((s) => kletka(s).replace(/^\d+;/, '999;'))].join('\n'),
+      'utf8',
+    );
+    const predRazbarkan = await broySabitiya(p);
+    razdel = '52 · Журналът · разбърканата таблица';
+    await p.setInputFiles('#zhurnal-fayl', patRazbarkan);
+    await p.waitForFunction(() => document.body.textContent.includes('Заключени колони'));
+    proveri('пипнатата заключена колона отказва ЦЯЛОТО внасяне',
+      Boolean(await p.$('#zhurnal-zapishi')), false);
+    proveri('и казва какво да се направи',
+      (await tekstNa(p, '.karta.izbrana .vest.zle')).includes('изнеси я наново'), true);
+    proveri('нищо не е влязло в Журнала', await broySabitiya(p), predRazbarkan);
 
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
@@ -3274,6 +3395,44 @@ async function zapishiRazhod(p, { potok, sektor, dostavchik, opis, suma, nachin,
 }
 
 /** Числото на едно поле от Отчети, в цели стотинки — за да се СМЯТА, не да се сравнява текст. */
+/**
+ * Сменя коефициент в секция „Калкулатор" и ЧАКА числото долу да го усети.
+ *
+ * Не чака прерисуването: обработчикът първо пресмята листата и чак после
+ * прерисува, тъй че нова шапка не значи ново число. Чака се самото число.
+ */
+async function smeniKoefitsient(p, klyuch, stapka) {
+  const predi = await p.$eval('[data-pole="stoynost-a"] .chislo', (e) => e.textContent.trim());
+  await p.selectOption(`select[data-koef=${klyuch}]`, stapka);
+  try {
+    await p.waitForFunction(
+    ([izbrano, staro, koef]) => {
+      const s = document.querySelector(`select[data-koef=${koef}]`);
+      const chislo = document.querySelector('[data-pole="stoynost-a"] .chislo');
+      return Boolean(s) && s.value === izbrano && Boolean(chislo) && chislo.textContent.trim() !== staro;
+    },
+      [stapka, predi, klyuch],
+      { timeout: 8000 },
+    );
+  } catch {
+    const sega = await p.evaluate((koef) => ({
+      izbrano: document.querySelector(`select[data-koef=${koef}]`)?.value ?? 'няма селект',
+      chislo: document.querySelector('[data-pole="stoynost-a"] .chislo')?.textContent?.trim() ?? 'няма число',
+      broySelekti: document.querySelectorAll('select[data-koef]').length,
+    }), klyuch);
+    throw new Error(
+      `смяната на „${klyuch}" към „${stapka}" не стигна до числото · ` +
+        `избрано=${sega.izbrano} · число=${sega.chislo} (беше ${predi}) · селекти=${sega.broySelekti}`,
+    );
+  }
+}
+
+/** Цялото число от плочка · за броячи, които не са пари. */
+async function chisloNaPoleto2(p, klyuch) {
+  const tekst = await p.$eval(`[data-pole="${klyuch}"] .chislo`, (e) => e.textContent.trim());
+  return Number(tekst.replace(/[^\d-]/g, ''));
+}
+
 async function chisloNaPoleto(p, klyuch) {
   const tekst = await p.$eval(`[data-pole="${klyuch}"] .chislo`, (e) => e.textContent.trim());
   // „−12 500,00 €" → −1250000; неразделимите интервали и знакът за евро падат

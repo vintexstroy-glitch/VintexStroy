@@ -535,6 +535,9 @@ export function matritsaOtNastroyki(n: Nastroyki): Matritsa {
     nezaetost_bt: n.nezaetost_bt,
     operativni_bt: n.operativni_bt,
     obshti_bt: obshtiyatMnozhitel_bt(n),
+    // Какво важи, когато файлът мълчи · думата на човека от менюто.
+    podrazbiran_etazh_bt: stapka(koefitsient('etazh'), n.izbrani.etazh).bt,
+    podrazbirano_izlozhenie_bt: stapka(koefitsient('izlozhenie'), n.izbrani.izlozhenie).bt,
   });
 }
 

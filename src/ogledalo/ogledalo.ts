@@ -22,6 +22,7 @@ import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
+import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -41,6 +42,7 @@ import type {
   PayloadModelZapisan,
   PayloadSpravkaPodadena,
   PayloadSverkaZapisana,
+  PayloadSvrazkaZapisana,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -213,6 +215,14 @@ export interface Ogledalo {
    * (И94 т.6), а задачите се възлагат и превключват всеки ден.
    */
   readonly zadachi: ReadonlyMap<string, Zadacha>;
+  /**
+   * СВРЪЗКИТЕ · третият номер, който залепва изнесения файл за върнатия
+   * (И96 т.8). Ключът е номерът на свръзката, изписан.
+   *
+   * Номерът НЕ е `seq` и не се мери с него — той е „извън графата на нормалния
+   * ред". Поколението расте с всяко залепване; номерът стои.
+   */
+  readonly svrazki: ReadonlyMap<number, Svrazka>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -281,6 +291,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
   const zadachi = new Map<string, Zadacha>();
+  const svrazki = new Map<number, Svrazka>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -384,6 +395,30 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Потвърждаване и превключване са СЪЩОТО събитие с ново съдържание.
         const p = s.payload as unknown as Zadacha;
         zadachi.set(p.id, p);
+        break;
+      }
+
+      case 'СвръзкаЗаписана': {
+        // Всяко залепване е СВОЙ запис със същия номер и порасналото поколение.
+        // Огледалото ги събира: последният запис за един номер носи текущото
+        // поколение, а файловете се трупат по реда, в който са дошли.
+        const p = s.payload as unknown as PayloadSvrazkaZapisana;
+        const bilo = svrazki.get(p.nomer);
+        const fayl: FaylVSvrazka = {
+          nomer: p.fayl,
+          ime: p.ime,
+          dataNaFayla: p.dataNaFayla,
+          kogato: s.ts,
+          actor: s.actor,
+          sluchay: p.sluchay,
+          redove: p.redove,
+          otpechatak: p.otpechatak,
+        };
+        svrazki.set(p.nomer, {
+          nomer: p.nomer,
+          pokolenie: p.pokolenie,
+          fayli: bilo ? [...bilo.fayli, fayl] : [fayl],
+        });
         break;
       }
 
@@ -588,6 +623,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     agenti,
     predlozheniya,
     zadachi,
+    svrazki,
     sverki,
     prilozheni,
     pogaseni,

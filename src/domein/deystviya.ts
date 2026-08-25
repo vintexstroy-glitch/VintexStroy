@@ -16,6 +16,7 @@ import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
+import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -23,6 +24,7 @@ import type {
   PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSverkaZapisana,
+  PayloadSvrazkaZapisana,
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
@@ -328,6 +330,70 @@ export class Deystviya {
       );
     }
     return this.#pusni('ЗадачаЗаписана', VID.zadacha, danni.id, danni, z);
+  }
+
+  /**
+   * ПОВТАРЯ ПОПРАВЕНО СЪБИТИЕ · втората половина на сверената промяна (И96 т.8).
+   *
+   * Тесен нарочно: НЕ приема вид, същност и тип отвън — те се ПРЕПИСВАТ от
+   * събитието, което се поправя. Иначе това щеше да е „запиши каквото си
+   * искаш", а такъв път заобикаля всяка проверка, която другите действия
+   * правят (падеж, замразен период, закрит агент).
+   *
+   * Иска `svereno`: това е ПЪТЯТ НА СВЕРЕНАТА ПРОМЯНА от правило 9, не
+   * обикновено писане. Върви само след сторно на стария запис — първо се
+   * гаси, после се записва наново.
+   */
+  async povtoriPopraveno(
+    staro: Sabitie,
+    payload: Readonly<Record<string, unknown>>,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    if (z.svereno !== true) {
+      throw new GreshkaTablitsa(
+        'Повторният запис е част от СВЕРЕНА промяна и не се прави поотделно. ' +
+          'Мине ли без сверката, той става втори вход към Журнала (правило 2).',
+      );
+    }
+    return this.#pusni(
+      staro.type as TipSabitie,
+      staro.sashtnost.vid as Vid,
+      staro.sashtnost.id,
+      payload,
+      z,
+    );
+  }
+
+  /**
+   * Записва СВРЪЗКА · третият номер, който залепва файл за файл (И96 т.8).
+   *
+   * Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ **в журнала**."
+   * Затова свръзката е събитие, а не таблица встрани: свръзка извън Журнала не
+   * може да се докаже след година (правило 17).
+   *
+   * СЛУЧАЯТ Е ЗАДЪЛЖИТЕЛЕН. „Да се отчете в Журнала за случая на промяна" е
+   * негово изречение; свръзка без причина е следа, която не обяснява нищо —
+   * същото правило като при сторното (И97: „защо — свободен текст, задължителен").
+   *
+   * Не иска отключен период: свръзката НЕ мени число. Числата се менят от
+   * сторното и новия запис, всяко със своя път през Вратата.
+   */
+  async zapishiSvrazka(danni: PayloadSvrazkaZapisana, z: Zayavka): Promise<Rezultat> {
+    if (danni.sluchay.trim() === '') {
+      throw new GreshkaTablitsa(
+        'Свръзка без СЛУЧАЙ на промяна не се записва — следа, която не обяснява нищо, ' +
+          'е по-лоша от липсваща.',
+      );
+    }
+    // Ключът е номер И файл: всяко залепване е свой запис, не презапис на
+    // предишния. Иначе „кога дойде третият файл" би останало без отговор.
+    return this.#pusni(
+      'СвръзкаЗаписана',
+      VID.svrazka,
+      `${danni.nomer}:${danni.fayl}`,
+      danni,
+      z,
+    );
   }
 
   /**

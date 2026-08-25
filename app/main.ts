@@ -426,7 +426,7 @@ async function trugvay(): Promise<void> {
                     : ekran === 'smetki'
                       ? narisuvaySmetki(ogledalo, dnes)
                       : ekran === 'nastroyki'
-                        ? narisuvayNastroyki(ogledalo)
+                        ? narisuvayNastroyki(ogledalo, sabitiya.length)
                         : ekran === 'ii'
                           ? narisuvayII(
                               ogledalo,

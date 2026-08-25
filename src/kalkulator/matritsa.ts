@@ -94,6 +94,20 @@ export interface Matritsa {
    * обект (правило 3).
    */
   readonly obshti_bt: number;
+  /**
+   * КАКВО ВАЖИ, КОГАТО ФАЙЛЪТ МЪЛЧИ · избраното в секция „Калкулатор".
+   *
+   * Етажът и изложението са свойства НА ОБЕКТА и идват от неговия файл — там
+   * всеки апартамент си има свои. Но гаражите и паркоместата в същия файл
+   * нямат изложение, а нов лист може да няма и етаж.
+   *
+   * Дотук празната клетка падаше на 1,00 и менютата „Етаж" и „Изложение" не
+   * стигаха до листата изобщо: човек ги мени, а числата долу не мърдат. Затова
+   * празното пада на ИЗБРАНОТО. Това не е измислен коефициент — измисленото е
+   * когато приложението гадае; тук стои думата на човека за неизвестния случай.
+   */
+  readonly podrazbiran_etazh_bt: number;
+  readonly podrazbirano_izlozhenie_bt: number;
 }
 
 /**
@@ -109,11 +123,21 @@ export interface Matritsa {
  */
 export const MATRITSA_ZA_RAZRABOTKA: Matritsa = matritsaOtNastroyki(PO_PODRAZBIRANE);
 
-/** Коефициент по ключ; липсващият е 1,00 — не се измисля, не се отказва. */
-export function koefitsient(karta: Readonly<Record<string, number>>, klyuch: string): number {
+/**
+ * Коефициент по ключ · липсващият пада на ПОДРАЗБИРАНИЯ, не се отказва.
+ *
+ * Подразбираният идва от менюто в секция „Калкулатор" (`matritsaOtNastroyki`);
+ * без него — 1,00. Празна клетка и непозната дума са едно и също: и в двата
+ * случая файлът не казва нищо и решава човекът.
+ */
+export function koefitsient(
+  karta: Readonly<Record<string, number>>,
+  klyuch: string,
+  podrazbiran: number = EDINITSA_BT,
+): number {
   const t = klyuch.trim();
-  if (t === '') return EDINITSA_BT;
-  return karta[t] ?? EDINITSA_BT;
+  if (t === '') return podrazbiran;
+  return karta[t] ?? podrazbiran;
 }
 
 /**
@@ -142,8 +166,8 @@ export function tsenaTochno(n: {
     obshta_kvsm: n.obshta_kvsm,
     baza_st,
     koefitsienti_bt: [
-      koefitsient(m.etazhi, n.etazh),
-      koefitsient(m.izlozheniya, n.izlozhenie),
+      koefitsient(m.etazhi, n.etazh, m.podrazbiran_etazh_bt ?? EDINITSA_BT),
+      koefitsient(m.izlozheniya, n.izlozhenie, m.podrazbirano_izlozhenie_bt ?? EDINITSA_BT),
       m.obshti_bt ?? EDINITSA_BT,
     ],
   });

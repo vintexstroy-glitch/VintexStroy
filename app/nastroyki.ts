@@ -16,6 +16,7 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import {
@@ -99,7 +100,7 @@ let dobavyamKolona = false;
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
-export function narisuvayNastroyki(o: Ogledalo): string {
+export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0): string {
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
 
@@ -135,6 +136,7 @@ export function narisuvayNastroyki(o: Ogledalo): string {
     ${blokNaRedaktora(modeli)}
     ${blokNaPravata(o, modeli)}
     ${blokNaSverkite(o)}
+    ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}`;
 }
 
@@ -729,6 +731,9 @@ export function zakachiNastroyki(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  // Журналът от таблица (И96 т.8) · своя секция, свое закачане.
+  zakachiZhurnalat(koren, k, prerisuvay);
+
   koren.querySelector<HTMLButtonElement>('#nov-buton')?.addEventListener('click', async () => {
     dobavyam = true;
     greshka = '';

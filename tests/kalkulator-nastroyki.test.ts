@@ -137,6 +137,37 @@ describe('един дом за числата · матрицата се СТР�
     expect(matritsaOtNastroyki(trite).obshti_bt).toBe(10_886);
   });
 
+  it('менютата „Етаж" и „Изложение" важат, КОГАТО ФАЙЛЪТ МЪЛЧИ', () => {
+    // Платено с находка в прохода: човек мени изложението в менюто, а числата
+    // долу не мърдат — защото всеки апартамент носи СВОЕ изложение от файла и
+    // празната клетка падаше на 1,00. Гаражите нямат изложение; за тях важи
+    // избраното. Това не е гадаене — гадаенето е когато приложението решава.
+    const bez = tsenaTochno({
+      obshta_kvsm: 1_000_000,
+      vid: 'apartament',
+      etazh: '',
+      izlozhenie: '',
+      matritsa: matritsaOtNastroyki(PO_PODRAZBIRANE),
+    });
+    const yug = tsenaTochno({
+      obshta_kvsm: 1_000_000,
+      vid: 'apartament',
+      etazh: '',
+      izlozhenie: '',
+      matritsa: matritsaOtNastroyki(sIzbranaStapka(PO_PODRAZBIRANE, 'izlozhenie', 'yug')),
+    });
+    expect(bez).toBe(300_000_00);
+    expect(yug).toBe(309_000_00); // × 1,03
+  });
+
+  it('…но КАЗАНОТО от файла бие избраното', () => {
+    // „СИ" е в листата му за този апартамент — менюто не го пренаписва.
+    const sizbran = matritsaOtNastroyki(sIzbranaStapka(PO_PODRAZBIRANE, 'izlozhenie', 'yug'));
+    expect(
+      tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'трети', izlozhenie: 'СИ', matritsa: sizbran }),
+    ).toBe(291_000_00); // × 0,97 · север, както пише във файла
+  });
+
   it('общият множител мени цената на всеки обект в партидата', () => {
     const bez = tsenaTochno({
       obshta_kvsm: 1_000_000,
