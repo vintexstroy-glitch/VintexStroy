@@ -519,6 +519,30 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   .desno-gore button.sIkona .duma { display: none; }
   .butoni button.sIkona, .desno-gore button.sIkona { padding: 6px 9px; gap: 0; }
 }
+/* ── ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045) ────────────────── */
+.menyu-nastroyki { display: flex; flex-direction: column; gap: 2px; }
+.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 11px; color: var(--mastilo2); }
+.menyu-nastroyki.otvoreno .strelka-dolu { transform: rotate(180deg); }
+.nastroyki-red {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 2px 0 6px 8px; padding-left: 8px;
+  border-left: 2px solid var(--liniya);
+}
+.nastroyki-red .za-kogo { margin: 2px 0 4px; }
+.nastroyki-red .tema {
+  display: flex; align-items: flex-start; gap: 8px; text-align: left;
+  background: none; border: none; border-radius: 4px; padding: 6px 8px;
+  color: var(--mastilo); font-family: inherit; font-size: 12.5px;
+}
+.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible { background: var(--panel); }
+.nastroyki-red .tema .ikona { margin-top: 2px; color: var(--mastilo2); }
+.nastroyki-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nastroyki-red .dvete b { font-weight: 600; }
+
+/* Темата, до която редът те е завел · подчертава се за миг, за да се види
+   къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */
+.podchertana { outline: 2px solid var(--aktsent); outline-offset: 3px; border-radius: 5px; }
+
 .karta.izbrana { border-color: var(--aktsent); background: var(--toplo); }
 .karta.izbrana .pole input, .karta.izbrana .pole select { background: #FFFFFF; }
 

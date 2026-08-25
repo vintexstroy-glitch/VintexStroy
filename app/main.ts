@@ -34,6 +34,8 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, fold, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { pregledayIznos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { butonSIkona, ikona } from './ikoni.js';
+import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
+import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
@@ -574,7 +576,14 @@ async function trugvay(): Promise<void> {
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
-      ${strana(ogledalo, dnes, lichnoVklyucheno, rolyataNa(kojSam.imeyl, ogledalo), lichnoOgledalo !== null)}
+      ${strana(
+        ogledalo,
+        dnes,
+        lichnoVklyucheno,
+        rolyataNa(kojSam.imeyl, ogledalo),
+        lichnoOgledalo !== null,
+        koyGleda(kojSam.imeyl, ogledalo),
+      )}
       <main class="glavno">
         <header class="shapka">
           <div>
@@ -732,6 +741,8 @@ function strana(
   lichnoVklyucheno = false,
   rolya: Rolya = 'sobstvenik',
   lichnoPipnato = false,
+  /** кой гледа · оттам идват темите на падащия ред (И101 т.2) */
+  gledashtiyat: KoyGleda = 'stopanin',
 ): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
@@ -751,12 +762,24 @@ function strana(
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
       if (koy === 'lichno') return lichnoVklyucheno || !lichnoPipnato;
+      // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
+      // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
+      // НЕГОВИ — езикът на интерфейса и личният таб.
+      if (koy === 'nastroyki') return true;
       const iska = EKRANI[koy].iska;
       if (iska && !mozhe(izbor, iska)) return false;
       return dostapenLiE(koy, rolya);
     })
     .map((koy) => {
       const e = EKRANI[koy];
+      /**
+       * НАСТРОЙКИ Е ПАДАЩ РЕД, не обикновен пункт (И101 т.2 · ADR-045).
+       *
+       * Негови думи: „управление на всяка тема от настройки **като падащ ред
+       * при натискане на настройки**". Пунктът остава на мястото си в лентата;
+       * различава се само с това, което прави при натискане.
+       */
+      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya));
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';
@@ -828,6 +851,14 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       await prerisuvay();
     });
   }
+
+  // ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045). Отварянето на екран е
+  // подадено, а не вградено: компонентът не знае кой екран е отворен и не бива
+  // да научава — той води до ТЕМА, а къде живее тя, казва домейнът.
+  zakachiMenyutoNaNastroykite(koren, prerisuvay, async (koy) => {
+    ekran = koy as KoyEkran;
+    zapomniEkranno('ekran', ekran);
+  });
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
     const sabitiya = await k.dnevnik.chetiVsichki(akaunt);

@@ -159,7 +159,7 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izb
 // ── бутоните ───────────────────────────────────────────────────────────────
 function blokNaButonite(butoni: readonly Buton[]): string {
   return `
-    <section>
+    <section data-sektsiya="butoni">
       <div class="dyalglava">
         <h2>Бутоните</h2>
         <span>един бутон = един път · посоката е ЕДНА</span>
@@ -259,7 +259,7 @@ function formaNaButon(modeli: readonly ModelNaTablitsa[]): string {
 // ── моделите ───────────────────────────────────────────────────────────────
 function blokNaModelite(modeli: readonly ModelNaTablitsa[]): string {
   return `
-    <section>
+    <section data-sektsiya="modeli">
       <div class="dyalglava">
         <h2>Модели на таблици</h2>
         <span>по един на глава · правят се при първото непознато четене</span>
@@ -303,7 +303,7 @@ function redNaModel(m: ModelNaTablitsa): string {
 function blokNaRedaktora(modeli: readonly ModelNaTablitsa[]): string {
   const izbran = modeli.find((m) => m.klyuch === izbranHedar);
   return `
-    <section>
+    <section data-sektsiya="hedari">
       <div class="dyalglava">
         <h2>Редакторът на хедъри</h2>
         <span>и Описът на Подредба · две отделни, но свързани · едно място</span>
@@ -631,7 +631,7 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: I
   const izbran = hora.find((h) => h.imeyl === izbranSluzhitel);
 
   return `
-    <section>
+    <section data-sektsiya="pravata">
       <div class="dyalglava">
         <h2>Кой какво вижда</h2>
         <span>колонно право · скрива, не редактира</span>
@@ -749,7 +749,7 @@ function kletkaNaPravo(
 function blokNaSverkite(o: Ogledalo): string {
   const posledni = [...o.sverki].reverse().slice(0, 12);
   return `
-    <section>
+    <section data-sektsiya="sverki">
       <div class="dyalglava">
         <h2>Записани сверки</h2>
         <span>всяка минала през бутон · и нулевите</span>
@@ -787,7 +787,7 @@ function redNaSverka(s: ZapisanaSverka): string {
 // ── честният списък ────────────────────────────────────────────────────────
 function blokNaDeystviyata(): string {
   return `
-    <section>
+    <section data-sektsiya="patishta">
       <div class="dyalglava">
         <h2>Десетте пътя</h2>
         <span>обявени поименно · построеното си личи</span>

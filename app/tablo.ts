@@ -105,7 +105,7 @@ function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya:
     : 'няма вързани';
 
   return `
-    <section class="karta">
+    <section class="karta" data-sektsiya="koy-sam">
       <div class="dyalglava">
         <h2>Кой съм</h2>
         <span>вход без парола · самоличността идва отвън</span>
@@ -209,7 +209,7 @@ function kartaOtmetki(izbor: Izbor): string {
             : `${izklyucheni} ${izklyucheni === 1 ? 'изключена' : 'изключени'} — планът пак ги дава`
         }</span>
       </div>
-      <div class="vazmozhnosti">${RED.map((v) => redNaOtmetka(izbor, v)).join('')}</div>
+      <div class="vazmozhnosti" data-sektsiya="vazmozhnosti">${RED.map((v) => redNaOtmetka(izbor, v)).join('')}</div>
       <p class="drebno">
         Изключената възможност изчезва от лентата и от бутоните веднага. Тя не е
         отнета — планът пак я дава и отметката я връща. Затова „изключена" и

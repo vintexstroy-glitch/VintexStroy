@@ -3828,6 +3828,61 @@ async function main() {
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
         .includes('Нов Доставчик ООД'), true);
 
+    // ══ 63 · НАСТРОЙКИТЕ КАТО ПАДАЩ РЕД · тема по тема (И101 т.2) ══════════
+    razdel = '63 · Настройките · падащият ред';
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('пунктът „Настройки" е ПАДАЩ РЕД, не гол бутон',
+      Boolean(await p.$('#nastroyki-vhod')), true);
+    proveri('казва на КОГО са темите',
+      (await p.$eval('#nastroyki-red', (e) => e.textContent)).includes('Стопанинът'), true);
+
+    // СЪСТОЯНИЕТО СЕ ПОМНИ, докато екранът стои — по-ранните секции вече са
+    // минавали през този пункт. Затова се проверява ПОВЕДЕНИЕТО (натискането
+    // превключва), а не предполагаемо начално положение.
+    const redatBeshe = await p.$eval('#nastroyki-red', (e) => e.hidden);
+    await p.click('#nastroyki-vhod');
+    await p.waitForFunction((p0) => document.querySelector('#nastroyki-red')?.hidden !== p0, redatBeshe);
+    proveri('натискането го превключва',
+      await p.$eval('#nastroyki-red', (e) => e.hidden), !redatBeshe);
+    if (redatBeshe === false) {
+      await p.click('#nastroyki-vhod');
+      await p.waitForFunction(() => document.querySelector('#nastroyki-red')?.hidden === false);
+    }
+    proveri('и стига до ОТВОРЕН', await p.$eval('#nastroyki-red', (e) => e.hidden), false);
+    proveri('и състоянието се КАЗВА на четеца на екран',
+      await p.$eval('#nastroyki-vhod', (e) => e.getAttribute('aria-expanded')), 'true');
+    const temiteNaStopanina = await p.$$eval('#nastroyki-red [data-tema]', (b) => b.length);
+    proveri('Стопанинът вижда всички теми', temiteNaStopanina >= 12, true);
+
+    razdel = '63 · Настройките · редът ВОДИ до темата';
+    // Темата е ПЪТ, не съдържание: води до онова, което вече стои, и го
+    // подчертава за миг. Втори дом за същото управление би изостанал.
+    // Подчертаването живее 1,6 секунди и си отива само. Затова се ЧАКА да се
+    // появи, вместо да се чете след прерисуването: при бавен старт екранът
+    // може да се обнови по-късно от белега и проверката да го изпусне.
+    await p.click('#nastroyki-red [data-tema="pravata"]');
+    await p.waitForFunction(() =>
+      document.querySelector('[data-sektsiya=pravata]')?.classList.contains('podchertana'),
+    );
+    proveri('заведе на екрана, където живее темата',
+      Boolean(await p.$('[data-sektsiya=pravata]')), true);
+    proveri('и я ПОДЧЕРТА, за да се види къде е стигнало окото', true, true);
+
+    razdel = '63 · Настройките · изскачащият прозорец';
+    await p.click('#nastroyki-vhod');
+    await p.waitForFunction(() => document.querySelector('#nastroyki-red')?.hidden === false);
+    await p.click('#nastroyki-red [data-tema="ezik"]');
+    await p.waitForSelector('.istoriya-karta');
+    proveri('темата без своя секция се отваря в ПРОЗОРЕЦ',
+      (await tekstNa(p, '.istoriya-karta')).includes('Езикът на'), true);
+    proveri('и казва, че езикът НЕ е право',
+      (await tekstNa(p, '.istoriya-karta')).includes('НЕ е право'), true);
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => !document.querySelector('.istoriya-karta'));
+    proveri('Escape го затваря · клавиатурата не остава в капан',
+      Boolean(await p.$('.istoriya-karta')), false);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
     razdel = '62 · Табовете от Таблото';
     await naEkran(p, 'tablo', '[data-sektsiya=tablo-tabove]');
