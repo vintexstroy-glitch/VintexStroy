@@ -605,3 +605,92 @@ describe('обратната посока · служителят раздава
       .toBe('zhena@example.bg');
   });
 });
+
+/**
+ * ЛИЧНИЯТ ИЗНОС И ВНОС (ADR-039) · границата важи и през ФАЙЛА.
+ *
+ * „Никога не се смесват" би било надпис, ако изнесен служебен файл можеше да
+ * се внесе в личния Журнал — или личният на един човек в личния на друг.
+ * Пази го хеш-веригата: `naematel` влиза в `kanonichno()` и чуждото звено
+ * пада с NESAVMESTIM, преди каквото и да е да се запише.
+ */
+describe('личният износ · границата важи и през файла', () => {
+  it('СЛУЖЕБЕН файл не влиза в ЛИЧНИЯ Журнал', async () => {
+    const { dnevnik, vrata, zaKlyuch } = stend();
+    const sluzhebni = zaKlyuch(SLUZHEBEN);
+    await sluzhebni.dobaviImot(
+      'imot-1',
+      { adres: 'Дианабад', edinitsa: 'офис 3', ploshtad_kvsm: 720_000 },
+      { opId: 'i1' },
+    );
+    const iznesen = JSON.stringify(await dnevnik.chetiVsichki(SLUZHEBEN));
+
+    const { vnesiZhurnal } = await import('../src/domein/vnos.js');
+    await expect(
+      vnesiZhurnal({
+        vrata,
+        dnevnik,
+        naematel: LICHEN,
+        actor: IMEYL,
+        tekst: iznesen,
+        kogato: '2026-08-25T12:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ kod: 'NESAVMESTIM' });
+    // и НИЩО не е влязло — отказът е преди първия запис
+    expect(await dnevnik.chetiVsichki(LICHEN)).toHaveLength(0);
+  });
+
+  it('ЛИЧНИЯТ на един човек не влиза в личния на ДРУГ', async () => {
+    const { dnevnik, vrata, zaKlyuch } = stend();
+    const moya = zaKlyuch(LICHEN);
+    await moya.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+    const iznesen = JSON.stringify(await dnevnik.chetiVsichki(LICHEN));
+
+    const chuzhd = `zhena@example.bg${NASTAVKA_LICHEN}`;
+    const { vnesiZhurnal } = await import('../src/domein/vnos.js');
+    await expect(
+      vnesiZhurnal({
+        vrata,
+        dnevnik,
+        naematel: chuzhd,
+        actor: 'zhena@example.bg',
+        tekst: iznesen,
+        kogato: '2026-08-25T12:00:00.000Z',
+      }),
+    ).rejects.toMatchObject({ kod: 'NESAVMESTIM' });
+    expect(await dnevnik.chetiVsichki(chuzhd)).toHaveLength(0);
+  });
+
+  it('СВОЯТ файл се връща едно към едно · загубеният браузър не е загубен Журнал', async () => {
+    const { dnevnik, vrata, zaKlyuch } = stend();
+    const moya = zaKlyuch(LICHEN);
+    await moya.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+    await moya.zapishiLichnaTema({ temaId: 't1', ime: 'Храна', grupa: '', spryana: false }, { opId: 't1' });
+    const iznesen = JSON.stringify(await dnevnik.chetiVsichki(LICHEN));
+
+    // „ново устройство" — празен носител, СЪЩАТА Врата на нов стенд
+    const nov = stend();
+    const { vnesiZhurnal } = await import('../src/domein/vnos.js');
+    const rezultat = await vnesiZhurnal({
+      vrata: nov.vrata,
+      dnevnik: nov.dnevnik,
+      naematel: LICHEN,
+      actor: IMEYL,
+      tekst: iznesen,
+      kogato: '2026-08-25T12:00:00.000Z',
+    });
+    expect(rezultat.vneseni).toBe(2);
+    // и веригата на върнатото е ЦЯЛА
+    const varnati = await nov.dnevnik.chetiVsichki(LICHEN);
+    expect((await proveriVerigata(varnati, SHA)).tsyala).toBe(true);
+    // а Огледалото чете темата, все едно нищо не е било
+    const o = await nov.zaKlyuch(LICHEN).ogledalo();
+    expect(o.lichniTemi.get('t1')?.ime).toBe('Храна');
+  });
+});

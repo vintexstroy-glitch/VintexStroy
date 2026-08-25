@@ -29,7 +29,16 @@
  */
 
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { ekraniraj } from './obshto.js';
+import { proveriVerigata } from '../src/yadro/index.js';
+import { sha256Web } from '../src/nositel/hash-web.js';
+import { vnesiZhurnal } from '../src/domein/vnos.js';
+import {
+  chetiBelegZaIznos,
+  dnesKato,
+  ekraniraj,
+  svaliFayl,
+  zapishiBelegZaIznos,
+} from './obshto.js';
 import {
   NADPISI_LICHNI,
   narisuvayGant,
@@ -113,17 +122,33 @@ export function narisuvayLichno(
   lichnoOgledalo: Ogledalo,
   sluzhebnoOgledalo: Ogledalo,
   dnes: string,
+  akauntLichen: string,
+  broySabitiya: number,
 ): string {
+  // Белегът е ПО НАЕМАТЕЛ: на едно устройство личните Журнали са колкото
+  // служителите, и общ белег би лъгал всички освен единия.
+  klyuchNaBelega = `masterbook:posleden-iznos:${akauntLichen}`;
+  brojatNaLichnite = broySabitiya;
   return `
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
     ${narisuvayGant(lichnoOgledalo, dnes, KLYUCH_POGLED, NADPISI_LICHNI, PREDSTAVKA)}
     ${sektsiyaPari(lichnoOgledalo, dnes)}
     ${sektsiyaPrenos(lichnoOgledalo, sluzhebnoOgledalo)}
     ${sektsiyaDostapi(lichnoOgledalo)}
-    <section>
+    <section data-sektsiya="lichen-iznos">
       <div class="dyalglava">
         <h2>Личният Журнал</h2>
         <span>своя верига, свой износ · никога не се смесва със служебния</span>
+      </div>
+      <p class="drebno">${redZaLichniyaIznos(brojatNaLichnite)}</p>
+      <p class="drebno"><b>Един носител, една съдба</b> (ADR-036 §10): изчистване на данните на
+      сайта удря и двата Журнала наведнъж. Без облак копието е ТВОЕ задължение — затова износът
+      е тук, а не „после". Файлът е отделен от служебния и се внася отделно.</p>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="lichno-proveri">Провери веригата</button>
+        <button type="button" class="vtorichen" id="lichno-iznesi">Изнеси личния Журнал</button>
+        <button type="button" class="vtorichen" id="lichno-vnesi">Внеси личен Журнал</button>
+        <input translate="no" type="file" id="lichno-fayl" accept="application/json,.json" hidden>
       </div>
       <p class="drebno">Личното се прибира от <b>Таблото</b> — пунктът пада от лентата, а Журналът
       остава непокътнат. Прибраното не е изтрито; „изключено ≠ липсващо" (правило 15).</p>
@@ -132,6 +157,33 @@ export function narisuvayLichno(
       </div>
     </section>`;
 }
+
+/**
+ * КОГА Е ИЗНАСЯН ЛИЧНИЯТ · същото тихо напомняне като при служебния.
+ *
+ * Белегът е под СВОЙ ключ по наемател: на едно устройство личните Журнали са
+ * колкото служителите, и общ белег би казал „изнесен вчера" за Журнал, който
+ * никога не е изнасян.
+ */
+function redZaLichniyaIznos(sega: number): string {
+  const beleg = chetiBelegZaIznos(klyuchNaBelega);
+  if (!beleg) {
+    return sega === 0
+      ? 'Още няма какво да се изнася.'
+      : '<b>Личният Журнал не е изнасян</b> · съществува само в този браузър.';
+  }
+  const dni = Math.max(0, Math.round((Date.now() - Date.parse(beleg.kogato)) / 86_400_000));
+  const novi = sega - beleg.broi;
+  const kolko = dni === 0 ? 'днес' : dni === 1 ? 'вчера' : `преди ${dni} дни`;
+  return novi > 0
+    ? `Изнесен ${kolko} · <b>${novi} ${novi === 1 ? 'ново събитие' : 'нови събития'}</b> оттогава.`
+    : `Изнесен ${kolko} · нищо ново оттогава.`;
+}
+
+/** Ключът на белега за ТОЗИ личен Журнал · слага се при рисуване. */
+let klyuchNaBelega = 'masterbook:posleden-iznos:lichen';
+/** Броят СУРОВИ събития · белегът мери спрямо него, както при служебния. */
+let brojatNaLichnite = 0;
 
 /**
  * ПРЕНОСЪТ · двете посоки, с причина и с казано какво НЕ пътува.
@@ -292,6 +344,7 @@ export function zakachiLichno(
   // ПАРИТЕ · също с ЛИЧНИЯ контекст. Подаден `k` тук би писал разходите на
   // човека в служебния Журнал — точно грешката, срещу която стои ADR-036 §8.
   zakachiLichniPari(koren, lichen, prerisuvay);
+  zakachiLichniyaIznos(koren, lichen, prerisuvay);
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-posoka]')) {
     b.addEventListener('click', async () => {
@@ -394,5 +447,102 @@ export function zakachiLichno(
       greshka = err instanceof GreshkaPrenos ? err.message : dumiZaGreshka(err);
     }
     await prerisuvay();
+  });
+}
+
+/**
+ * ТРИТЕ ПЪТЯ НА ЛИЧНИЯ ЖУРНАЛ · проверка, износ, внос (ADR-039).
+ *
+ * СЪЩИТЕ функции като при служебния (`proveriVerigata` · `vnesiZhurnal` ·
+ * `svaliFayl`) — различен е само КОНТЕКСТЪТ. Точно затова стоят тук, а не в
+ * `main.ts`: закачени там със служебния `k`, те биха проверявали и изнасяли
+ * ГРЕШНИЯ Журнал под правилното заглавие.
+ *
+ * ПРАВОТО е вече построено: `LichnoESamoTvoe.mozheDaIznasya` отговаря за
+ * личен ключ „собственикът или онзи, на когото е дал да ВИЖДА" (И99).
+ * Наблюдателят изнася; чуждият — не.
+ */
+function zakachiLichniyaIznos(
+  koren: HTMLElement,
+  lichen: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
+  koren.querySelector<HTMLButtonElement>('#lichno-proveri')?.addEventListener('click', async () => {
+    const sabitiya = await lichen.dnevnik.chetiVsichki(lichen.akaunt);
+    const rezultat = await proveriVerigata(sabitiya, sha256Web);
+    if (rezultat.tsyala) {
+      lichen.vest('dobre', `Личната верига е цяла · ${rezultat.proverni} от ${sabitiya.length} звена.`);
+    } else {
+      // КРАНЪТ Е ЕДИН (ADR-036 §10): скъсана ЛИЧНА верига спира и служебния
+      // запис. Нарочно — Вратата е една, и инцидент на носителя не подбира.
+      lichen.vrata.zatvori(`скъсана лична верига на seq ${rezultat.parvoSchupeno}`);
+      lichen.vest(
+        'zle',
+        `Личната верига се къса на seq ${rezultat.parvoSchupeno} (${rezultat.prichina}). ` +
+          'Вратата е спряна — четенето работи, записът не. Журналът не се пипа.',
+      );
+    }
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#lichno-iznesi')?.addEventListener('click', async () => {
+    // Свалянето е ПРАВО и тук — само че списъкът го пише СОБСТВЕНИКЪТ НА
+    // ЛИЧНОТО, не Стопанинът (И99 · обратната посока).
+    if (!(await lichen.pravata.mozheDaIznasya(lichen.kojSam.imeyl, lichen.akaunt))) {
+      lichen.vest('zle', 'Нямаш достъп до този личен Журнал. Дава го само неговият човек.');
+      await prerisuvay();
+      return;
+    }
+    const sabitiya = await lichen.dnevnik.chetiVsichki(lichen.akaunt);
+    const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], { type: 'application/json' });
+    // Името носи „lichen", НЕ имейла с наставката: „ivo@example.bg#lichen" е
+    // невалидно име на файл на половината системи, а „#" реже адреси.
+    svaliFayl(fayl, `zhurnal-lichen-${dnesKato()}.json`);
+    const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
+    zapishiBelegZaIznos(klyuchNaBelega, {
+      kogato: new Date().toISOString(),
+      broi: sabitiya.length,
+      hash: posledenHash,
+    });
+    lichen.vest(
+      'dobre',
+      `Изнесени ${sabitiya.length} лични събития. Последен hash: ${posledenHash.slice(0, 12)}… ` +
+        'Файлът е за ТВОЯТА папка в драйва — той не минава през служебния износ.',
+    );
+    await prerisuvay();
+  });
+
+  const fayl = koren.querySelector<HTMLInputElement>('#lichno-fayl');
+  koren.querySelector<HTMLButtonElement>('#lichno-vnesi')?.addEventListener('click', () => fayl?.click());
+
+  fayl?.addEventListener('change', async () => {
+    const izbran = fayl.files?.[0];
+    if (!izbran) return;
+    try {
+      // `vnesiZhurnal` пази сам: проверява веригата на файла ПРЕДИ да влезе
+      // каквото и да е, а чужд наемател (служебен файл тук, личен на друг
+      // човек) пада с NESAVMESTIM — ключът е в хеша на всяко звено.
+      const rezultat = await vnesiZhurnal({
+        vrata: lichen.vrata,
+        dnevnik: lichen.dnevnik,
+        naematel: lichen.akaunt,
+        actor: lichen.kojSam.imeyl,
+        tekst: await izbran.text(),
+        kogato: new Date().toISOString(),
+      });
+      lichen.vest(
+        'dobre',
+        rezultat.vneseni === 0
+          ? `Файлът вече е тук — всичките ${rezultat.vsichko} събития съвпадат. Нищо ново не влезе.`
+          : `Върнати ${rezultat.vneseni} ${rezultat.vneseni === 1 ? 'събитие' : 'събития'}` +
+            `${rezultat.veche ? `, ${rezultat.veche} вече бяха` : ''}. ` +
+            `Личният Журнал е на ${rezultat.vsichko}. Веригата е проверена, преди да влезе каквото и да е.`,
+      );
+    } catch (err) {
+      lichen.vest('zle', `Внасянето е отказано. ${dumiZaGreshka(err)}`);
+    } finally {
+      fayl.value = '';
+      await prerisuvay();
+    }
   });
 }

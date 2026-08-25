@@ -3486,7 +3486,56 @@ async function main() {
     proveri('нито „Провери веригата" · тя проверява СЛУЖЕБНАТА',
       Boolean(await p.$('#proveri')), false);
     proveri('но екранът КАЗВА защо ги няма',
-      (await p.evaluate(() => document.body.textContent)).includes('изнася и проверява отделно'), true);
+      (await p.evaluate(() => document.body.textContent)).includes('в секцията си долу'), true);
+
+    // ══ 56 · ЛИЧНИЯТ ИЗНОС · своя верига, свой файл (ADR-039) ═══════════════
+    razdel = '56 · Личният износ · веригата';
+    await naEkran(p, 'lichno', '[data-sektsiya=lichen-iznos]');
+    proveri('екранът напомня, че личният НЕ Е изнасян',
+      (await p.$eval('[data-sektsiya=lichen-iznos]', (e) => e.textContent)).includes('не е изнасян'), true);
+    await p.click('#lichno-proveri');
+    await p.waitForFunction(() => document.body.innerText.includes('Личната верига е цяла'));
+    proveri('личната верига е цяла и се брои ОТДЕЛНО',
+      (await tekstNa(p, '.vest')).includes('Личната верига е цяла'), true);
+
+    razdel = '56 · Личният износ · файлът';
+    const [svalenLichen] = await Promise.all([p.waitForEvent('download'), p.click('#lichno-iznesi')]);
+    const patLichen = await svalenLichen.path();
+    const izneseniLichni = JSON.parse(await readFile(patLichen, 'utf8'));
+    proveri('името на файла казва ЛИЧЕН, без имейла с наставката',
+      svalenLichen.suggestedFilename().startsWith('zhurnal-lichen-'), true);
+    proveri('всяко звено е на ЛИЧНИЯ наемател',
+      izneseniLichni.every((x) => x.naematel.endsWith('#lichen')), true);
+    proveri('и броят съвпада с личния Журнал', izneseniLichni.length, await broyLichni(p));
+    proveri('лентата помни ЛИЧНИЯ износ',
+      (await p.$eval('[data-sektsiya=lichen-iznos]', (e) => e.textContent)).includes('Изнесен днес'), true);
+
+    razdel = '56 · Личният износ · границата през файла';
+    // СЛУЖЕБНИЯТ файл не влиза в личния Журнал — веригата го отказва изцяло.
+    const sluzhebenFayl = `${patLichen}.sluzheben.json`;
+    const sluzhebniSabitiya = await p.evaluate(async () => {
+      const db = await new Promise((da) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+      });
+      const vsichki = await new Promise((da) => {
+        const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+        z.onsuccess = () => da(z.result);
+      });
+      return vsichki.filter((s) => !s.naematel.endsWith('#lichen'));
+    });
+    await writeFile(sluzhebenFayl, JSON.stringify(sluzhebniSabitiya));
+    const predChuzhdiya = await broyLichni(p);
+    await p.setInputFiles('#lichno-fayl', sluzhebenFayl);
+    await p.waitForFunction(() => document.body.innerText.includes('Внасянето е отказано'));
+    proveri('служебен файл в личния се ОТКАЗВА с думи',
+      (await tekstNa(p, '.vest')).includes('Внасянето е отказано'), true);
+    proveri('и НИТО ЕДНО събитие не е влязло', await broyLichni(p), predChuzhdiya);
+
+    // а СВОЯТ файл се приема и не добавя нищо — той вече е тук
+    await p.setInputFiles('#lichno-fayl', patLichen);
+    await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
+    proveri('своят файл съвпада едно към едно', await broyLichni(p), predChuzhdiya);
 
     // ПРИБИРАНЕТО · пунктът пада, Журналът остава
     razdel = '53 · Личното · прибирането';

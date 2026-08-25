@@ -44,3 +44,37 @@ export function svaliFayl(fayl: Blob, ime: string): void {
   vruzka.click();
   URL.revokeObjectURL(adres);
 }
+
+/**
+ * КОГА Е БИЛ ПОСЛЕДНИЯТ ИЗНОС · по Журнал, не общо.
+ *
+ * Живее в localStorage, не в Журнала — това е удобство на този браузър, не
+ * факт от историята. Може и да го няма (частен прозорец, чистени данни).
+ *
+ * Ключът се ПОДАВА, защото Журналите вече са два: служебният и личният на
+ * всеки служител. Един общ белег би казал „изнесен вчера" за Журнал, който
+ * никога не е изнасян — а точно този ред е единственото напомняне, че без
+ * облак износът е задължение (ADR-036 §10: „лекарството е износът").
+ */
+export interface BelegZaIznos {
+  readonly kogato: string;
+  readonly broi: number;
+  readonly hash: string;
+}
+
+export function chetiBelegZaIznos(klyuch: string): BelegZaIznos | null {
+  try {
+    const surovo = localStorage.getItem(klyuch);
+    return surovo ? (JSON.parse(surovo) as BelegZaIznos) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function zapishiBelegZaIznos(klyuch: string, beleg: BelegZaIznos): void {
+  try {
+    localStorage.setItem(klyuch, JSON.stringify(beleg));
+  } catch {
+    // Частен прозорец или забранени данни — износът пак стана, само не се помни.
+  }
+}

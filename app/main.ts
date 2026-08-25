@@ -21,7 +21,14 @@ import {
 } from '../src/nositel/hranilishte.js';
 import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import {
+  chetiBelegZaIznos,
+  dnesKato,
+  ekraniraj,
+  svaliFayl,
+  zapishiBelegZaIznos,
+  type BelegZaIznos,
+} from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
@@ -178,33 +185,13 @@ export interface Konteks {
 }
 
 /**
- * Кога е бил последният износ. Живее в localStorage, не в Журнала — това е
- * удобство на този браузър, не факт от историята. Може и да го няма.
+ * Белегът на СЛУЖЕБНИЯ износ. Домът на четенето и писането е `obshto.ts` —
+ * ключът се подава, защото личният Журнал носи свой белег под свой ключ.
  */
 const KLYUCH_IZNOS = 'masterbook:posleden-iznos';
 
-interface BelegZaIznos {
-  readonly kogato: string;
-  readonly broi: number;
-  readonly hash: string;
-}
-
-function chetiBeleg(): BelegZaIznos | null {
-  try {
-    const surovo = localStorage.getItem(KLYUCH_IZNOS);
-    return surovo ? (JSON.parse(surovo) as BelegZaIznos) : null;
-  } catch {
-    return null;
-  }
-}
-
-function zapishiBeleg(beleg: BelegZaIznos): void {
-  try {
-    localStorage.setItem(KLYUCH_IZNOS, JSON.stringify(beleg));
-  } catch {
-    // Частен прозорец или забранени данни — износът пак стана, само не се помни.
-  }
-}
+const chetiBeleg = () => chetiBelegZaIznos(KLYUCH_IZNOS);
+const zapishiBeleg = (beleg: BelegZaIznos) => zapishiBelegZaIznos(KLYUCH_IZNOS, beleg);
 
 const koren = document.getElementById('ekran')!;
 let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
@@ -558,7 +545,7 @@ async function trugvay(): Promise<void> {
                * да се открие при инцидент.
                */
               ekran === 'lichno'
-                ? '<span class="drebno">Личният Журнал се изнася и проверява отделно — това още не е построено.</span>'
+                ? '<span class="drebno">Личният Журнал се изнася и проверява в секцията си долу — отделно от служебния.</span>'
                 : `${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
             <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
             ${
@@ -610,7 +597,7 @@ async function trugvay(): Promise<void> {
                             ? narisuvayTabove(ogledalo, dnes)
                             : ekran === 'lichno'
                               ? lichnoOgledalo && lichnoOgledalo.lichnoVklyucheno
-                                ? narisuvayLichno(lichnoOgledalo, ogledalo, dnes)
+                                ? narisuvayLichno(lichnoOgledalo, ogledalo, dnes, lichen.akaunt, lichniteSabitiya.length)
                                 : pokanaZaLichno(lichen.akaunt, lichnoOgledalo?.lichnoMyasto ?? '')
                               : narisuvayTablo(kojSam, izbor, akaunt, lichnoVklyucheno, lichnoOgledalo !== null)
           }
