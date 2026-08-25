@@ -543,6 +543,16 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
    къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */
 .podchertana { outline: 2px solid var(--aktsent); outline-offset: 3px; border-radius: 5px; }
 
+/* ── ПОДРЕДБАТА · дребните бутончета до главата (И101 т.2 · ADR-045) ──── */
+.premestvane { margin-left: auto; display: inline-flex; gap: 2px; align-items: center; }
+.premestvach {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--mastilo2); font-size: 10px; line-height: 1;
+  padding: 3px 5px; min-height: 22px; display: inline-flex; align-items: center; gap: 3px;
+}
+.premestvach:hover, .premestvach:focus-visible { border-color: var(--liniya); background: var(--panel); }
+.premestvach .ikona { width: 12px; height: 12px; }
+
 .karta.izbrana { border-color: var(--aktsent); background: var(--toplo); }
 .karta.izbrana .pole input, .karta.izbrana .pole select { background: #FFFFFF; }
 

@@ -35,6 +35,7 @@ import { duljimo, fold, prosrocheni, type Ogledalo } from '../src/ogledalo/ogled
 import { pregledayIznos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { butonSIkona, ikona } from './ikoni.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
+import { zakachiPodredbata } from './podredba.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -710,6 +711,9 @@ async function trugvay(): Promise<void> {
       zakachiRedaktsiya(koren, k, prerisuvay);
     }
     zakachiChernovata(koren);
+    // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
+    // След рисуването, защото пренарежда вече нарисувани възли.
+    zakachiPodredbata(koren, ekran);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }

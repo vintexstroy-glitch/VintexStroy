@@ -3828,6 +3828,44 @@ async function main() {
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
         .includes('Нов Доставчик ООД'), true);
 
+    // ══ 64 · ПОДРЕДБАТА · всеки сам мести секциите си (И101 т.2) ═══════════
+    razdel = '64 · Подредбата на екрана';
+    await naEkran(p, 'smetki', '#forma-period');
+    // Ключът е маркерът, ако го има; иначе ЗАГЛАВИЕТО — повечето екрани нямат
+    // маркер и лостът пак трябва да работи на тях (ADR-045).
+    const sektsiiteNaSmetki = () =>
+      p.$$eval('.telo > *', (e) =>
+        e
+          .filter((x) => x.querySelector('.dyalglava'))
+          .map((x) => x.dataset.sektsiya ?? x.querySelector('.dyalglava h2, .dyalglava h3')?.textContent?.trim() ?? ''),
+      );
+    const predRazmestvaneto = await sektsiiteNaSmetki();
+    proveri('екранът носи повече от една секция', predRazmestvaneto.length > 1, true);
+    proveri('и всяка има свои дребни бутончета',
+      (await p.$$eval('.telo [data-premesti]', (e) => e.length)) >= 2, true);
+
+    // Второто слиза на първо място · местенето е една стъпка, без изненади.
+    // Второто по ред · първото няма къде да отиде нагоре.
+    await p.evaluate(() => {
+      const dyalove = [...document.querySelectorAll('.telo > *')].filter((x) => x.querySelector('.dyalglava'));
+      dyalove[1].querySelector('[data-premesti="gore"]').click();
+    });
+    const sledRazmestvaneto = await sektsiiteNaSmetki();
+    proveri('натискането разменя съседите',
+      sledRazmestvaneto[0], predRazmestvaneto[1]);
+    proveri('и нищо не изчезва · същите секции, друг ред',
+      [...sledRazmestvaneto].sort().join('|'), [...predRazmestvaneto].sort().join('|'));
+
+    // ПОМНИ СЕ · подредбата е поглед, не факт (ADR-022): преживява смяна на
+    // екран, но НЕ влиза в Журнала — тя е негова, не обща.
+    const predSabitiya = await broySabitiya(p);
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('редът се помни след връщане',
+      (await sektsiiteNaSmetki())[0], sledRazmestvaneto[0]);
+    proveri('и НИЩО не е записано в Журнала', await broySabitiya(p), predSabitiya);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 63 · НАСТРОЙКИТЕ КАТО ПАДАЩ РЕД · тема по тема (И101 т.2) ══════════
     razdel = '63 · Настройките · падащият ред';
     await naEkran(p, 'imoti', '#forma-imot');
