@@ -429,7 +429,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .pole { display: flex; flex-direction: column; gap: 6px; }
-.pole label { font-size: 12.5px; color: var(--mastilo2); }
+/* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
+   „<label class=pole><span>". Втората е в личните форми; без този ред нейният
+   надпис остава с ръста на текста и полето до него изглежда от друг екран. */
+.pole label, .pole > span { font-size: 12.5px; color: var(--mastilo2); }
 .pole input, .pole select {
   font-family: inherit; font-size: 14px; color: var(--mastilo);
   border: 1px solid var(--liniya); border-radius: 4px; padding: 10px 12px;

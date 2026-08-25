@@ -161,7 +161,7 @@ export function narisuvayStoynost(): string {
         <button type="button" class="vtorichen" id="cheti-tseni">Чети Ценова листа</button>
         <label class="pole tyasno">
           <span>Кои цени се пускат</span>
-          <select id="koya-tsena">
+          <select translate="no" id="koya-tsena">
             ${(['dvete', 'plosht', 'sastoyanie'] as const)
               .map(
                 (k) =>
@@ -177,8 +177,8 @@ export function narisuvayStoynost(): string {
             : ''
         }
       </div>
-      <input type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
-      <input type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
+      <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
+      <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
       <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
     </section>

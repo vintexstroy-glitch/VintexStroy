@@ -73,7 +73,7 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number): string {
       <div class="deystviya">
         <button type="button" class="glaven" id="zhurnal-iznesi">Изнеси Журнала като таблица</button>
         <button type="button" class="vtorichen" id="zhurnal-varni">Върни редактираната таблица</button>
-        <input type="file" id="zhurnal-fayl" accept=".xlsx,.csv" hidden>
+        <input translate="no" type="file" id="zhurnal-fayl" accept=".xlsx,.csv" hidden>
       </div>
       <p class="drebno"><b>Няма редакция — има нов файл, залепен за стария.</b> Поправеният ред влиза като <b>сторно + нов запис</b> (правило 9); старият остава завинаги. Двата файла се скачват с <b>трети номер</b>, който има СВОЯ номерация — извън графата на нормалния ред. Редактират се само <b>Описание</b> и <b>Сума</b>; всичко останало е заключено, за да не мине сортирана в Ексел таблица за партида поправки.</p>
       <p class="drebno">Изнесеното носи ${sabitiya} ${sabitiya === 1 ? 'събитие' : 'събития'}. Точният износ с хешовете остава <b>JSON</b> — той е за връщане на цял Журнал, не за четене.</p>

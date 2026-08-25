@@ -51,7 +51,15 @@ import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
-import { menyuOtZhivi, novoteVSpisatsite, poleSMenyu, sDumiZaNovite, zakachiMenyuta } from './menyu.js';
+import {
+  menyuOtZhivi,
+  novoteVSpisatsite,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
 import type { Menyu } from '../src/domein/padashti-menyuta.js';
 
 import type { Konteks } from './ekranite.js';
@@ -104,18 +112,6 @@ export function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): Readon
     ['otgovornik', menyutoNaDelata(o, 'otgovornik', 'Отговорник')],
   ]);
 }
-
-/**
- * РЕЧНИЦИТЕ НА ФОРМАТА · по представка, точно както `POGLEDI` са по ключ.
- *
- * Пълнят се при РИСУВАНЕ (там е Огледалото) и се четат при ЗАКАЧАНЕ (там е
- * DOM-ът). Двете не могат да се слеят: `zakachiGant` няма Огледало и не бива
- * да го чака — то е асинхронно, а закачането трябва да стане в същия кадър.
- *
- * По представка, а не модулно: личната форма (`l-`) и служебната (`d-`) имат
- * РАЗЛИЧНИ речници — служебните дела и личните не се смесват (И98).
- */
-const RECHNITSI = new Map<string, ReadonlyMap<string, Menyu>>();
 
 const POGLEDI = new Map<string, PogledNaGanta>();
 
@@ -250,15 +246,15 @@ export function narisuvayGant(
       <div class="poleta tesni">
         <div class="pole">
           <label for="f-myasto">Място</label>
-          <select id="f-myasto">${opcii(mesta, filtarMyasto, 'всички')}</select>
+          <select translate="no" id="f-myasto">${opcii(mesta, filtarMyasto, 'всички')}</select>
         </div>
         <div class="pole">
           <label for="f-obekt">Обект</label>
-          <select id="f-obekt">${opcii(obekti, filtarObekt, 'всички')}</select>
+          <select translate="no" id="f-obekt">${opcii(obekti, filtarObekt, 'всички')}</select>
         </div>
         <div class="pole">
           <label for="f-otsenka">Оценка</label>
-          <select id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
+          <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
         </div>
       </div>
       <p class="drebno">Три колони с филтри, не три нива — филтрира се по която и да е, независимо от другите.</p>
@@ -474,7 +470,7 @@ export function formaDelo(
 ): string {
   const id = (kratko: string) => `${predstavka}${kratko}`;
   const menyutata = menyutataNaFormata(o, nadpisi);
-  RECHNITSI.set(predstavka, menyutata);
+  zapomniRechnitsite(predstavka, menyutata);
   return `
     <section class="karta">
       <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
@@ -519,19 +515,19 @@ export function formaDelo(
           </div>
           <div class="pole">
             <label for="${id('otsenka')}">Оценка</label>
-            <select id="${id('otsenka')}" name="otsenka">
+            <select translate="no" id="${id('otsenka')}" name="otsenka">
               ${OTSENKI.map((x) => `<option value="${x}">${IMENA_NA_OTSENKITE[x]}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
             <label for="${id('sastoyanie')}">Състояние</label>
-            <select id="${id('sastoyanie')}" name="sastoyanie">
+            <select translate="no" id="${id('sastoyanie')}" name="sastoyanie">
               ${SASTOYANIYA.map((x) => `<option value="${x}">${x}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
             <label for="${id('nad')}">Поддело на</label>
-            <select id="${id('nad')}" name="nadDelo">
+            <select translate="no" id="${id('nad')}" name="nadDelo">
               <option value="">— самостоятелно —</option>
               ${[...o.dela.values()]
                 .map((d) => `<option value="${ekraniraj(d.id)}">${ekraniraj(d.ime)}</option>`)
@@ -583,7 +579,7 @@ export function zakachiGant(
   const p = pogled(klyuch);
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040) · четирите живи полета на формата.
   // Речниците се четат при закачане, значи всяко ново дело ги обогатява само.
-  const menyutata = RECHNITSI.get(predstavka) ?? new Map<string, Menyu>();
+  const menyutata = rechnitsite(predstavka);
   zakachiMenyuta(koren, menyutata);
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
@@ -693,7 +689,7 @@ export function zakachiFormataNaDelo(
 
     // Кои стойности ще влязат НОВИ · брои се ПРЕДИ записа, защото после
     // речникът вече ги съдържа и отговорът би бил „нищо ново".
-    const novite = novoteVSpisatsite(koren, RECHNITSI.get(predstavka) ?? new Map<string, Menyu>());
+    const novite = novoteVSpisatsite(koren, rechnitsite(predstavka));
 
     buton.disabled = true;
     try {

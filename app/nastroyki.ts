@@ -641,7 +641,7 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: I
           ? `<p class="prazno">Още няма записан служител.<br>Достъпът се дава при доставчика; тук се записва кой работи и с каква роля.</p>`
           : `<label class="pole">
         <span>Служител</span>
-        <select id="izbor-sluzhitel">
+        <select translate="no" id="izbor-sluzhitel">
           <option value="">— избери —</option>
           ${hora.map((h) => optsiyaZaChovek(h, h.imeyl === izbranSluzhitel)).join('')}
         </select>
@@ -663,15 +663,15 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: I
           : ''
       }
       <form id="forma-sluzhitel" class="forma">
-        <label class="pole"><span>Имейл</span><input name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
-        <label class="pole"><span>Име</span><input name="ime" required placeholder="как му казваш"></label>
+        <label class="pole"><span>Имейл</span><input translate="no" name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
+        <label class="pole"><span>Име</span><input translate="no" name="ime" required placeholder="как му казваш"></label>
         ${
           // РОЛИТЕ са трета възможност. Изключени, всеки нов човек влиза като
           // НАБЛЮДАТЕЛ — най-тясното, а не най-широкото: забравена отметка не
           // бива да раздава повече права, отколкото е поискано.
           mozhe(izbor, 'roli-za-dostap')
             ? `<label class="pole"><span>Роля</span>
-                 <select name="rolya">
+                 <select translate="no" name="rolya">
                    <option value="redaktor">редактира</option>
                    <option value="nablyudatel">наблюдава</option>
                    <option value="sobstvenik">собственик</option>

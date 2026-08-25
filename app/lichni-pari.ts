@@ -57,7 +57,28 @@ import {
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
+import {
+  menyuOtZhivi,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
 import type { Konteks } from './ekranite.js';
+
+/** Ключът на речниците на ЛИЧНИЯ екран · нарочно различен от служебния. */
+const RECHNIK_LICHEN = 'lichni-pari';
+
+/** РЕЧНИКЪТ НА ТЪРГОВЦИТЕ · изведен от личните движения, без ново събитие. */
+function menyutoNaTargovtsite(o: Ogledalo): Menyu {
+  return menyuOtZhivi(
+    'koy',
+    'Кой',
+    [...o.lichniDvizheniya.values()].map((d) => d.koy),
+  );
+}
 
 /** Представка на всяко id · служебният екран носи свои и не бива да се бият. */
 export const PREDSTAVKA_PARI = 'lp-';
@@ -149,7 +170,7 @@ function tablitsataNaRedovete(o: Ogledalo, skriti: boolean): string {
             <span>${
               d.izklyuchen
                 ? `<span class="znachka tiha">изключен · ${ekraniraj(d.prichina)}</span>`
-                : `<select data-smeni-tema="${ekraniraj(d.dvizhenieId)}">
+                : `<select translate="no" data-smeni-tema="${ekraniraj(d.dvizhenieId)}">
                      <option value="">— без тема —</option>
                      ${temi
                        .map(
@@ -170,7 +191,7 @@ function tablitsataNaRedovete(o: Ogledalo, skriti: boolean): string {
     </div>
     <div class="poleta">
       <label class="pole"><span>Защо се изключва</span>
-        <input type="text" id="${PREDSTAVKA_PARI}prichina" value="${ekraniraj(prichinaZaIzklyuchvane)}"
+        <input translate="no" type="text" id="${PREDSTAVKA_PARI}prichina" value="${ekraniraj(prichinaZaIzklyuchvane)}"
           placeholder="върнати пари · прехвърляне между свои сметки"></label>
     </div>
     <p class="drebno"><b>Ред се ИЗКЛЮЧВА, не се трие</b> (правило 23): пада от сборовете, остава в
@@ -180,24 +201,39 @@ function tablitsataNaRedovete(o: Ogledalo, skriti: boolean): string {
 
 /** Ръчният ред · „да може да се добавя лично". */
 function formaRed(o: Ogledalo, dnes: string): string {
+  zapomniRechnitsite(RECHNIK_LICHEN, new Map([['koy', menyutoNaTargovtsite(o)]]));
   const temi = predlaganiTemi(o.lichniTemi.values());
   return `
     <details class="karta" data-forma="${PREDSTAVKA_PARI}red">
       <summary>Добави ред на ръка</summary>
       <div class="poleta">
         <label class="pole"><span>Дата</span>
-          <input type="date" id="${PREDSTAVKA_PARI}r-data" value="${ekraniraj(dnes)}"></label>
-        <label class="pole"><span>Посока</span>
-          <select id="${PREDSTAVKA_PARI}r-posoka">
-            <option value="razhod">разход</option>
-            <option value="prihod">приход</option>
-          </select></label>
+          <input translate="no" type="date" id="${PREDSTAVKA_PARI}r-data" value="${ekraniraj(dnes)}"></label>
+        ${poleSIzbor({
+          id: `${PREDSTAVKA_PARI}r-posoka`,
+          etiket: 'Посока',
+          spisak: 'posoka',
+          opcii: '<option value="razhod">разход</option><option value="prihod">приход</option>',
+        })}
         <label class="pole"><span>Сума</span>
-          <input type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}r-suma" placeholder="35,00"></label>
-        <label class="pole"><span>Кой</span>
-          <input type="text" id="${PREDSTAVKA_PARI}r-koy" placeholder="ЛИДЛ"></label>
+          <input translate="no" type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}r-suma" placeholder="35,00"></label>
+        ${
+          /**
+           * КОЙ · живо меню от ЛИЧНИЯ Журнал (ADR-042).
+           *
+           * Търговците се повтарят повече от всичко друго в личните пари, а
+           * речникът им е ДРУГ: личното и служебното никога не се смесват
+           * (И98), значи и списъкът тук идва само от личните движения.
+           */
+          poleSMenyu({
+            id: `${PREDSTAVKA_PARI}r-koy`,
+            etiket: 'Кой',
+            menyu: menyutoNaTargovtsite(o),
+            mestodarzhatel: 'ЛИДЛ',
+          })
+        }
         <label class="pole"><span>Тема</span>
-          <select id="${PREDSTAVKA_PARI}r-tema">
+          <select translate="no" id="${PREDSTAVKA_PARI}r-tema">
             <option value="">— без тема —</option>
             ${temi.map((t) => `<option value="${ekraniraj(t.temaId)}">${ekraniraj(t.ime)}</option>`).join('')}
           </select></label>
@@ -239,9 +275,9 @@ function formaTema(o: Ogledalo): string {
       }
       <div class="poleta">
         <label class="pole"><span>Име</span>
-          <input type="text" id="${PREDSTAVKA_PARI}t-ime" placeholder="Храна"></label>
+          <input translate="no" type="text" id="${PREDSTAVKA_PARI}t-ime" placeholder="Храна"></label>
         <label class="pole"><span>Група</span>
-          <input type="text" id="${PREDSTAVKA_PARI}t-grupa" placeholder="Дом"></label>
+          <input translate="no" type="text" id="${PREDSTAVKA_PARI}t-grupa" placeholder="Дом"></label>
       </div>
       <div class="deystviya">
         <button type="button" class="glaven" id="${PREDSTAVKA_PARI}t-zapishi">Добави тема</button>
@@ -371,23 +407,23 @@ function formaKredit(o: Ogledalo, dnes: string): string {
       3,45 % се пише <b>345</b>. Вноската се <b>въвежда от договора</b>, не се изчислява.</p>
       <div class="poleta">
         <label class="pole"><span>Име</span>
-          <input type="text" id="${PREDSTAVKA_PARI}k-ime" placeholder="Ипотека · Пощенска"></label>
+          <input translate="no" type="text" id="${PREDSTAVKA_PARI}k-ime" placeholder="Ипотека · Пощенска"></label>
         <label class="pole"><span>Вид</span>
-          <select id="${PREDSTAVKA_PARI}k-vid">
+          <select translate="no" id="${PREDSTAVKA_PARI}k-vid">
             ${VIDOVE_KREDIT.map((v) => `<option value="${v}">${ekraniraj(IMENA_NA_VIDOVETE_KREDIT[v])}</option>`).join('')}
           </select></label>
         <label class="pole"><span>Остатък днес</span>
-          <input type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}k-ostatak" placeholder="87 400,00"></label>
+          <input translate="no" type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}k-ostatak" placeholder="87 400,00"></label>
         <label class="pole"><span>Към дата</span>
-          <input type="date" id="${PREDSTAVKA_PARI}k-ot" value="${ekraniraj(dnes)}"></label>
+          <input translate="no" type="date" id="${PREDSTAVKA_PARI}k-ot" value="${ekraniraj(dnes)}"></label>
         <label class="pole"><span>Лихва (б.п.)</span>
-          <input type="number" min="0" max="10000" step="1" id="${PREDSTAVKA_PARI}k-lihva" placeholder="345"></label>
+          <input translate="no" type="number" min="0" max="10000" step="1" id="${PREDSTAVKA_PARI}k-lihva" placeholder="345"></label>
         <label class="pole"><span>Вноска</span>
-          <input type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}k-vnoska" placeholder="612,34"></label>
+          <input translate="no" type="text" inputmode="decimal" id="${PREDSTAVKA_PARI}k-vnoska" placeholder="612,34"></label>
         <label class="pole"><span>Ден от месеца</span>
-          <input type="number" min="1" max="31" step="1" id="${PREDSTAVKA_PARI}k-den" value="5"></label>
+          <input translate="no" type="number" min="1" max="31" step="1" id="${PREDSTAVKA_PARI}k-den" value="5"></label>
         <label class="pole"><span>Тема на лихвата</span>
-          <select id="${PREDSTAVKA_PARI}k-tema">
+          <select translate="no" id="${PREDSTAVKA_PARI}k-tema">
             <option value="">— без тема —</option>
             ${temi.map((t) => `<option value="${ekraniraj(t.temaId)}">${ekraniraj(t.ime)}</option>`).join('')}
           </select></label>
@@ -467,7 +503,7 @@ function planatNaEkrana(p: PlanZaVnos, o: Ogledalo, skriti: boolean): string {
             }${chislo(d?.suma_st ?? r.star?.suma_st ?? 0)}</span>
             <span>${
               r.kakvo === 'nov' || r.kakvo === 'promenen'
-                ? `<select data-tema-za="${ekraniraj(r.klyuch)}">
+                ? `<select translate="no" data-tema-za="${ekraniraj(r.klyuch)}">
                      <option value="">— без тема —</option>
                      ${temi
                        .map(
@@ -532,6 +568,8 @@ export function zakachiLichniPari(
   prerisuvay: () => Promise<void>,
 ): void {
   const id = (ime: string) => `#${PREDSTAVKA_PARI}${ime}`;
+  // ЗАКОНЪТ ЗА МЕНЮТАТА · тук речникът е ЛИЧНИЯТ и не се смесва със служебния.
+  zakachiMenyuta(koren, rechnitsite(RECHNIK_LICHEN));
 
   koren.querySelector<HTMLButtonElement>(id('pokazhi'))?.addEventListener('click', async () => {
     zapomniEkranno(KLYUCH_SKRITI, !skritiLiSa());

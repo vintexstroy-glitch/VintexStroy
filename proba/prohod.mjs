@@ -3608,6 +3608,22 @@ async function main() {
     proveri('но екранът КАЗВА защо ги няма',
       (await p.evaluate(() => document.body.textContent)).includes('в секцията си долу'), true);
 
+    // ЖИВОТО МЕНЮ НА ЛИЧНИЯ ЕКРАН (ADR-042) · речникът тук е ЛИЧНИЯТ.
+    // Проверява се СЕГА, защото по §53 личният пункт се прибира и екранът
+    // после го няма — а §17б обхожда само каквото стои в лентата.
+    razdel = '59 · Менютата · личното поле „Кой"';
+    proveri('„Кой" носи списък от ЛИЧНИТЕ движения',
+      await p.$eval('#lp-r-koy', (e) => e.getAttribute('list')), 'lp-r-koy-spisak');
+    proveri('и „Посока" е ЗАКЛЮЧЕНА · приход и разход са фиксирани модели',
+      await p.$eval('#lp-r-posoka', (e) => e.tagName), 'SELECT');
+    proveri('личният екран · полетата са защитени от превод',
+      await p.evaluate(() => {
+        const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+        const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+        return goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || e.name).join(' · ')}`;
+      }),
+      'всички');
+
     // ══ 56 · ЛИЧНИЯТ ИЗНОС · своя верига, свой файл (ADR-039) ═══════════════
     razdel = '56 · Личният износ · веригата';
     await naEkran(p, 'lichno', '[data-sektsiya=lichen-iznos]');
@@ -3681,6 +3697,90 @@ async function main() {
     });
     proveri('но Журналът ОСТАНА — прибраното не е изтрито',
       sledPribirane > predPribirane, true);
+
+    // ══ 59 · МЕНЮТАТА ИЗВЪН УПРАВЛЕНИЕ · живото и заключеното (ADR-042) ═════
+    //
+    // ADR-040 закачи закона за четирите полета на делото. Тук се проверява
+    // втората му половина: полетата, които ОПИСВАТ, вече имат речник и на
+    // другите екрани; полетата, върху които системата СМЯТА, си остават избор
+    // и КАЗВАТ защо.
+    razdel = '59 · Менютата · живото поле на Имоти';
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('„Наемател" носи СПИСЪК, а не само текст',
+      await p.$eval('#naem-naemetel', (e) => e.getAttribute('list')), 'naem-naemetel-spisak');
+    const naemateliVSpisaka = await p.$$eval('#naem-naemetel-spisak option', (o) => o.map((x) => x.value));
+    proveri('и в него стоят ЖИВИТЕ наематели от Журнала',
+      naemateliVSpisaka.length > 0, true);
+    await p.fill('#naem-naemetel', naemateliVSpisaka[0]);
+    proveri('писаното на ръка ПОЧЕРНЯВА и тук',
+      await p.$eval('#naem-naemetel', (e) => e.classList.contains('menyu-cherno')), true);
+    proveri('а думата казва, че дубликат няма да се създаде',
+      await p.$eval('[data-znak-za="naem-naemetel"]', (e) => e.textContent.trim()), '= съществуваща');
+    await p.fill('#naem-naemetel', 'Нов Наемател ЕООД');
+    proveri('нов наемател обещава НОВА стойност',
+      await p.$eval('[data-znak-za="naem-naemetel"]', (e) => e.textContent.trim()), '＋ нова стойност');
+
+    razdel = '59 · Менютата · заключеното поле КАЗВА защо';
+    proveri('„Сектор" остава ИЗБОР · непозната стойност не може да се появи',
+      await p.$eval('#naem-sektor', (e) => e.tagName), 'SELECT');
+    const kazvaSektor = await p.$eval('[data-zaklyuchen="sektor"]', (e) => e.textContent.trim());
+    proveri('до него стои катинарът', kazvaSektor.startsWith('🔒'), true);
+    proveri('и причината е СВОЯТА му, не заета от закона',
+      kazvaSektor.includes('ЗДДС') && !kazvaSektor.includes('Настройки'), true);
+
+    razdel = '59 · Менютата · Сметки';
+    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    proveri('„Доставчик" носи списък от записаните разходи',
+      (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.length)) > 0, true);
+    proveri('и „За какво" също · двете полета, не едното',
+      (await p.$$eval('#razhod-opis-spisak option', (o) => o.length)) > 0, true);
+    proveri('„Поток" е ЗАКЛЮЧЕН · акумулаторите не растат от полето',
+      await p.$eval('#razhod-potok', (e) => e.tagName), 'SELECT');
+    proveri('и го казва с думи',
+      (await p.$eval('[data-zaklyuchen="potok"]', (e) => e.textContent)).includes('акумулаторите'), true);
+    // НАЙ-ВАЖНИЯТ заключен списък: „Платено" дели КЕШ от БАНКА в Сметки.
+    proveri('„Платено" е заключен · свободна стойност би паднала тихо в БАНКА',
+      await p.$eval('#razhod-nachin', (e) => e.tagName), 'SELECT');
+
+    razdel = '59 · Менютата · следата след записа на разход';
+    // Датата е в НЕЗАМРАЗЕН месец: справката за 2026-03 е подадена по §? и
+    // формата отказва разход там — с думи, както се и проверява по-горе.
+    await zapishiRazhod(p, { potok: 'zaplati', dostavchik: 'Нов Доставчик ООД',
+      opis: 'ново перо', suma: '100,00', nachin: 'банка', data: '2026-11-12', dokument: '' });
+    const vestZaRazhod = await tekstNa(p, '.vest');
+    proveri('след записа КАЗВА какво е влязло ново',
+      vestZaRazhod.includes('Нови стойности') && vestZaRazhod.includes('Нов Доставчик ООД'), true);
+    proveri('и речникът вече го носи',
+      (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
+        .includes('Нов Доставчик ООД'), true);
+
+    // ══ 17б · ЗАЩИТАТА ОТ ПРЕВОД по ВСИЧКИ екрани ══════════════════════════
+    //
+    // §17 пазеше САМО екран Имоти и обявяваше „всички" — а полетата на другите
+    // екрани никой не гледаше. Точно там се намери пропуснатото: компонентът на
+    // живите менюта (ADR-040) рисуваше входа без `translate="no"`, и името на
+    // наемател можеше да бъде преформулирано от браузърния превод.
+    razdel = '17б · защитата от превод · всички екрани';
+    for (const [ekran, znak] of [
+      ['imoti', '#forma-imot'],
+      ['pari', '#forma-nachisli'],
+      ['smetki', '#razhod-dostavchik'],
+      ['gant', '#d-forma-delo'],
+      ['stoynost', '#cheti-ploshti'],
+      ['tabove', '#izbor-tab'],
+      ['nastroyki', '#nov-buton'],
+      ['ii', '#nov-agent'],
+      ['tablo', '#tablo-lichno'],
+    ]) {
+      await naEkran(p, ekran, znak);
+      proveri(`екран „${ekran}" · полетата са защитени`,
+        await p.evaluate(() => {
+          const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+          const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+          return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || e.name).join(' · ')}`) : 'няма полета';
+        }),
+        'всички');
+    }
 
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //

@@ -26,6 +26,7 @@ import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { butonIstoriya } from './istoriya.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
+import { poleSIzbor } from './menyu.js';
 import type { Konteks } from './ekranite.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
@@ -370,12 +371,15 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
             <input translate="no" id="pl-suma" name="suma" inputmode="decimal" required
                    value="${pishiVPole(v.ostatak_st)}" autocomplete="off">
           </div>
-          <div class="pole">
-            <label for="pl-nachin">Начин</label>
-            <select translate="no" id="pl-nachin" name="nachin">
-              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'pl-nachin',
+            ime: 'nachin',
+            etiket: 'Начин',
+            spisak: 'nachin',
+            opcii: NACHINI_NA_PLASHTANE.map(
+              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
+            ).join(''),
+          })}
           <div class="pole">
             <label for="pl-data">Дата</label>
             <input translate="no" id="pl-data" name="data" type="date" value="${dnesKato()}" required>

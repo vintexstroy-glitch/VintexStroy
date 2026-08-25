@@ -62,7 +62,36 @@ import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  menyuOtZhivi,
+  novoteVSpisatsite,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
 import type { Konteks } from './ekranite.js';
+
+/** Ключът на речниците на този екран · формата на разхода е една. */
+const RECHNIK_RAZHOD = 'razhod';
+
+/**
+ * РЕЧНИЦИТЕ НА РАЗХОДА · изведени от записаните разходи, без ново събитие.
+ *
+ * Двете полета имат ЕДНА мярка и затова един помощник: и доставчикът, и „за
+ * какво" са свободен текст, който се повтаря — разликата е само от кое поле
+ * се чете.
+ */
+function menyutoNaRazhodite(o: Ogledalo, klyuch: 'dostavchik' | 'opis', ime: string): Menyu {
+  return menyuOtZhivi(
+    klyuch,
+    ime,
+    [...o.razhodi.values()].map((r) => r[klyuch]),
+  );
+}
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();
@@ -255,7 +284,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${blokMesetsatZaAgenta(o, mesets)}
 
-    ${formaRazhod(mesets)}
+    ${formaRazhod(o, mesets)}
 
     ${
       razhodi.length === 0
@@ -300,13 +329,14 @@ function formaSalda(o: Ogledalo): string {
       </div>
       <form id="forma-saldo">
         <div class="poleta tesni">
-          <div class="pole">
-            <label for="saldo-kade">Джоб</label>
-            <select id="saldo-kade" name="kade">
-              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${pishi(banka_st)}</option>
-              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${pishi(trezor_st)}</option>
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'saldo-kade',
+            ime: 'kade',
+            etiket: 'Джоб',
+            spisak: 'dzhob',
+            opcii: `<option value="banka">${ekraniraj(IMENA_NA_DZHOBOVETE.banka)} · сега ${pishi(banka_st)}</option>
+              <option value="trezor">${ekraniraj(IMENA_NA_DZHOBOVETE.trezor)} · сега ${pishi(trezor_st)}</option>`,
+          })}
           <div class="pole">
             <label for="saldo-suma">Начално салдо</label>
             <input translate="no" id="saldo-suma" name="suma" inputmode="decimal" placeholder="10 000,00" required>
@@ -502,56 +532,93 @@ function poleNaOtcheta(p: Pole): string {
     </article>`;
 }
 
-function formaRazhod(mesets: string): string {
+function formaRazhod(o: Ogledalo, mesets: string): string {
+  // Речникът се пълни при РИСУВАНЕ (тук е Огледалото) и се чете при ЗАКАЧАНЕ.
+  zapomniRechnitsite(
+    RECHNIK_RAZHOD,
+    new Map([
+      ['dostavchik', menyutoNaRazhodite(o, 'dostavchik', 'Доставчик')],
+      ['opis', menyutoNaRazhodite(o, 'opis', 'За какво')],
+    ]),
+  );
   return `
     <section class="karta">
       <div class="dyalglava"><h2>Нов разход</h2><span>сумата е обща цена с ДДС — както при наема</span></div>
       <form id="forma-razhod">
         <div class="poleta">
-          <div class="pole">
-            <label for="razhod-potok">Поток</label>
-            <select translate="no" id="razhod-potok" name="potok" required>
-              ${potototsiNaRazhod()
-                .map((p) => `<option value="${ekraniraj(p.klyuch)}">${ekraniraj(p.ime)}</option>`)
-                .join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-sektor">Сектор — важи за Фактури</label>
-            <select translate="no" id="razhod-sektor" name="sektor" required>
-              ${sektoriNaRazhod()
-                .filter((a) => a.stavka > 0)
-                .map((a) => `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
-                .join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-stavka">Ставка на ТАЗИ фактура</label>
-            <select translate="no" id="razhod-stavka" name="stavka" required>
-              ${STAVKI.map(
-                (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
-              ).join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-dostavchik">Доставчик или получател</label>
-            <input translate="no" id="razhod-dostavchik" name="dostavchik" required placeholder="напр. Материали ООД" autocomplete="off">
-            <p class="kazva-problem" id="kazva-dostavchik" data-spira="ne"></p>
-          </div>
-          <div class="pole">
-            <label for="razhod-opis">За какво</label>
-            <input translate="no" id="razhod-opis" name="opis" required placeholder="напр. цимент" autocomplete="off">
-          </div>
+          ${poleSIzbor({
+            id: 'razhod-potok',
+            ime: 'potok',
+            etiket: 'Поток',
+            spisak: 'potok',
+            zadalzhitelno: true,
+            opcii: potototsiNaRazhod()
+              .map((p) => `<option value="${ekraniraj(p.klyuch)}">${ekraniraj(p.ime)}</option>`)
+              .join(''),
+          })}
+          ${poleSIzbor({
+            id: 'razhod-sektor',
+            ime: 'sektor',
+            etiket: 'Сектор — важи за Фактури',
+            spisak: 'sektor',
+            zadalzhitelno: true,
+            opcii: sektoriNaRazhod()
+              .filter((a) => a.stavka > 0)
+              .map((a) => `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
+              .join(''),
+          })}
+          ${poleSIzbor({
+            id: 'razhod-stavka',
+            ime: 'stavka',
+            etiket: 'Ставка на ТАЗИ фактура',
+            spisak: 'stavka',
+            zadalzhitelno: true,
+            opcii: STAVKI.map(
+              (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
+            ).join(''),
+          })}
+          ${
+            /**
+             * ДОСТАВЧИКЪТ И „ЗА КАКВО" · двете живи менюта на разхода (ADR-042).
+             *
+             * Дотук и двете бяха голи текстови полета. Един и същ доставчик се
+             * изписваше по три начина в три месеца, а „ток" и „Ток" ставаха два
+             * различни разхода в очите на всеки изглед, който групира по име.
+             *
+             * И двете ОПИСВАТ — системата смята по ПОТОКА и по СЕКТОРА, не по
+             * името на доставчика — значи растат свободно от полето.
+             */
+            poleSMenyu({
+              id: 'razhod-dostavchik',
+              ime: 'dostavchik',
+              etiket: 'Доставчик или получател',
+              menyu: menyutoNaRazhodite(o, 'dostavchik', 'Доставчик'),
+              zadalzhitelno: true,
+              mestodarzhatel: 'напр. Материали ООД',
+              pod: '<p class="kazva-problem" id="kazva-dostavchik" data-spira="ne"></p>',
+            })
+          }
+          ${poleSMenyu({
+            id: 'razhod-opis',
+            ime: 'opis',
+            etiket: 'За какво',
+            menyu: menyutoNaRazhodite(o, 'opis', 'За какво'),
+            zadalzhitelno: true,
+            mestodarzhatel: 'напр. цимент',
+          })}
           <div class="pole">
             <label for="razhod-suma">Обща сума, € — с ДДС</label>
             <input translate="no" id="razhod-suma" name="suma" required inputmode="decimal" placeholder="600,00" autocomplete="off">
           </div>
-          <div class="pole">
-            <label for="razhod-nachin">Платено</label>
-            <select translate="no" id="razhod-nachin" name="nachin">
-              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'razhod-nachin',
+            ime: 'nachin',
+            etiket: 'Платено',
+            spisak: 'nachin',
+            opcii: NACHINI_NA_PLASHTANE.map(
+              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
+            ).join(''),
+          })}
           <div class="pole">
             <label for="razhod-data">Дата</label>
             <input translate="no" id="razhod-data" name="data" type="date" value="${ekraniraj(mesets)}-01" required>
@@ -673,12 +740,15 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
             <label for="dds-data">Дата на плащането</label>
             <input translate="no" id="dds-data" name="data" type="date" required>
           </div>
-          <div class="pole">
-            <label for="dds-nachin">Начин</label>
-            <select translate="no" id="dds-nachin" name="nachin">
-              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'dds-nachin',
+            ime: 'nachin',
+            etiket: 'Начин',
+            spisak: 'nachin',
+            opcii: NACHINI_NA_PLASHTANE.map(
+              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
+            ).join(''),
+          })}
         </div>
         <p class="greshka" id="greshka-dds"></p>
         <div class="deystviya">
@@ -847,13 +917,16 @@ function kalkulator(): string {
             <label for="smyatane-suma">Обща цена, € — с ДДС</label>
             <input translate="no" id="smyatane-suma" name="suma" required inputmode="decimal" placeholder="1200,00" autocomplete="off">
           </div>
-          <div class="pole">
-            <label for="smyatane-stavka">Ставка</label>
-            <select translate="no" id="smyatane-stavka" name="stavka" required>
-              ${STAVKI.map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
-                .join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'smyatane-stavka',
+            ime: 'stavka',
+            etiket: 'Ставка',
+            spisak: 'stavka',
+            zadalzhitelno: true,
+            opcii: STAVKI.map(
+              (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
+            ).join(''),
+          })}
         </div>
         <p class="greshka" id="greshka-smyatane"></p>
         <div class="deystviya">
@@ -902,6 +975,8 @@ export function zakachiSmetki(
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
   zakachiKoefitsientite(koren, prerisuvay);
+  // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
+  zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
 
   // ЦВЕТОВЕТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · т.9) · полето свети, ДОКАТО се пише.
   // Доставчикът е текстово поле, което човек пише на ръка и в което най-често
@@ -1029,6 +1104,8 @@ export function zakachiSmetki(
     const stavka = potokKlyuch === 'fakturi' ? Number(danni.get('stavka')) : 0;
 
     buton.disabled = true;
+    // Брои се ПРЕДИ записа: после речникът вече ги съдържа (ADR-040).
+    const novite = novoteVSpisatsite(koren, rechnitsite(RECHNIK_RAZHOD));
     try {
       await k.deystviya.zapishiRazhod(
         `R:${crypto.randomUUID()}`,
@@ -1046,7 +1123,10 @@ export function zakachiSmetki(
         { opId: opIdRazhod },
       );
       opIdRazhod = crypto.randomUUID();
-      k.vest('dobre', 'Разходът е записан. Входящият ДДС влезе в акумулатора си.');
+      k.vest(
+        'dobre',
+        `Разходът е записан. Входящият ДДС влезе в акумулатора си.${sDumiZaNovite(novite)}`,
+      );
       await prerisuvay();
     } catch (err) {
       greshka.textContent = dumiZaGreshka(err);

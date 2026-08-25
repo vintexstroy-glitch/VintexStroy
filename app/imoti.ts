@@ -20,7 +20,36 @@ import { poImot } from '../src/ogledalo/izgledi.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
+import {
+  menyuOtZhivi,
+  novoteVSpisatsite,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
 import type { Konteks } from './ekranite.js';
+
+/** Ключът на речниците на този екран · формата на наема е една. */
+const RECHNIK_NAEM = 'naem';
+
+/**
+ * РЕЧНИКЪТ НА НАЕМАТЕЛИТЕ · изведен от живите наеми, без ново събитие.
+ *
+ * Прекратените наеми ВЛИЗАТ нарочно: същият наемател често се връща, а името
+ * му не престава да съществува, когато договорът свърши (правило 1, приложено
+ * към речника — старото не се трие).
+ */
+function menyutoNaNaemite(o: Ogledalo): Menyu {
+  return menyuOtZhivi(
+    'naemetel',
+    'Наемател',
+    [...o.naemi.values()].map((n) => n.naemetel),
+  );
+}
 
 export interface SastoyanieNaEkrana {
   readonly ogledalo: Ogledalo;
@@ -106,6 +135,9 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const naemi = [...ogledalo.naemi.values()].sort(
     (a, b) => Number(a.prekraten) - Number(b.prekraten) || a.naemetel.localeCompare(b.naemetel),
   );
+  // Речникът се пълни при РИСУВАНЕ (тук е Огледалото) и се чете при ЗАКАЧАНЕ
+  // (там е DOM-ът) — двете не могат да се слеят (ADR-040).
+  zapomniRechnitsite(RECHNIK_NAEM, new Map([['naemetel', menyutoNaNaemite(ogledalo)]]));
   const naemiPoImot = new Map<string, Naem[]>();
   for (const naem of naemi) {
     const spisak = naemiPoImot.get(naem.imotId) ?? [];
@@ -226,11 +258,28 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
                 .join('')}
             </select>
           </div>
-          <div class="pole">
-            <label for="naem-naemetel">Наемател</label>
-            <input translate="no" id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off"
-                   value="${popravyanNaem ? ekraniraj(popravyanNaem.naemetel) : ''}">
-          </div>
+          ${
+            /**
+             * НАЕМАТЕЛЯТ · живо меню от Журнала (ADR-042).
+             *
+             * Дотук беше голо текстово поле — тоест речник НЯМАШЕ, а човекът
+             * пишеше едно и също име по петдесет пъти. „Петров ЕООД" и
+             * „ПЕТРОВ еоод" ставаха двама наематели, които после не се събират
+             * в нито един изглед — и това не се вижда, докато някой не потърси.
+             *
+             * Менюто ОПИСВА (системата не смята върху името), значи расте
+             * свободно от полето: „нищо не спира човека".
+             */
+            poleSMenyu({
+              id: 'naem-naemetel',
+              ime: 'naemetel',
+              etiket: 'Наемател',
+              menyu: menyutoNaNaemite(ogledalo),
+              stoynost: popravyanNaem ? popravyanNaem.naemetel : '',
+              zadalzhitelno: true,
+              mestodarzhatel: 'име или дружество',
+            })
+          }
           <div class="pole">
             <label for="naem-telefon">Телефон (по избор)</label>
             <input translate="no" id="naem-telefon" name="telefon" placeholder="0888 123 456" autocomplete="off"
@@ -246,19 +295,21 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             <input translate="no" id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
                    value="${popravyanNaem ? pishiVPole(popravyanNaem.naem_st) : ''}">
           </div>
-          <div class="pole">
-            <label for="naem-sektor">Сектор — определя ставката</label>
-            <select translate="no" id="naem-sektor" name="sektor" required>
-              ${sektoriNaNaem()
-                .map(
-                  (a) =>
-                    `<option value="${ekraniraj(a.klyuch)}"${
-                      popravyanNaem?.sektor === a.klyuch ? ' selected' : ''
-                    }>${ekraniraj(a.sektor)} · ${a.stavka}%</option>`,
-                )
-                .join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'naem-sektor',
+            ime: 'sektor',
+            etiket: 'Сектор — определя ставката',
+            spisak: 'sektor',
+            zadalzhitelno: true,
+            opcii: sektoriNaNaem()
+              .map(
+                (a) =>
+                  `<option value="${ekraniraj(a.klyuch)}"${
+                    popravyanNaem?.sektor === a.klyuch ? ' selected' : ''
+                  }>${ekraniraj(a.sektor)} · ${a.stavka}%</option>`,
+              )
+              .join(''),
+          })}
           <div class="pole">
             <label for="naem-depozit">Депозит, € (по избор)</label>
             <input translate="no" id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
@@ -489,6 +540,9 @@ function opisi(i: Imot): string {
 }
 
 export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
+  // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · наемателят е живо поле.
+  zakachiMenyuta(koren, rechnitsite(RECHNIK_NAEM));
+
   // ── имот: нов или поправен ───────────────────────────────────────────────
   const formaImot = koren.querySelector<HTMLFormElement>('#forma-imot');
   formaImot?.addEventListener('submit', async (sabitie) => {
@@ -564,6 +618,9 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     }
 
     buton.disabled = true;
+    // БРОИ СЕ ПРЕДИ ЗАПИСА: после речникът вече ги съдържа и отговорът би бил
+    // „нищо ново". Преди записа това би било въпрос; след него е следа (ADR-040).
+    const novite = novoteVSpisatsite(koren, rechnitsite(RECHNIK_NAEM));
     try {
       if (rezhim.kakvo === 'popravi-naem') {
         const star = (await k.deystviya.ogledalo()).naemi.get(rezhim.id)!;
@@ -578,7 +635,10 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         );
         opIdDeystvie = novOpId();
         rezhim = { kakvo: 'nov' };
-        k.vest('dobre', 'Поправката е записана. Новата сума важи за бъдещите начисления.');
+        k.vest(
+          'dobre',
+          `Поправката е записана. Новата сума важи за бъдещите начисления.${sDumiZaNovite(novite)}`,
+        );
       } else {
         await k.deystviya.dobaviNaem(
           `N:${crypto.randomUUID()}`,
@@ -591,7 +651,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         );
         opIdNaem = novOpId();
         formaNaem.reset();
-        k.vest('dobre', 'Наемът е записан в Журнала.');
+        k.vest('dobre', `Наемът е записан в Журнала.${sDumiZaNovite(novite)}`);
       }
       await prerisuvay();
     } catch (e) {

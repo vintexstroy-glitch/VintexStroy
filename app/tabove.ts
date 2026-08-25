@@ -172,7 +172,7 @@ export function narisuvayTabove(o: Ogledalo, dnes: string): string {
       <div class="poleta tesni">
         <div class="pole">
           <label for="izbor-tab">Кой преглеждам</label>
-          <select id="izbor-tab">
+          <select translate="no" id="izbor-tab">
             <option value="">— избери —</option>
             <optgroup label="Стационарни · допълват екран">
               ${STATSIONARNI.map(
@@ -252,7 +252,7 @@ function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
       <span>${
         r.otkade === 'vgradena'
           ? `<b>${r.nomer}</b>`
-          : `<input data-nomer-vhod="${ekraniraj(r.tablitsa)}·${r.indeks}" value="${r.nomer || ''}"
+          : `<input translate="no" data-nomer-vhod="${ekraniraj(r.tablitsa)}·${r.indeks}" value="${r.nomer || ''}"
               inputmode="numeric" placeholder="—" aria-label="номер на връзка" class="tesen">`
       }</span>
       <span>${ekraniraj(r.tablitsa)}${r.otkade === 'vgradena' ? '' : ' · хедър'}</span>

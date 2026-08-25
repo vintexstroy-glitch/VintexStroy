@@ -103,7 +103,7 @@ export function pokanaZaLichno(imeyl: string, myasto = ''): string {
         <div class="poleta">
           <label class="pole">
             <span>Място в твоя драйв</span>
-            <input type="text" id="lichno-myasto" value="${ekraniraj(myasto)}" placeholder="MasterBook/Лично">
+            <input translate="no" type="text" id="lichno-myasto" value="${ekraniraj(myasto)}" placeholder="MasterBook/Лично">
           </label>
         </div>
         <p class="drebno"><b>Личното се активира с място.</b> Там ще живее и оттам се споделя;
@@ -234,7 +234,7 @@ function sektsiyaPrenos(lichno: Ogledalo, sluzhebno: Ogledalo): string {
             <div class="poleta">
               <label class="pole">
                 <span>Защо се прехвърля</span>
-                <input type="text" id="prenos-prichina" value="${ekraniraj(prichinaZaPrenos)}" placeholder="това е мое, не на фирмата">
+                <input translate="no" type="text" id="prenos-prichina" value="${ekraniraj(prichinaZaPrenos)}" placeholder="това е мое, не на фирмата">
               </label>
             </div>
             <div class="deystviya">
@@ -294,24 +294,24 @@ function sektsiyaDostapi(o: Ogledalo): string {
       <div class="poleta">
         <label class="pole">
           <span>Имейл</span>
-          <input type="email" id="dostap-imeyl" placeholder="zhena@example.bg">
+          <input translate="no" type="email" id="dostap-imeyl" placeholder="zhena@example.bg">
         </label>
         <label class="pole">
           <span>Кой е</span>
-          <select id="dostap-kakav">
+          <select translate="no" id="dostap-kakav">
             ${KAKAV.map((x) => `<option value="${x}">${ekraniraj(IMENA_NA_KAKAV[x])}</option>`).join('')}
           </select>
         </label>
         <label class="pole">
           <span>Може</span>
-          <select id="dostap-rolya">
+          <select translate="no" id="dostap-rolya">
             <option value="nablyudatel">${ekraniraj(IMENA_NA_ROLITE['nablyudatel'])}</option>
             <option value="redaktor">${ekraniraj(IMENA_NA_ROLITE['redaktor'])}</option>
           </select>
         </label>
         <label class="pole">
           <span>Какво</span>
-          <select id="dostap-kakvo">
+          <select translate="no" id="dostap-kakvo">
             ${VIDOVE_SPODELYANE.map(
               (x) => `<option value="${x}"${x === 'dvete' ? ' selected' : ''}>${ekraniraj(IMENA_NA_SPODELYANETO[x])}</option>`,
             ).join('')}

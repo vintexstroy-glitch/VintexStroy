@@ -125,11 +125,11 @@ export function sektsiyaKalkulator(): string {
       <div class="poleta">
         <label class="pole">
           <span>Базова цена · €/м²</span>
-          <input type="text" id="kalk-baza" value="${pishiCyalo(nastroyki.baza_st.apartament)}" inputmode="decimal">
+          <input translate="no" type="text" id="kalk-baza" value="${pishiCyalo(nastroyki.baza_st.apartament)}" inputmode="decimal">
         </label>
         <label class="pole">
           <span>Доходност · клас</span>
-          <select id="kalk-klas">
+          <select translate="no" id="kalk-klas">
             ${KLASOVE.map(
               (x) =>
                 `<option value="${x.klyuch}"${x.klyuch === nastroyki.klas ? ' selected' : ''}>${ekraniraj(x.ime)} · ${vProtsent(x.bt)}</option>`,
@@ -138,7 +138,7 @@ export function sektsiyaKalkulator(): string {
         </label>
         <label class="pole tyasno">
           <span>Доходност · %</span>
-          <input type="text" id="kalk-dohodnost" value="${vProtsent(nastroyki.dohodnost_bt).replace(' %', '')}" inputmode="decimal">
+          <input translate="no" type="text" id="kalk-dohodnost" value="${vProtsent(nastroyki.dohodnost_bt).replace(' %', '')}" inputmode="decimal">
         </label>
       </div>
       <p class="drebno" translate="no">${ekraniraj(k.zashto)} Скалата на занаята върви от ${vProtsent(KLASOVE[1]!.ot_bt)} до ${vProtsent(KLASOVE[3]!.do_bt)}; ${ekraniraj(KLASOVE[0]!.ime)} стои под нея, и това е информация, не грешка.</p>
@@ -190,7 +190,7 @@ function redNaKoefitsient(klyuch: KlyuchKoefitsient, r: ReturnType<typeof razbiv
     <div class="red kalk-koef" translate="no">
       <span class="kletka"><b>${ekraniraj(koef.ime)}</b></span>
       <span>
-        <select data-koef="${klyuch}">
+        <select translate="no" data-koef="${klyuch}">
           ${koef.stapki
             .map(
               (x) =>

@@ -7,7 +7,15 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { menyuOtZhivi, poleSMenyu, sDumiZaNovite } from '../app/menyu.js';
+import {
+  menyuOtZhivi,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zapomniRechnitsite,
+  ZAKLYUCHENITE,
+} from '../app/menyu.js';
 import { predlagani, sastoyanieNaPoleto, veche } from '../src/domein/padashti-menyuta.js';
 
 describe('речникът се вади от ЖИВИТЕ записи', () => {
@@ -156,5 +164,120 @@ describe('законът върху жив речник', () => {
     expect(razpoznat.shteDobavi).toBe(nerazpoznat.shteDobavi); // а записът — НЕ
     expect(nerazpoznat.shteDobavi).toBe(false);
     expect(nerazpoznat.priema).toBe(true);
+  });
+});
+
+/**
+ * ═══ ВТОРОТО ЛИЦЕ НА ЗАКОНА · ЗАКЛЮЧЕНИТЕ СПИСЪЦИ (ADR-042) ═══
+ *
+ * „Заключените растат само от Настройки" значи, че полето остава ИЗБОР — не
+ * че става свободно поле с отказ. Тук се пази точно това: разметката е
+ * `select`, думата е ЧЕСТНА, и нито един заключен списък не обещава място,
+ * от което не расте.
+ */
+describe('заключеното поле · избор, катинар и причина', () => {
+  const html = poleSIzbor({
+    id: 'razhod-potok',
+    ime: 'potok',
+    etiket: 'Поток',
+    spisak: 'potok',
+    zadalzhitelno: true,
+    opcii: '<option value="zaplati">Заплати</option>',
+  });
+
+  it('е SELECT, не текстово поле · непозната стойност не може да се появи', () => {
+    expect(html).toContain('<select translate="no" id="razhod-potok"');
+    expect(html).not.toContain('<datalist');
+    expect(html).not.toContain('list=');
+  });
+
+  it('носи КАТИНАРА и причината, с която се заключва', () => {
+    expect(html).toContain('🔒');
+    expect(html).toContain(ZAKLYUCHENITE['potok']!.kazva);
+    expect(html).toContain('data-zaklyuchen="potok"');
+  });
+
+  it('данните не се превеждат · правило 19 важи и за избора', () => {
+    expect(html).toContain('translate="no"');
+  });
+
+  it('`name` пада на id-то, когато не е подадено', () => {
+    const bez = poleSIzbor({ id: 'kade', etiket: 'Джоб', spisak: 'dzhob', opcii: '' });
+    expect(bez).toContain('name="kade"');
+  });
+
+  it('непознат списък не чупи полето · казва общото', () => {
+    const chuzhd = poleSIzbor({ id: 'x', etiket: 'Х', spisak: 'nyama-takav', opcii: '' });
+    expect(chuzhd).toContain('🔒');
+    expect(chuzhd).toContain('заключен');
+  });
+});
+
+describe('думата на заключените е ЧЕСТНА, не заета от закона', () => {
+  it('всеки заключен списък казва СВОЯТА причина', () => {
+    for (const z of Object.values(ZAKLYUCHENITE)) {
+      expect(z.kazva.trim()).not.toBe('');
+      expect(z.ime.trim()).not.toBe('');
+    }
+  });
+
+  /**
+   * НАЙ-ВАЖНИЯТ ред в този файл. Законът казва „растат само от Настройки", но
+   * НИТО ЕДИН от днешните заключени списъци не расте оттам: потоците са
+   * акумулатори, секторите и ставките са членове от ЗДДС, посоката е фиксиран
+   * модел. Надпис „от Настройки" върху такъв списък е ЕКРАН, КОЙТО ЛЪЖЕ —
+   * най-скъпата находка на сверката от 24.08.
+   *
+   * Тестът пада нарочно в деня, в който някой списък наистина порасне от
+   * Настройки: тогава думата се сменя ЗАЕДНО с механизма, не преди него.
+   */
+  it('петте заключени списъка стоят ПОИМЕННО · екраните ги викат по ключ', () => {
+    // Сгрешен ключ в екрана не хвърля — полето казва общото „заключен". Тихо
+    // и по-бедно, значи се пази с изброяване, а не с надежда.
+    expect(Object.keys(ZAKLYUCHENITE).sort()).toEqual(
+      ['dzhob', 'nachin', 'posoka', 'potok', 'sektor', 'stavka'].sort(),
+    );
+  });
+
+  it('никоя дума не обещава Настройки, докато списъкът не расте оттам', () => {
+    for (const z of Object.values(ZAKLYUCHENITE)) {
+      expect(z.kazva).not.toContain('Настройки');
+    }
+  });
+});
+
+describe('речниците по ключ · личното и служебното не се смесват', () => {
+  it('непознат ключ дава ПРАЗНА карта, не грешка', () => {
+    expect(rechnitsite('нямагоняма').size).toBe(0);
+  });
+
+  it('два ключа държат РАЗЛИЧНИ речници', () => {
+    zapomniRechnitsite('sluzhebno', new Map([['koy', menyuOtZhivi('koy', 'Кой', ['ЛИДЛ'])]]));
+    zapomniRechnitsite('lichno', new Map([['koy', menyuOtZhivi('koy', 'Кой', ['Кауфланд'])]]));
+    expect(predlagani(rechnitsite('sluzhebno').get('koy')!).map((s) => s.tekst)).toEqual(['ЛИДЛ']);
+    expect(predlagani(rechnitsite('lichno').get('koy')!).map((s) => s.tekst)).toEqual(['Кауфланд']);
+  });
+});
+
+describe('живото поле · правило 19 стигна и до него', () => {
+  it('входът носи `translate="no"` · името на наемател не се превежда', () => {
+    // Пропуснато при ADR-040 и намерено чак когато менютата излязоха от
+    // Управление: §17 на прохода пазеше само екран Имоти.
+    const m = menyuOtZhivi('naemetel', 'Наемател', ['Петров ЕООД']);
+    expect(poleSMenyu({ id: 'naem-naemetel', etiket: 'Наемател', menyu: m })).toContain(
+      'translate="no"',
+    );
+  });
+
+  it('редът с проблема стои ВЪТРЕ в полето', () => {
+    const m = menyuOtZhivi('dostavchik', 'Доставчик', []);
+    const html = poleSMenyu({
+      id: 'razhod-dostavchik',
+      etiket: 'Доставчик',
+      menyu: m,
+      pod: '<p class="kazva-problem" id="kazva-dostavchik"></p>',
+    });
+    const krayNaPoleto = html.lastIndexOf('</div>');
+    expect(html.indexOf('kazva-dostavchik')).toBeLessThan(krayNaPoleto);
   });
 });

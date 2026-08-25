@@ -54,6 +54,12 @@ export interface PoleSMenyu {
   readonly stoynost?: string;
   readonly zadalzhitelno?: boolean;
   readonly mestodarzhatel?: string;
+  /**
+   * Готов HTML ПОД полето, вътре в неговия блок · за реда, който казва проблема
+   * (ADR-032). Извън блока той се откача от полето си при първото пренареждане
+   * на решетката и почва да сочи съседа.
+   */
+  readonly pod?: string;
 }
 
 /**
@@ -84,6 +90,32 @@ export function menyuOtZhivi(
   return Object.freeze({ klyuch, ime, vid, stoynosti: Object.freeze(podredeni) });
 }
 
+/**
+ * РЕЧНИЦИТЕ НА ЕДНА ФОРМА · по КЛЮЧ, и с ЕДИН дом (правило 17).
+ *
+ * Пълнят се при РИСУВАНЕ (там е Огледалото) и се четат при ЗАКАЧАНЕ (там е
+ * DOM-ът). Двете не могат да се слеят: закачането няма Огледало и не бива да
+ * го чака — то е асинхронно, а закачането става в същия кадър.
+ *
+ * Живееше в `gant.ts`, докато менютата бяха само там. Щом Имоти и Сметки
+ * поискаха същото, преписването на картата в трети и четвърти модул щеше да е
+ * точно онова, което правило 17 гони: три места, които се разминават при
+ * първата поправка.
+ *
+ * По КЛЮЧ, а не модулно: личната форма (`l-`) и служебната (`d-`) имат
+ * РАЗЛИЧНИ речници — служебните дела и личните не се смесват (И98).
+ */
+const RECHNITSI = new Map<string, ReadonlyMap<string, Menyu>>();
+
+export function zapomniRechnitsite(klyuch: string, menyuta: ReadonlyMap<string, Menyu>): void {
+  RECHNITSI.set(klyuch, menyuta);
+}
+
+/** Празна карта при непознат ключ — липсващ речник не бива да чупи закачането. */
+export function rechnitsite(klyuch: string): ReadonlyMap<string, Menyu> {
+  return RECHNITSI.get(klyuch) ?? new Map<string, Menyu>();
+}
+
 /** Ключът, под който полето помни какво е НАТИСНАТО от списъка. */
 const IZBRANO = 'izbrano';
 
@@ -100,6 +132,7 @@ export function poleSMenyu(p: PoleSMenyu): string {
     <div class="pole">
       <label for="${ekraniraj(p.id)}">${ekraniraj(p.etiket)}</label>
       <input
+        translate="no"
         id="${ekraniraj(p.id)}"
         name="${ekraniraj(p.ime ?? p.id)}"
         list="${ekraniraj(spisak)}"
@@ -116,6 +149,110 @@ export function poleSMenyu(p: PoleSMenyu): string {
           .join('')}
       </datalist>
       <span class="znak-menyu" data-znak-za="${ekraniraj(p.id)}" aria-live="polite"></span>
+      ${p.pod ?? ''}
+    </div>`;
+}
+
+/**
+ * ═══ ВТОРОТО ЛИЦЕ НА ЗАКОНА · ЗАКЛЮЧЕНИТЕ СПИСЪЦИ (ADR-042) ═══
+ *
+ * Негови думи, същият закон: „заключените растат само от Настройки". Тоест
+ * **заключеното меню не става свободно поле** — то си остава ИЗБОР. Изворите
+ * го казват и от другата страна: „Създаваме един сектор от колони и бутони с
+ * падащи менюта, **които са без възможност да пишеш, а само избираш**"
+ * (`izvori/03` §6).
+ *
+ * Затова тук НЕ се прави `datalist` за поток, сектор, ставка и начин. `select`
+ * е строго по-безопасен от текстово поле с отказ: непозната стойност просто не
+ * може да се появи, вместо да се появи и после да бъде отказана.
+ *
+ * КАКВО ВСЕ ПАК ЛИПСВАШЕ: думата. Човекът стоеше пред четири полета, в три от
+ * които може да пише свое, а в четвъртото — не, и нищо на екрана не казваше
+ * защо. „Заключено ≠ счупено" е същата грешка, която правило 15 гони при
+ * „изключено ≠ липсващо".
+ *
+ * ДУМАТА Е ЧЕСТНА, НЕ ЗАЕТА. Изкушението беше да се пише навсякъде „расте от
+ * Настройки", защото така казва законът — но потоците, секторите и ставките
+ * НЕ растат от Настройки днес: те са акумулатори и членове от закон. Надпис
+ * „расте от Настройки" върху списък, който не расте оттам, е точно онова, за
+ * което `docs/09` вече плати: **екранът лъжеше**. Затова всеки заключен списък
+ * казва СВОЯТА причина, и тя се пази на едно място.
+ */
+export interface ZaklyuchenSpisak {
+  readonly klyuch: string;
+  readonly ime: string;
+  /** КОЙ го определя · кратко изречение, което стои на екрана до полето */
+  readonly kazva: string;
+}
+
+export const ZAKLYUCHENITE: Readonly<Record<string, ZaklyuchenSpisak>> = Object.freeze({
+  potok: Object.freeze({
+    klyuch: 'potok',
+    ime: 'Поток',
+    kazva: 'потоците са акумулаторите на Сметки',
+  }),
+  sektor: Object.freeze({
+    klyuch: 'sektor',
+    ime: 'Сектор',
+    kazva: 'секторите и ставките им са от ЗДДС',
+  }),
+  stavka: Object.freeze({
+    klyuch: 'stavka',
+    ime: 'Ставка',
+    kazva: '0 · 9 · 20 % по ЗДДС',
+  }),
+  // НАЙ-ВАЖНИЯТ от четирите, и най-невинният на вид: `smetki.ts` дели КЕШ от
+  // БАНКА по този низ, и то с `!== 'в брой'`. Свободна стойност „карта" не би
+  // счупила нищо шумно — би паднала ТИХО в БАНКА и би разминала два акумулатора.
+  nachin: Object.freeze({
+    klyuch: 'nachin',
+    ime: 'Начин',
+    kazva: 'КЕШ и БАНКА се делят по него',
+  }),
+  // Негови думи, 11.08: „Приходи и Разходи са фиксирани математически модели и
+  // не се махат… забрана да триеш Приходи и Разходи от архива — това е Закон."
+  posoka: Object.freeze({
+    klyuch: 'posoka',
+    ime: 'Посока',
+    kazva: 'приход и разход са фиксирани модели',
+  }),
+  dzhob: Object.freeze({
+    klyuch: 'dzhob',
+    ime: 'Джоб',
+    kazva: 'джобовете са два — банка и трезор',
+  }),
+});
+
+export interface PoleSIzbor {
+  readonly id: string;
+  /** име на полето във формата (`name`) · по подразбиране същото като id-то */
+  readonly ime?: string;
+  readonly etiket: string;
+  /** ключ в `ZAKLYUCHENITE` · оттам идва думата */
+  readonly spisak: keyof typeof ZAKLYUCHENITE | string;
+  /** готовите `<option>`-и · стойностите живеят в домейна, не тук */
+  readonly opcii: string;
+  readonly zadalzhitelno?: boolean;
+  readonly izklyuchen?: boolean;
+}
+
+/**
+ * Рисува ЗАКЛЮЧЕНО поле · избор, катинар и причината, с която се заключва.
+ *
+ * Знакът носи същия клас като при живото меню (`znak-menyu`), защото двете са
+ * едно семейство: човекът вижда или „＋ нова стойност", или „🔒" — и никога
+ * поле, което мълчи за това кое от двете е.
+ */
+export function poleSIzbor(p: PoleSIzbor): string {
+  const opis = ZAKLYUCHENITE[p.spisak];
+  const kazva = opis ? opis.kazva : 'списъкът е заключен';
+  return `
+    <div class="pole">
+      <label for="${ekraniraj(p.id)}">${ekraniraj(p.etiket)}</label>
+      <select translate="no" id="${ekraniraj(p.id)}" name="${ekraniraj(p.ime ?? p.id)}"${
+        p.zadalzhitelno ? ' required' : ''
+      }${p.izklyuchen ? ' disabled' : ''}>${p.opcii}</select>
+      <span class="znak-menyu" data-zaklyuchen="${ekraniraj(p.spisak)}">🔒 ${ekraniraj(kazva)}</span>
     </div>`;
 }
 
