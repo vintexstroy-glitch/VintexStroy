@@ -31,8 +31,8 @@ import {
 } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
-import { duljimo, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { vnesiZhurnal } from '../src/domein/vnos.js';
+import { duljimo, fold, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
+import { pregledayIznos, vnesiZhurnal } from '../src/domein/vnos.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
@@ -66,10 +66,44 @@ import {
   svediImeyl,
 } from '../src/domein/akaunt.js';
 import {
+  eStopanin,
   kakvoSStopanina,
+  mozheDaVzemeZhurnala,
+  otpechatakNaTelefon,
   OTKRIVASHTO_SABITIE,
+  poslednite2,
   rolyataNa,
 } from '../src/domein/stopanin.js';
+
+/**
+ * ПОКАЗАЛЕЦЪТ КЪМ ВЪРНАТ ЖУРНАЛ · местен, като запомнения вход (И100).
+ *
+ * Живее в `localStorage`, не в Журнала: това е удобство на ТОЗИ браузър — къде
+ * да се погледне — а не факт от историята. Може и да го няма; тогава човекът
+ * връща архива пак, което е скучно, но безопасно. Изтрие ли се хранилището,
+ * изчезва и самият Журнал, тъй че показалецът е точно толкова траен, колкото
+ * данните, които сочи.
+ */
+const KLYUCH_NA_POKAZATELYA = 'masterbook:vrasten';
+
+function chetiPokazatelya(imeyl: string): string | null {
+  try {
+    const karta = JSON.parse(localStorage.getItem(KLYUCH_NA_POKAZATELYA) ?? '{}') as Record<string, string>;
+    return karta[svediImeyl(imeyl)] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function zapishiPokazatelya(imeyl: string, naematel: string): void {
+  try {
+    const karta = JSON.parse(localStorage.getItem(KLYUCH_NA_POKAZATELYA) ?? '{}') as Record<string, string>;
+    karta[svediImeyl(imeyl)] = naematel;
+    localStorage.setItem(KLYUCH_NA_POKAZATELYA, JSON.stringify(karta));
+  } catch {
+    // Частен прозорец · връщането пак стана, само не се помни за следващия път.
+  }
+}
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { zabraviIzbora } from './lichno.js';
 import { dostapenLiE, EKRANI, type Konteks, type KoyEkran } from './ekranite.js';
@@ -262,10 +296,26 @@ async function trugvay(): Promise<void> {
   // Постоянство: изтриваемото хранилище е дупката №1 за „нула загуба".
   hranilishte = await osiguriHranilishte();
 
+  /**
+   * ВЪРНАТИЯТ ЖУРНАЛ · показалец, който НЕ дава право (И100 · ADR-044).
+   *
+   * След връщане на архив с запасния контакт Журналът си остава под СТАРИЯ
+   * ключ — веригата не се преписва (правило 1 · `naematel` е в хеша). Затова
+   * тук се помни само КЪДЕ да се погледне, а дали този човек има право върху
+   * него, решава самата верига: чете се и се проверява, че сегашният ѝ
+   * стопанин е влезлият. Не е ли — показалецът се пренебрегва.
+   */
+  const posochen = chetiPokazatelya(kojSam.imeyl);
+  let vrasten: string | undefined;
+  if (posochen) {
+    const negovite = await dnevnik.chetiVsichki(posochen);
+    if (negovite.length > 0 && eStopanin(kojSam.imeyl, fold(negovite))) vrasten = posochen;
+  }
+
   // КОЙ ЖУРНАЛ · първо се пита има ли вече такъв от Алфа, после кой е влязъл.
   // Обратният ред би оставил първия Журнал невидим в мига, в който истинският
   // вход тръгне: данните му стоят на диска, но под ключ, който никой не пита.
-  akaunt = koyZhurnal(kojSam, (await dnevnik.chetiVsichki(KLYUCH_OT_ALFA)).length > 0);
+  akaunt = koyZhurnal(kojSam, (await dnevnik.chetiVsichki(KLYUCH_OT_ALFA)).length > 0, vrasten);
 
   // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
   const sabitiyaVNachaloto = await dnevnik.chetiVsichki(akaunt);
@@ -353,6 +403,113 @@ async function trugvay(): Promise<void> {
       },
       { opId: `stopanin:${naematel}` },
     );
+  }
+
+  /**
+   * ВПИСВАНЕ НА ЗАПАСНИЯ КОНТАКТ · пътят обратно (И100 · ADR-044).
+   *
+   * Телефонът се превръща в ОТПЕЧАТЪК тук, преди да тръгне към действието:
+   * самият номер не бива да стигне до Журнала, а оттам — до изнесения файл.
+   */
+  function zakachiZapasniya(koren: HTMLElement): void {
+    koren.querySelector<HTMLButtonElement>('#zapishi-zapasen')?.addEventListener('click', async (e) => {
+      const buton = e.target as HTMLButtonElement;
+      const greshka = koren.querySelector<HTMLElement>('#greshka-zapasen');
+      const imeyl = koren.querySelector<HTMLInputElement>('#zapasen-imeyl')?.value ?? '';
+      const telefon = koren.querySelector<HTMLInputElement>('#zapasen-telefon')?.value ?? '';
+      if (greshka) greshka.textContent = '';
+      buton.disabled = true;
+      try {
+        await deystviya.zapishiZapasenKontakt(
+          {
+            imeyl: svediImeyl(imeyl),
+            telefonOtpechatak: await otpechatakNaTelefon(telefon, sha256Web),
+            poslednite: poslednite2(telefon),
+          },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest('dobre', 'Запасният контакт е вписан. Пътят обратно вече съществува.');
+        await prerisuvay();
+      } catch (err) {
+        if (greshka) greshka.textContent = dumiZaGreshka(err);
+      } finally {
+        buton.disabled = false;
+      }
+    });
+  }
+
+  /**
+   * ВРЪЩАНЕ НА АРХИВ ОТ ДРУГ ИМЕЙЛ (И100 · ADR-044) · четирите крачки.
+   *
+   *   1. файлът се ПРЕГЛЕЖДА, без да се пише — чий е и какъв запасен носи;
+   *   2. доказателството се проверява СРЕЩУ ФАЙЛА, не срещу нещо тукашно;
+   *   3. веригата влиза под СВОЯ ключ, непокътната — `naematel` е в хеша и
+   *      преписването ѝ би я счупило (правило 4);
+   *   4. чак тогава се дописва смяната на Стопанина — в стария Журнал, със
+   *      свой автор и своя причина.
+   *
+   * Ако някоя крачка откаже, следващите не се правят. Файлът, който не докаже
+   * правото си, не влиза ИЗОБЩО — иначе устройството щеше да се пълни с чужди
+   * Журнали, които никой не може да отвори.
+   */
+  function zakachiVrashtaneto(koren: HTMLElement): void {
+    const poleto = koren.querySelector<HTMLInputElement>('#vrashtane-fayl');
+    koren.querySelector<HTMLButtonElement>('#vrashtane-izberi')?.addEventListener('click', () =>
+      poleto?.click(),
+    );
+    poleto?.addEventListener('change', async () => {
+      const izbran = poleto.files?.[0];
+      const greshka = koren.querySelector<HTMLElement>('#greshka-vrashtane');
+      if (greshka) greshka.textContent = '';
+      if (!izbran) return;
+      const telefon = koren.querySelector<HTMLInputElement>('#vrashtane-telefon')?.value ?? '';
+      const prichina = koren.querySelector<HTMLInputElement>('#vrashtane-prichina')?.value ?? '';
+      try {
+        const tekst = await izbran.text();
+        const pregled = pregledayIznos(tekst);
+        const otgovor = mozheDaVzemeZhurnala({
+          imeyl: kojSam.imeyl,
+          telefonOtpechatak: await otpechatakNaTelefon(telefon, sha256Web),
+          o: pregled.ogledalo,
+        });
+        if (!otgovor.mozhe) throw new Error(otgovor.kazva);
+
+        await vnesiZhurnal({
+          vrata: k.vrata,
+          dnevnik: k.dnevnik,
+          naematel: pregled.naematel,
+          actor: kojSam.imeyl,
+          tekst,
+          kogato: new Date().toISOString(),
+        });
+        const staraKniga = new Deystviya({
+          vrata: k.vrata,
+          dnevnik: k.dnevnik,
+          naematel: pregled.naematel,
+          actor: kojSam.imeyl,
+          chasovnik: () => new Date().toISOString(),
+        });
+        await staraKniga.smeniStopanina(
+          {
+            telefonOtpechatak: await otpechatakNaTelefon(telefon, sha256Web),
+            prichina: prichina.trim() || 'върнат архив със запасния контакт',
+          },
+          { opId: crypto.randomUUID() },
+        );
+        zapishiPokazatelya(kojSam.imeyl, pregled.naematel);
+        k.vest(
+          'dobre',
+          `Архивът е върнат: ${pregled.broy} събития под ключ „${pregled.naematel}". ` +
+            'Стопанинът вече си ти. Презареждам, за да се отвори.',
+        );
+        await prerisuvay();
+        location.reload();
+      } catch (err) {
+        if (greshka) greshka.textContent = dumiZaGreshka(err);
+      } finally {
+        poleto.value = '';
+      }
+    });
   }
 
   /**
@@ -499,6 +656,8 @@ async function trugvay(): Promise<void> {
         // включеното. Първото пускане е на самия екран „Лично" — там е полето
         // за мястото, без което личното не тръгва (И99).
         zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
+        zakachiZapasniya(koren);
+        zakachiVrashtaneto(koren);
         koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
           await vhod.izlez();
           // Презареждането е нарочно: следващото тръгване минава по целия път

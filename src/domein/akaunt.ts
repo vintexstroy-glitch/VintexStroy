@@ -78,7 +78,19 @@ export function klyuchNaAkaunta(s: Samolichnost): string {
  *
  * `imaZhurnalOtAlfa` идва отвън (от носителя), защото този модул не чете диск.
  */
-export function koyZhurnal(s: Samolichnost, imaZhurnalOtAlfa: boolean): string {
+export function koyZhurnal(
+  s: Samolichnost,
+  imaZhurnalOtAlfa: boolean,
+  /**
+   * ВЪРНАТИЯТ ЖУРНАЛ · ключът на архив, взет с запасния контакт (И100).
+   *
+   * Подава се САМО след като е ДОКАЗАН: приложението отваря онзи ключ, но
+   * преди това чете веригата му и проверява, че сегашният ѝ стопанин съм аз.
+   * Тоест този довод е ПОКАЗАЛЕЦ, не право — правото стои в самия Журнал.
+   */
+  vrasten?: string,
+): string {
+  if (vrasten) return vrasten;
   return imaZhurnalOtAlfa ? KLYUCH_OT_ALFA : klyuchNaAkaunta(s);
 }
 

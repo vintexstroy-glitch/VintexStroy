@@ -281,6 +281,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         // (ADR-043): доставчикът казва КОЙ си, Журналът — какво можеш в него.
         r.ogledalo.stopanin,
         rolyataNa(r.kojSam.imeyl, r.ogledalo),
+        r.ogledalo.zapasenKontakt,
       ),
     zakachi: (z) => z.zakachiTabloto(),
   },

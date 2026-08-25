@@ -44,7 +44,9 @@ import type {
   PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSpravkaPodadena,
+  PayloadStopaninSmenen,
   PayloadStopaninZapisan,
+  PayloadZapasenKontaktZapisan,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
@@ -181,6 +183,14 @@ export interface Ogledalo {
    * предлага дописването на онзи, който има право на него.
    */
   readonly stopanin: string;
+  /**
+   * ЗАПАСНИЯТ КОНТАКТ · пазителят на връщането (И100 · ADR-044).
+   *
+   * `null` значи „няма вписан" — и това е ВИДИМО състояние, не мълчание:
+   * Журнал без запасен контакт няма път назад, и екранът го казва, вместо да
+   * го открие в деня, в който главният имейл вече го няма.
+   */
+  readonly zapasenKontakt: PayloadZapasenKontaktZapisan | null;
   readonly imoti: ReadonlyMap<string, Imot>;
   readonly naemi: ReadonlyMap<string, Naem>;
   readonly vzemaniya: ReadonlyMap<string, Vzemane>;
@@ -385,6 +395,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   // ПЪРВИЯТ печели: втори „СтопанинЗаписан" Вратата не пуска, но Огледалото
   // не разчита на това — четенето остава вярно и върху пипнат отвън Журнал.
   let stopanin = '';
+  let zapasenKontakt: PayloadZapasenKontaktZapisan | null = null;
   const prava = new Map<string, PravaZaModel>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
@@ -730,6 +741,26 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      /**
+       * ПОСЛЕДНИЯТ ВПИСАН печели · запасният контакт се СМЕНЯ, не се трупа.
+       * Старите записи си остават в Журнала (правило 1) — просто вече не важат.
+       */
+      case 'ЗапасенКонтактЗаписан': {
+        zapasenKontakt = s.payload as unknown as PayloadZapasenKontaktZapisan;
+        break;
+      }
+
+      /**
+       * СМЯНАТА ПРЕЗАПИСВА стопанина · за разлика от записването, където
+       * ПЪРВИЯТ печели. Двете правила гледат едно и също нещо от двете му
+       * страни: откриването става веднъж, връщането — колкото пъти потрябва.
+       */
+      case 'СтопанинСменен': {
+        const p = s.payload as unknown as PayloadStopaninSmenen;
+        stopanin = p.kam;
+        break;
+      }
+
       case 'СправкаПодадена': {
         const p = s.payload as unknown as PayloadSpravkaPodadena;
         spravki.set(p.period, {
@@ -850,6 +881,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
 
   return {
     stopanin,
+    zapasenKontakt,
     imoti,
     naemi,
     vzemaniya,

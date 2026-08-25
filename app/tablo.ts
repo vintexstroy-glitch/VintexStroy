@@ -279,6 +279,111 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     </section>`;
 }
 
+/**
+ * ЗАПАСНИЯТ КОНТАКТ · пътят обратно, вписан ПРЕДВАРИТЕЛНО (И100 · ADR-044).
+ *
+ * Негови думи: „дай възможност за въстановяване на акаунт с добавен свързан за
+ * сигурност… от верификация на вкаран преди това имейл и телефон."
+ *
+ * Показва се САМО на Стопанина, защото само той може да го впише — това е
+ * пътят обратно към НЕГОВИЯ Журнал. На всеки друг картата липсва изцяло:
+ * телефонът, дори с две цифри, е чужд личен данни.
+ *
+ * ЛИПСАТА СЕ КАЗВА. Журнал без запасен контакт няма път назад, и това трябва
+ * да се научи ДНЕС, а не в деня, в който главният имейл вече го няма.
+ */
+function kartaZapasen(
+  tozi: boolean,
+  zapasen: { readonly imeyl: string; readonly poslednite: string } | null,
+): string {
+  if (!tozi) return '';
+  return `
+    <section class="karta" data-sektsiya="zapasen">
+      <div class="dyalglava">
+        <h2>Запасен контакт</h2>
+        <span>пътят обратно · вписва се ПРЕДИ да потрябва</span>
+      </div>
+      ${
+        zapasen
+          ? `<p class="drebno"><b>Вписан:</b> <span translate="no">${ekraniraj(zapasen.imeyl)}</span>
+             · телефон …${ekraniraj(zapasen.poslednite)}. Този имейл може да вземе Журнала,
+             ако твоят вече не отваря — с влизане при доставчика И знание на телефона.</p>`
+          : `<p class="drebno trevoga"><b>Няма вписан запасен контакт.</b> Без него този Журнал
+             няма път назад: изгуби ли се главният имейл, остава само износът, но никой не може
+             да го отвори под друго име.</p>`
+      }
+      <div class="poleta">
+        <div class="pole">
+          <label for="zapasen-imeyl">Запасен имейл</label>
+          <input translate="no" id="zapasen-imeyl" type="email" placeholder="zhena@example.bg" autocomplete="off">
+        </div>
+        <div class="pole">
+          <label for="zapasen-telefon">Телефон</label>
+          <input translate="no" id="zapasen-telefon" placeholder="0888 123 456" autocomplete="off">
+        </div>
+      </div>
+      <p class="greshka" id="greshka-zapasen"></p>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="zapishi-zapasen">${
+          zapasen ? 'Смени запасния контакт' : 'Впиши запасен контакт'
+        }</button>
+        <p class="drebno">
+          Телефонът <b>не влиза в Журнала</b> — влиза само отпечатъкът му, за да не
+          пътува личен номер в изнесения файл. Затова и не се показва: помни се, не се чете.
+          Кодове не се пращат (няма сървър и не се строи): това е <b>честна спирачка</b>,
+          която лови грешния човек, не професионалния крадец.
+        </p>
+      </div>
+    </section>`;
+}
+
+/**
+ * ВРЪЩАНЕ НА АРХИВ ОТ ДРУГ ИМЕЙЛ (И100 · ADR-044).
+ *
+ * Негови думи: „…и да се възстанови архив на друг имейл, от верификация на
+ * вкаран преди това имейл и телефон."
+ *
+ * Стои на ВСЕКИ Табло, не само при беда: човекът, който е загубил главния си
+ * имейл, влиза с ЗАПАСНИЯ и попада в празен Журнал — точно тогава пътят трябва
+ * да е пред очите му, а не скрит зад състояние, което той не може да достигне.
+ *
+ * Нищо тук не се обещава без файл: без износа няма какво да се върне. Затова и
+ * текстът го казва пръв — най-честното напомняне, че износът е задължение.
+ */
+function kartaVrashtane(): string {
+  return `
+    <section class="karta" data-sektsiya="vrashtane">
+      <div class="dyalglava">
+        <h2>Върни архив от друг имейл</h2>
+        <span>когато главният имейл вече не отваря</span>
+      </div>
+      <p class="drebno">
+        Носи износа на стария Журнал и телефона, вписан в него като запасен контакт.
+        Файлът сам казва чий е и кой има право върху него — веригата му пътува с него.
+        <b>Без износ няма връщане:</b> ако главният имейл го няма, а файл няма, няма и какво да се отвори.
+      </p>
+      <div class="poleta">
+        <div class="pole">
+          <label for="vrashtane-telefon">Телефонът, вписан като запасен</label>
+          <input translate="no" id="vrashtane-telefon" placeholder="0888 123 456" autocomplete="off">
+        </div>
+        <div class="pole">
+          <label for="vrashtane-prichina">Защо се връща</label>
+          <input translate="no" id="vrashtane-prichina" placeholder="акаунтът е закрит" autocomplete="off">
+        </div>
+      </div>
+      <p class="greshka" id="greshka-vrashtane"></p>
+      <div class="deystviya">
+        <input translate="no" type="file" id="vrashtane-fayl" accept=".json" hidden>
+        <button type="button" class="vtorichen" id="vrashtane-izberi">Избери износа</button>
+        <p class="drebno">
+          Проверява се <b>номерът</b>, не начинът на изписване. Смяната влиза в стария Журнал
+          като събитие с автор и причина — нищо не се презаписва и нищо не се трие.
+        </p>
+      </div>
+    </section>`;
+}
+
 export function narisuvayTablo(
   koj: Samolichnost,
   izbor: Izbor,
@@ -294,9 +399,12 @@ export function narisuvayTablo(
    */
   stopanin = '',
   rolya: Rolya = koj.rolya,
+  zapasen: { readonly imeyl: string; readonly poslednite: string } | null = null,
 ): string {
   return (
     kartaKoySam(koj, akaunt, stopanin, rolya) +
+    kartaZapasen(stopanin !== '' && stopanin === koj.imeyl, zapasen) +
+    kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
     kartaOtmetki(izbor) +
     kartaSravnenie(izbor, koj)

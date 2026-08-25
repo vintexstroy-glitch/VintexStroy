@@ -25,7 +25,8 @@ import {
   VIDOVE_KREDIT,
 } from './lichni-pari.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
-import { eLichenKlyuch } from './akaunt.js';
+import { eLichenKlyuch, svediImeyl } from './akaunt.js';
+import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -49,7 +50,9 @@ import type {
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
+  PayloadStopaninSmenen,
   PayloadStopaninZapisan,
+  PayloadZapasenKontaktZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
@@ -490,6 +493,68 @@ export class Deystviya {
       ...z,
       expectedRev: 0,
     });
+  }
+
+  /**
+   * ВПИСВА ЗАПАСНИЯ КОНТАКТ · само Стопанинът, и то предварително (И100).
+   *
+   * Проверката „ти ли си Стопанинът" е ТУК, а не при Вратата: Вратата не чете
+   * Огледалото и не бива да го научава. Същият модел като при замразения
+   * период — предусловието живее в действието, записът минава през Вратата.
+   *
+   * Телефонът НЕ влиза: подава се вече сметнатият му отпечатък (`stopanin.ts`).
+   * Действието не смята — то записва, а какво е доказателство, решава домейнът.
+   */
+  async zapishiZapasenKontakt(
+    danni: PayloadZapasenKontaktZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Запасният контакт се вписва само от Стопанина — той е пътят обратно към ' +
+          'НЕГОВИЯ Журнал.',
+      );
+    }
+    if (svediImeyl(danni.imeyl) === svediImeyl(o.stopanin)) {
+      throw new GreshkaStopanin(
+        'Запасният контакт не може да е самият главен имейл: тогава загубата на ' +
+          'единия отнася и другия, а точно това трябва да предотврати.',
+      );
+    }
+    return this.#pusni('ЗапасенКонтактЗаписан', VID.zapasen, danni.imeyl, danni, z);
+  }
+
+  /**
+   * СМЕНЯ СТОПАНИНА · единственият път, и той минава само през запасния (И100).
+   *
+   * Тук се проверява ЦЯЛОТО условие, преди да се пише: кой го иска, съвпада ли
+   * със запасния имейл и знае ли телефона. Отказът носи думи, защото човекът от
+   * другата страна се опитва да си върне собствения Журнал.
+   *
+   * Действието НЕ пита „ти ли си Стопанинът" — точно обратното: то съществува
+   * за случая, в който Стопанинът вече не може да влезе.
+   */
+  async smeniStopanina(
+    danni: { readonly telefonOtpechatak: string; readonly prichina: string },
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const otgovor = mozheDaVzemeZhurnala({
+      imeyl: this.#actor,
+      telefonOtpechatak: danni.telefonOtpechatak,
+      o,
+    });
+    if (!otgovor.mozhe) throw new GreshkaStopanin(otgovor.kazva);
+    if (danni.prichina.trim() === '') {
+      throw new GreshkaStopanin('Смяната на Стопанина иска причина — тя остава в Журнала.');
+    }
+    const payload: PayloadStopaninSmenen = {
+      ot: o.stopanin,
+      kam: svediImeyl(this.#actor),
+      prichina: danni.prichina.trim(),
+    };
+    return this.#pusni('СтопанинСменен', VID.stopanin, payload.kam, payload, z);
   }
 
   /**

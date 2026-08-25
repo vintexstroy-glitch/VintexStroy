@@ -11,6 +11,7 @@
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import type { Dnevnik, Sabitie, Vrata } from '../yadro/index.js';
+import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 
 export class GreshkaVnos extends Error {
   readonly sverki: readonly Sverka[];
@@ -69,6 +70,30 @@ export function prochetiIznos(tekst: string): Sabitie[] {
     }
     return red as Sabitie;
   });
+}
+
+/**
+ * ПРЕГЛЕД НА ИЗНОС · чете КАКВО има вътре, без да пише нито ред (И100).
+ *
+ * Появи се за връщането на архив на друг имейл: преди да се реши къде отива
+ * файлът и има ли право този човек върху него, трябва да се прочете чий е и
+ * какъв запасен контакт носи. Всичко това вече стои В САМИЯ ФАЙЛ — Журналът
+ * носи историята си, включително кой е стопанинът и кой е пазителят му.
+ *
+ * Нищо тук не пише. Затова прегледът е безопасен и за файл, който после ще
+ * бъде отказан.
+ */
+export function pregledayIznos(tekst: string): {
+  readonly naematel: string;
+  readonly broy: number;
+  readonly ogledalo: Ogledalo;
+} {
+  const sabitiya = prochetiIznos(tekst);
+  return {
+    naematel: sabitiya[0]!.naematel,
+    broy: sabitiya.length,
+    ogledalo: fold(sabitiya),
+  };
 }
 
 /**

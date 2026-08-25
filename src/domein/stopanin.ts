@@ -23,7 +23,16 @@
 
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { Rolya } from '../yadro/samolichnost.js';
+import type { Sha256 } from '../yadro/hash.js';
+import type { PayloadZapasenKontaktZapisan } from './sabitiya.js';
 import { svediImeyl } from './akaunt.js';
+
+export class GreshkaStopanin extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaStopanin';
+  }
+}
 
 /**
  * ТИПЪТ НА ОТКРИВАЩОТО СЪБИТИЕ · подава се на Вратата (`parvoto`).
@@ -116,6 +125,104 @@ export function kakvoSStopanina(
   });
 }
 
+/* ═══════════ ЗАПАСНИЯТ КОНТАКТ · пазителят на връщането (И100) ═══════════ */
+
+/**
+ * ПОДРАВНЯВАНЕ НА ТЕЛЕФОН · ЕДИН дом за въпроса „същият номер ли е".
+ *
+ * Един и същи номер се пише по десет начина: „0888 123 456", „+359 888 123
+ * 456", „0888-123-456". Ако сравнението беше буквално, човекът щеше да въведе
+ * СВОЯ номер и да получи отказ — в мига, в който най-малко му трябва.
+ *
+ * Затова остават САМО цифрите, а водещата нула на българския номер се чете
+ * като „+359": двата записа на един и същ номер трябва да дадат един отпечатък.
+ */
+export function podravniTelefon(tekst: string): string {
+  const samoTsifri = tekst.normalize('NFC').replace(/\D/g, '');
+  if (samoTsifri === '') return '';
+  // „0888…" и „359888…" са един номер. Водещата нула пада, кодът се слага.
+  if (samoTsifri.startsWith('0') && !samoTsifri.startsWith('00')) {
+    return `359${samoTsifri.slice(1)}`;
+  }
+  if (samoTsifri.startsWith('00')) return samoTsifri.slice(2);
+  return samoTsifri;
+}
+
+/** Последните две цифри · само за да се познае кой номер е вписан. */
+export function poslednite2(tekst: string): string {
+  return podravniTelefon(tekst).slice(-2);
+}
+
+/**
+ * ОТПЕЧАТЪКЪТ НА ТЕЛЕФОНА · номерът не влиза в Журнала, само следата му.
+ *
+ * Сол няма нарочно: тя би трябвало да се пази някъде, а „някъде" в местно-първа
+ * система значи в същия файл. Кратък номер и без сол се намира с изчерпване от
+ * онзи, който вече държи износа — затова тук не се обещава тайна, а СПИРАЧКА:
+ * телефонът лови грешния човек, не професионалния крадец (ADR-044).
+ */
+export async function otpechatakNaTelefon(tekst: string, sha: Sha256): Promise<string> {
+  const podraven = podravniTelefon(tekst);
+  if (podraven === '') throw new GreshkaStopanin('Празен телефон не става доказателство.');
+  return sha(`telefon:${podraven}`);
+}
+
+/** Живият запасен контакт · `null`, когато няма вписан. */
+export function zapasniyat(o: Ogledalo): PayloadZapasenKontaktZapisan | null {
+  return o.zapasenKontakt;
+}
+
+export interface OtgovorZaSmyana {
+  readonly mozhe: boolean;
+  readonly kazva: string;
+}
+
+/**
+ * МОЖЕ ЛИ ТОЗИ ДА ВЗЕМЕ ЖУРНАЛА · четирите условия, всяко със свои думи.
+ *
+ * Отказът никога не е само `false`: човек, който се опитва да си върне
+ * собствения Журнал, трябва да научи КОЕ не достига — иначе пробва наслуки и
+ * се отказва там, където е бил на една цифра разстояние.
+ *
+ * `telefonOtpechatak` идва СМЕТНАТ отвън, защото смятането е асинхронно, а
+ * решението — не. Така правилото се чете и се тества без нито едно чакане.
+ */
+export function mozheDaVzemeZhurnala(n: {
+  readonly imeyl: string;
+  readonly telefonOtpechatak: string;
+  readonly o: Ogledalo;
+}): OtgovorZaSmyana {
+  const zapasen = zapasniyat(n.o);
+  if (!zapasen) {
+    return Object.freeze({
+      mozhe: false,
+      kazva:
+        'Този Журнал няма вписан запасен контакт. Връщането минава само през нещо, ' +
+        'вписано ПРЕДИ бедата — затова пътят е затворен, а не заобиколен.',
+    });
+  }
+  if (svediImeyl(n.imeyl) !== svediImeyl(zapasen.imeyl)) {
+    return Object.freeze({
+      mozhe: false,
+      kazva:
+        `Запасният контакт на този Журнал е друг имейл. Влез с него — ` +
+        `последните цифри на вписания телефон са …${zapasen.poslednite}.`,
+    });
+  }
+  if (n.telefonOtpechatak !== zapasen.telefonOtpechatak) {
+    return Object.freeze({
+      mozhe: false,
+      kazva:
+        `Телефонът не съвпада с вписания (…${zapasen.poslednite}). ` +
+        'Проверява се номерът, не начинът на изписване.',
+    });
+  }
+  return Object.freeze({
+    mozhe: true,
+    kazva: 'Запасният контакт съвпада — Журналът минава към този имейл.',
+  });
+}
+
 /**
  * ДВЕТЕ ЗАБРАНИ, изписани · за екрана, който иска да ги обясни.
  *
@@ -127,3 +234,17 @@ export const DVETE_ZABRANI: readonly string[] = Object.freeze([
   'Стопанинът не може сам да си отнеме правата.',
   'Стопанинът не може да назначи друг имейл за главен.',
 ]);
+
+/**
+ * И ЕДИНСТВЕНОТО ИЗКЛЮЧЕНИЕ, изписано до тях (И100 · ADR-044).
+ *
+ * Втората забрана не пада. Тя казва „не може да НАЗНАЧИ" — а тук Стопанинът не
+ * назначава никого: той вписва запасен контакт, и смяната после я прави самият
+ * запасен, към СЕБЕ СИ. Разликата е цялата разлика: назначаването е решение в
+ * движение; запасният контакт е решение, взето предварително и на трезва глава.
+ */
+export const EDINSTVENIYAT_PAT = Object.freeze({
+  kakvo: 'Журналът минава към ЗАПАСНИЯ контакт, вписан предварително.',
+  koy: 'Прави го самият запасен имейл, не Стопанинът.',
+  sKakvo: 'С влизане при доставчика И знание на вписания телефон.',
+});
