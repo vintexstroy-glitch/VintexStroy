@@ -60,7 +60,7 @@ import {
   zakachiKalkulator,
 } from './kalkulator.js';
 import { matritsaOtNastroyki } from '../src/kalkulator/nastroyki.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
 let obekti: readonly ProchetenObekt[] = [];

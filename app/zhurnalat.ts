@@ -42,7 +42,7 @@ import {
 } from '../src/domein/zhurnal-ot-tablitsa.js';
 import type { Sabitie } from '../src/yadro/index.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато секцията стои отворена. */
 let predlozheno: Predlozhenie | null = null;

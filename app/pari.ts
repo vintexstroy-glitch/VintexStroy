@@ -26,7 +26,7 @@ import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { butonIstoriya } from './istoriya.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */

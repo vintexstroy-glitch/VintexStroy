@@ -62,7 +62,7 @@ import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();

@@ -20,7 +20,7 @@ import { poImot } from '../src/ogledalo/izgledi.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 export interface SastoyanieNaEkrana {
   readonly ogledalo: Ogledalo;

@@ -31,7 +31,7 @@ import {
 } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
-import { duljimo, prosrocheni } from '../src/ogledalo/ogledalo.js';
+import { duljimo, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { vnesiZhurnal } from '../src/domein/vnos.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -66,123 +66,8 @@ import {
   svediImeyl,
 } from '../src/domein/akaunt.js';
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
-import { narisuvayLichno, pokanaZaLichno, zabraviIzbora, zakachiLichno } from './lichno.js';
-
-/**
- * КЛЮЧЪТ НА АКАУНТА · вече не е закован ред.
- *
- * Решава се веднъж, при тръгване (`koyZhurnal`): ако на това устройство вече
- * има Журнал от Алфа, отваря се ТОЙ — ключът му влиза в хеша и не се преселва
- * (правило 4). Иначе акаунтът тръгва с имейла на влезлия.
- *
- * `let`, защото стойността се знае едва СЛЕД влизането и след първото четене
- * от носителя; дотогава е ключът от Алфа, за да има какво да се прочете.
- */
-let akaunt = KLYUCH_OT_ALFA;
-
-/**
- * КОЙ Е ВЛЯЗЪЛ · вече истински.
- *
- * Дотук тук стоеше ЗАКОВАНА самоличност, която пазеше мястото на входа. Сега
- * влизането минава през Google и `actor` в Журнала е имейл, който доставчикът
- * е потвърдил (ADR-021). Ключът на акаунта идва от същия имейл (ADR-020) —
- * затова истинският вход е и онова, което прави втория акаунт истински.
- *
- * `kojSam` няма начална стойност: празната самоличност е по-честна от
- * измислената. Който чете преди влизането, гърми — вместо да получи име, което
- * никой не е дал.
- */
-const vhod = new VhodSGoogle({
-  kade: () => document.getElementById('butonat-na-google'),
-});
-let kojSam: Samolichnost;
-let izbor: Izbor = chetiIzbor();
-
-export type KoyEkran =
-  | 'imoti'
-  | 'pari'
-  | 'stoynost'
-  | 'gant'
-  | 'smetki'
-  | 'nastroyki'
-  | 'ii'
-  | 'tabove'
-  | 'lichno'
-  | 'tablo';
-
-/**
- * Кой екран от коя възможност зависи. Таблото го няма тук нарочно: то е
- * мястото, където отметките се връщат — не бива да може да се самозаключи.
- */
-const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
-  smetki: 'smetki-dds',
-  nastroyki: 'iztochnitsi',
-  // ИИ-таблото иска ПРАВОТО (планът). Отметката и кранът се показват ВЪТРЕ,
-  // поотделно (правило 15) — иначе изключената отметка би скрила екрана, на
-  // който пише защо е скрит.
-  ii: 'svarzhi-ii',
-};
-
-/**
- * КОИ ПУНКТОВЕ ЗАВИСЯТ ОТ ДОСТЪПА · неговата поръчка, изпълнена поименно.
- *
- * Негови думи (И98): „**прецени ти** кои от основното меню са свързани с
- * достъпа естествено."
- *
- * КРИТЕРИЯТ, който избрах, е ЕДИН: екран се заключва по роля САМО когато носи
- * действие, което **колонното право не може да ограничи** — необратимо,
- * харчещо пари, или менящо ЧУЖДИ числа (И97 т.6). Всичко, което се стеснява с
- * изключен ред или скрита колона (правило 23), НЕ се заключва: скритото пак се
- * смята, а скритият ПУНКТ значи празен екран.
- *
- * | екран | зависи ли | защо |
- * | :---- | :----: | :---- |
- * | **Настройки** | ДА · собственик | оттам се раздава самото колонно право — не може да се ограничи от него |
- * | **Сметки** | ДА · редактор | ДДС-справката ЗАМРАЗЯВА месеца (правило 9); скрита колона не го спира |
- * | **ИИ** | ДА · собственик | агентът ХАРЧИ ПАРИ с ключ (ADR-029) |
- * | **Стойност** | ДА · собственик | базовата цена и коефициентите са изрично негови (И97 т.6); числото Е екранът, колона няма какво да скрие |
- * | Имоти | не | падането по подразбиране — скрито падане значи празен екран или цикъл |
- * | Пари | не | ежедневната работа на редактора; сумите се крият по КОЛОНА |
- * | Управление | не | скрит пункт значи човек, който не вижда какво му е възложено |
- * | Табове | не | конструкторът рисува от вече позволеното |
- * | **Лично** | не | зависи само от СОБСТВЕНИЯ превключвател, не от чужд достъп |
- * | **Табло** | НИКОГА | там се връща изключеното и там стои ключът на личното — не бива да може да се самозаключи |
- *
- * НЕ СЕ СЛИВА с `mozhe()`: правило 15 казва, че правото (планът) и отметката
- * не се сливат; трети въпрос вътре в същата функция би направил същото.
- */
-const EKRAN_ISKA_ROLYA: Readonly<Partial<Record<KoyEkran, Rolya>>> = {
-  nastroyki: 'sobstvenik',
-  smetki: 'redaktor',
-  ii: 'sobstvenik',
-  stoynost: 'sobstvenik',
-};
-
-/** Стига ли ролята · наблюдател < редактор < собственик. */
-function dostapenLiE(koy: KoyEkran, rolya: Rolya): boolean {
-  const iska = EKRAN_ISKA_ROLYA[koy];
-  if (!iska) return true;
-  if (iska === 'redaktor') return rolya !== 'nablyudatel';
-  return rolya === 'sobstvenik';
-}
-
-export interface Konteks {
-  readonly deystviya: Deystviya;
-  readonly dnevnik: DnevnikVIndexedDB;
-  readonly vrata: Vrata;
-  readonly pravata: Pravata;
-  /** под кой ключ е отвореният Журнал (ADR-020) — историята на реда чете по него */
-  readonly akaunt: string;
-  /**
-   * КОЙ Е ВЛЯЗЪЛ · самоличността, не ключът на Журнала (И98).
-   *
-   * Дотук стигаше само до `main.ts`. Първият екран, който трябва да пита
-   * „този служител може ли", я налага — а личният ключ се строи именно от
-   * имейла, не от отворения акаунт.
-   */
-  readonly kojSam: Samolichnost;
-  readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
-}
+import { zabraviIzbora } from './lichno.js';
+import { dostapenLiE, EKRANI, type Konteks, type KoyEkran } from './ekranite.js';
 
 /**
  * Белегът на СЛУЖЕБНИЯ износ. Домът на четенето и писането е `obshto.ts` —
@@ -190,31 +75,16 @@ export interface Konteks {
  */
 const KLYUCH_IZNOS = 'masterbook:posleden-iznos';
 
-const chetiBeleg = () => chetiBelegZaIznos(KLYUCH_IZNOS);
-const zapishiBeleg = (beleg: BelegZaIznos) => zapishiBelegZaIznos(KLYUCH_IZNOS, beleg);
-
 const koren = document.getElementById('ekran')!;
-let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
-let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
+let ekran: KoyEkran = chetiEkranno<KoyEkran>('ekran', 'imoti');
 let hranilishte: SastoyanieNaHranilishteto = {
   postoyanstvo: 'неизвестно',
   zaeto: -1,
   pozvoleno: -1,
 };
-// Отваря се екранът, на който човек е спрял (ADR-022). Непознат запис (от
-// стара версия) пада към Имоти — паметта никога не чупи тръгването.
-let ekran: KoyEkran = chetiEkranno<KoyEkran>('ekran', 'imoti');
+let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
+let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
 
-/**
- * ДЖОБЪТ · служебният работник.
- *
- * Той прави приложението продукт, който се отваря без мрежа — план 1 от
- * ADR-006. Регистрацията е тиха: провали ли се, приложението работи както
- * досега, само че иска мрежа за да се отвори.
- *
- * `imaNova` пали ТИХ ред в лентата, когато нова версия чака. Нарочно не
- * презарежда сама: човек може да въвежда плащане точно в този миг.
- */
 let imaNova = false;
 
 /**
@@ -265,58 +135,39 @@ async function zakachiDzhoba(prerisuvay: () => Promise<void>): Promise<void> {
   }
 }
 
-const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }> = {
-  imoti: {
-    ime: 'Имоти',
-    podnaslov: 'записва вместо да помни · всичко минава през Вратата',
-    ikona: '<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9.5 21v-6.5h5V21"></path>',
-  },
-  pari: {
-    ime: 'Пари',
-    podnaslov: 'какво ти дължат, кой закъснява, какво е влязло',
-    ikona: '<rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path>',
-  },
-  smetki: {
-    ime: 'Сметки',
-    podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
-    ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
-  },
-  nastroyki: {
-    ime: 'Настройки',
-    podnaslov: 'бутоните са модели на пътища · нищо не е константа',
-    ikona: '<circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"></path>',
-  },
-  stoynost: {
-    ime: 'Стойност на Състояние',
-    podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
-    ikona: '<path d="M4 20V9"></path><path d="M9.5 20V4"></path><path d="M15 20v-7"></path><path d="M20.5 20V7"></path><path d="M2.5 20h19"></path>',
-  },
-  gant: {
-    ime: 'Управление',
-    podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
-    ikona: '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
-  },
-  ii: {
-    ime: 'ИИ',
-    podnaslov: 'агентът чете, смята и ПРЕДЛАГА · записва човекът',
-    ikona: '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
-  },
-  tabove: {
-    ime: 'Табове',
-    podnaslov: 'стационарни и добавени · секции с таблици и графики, комбинират се',
-    ikona: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
-  },
-  lichno: {
-    ime: 'Лично',
-    podnaslov: 'същата таблица за собствени нужди · ОТДЕЛЕН Журнал, който никога не се смесва',
-    ikona: '<path d="M12 21s-7.5-4.4-7.5-9.6A4.4 4.4 0 0 1 12 8.3a4.4 4.4 0 0 1 7.5 3.1C19.5 16.6 12 21 12 21z"></path>',
-  },
-  tablo: {
-    ime: 'Табло',
-    podnaslov: 'кой съм · какъв е планът · какво да се вижда',
-    ikona: '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
-  },
-};
+const chetiBeleg = () => chetiBelegZaIznos(KLYUCH_IZNOS);
+const zapishiBeleg = (beleg: BelegZaIznos) => zapishiBelegZaIznos(KLYUCH_IZNOS, beleg);
+
+
+/**
+ * КЛЮЧЪТ НА АКАУНТА · вече не е закован ред.
+ *
+ * Решава се веднъж, при тръгване (`koyZhurnal`): ако на това устройство вече
+ * има Журнал от Алфа, отваря се ТОЙ — ключът му влиза в хеша и не се преселва
+ * (правило 4). Иначе акаунтът тръгва с имейла на влезлия.
+ *
+ * `let`, защото стойността се знае едва СЛЕД влизането и след първото четене
+ * от носителя; дотогава е ключът от Алфа, за да има какво да се прочете.
+ */
+let akaunt = KLYUCH_OT_ALFA;
+
+/**
+ * КОЙ Е ВЛЯЗЪЛ · вече истински.
+ *
+ * Дотук тук стоеше ЗАКОВАНА самоличност, която пазеше мястото на входа. Сега
+ * влизането минава през Google и `actor` в Журнала е имейл, който доставчикът
+ * е потвърдил (ADR-021). Ключът на акаунта идва от същия имейл (ADR-020) —
+ * затова истинският вход е и онова, което прави втория акаунт истински.
+ *
+ * `kojSam` няма начална стойност: празната самоличност е по-честна от
+ * измислената. Който чете преди влизането, гърми — вместо да получи име, което
+ * никой не е дал.
+ */
+const vhod = new VhodSGoogle({
+  kade: () => document.getElementById('butonat-na-google'),
+});
+let kojSam: Samolichnost;
+let izbor: Izbor = chetiIzbor();
 
 /**
  * ЕКРАНЪТ „ВЛЕЗ" · когато няма нито обхват, нито запомнен вход.
@@ -517,8 +368,10 @@ async function trugvay(): Promise<void> {
     pishatVLichnoto = pishatImeyli(lichniDostapi);
     const dnes = dnesKato();
     // Изключен екран не се показва празен — връщаме се на Имоти.
-    const iska = EKRAN_ISKA[ekran];
-    if (iska && !mozhe(izbor, iska)) ekran = 'imoti';
+    const iskanoto = EKRANI[ekran].iska;
+    if (iskanoto && !mozhe(izbor, iskanoto)) ekran = 'imoti';
+    // `opis` СЛЕД падането — иначе заглавието остава на екрана, който току-що
+    // беше отказан, а тялото рисува другия.
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
@@ -570,74 +423,50 @@ async function trugvay(): Promise<void> {
         <div class="telo">
           ${vestHTML()}
           ${ekran !== 'lichno' && mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
-          ${
-            ekran === 'imoti'
-              ? narisuvayImoti({ ogledalo, sabitiya: sabitiya.length })
-              : ekran === 'pari'
-                ? narisuvayPari(ogledalo, dnes)
-                : ekran === 'stoynost'
-                  ? narisuvayStoynost()
-                  : ekran === 'gant'
-                    ? narisuvayGant(ogledalo, dnes)
-                    : ekran === 'smetki'
-                      ? narisuvaySmetki(ogledalo, dnes)
-                      : ekran === 'nastroyki'
-                        ? narisuvayNastroyki(ogledalo, sabitiya.length, izbor)
-                        : ekran === 'ii'
-                          ? narisuvayII(
-                              ogledalo,
-                              {
-                                pravo: izbor.plan.vazmozhnosti.has('svarzhi-ii'),
-                                otmetka: mozhe(izbor, 'svarzhi-ii'),
-                                kran: !vrata.zatvorena,
-                              },
-                              dnes,
-                            )
-                          : ekran === 'tabove'
-                            ? narisuvayTabove(ogledalo, dnes)
-                            : ekran === 'lichno'
-                              ? lichnoOgledalo && lichnoOgledalo.lichnoVklyucheno
-                                ? narisuvayLichno(lichnoOgledalo, ogledalo, dnes, lichen.akaunt, lichniteSabitiya.length)
-                                : pokanaZaLichno(lichen.akaunt, lichnoOgledalo?.lichnoMyasto ?? '')
-                              : narisuvayTablo(kojSam, izbor, akaunt, lichnoVklyucheno, lichnoOgledalo !== null)
-          }
+          ${opis.narisuvay({
+            ogledalo,
+            broySabitiya: sabitiya.length,
+            dnes,
+            izbor,
+            kojSam,
+            akaunt,
+            kranatEOtvoren: !vrata.zatvorena,
+            lichnoOgledalo,
+            lichenAkaunt: lichen.akaunt,
+            broyLichni: lichniteSabitiya.length,
+          })}
         </div>
       </main>`;
 
     poslednaVest = null;
-    if (ekran === 'imoti') zakachiFormite(koren, k, prerisuvay);
-    else if (ekran === 'pari') zakachiPari(koren, k, prerisuvay);
-    else if (ekran === 'stoynost') zakachiStoynost(koren, k, prerisuvay);
-    else if (ekran === 'gant') zakachiGant(koren, k, prerisuvay);
-    else if (ekran === 'smetki') zakachiSmetki(koren, k, prerisuvay);
-    else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
-    else if (ekran === 'ii') zakachiII(koren, k, prerisuvay);
-    else if (ekran === 'tabove') zakachiTabove(koren, k, prerisuvay);
-    else if (ekran === 'lichno') {
-      zakachiLichno(koren, k, lichen, prerisuvay);
-      zakachiPrevklyuchvaneto(koren, '#lichno-pusni', true);
-      zakachiPrevklyuchvaneto(koren, '#lichno-priberi', false);
-    } else {
-      zakachiTablo(
-        koren,
-        () => izbor,
-        (nov) => {
-          izbor = nov;
-        },
-        prerisuvay,
-      );
-      // Таблото ВРЪЩА прибраното (мястото вече е записано) и ПРИБИРА
-      // включеното. Първото пускане е на самия екран „Лично" — там е полето
-      // за мястото, без което личното не тръгва (И99).
-      zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
-      koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
-        await vhod.izlez();
-        // Презареждането е нарочно: следващото тръгване минава по целия път на
-        // влизането. Опит да се „смени самоличността в движение" би оставил
-        // отворено Огледало на един акаунт под името на друг.
-        location.reload();
-      });
-    }
+    opis.zakachi({
+      koren,
+      k,
+      lichen,
+      prerisuvay,
+      prevklyuchiLichnoto: (znak, vklyucheno) => zakachiPrevklyuchvaneto(koren, znak, vklyucheno),
+      zakachiTabloto: () => {
+        zakachiTablo(
+          koren,
+          () => izbor,
+          (nov) => {
+            izbor = nov;
+          },
+          prerisuvay,
+        );
+        // Таблото ВРЪЩА прибраното (мястото вече е записано) и ПРИБИРА
+        // включеното. Първото пускане е на самия екран „Лично" — там е полето
+        // за мястото, без което личното не тръгва (И99).
+        zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
+        koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
+          await vhod.izlez();
+          // Презареждането е нарочно: следващото тръгване минава по целия път
+          // на влизането. Опит да се „смени самоличността в движение" би
+          // оставил отворено Огледало на един акаунт под името на друг.
+          location.reload();
+        });
+      },
+    });
     /**
      * СЛУЖЕБНИТЕ ПЪТИЩА НЕ ВИСЯТ НА ЛИЧНИЯ ЕКРАН.
      *
@@ -696,7 +525,7 @@ function strana(
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
       if (koy === 'lichno') return lichnoVklyucheno || !lichnoPipnato;
-      const iska = EKRAN_ISKA[koy];
+      const iska = EKRANI[koy].iska;
       if (iska && !mozhe(izbor, iska)) return false;
       return dostapenLiE(koy, rolya);
     })

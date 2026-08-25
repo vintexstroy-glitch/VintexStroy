@@ -32,7 +32,7 @@
 import { eStotinki, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /**
  * Отказът на клипборда · ЕДИН текст за двата пътя към него (правило 17).

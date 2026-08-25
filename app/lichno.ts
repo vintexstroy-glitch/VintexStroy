@@ -55,7 +55,7 @@ import {
 import { IMENA_NA_ROLITE, type Rolya } from '../src/yadro/samolichnost.js';
 import { sektsiyaPari, zabraviPlana, zakachiLichniPari } from './lichni-pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Ключът на погледа · свои такт, филтри и сгънати (И98 „собствените настройки"). */
 export const KLYUCH_POGLED = 'lichno';

@@ -15,7 +15,7 @@
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import type { Sabitie } from '../src/yadro/index.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Малкият бутон в реда · `vid` и `id` са същността от Журнала. */
 export function butonIstoriya(vid: string, id: string): string {

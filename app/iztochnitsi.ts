@@ -68,7 +68,7 @@ import {
   type PodadenFayl,
 } from '../src/domein/sveryavane.js';
 import { fokusVPole } from './klaviatura.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
 type Filtar = 'promenite' | 'vsichko';

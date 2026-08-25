@@ -26,7 +26,7 @@ import { otSuma, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import { aktivnataKletka, fokusVPole, kletkiteNaIzbora } from './klaviatura.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Причината, която влиза в Журнала — чиста, за да има тест. */
 export function prichinaZaRedaktsiya(bilo: string, stava: string): string {

@@ -57,7 +57,7 @@ import {
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Представка на всяко id · служебният екран носи свои и не бива да се бият. */
 export const PREDSTAVKA_PARI = 'lp-';

@@ -77,7 +77,7 @@ import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Кой агент е отворен · помни се като поглед, не като факт (ADR-022). */
 let izbranAgent = chetiEkranno('ii.agent', '');

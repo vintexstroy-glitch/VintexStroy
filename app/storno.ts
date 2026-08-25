@@ -8,7 +8,7 @@
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { VID, type Vid } from '../src/domein/sabitiya.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 export interface Izhod {
   readonly stana: boolean;

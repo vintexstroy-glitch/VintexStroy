@@ -62,7 +62,7 @@ import { pishi } from '../src/yadro/pari.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Кой таб се преглежда — поглед върху екрана, помни се (ADR-022). */
 let izbranTab = chetiEkranno('tabove.izbran', '');

@@ -54,7 +54,7 @@ import { narisuvayDiagrama } from './gant-diagrama.js';
 import { menyuOtZhivi, novoteVSpisatsite, poleSMenyu, sDumiZaNovite, zakachiMenyuta } from './menyu.js';
 import type { Menyu } from '../src/domein/padashti-menyuta.js';
 
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /**
  * Погледът на Ганта СЕ ПОМНИ (ADR-022): тактът, трите филтъра, сгънатите дела

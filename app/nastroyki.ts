@@ -74,7 +74,7 @@ import { klyuchNaPravo,
 import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 
