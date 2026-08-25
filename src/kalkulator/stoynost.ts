@@ -52,7 +52,7 @@ export interface OtTsenovaLista {
   readonly prodaden: boolean;
 }
 
-export const PRAZNO_OT_LISTA: OtTsenovaLista = Object.freeze({
+const PRAZNO_OT_LISTA: OtTsenovaLista = Object.freeze({
   izlozhenie: '',
   stai: 0,
   terasi_kvsm: 0,

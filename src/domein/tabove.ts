@@ -36,7 +36,7 @@ export class GreshkaTab extends Error {
 }
 
 /** Двата вида секция. Нов вид се добавя ТУК, където се вижда. */
-export const VIDOVE_SEKTSII = ['tablitsa', 'diagrama'] as const;
+const VIDOVE_SEKTSII = ['tablitsa', 'diagrama'] as const;
 
 export type VidSektsiya = (typeof VIDOVE_SEKTSII)[number];
 

@@ -98,7 +98,7 @@ export function pokazhiObekt(v: Vhod): void {
   pokazan = v;
 }
 
-export function primernObektLiSePokazva(): boolean {
+function primernObektLiSePokazva(): boolean {
   return pokazan === PRIMEREN_OBEKT;
 }
 

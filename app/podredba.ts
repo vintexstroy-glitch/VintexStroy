@@ -35,12 +35,8 @@ function klyuchat(ekran: string): string {
   return `podredba.${ekran}`;
 }
 
-export function zapomneniyatRed(ekran: string): readonly string[] {
+function zapomneniyatRed(ekran: string): readonly string[] {
   return chetiEkranno<string[]>(klyuchat(ekran), []);
-}
-
-export function zabraviRedaNa(ekran: string): void {
-  zapomniEkranno(klyuchat(ekran), []);
 }
 
 /**

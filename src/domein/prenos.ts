@@ -87,7 +87,7 @@ export function mozheLiDaSePrenese(
 }
 
 /** Изведените opId-та · едно място, за да не се разминат двете половини. */
-export const OPID = {
+const OPID = {
   novo: (prenosId: string, id: string) => `prenos:${prenosId}:novo:${id}`,
   priet: (prenosId: string) => `prenos:${prenosId}:priet`,
   mahni: (prenosId: string, id: string) => `prenos:${prenosId}:mahni:${id}`,

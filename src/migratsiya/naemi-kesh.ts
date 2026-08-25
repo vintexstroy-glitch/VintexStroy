@@ -175,11 +175,11 @@ export async function migrirajNaemiKesh(n: NastroykiMigratsiya): Promise<Rezulta
 }
 
 /** Стабилен ключ от място и единица — за да е повторното пускане безопасно. */
-export function idNaImot(r: RedOtRegistara): string {
+function idNaImot(r: RedOtRegistara): string {
   return `I:${klyuch(r.myasto)}:${klyuch(r.edinitsa)}`;
 }
 
-export function idNaNaem(r: RedOtRegistara): string {
+function idNaNaem(r: RedOtRegistara): string {
   return `N:${klyuch(r.myasto)}:${klyuch(r.edinitsa)}:${klyuch(r.kolona)}`;
 }
 

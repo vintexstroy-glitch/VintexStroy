@@ -33,7 +33,7 @@ function broy(n: number, edno: string, mnogo: string): string {
 }
 
 /** Кое събитие носи този seq. */
-export function sabitiePoSeq(sabitiya: readonly Sabitie[], seq: number): Sabitie | undefined {
+function sabitiePoSeq(sabitiya: readonly Sabitie[], seq: number): Sabitie | undefined {
   return sabitiya.find((s) => s.seq === seq);
 }
 

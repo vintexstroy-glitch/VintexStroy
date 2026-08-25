@@ -836,7 +836,7 @@ export class Deystviya {
  * ги преглътне с Math.min/Math.max, раждайки падеж, който никой не е искал.
  * Границата е при записа, с думи — не при смятането, мълчешком.
  */
-export class GreshkaNaem extends Error {
+class GreshkaNaem extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaNaem';

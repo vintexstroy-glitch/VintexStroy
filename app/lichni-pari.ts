@@ -81,7 +81,7 @@ function menyutoNaTargovtsite(o: Ogledalo): Menyu {
 }
 
 /** Представка на всяко id · служебният екран носи свои и не бива да се бият. */
-export const PREDSTAVKA_PARI = 'lp-';
+const PREDSTAVKA_PARI = 'lp-';
 
 /** Скрити ли са числата · помни се на ТОЗИ браузър, не в Журнала. */
 const KLYUCH_SKRITI = 'lichnipari.skriti';

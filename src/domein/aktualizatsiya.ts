@@ -61,7 +61,7 @@ export function otIztochnik(o: Ogledalo, period: string): Razhod[] {
   );
 }
 
-export function rachniZaPerioda(o: Ogledalo, period: string): number {
+function rachniZaPerioda(o: Ogledalo, period: string): number {
   return [...o.razhodi.values()].filter(
     (r) => r.data.slice(0, 7) === period && r.klyuch === '',
   ).length;

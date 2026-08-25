@@ -31,7 +31,7 @@ import { klyuchNaLichnoDvizhenie, type RedOtKarta, type SlyataKarta } from '../i
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { LichnoDvizhenie } from './lichni-pari.js';
 
-export class GreshkaLichenVnos extends Error {
+class GreshkaLichenVnos extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaLichenVnos';
@@ -103,7 +103,7 @@ function dniMezhdu(a: string, b: string): number {
 }
 
 /** Прозорецът, в който близък ред буди подозрение · същият като при Actual. */
-export const DNI_PODOZRENIE = 7;
+const DNI_PODOZRENIE = 7;
 
 /**
  * СРАВНЯВА снимката с Журнала · и НИЩО не гаси.

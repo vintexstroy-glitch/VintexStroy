@@ -210,7 +210,7 @@ export function stapka(k: Koefitsient, klyuch: string): Stapka {
  * Двете влизат СЛЕД умножението по коефициентите: коефициентът за изложение
  * не мени цената на едно мазе.
  */
-export const VIDOVE_DOBAVKA = ['broy', 'plosht'] as const;
+const VIDOVE_DOBAVKA = ['broy', 'plosht'] as const;
 
 export type VidDobavka = (typeof VIDOVE_DOBAVKA)[number];
 
@@ -382,7 +382,7 @@ export const PO_PODRAZBIRANE: Nastroyki = Object.freeze({
  * Границите на коефициент. Под 0,50 и над 2,00 не е корекция, а друга цена —
  * и почти винаги е сбъркано въвеждане (1,05 написано като 105).
  */
-export const NAY_MALAK_BT = 5_000;
+const NAY_MALAK_BT = 5_000;
 export const NAY_GOLYAM_BT = 20_000;
 
 /**

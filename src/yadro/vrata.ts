@@ -426,7 +426,7 @@ export class Vrata {
  * Привежда всеки низ в стойността — рекурсивно, и ключовете на обектите —
  * към NFC. Едно „й" = един запис, независимо от клавиатурата, която го е писала.
  */
-export function normalizirayNFC(v: unknown): unknown {
+function normalizirayNFC(v: unknown): unknown {
   if (typeof v === 'string') return v.normalize('NFC');
   if (Array.isArray(v)) return v.map(normalizirayNFC);
   if (v !== null && typeof v === 'object') {
@@ -446,7 +446,7 @@ export function normalizirayNFC(v: unknown): unknown {
  * може — нормализираният байт мени хеша и къса веригата. Затова тук се пита,
  * не се поправя: едно „й" в NFD значи файл, който не е излизал оттук.
  */
-export function proveriNFC(v: unknown, pat: string): void {
+function proveriNFC(v: unknown, pat: string): void {
   if (typeof v === 'string') {
     if (v !== v.normalize('NFC')) {
       throw new Error(`${pat} носи текст извън NFC — файлът не е износ на Вратата.`);
@@ -466,9 +466,9 @@ export function proveriNFC(v: unknown, pat: string): void {
 }
 
 /** Полетата за пари завършват на `_st` и са ЦЕЛИ СТОТИНКИ. */
-export const NASTAVKA_PARI = '_st';
+const NASTAVKA_PARI = '_st';
 
-export function proveriValidnost(op: Operatsiya): void {
+function proveriValidnost(op: Operatsiya): void {
   neprazen(op.opId, 'opId');
   neprazen(op.naematel, 'naematel');
   neprazen(op.actor, 'actor');

@@ -209,7 +209,7 @@ export function parichnoPole(p: Readonly<Record<string, unknown>>): string {
 }
 
 /** Описанието на едно събитие · полето `opis`, когато го има. */
-export function opisnoPole(p: Readonly<Record<string, unknown>>): string {
+function opisnoPole(p: Readonly<Record<string, unknown>>): string {
   for (const k of ['opis', 'prichina', 'ime', 'adres']) {
     if (typeof p[k] === 'string') return k;
   }

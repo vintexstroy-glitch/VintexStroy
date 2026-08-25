@@ -52,8 +52,8 @@ export interface LichnaTema {
   readonly spryana: boolean;
 }
 
-export const BEZ_GRUPA = 'Без група';
-export const BEZ_TEMA = 'Без тема';
+const BEZ_GRUPA = 'Без група';
+const BEZ_TEMA = 'Без тема';
 
 /**
  * Прави и проверява една тема.

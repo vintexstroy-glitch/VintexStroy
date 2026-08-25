@@ -35,13 +35,13 @@ export class GreshkaKarta extends Error {
 }
 
 /** Думите, по които се познава глава на извлечение · достатъчна е ДАТА и още една. */
-export const DUMI_DATA = ['дата', 'date', 'валута'] as const;
-export const DUMI_OPISANIE = ['описание', 'основание', 'детайли', 'контрагент', 'description'] as const;
-export const DUMI_SUMA = ['сума', 'amount'] as const;
-export const DUMI_DEBIT = ['дебит', 'debit', 'изход', 'теглене'] as const;
-export const DUMI_KREDIT = ['кредит', 'credit', 'вход', 'захранване'] as const;
-export const DUMI_REFERENTSIYA = ['референц', 'reference', 'документ', 'номер'] as const;
-export const DUMI_SALDO = ['салдо', 'balance', 'остатък'] as const;
+const DUMI_DATA = ['дата', 'date', 'валута'] as const;
+const DUMI_OPISANIE = ['описание', 'основание', 'детайли', 'контрагент', 'description'] as const;
+const DUMI_SUMA = ['сума', 'amount'] as const;
+const DUMI_DEBIT = ['дебит', 'debit', 'изход', 'теглене'] as const;
+const DUMI_KREDIT = ['кредит', 'credit', 'вход', 'захранване'] as const;
+const DUMI_REFERENTSIYA = ['референц', 'reference', 'документ', 'номер'] as const;
+const DUMI_SALDO = ['салдо', 'balance', 'остатък'] as const;
 
 export interface KoloniNaKartata {
   readonly glava: number;

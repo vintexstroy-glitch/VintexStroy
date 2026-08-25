@@ -797,7 +797,7 @@ function redNaPredlozhenie(p: Predlozhenie): string {
  * гледа числата; за да прецени посоката, обобщението стига, а имената на
  * наематели и доставчици нямат работа на чужд сървър.
  */
-export function dannitezaAgenta(o: Ogledalo, a: Agent, dnes: string): string {
+function dannitezaAgenta(o: Ogledalo, a: Agent, dnes: string): string {
   const redove: string[] = [];
 
   // МЕСЕЦЪТ КАТО ТАБЛИЦА · пилотът на ADR-005 (резен 15б).

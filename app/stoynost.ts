@@ -512,9 +512,9 @@ export function zakachiStoynost(
  * Идемпотентността е по ОГЛЕДАЛОТО: имот с този адрес и единица, или дело
  * със същото място·обект·име, не се вписва втори път — брои се и се казва.
  */
-export const MD_ADRES = 'Малинова Долина';
+const MD_ADRES = 'Малинова Долина';
 
-export async function vpishiMD(
+async function vpishiMD(
   k: Konteks,
   md: ProchetenoTseniMD,
 ): Promise<{ imoti: number; dela: number; veche: number }> {

@@ -91,7 +91,7 @@ export const ZASHTO_PRIRAVNYAVANE: Readonly<Record<Priravnyavane, string>> = Obj
 });
 
 /** Мерките · всяка с цяло число зад себе си, никакъв float. */
-export const MERKI = ['protsent', 'pari', 'pati', 'dni'] as const;
+const MERKI = ['protsent', 'pari', 'pati', 'dni'] as const;
 
 export type Merka = (typeof MERKI)[number];
 

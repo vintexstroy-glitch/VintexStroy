@@ -36,10 +36,6 @@ import {
 /** Кой ред е отворен · `null` значи затворен. Живее, докато екранът стои. */
 let otvoren = false;
 
-export function zatvoriMenyutoNaNastroykite(): void {
-  otvoren = false;
-}
-
 /**
  * Рисува пункта „Настройки" с падащия си ред.
  *

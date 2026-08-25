@@ -34,7 +34,7 @@ export class GreshkaAgent extends Error {
 }
 
 /** Трите състояния на агента. Спрян ≠ изключен: кранът е трети контрол. */
-export const SASTOYANIYA_NA_AGENT = ['izklyuchen', 'vklyuchen', 'spryan', 'zakrit'] as const;
+const SASTOYANIYA_NA_AGENT = ['izklyuchen', 'vklyuchen', 'spryan', 'zakrit'] as const;
 
 export type SastoyanieNaAgent = (typeof SASTOYANIYA_NA_AGENT)[number];
 
@@ -131,7 +131,7 @@ export interface Umenie {
 }
 
 /** Ключът на постоянното умение · характеристиката. Един е и се знае. */
-export const KLYUCH_HARAKTERISTIKA = 'harakteristika';
+const KLYUCH_HARAKTERISTIKA = 'harakteristika';
 
 /** Картата на агента — един агент, един ред (Agent Registry на Microsoft). */
 export interface Agent {
@@ -412,7 +412,7 @@ export function sglobiProtokol(a: Agent): string {
 }
 
 /** Четирите присъди на човека върху предложение (LangGraph HITL). */
-export const PRISADI = ['chaka', 'prieto', 'popraveno', 'othvarleno'] as const;
+const PRISADI = ['chaka', 'prieto', 'popraveno', 'othvarleno'] as const;
 
 export type Prisada = (typeof PRISADI)[number];
 

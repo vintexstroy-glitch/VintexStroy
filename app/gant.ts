@@ -94,7 +94,7 @@ export type KlyuchNaMenyu = 'myasto' | 'obekt' | 'ime' | 'otgovornik';
  * Втори списък, пазен отделно, би трябвало да се държи синхронен с Журнала — и
  * щеше да се разминава точно в деня, в който някой сторнира дело.
  */
-export function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu {
+function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu {
   return menyuOtZhivi(
     klyuch,
     ime,
@@ -103,7 +103,7 @@ export function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string)
 }
 
 /** Четирите менюта наведнъж · за закачането след рисуване. */
-export function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
+function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
   const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място';
   return new Map<string, Menyu>([
     ['myasto', menyutoNaDelata(o, 'myasto', parvata)],
@@ -115,7 +115,7 @@ export function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): Readon
 
 const POGLEDI = new Map<string, PogledNaGanta>();
 
-export function pogled(klyuch = 'gant'): PogledNaGanta {
+function pogled(klyuch = 'gant'): PogledNaGanta {
   const veche = POGLEDI.get(klyuch);
   if (veche) return veche;
   const nov: PogledNaGanta = {
@@ -157,7 +157,7 @@ export interface NadpisiNaGanta {
   readonly imeNaFormata: string;
 }
 
-export const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
+const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
   zaglavie: 'Управление на Времевия Ред в Делата',
   glavaNaImenata: 'Място · Обект · Дело',
   podnaslovNaFormata: 'Място · Обект · Дело — трите колони',

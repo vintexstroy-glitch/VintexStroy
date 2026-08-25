@@ -70,7 +70,7 @@ export function chetiIzbor(): Izbor {
   }
 }
 
-export function zapishiIzbor(izbor: Izbor): void {
+function zapishiIzbor(izbor: Izbor): void {
   try {
     const zapis: ZapisanIzbor = {
       plan: izbor.plan.klyuch,

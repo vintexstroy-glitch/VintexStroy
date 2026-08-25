@@ -36,7 +36,7 @@ import { EDINITSA_BT, PO_PODRAZBIRANE, matritsaOtNastroyki } from './nastroyki.j
  */
 export { EDINITSA_BT };
 
-export class GreshkaMatritsa extends Error {
+class GreshkaMatritsa extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaMatritsa';

@@ -44,7 +44,7 @@ import { svediImeyl } from '../src/domein/akaunt.js';
  * Тайната (`client_secret`) не влиза тук и не се ползва никъде. Приложение,
  * което живее в браузър, не може да пази тайна — затова и няма такава.
  */
-export const KLIENT_NOMER =
+const KLIENT_NOMER =
   '41382209788-ggjrn13mf5upp068flm6kup5u9usg5lg.apps.googleusercontent.com';
 
 const ADRES_NA_SKRIPTA = 'https://accounts.google.com/gsi/client';

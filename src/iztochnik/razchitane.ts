@@ -17,7 +17,7 @@ import { poRolya, redoveSDanni, type ModelNaTablitsa } from './model.js';
 import { pozvolenaStavka, STAVKI } from '../domein/dds.js';
 import type { Izvor, Propusnat, RedOtSnimka, Snimka } from './snimka.js';
 
-export class GreshkaRazchitane extends Error {
+class GreshkaRazchitane extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaRazchitane';
@@ -25,7 +25,7 @@ export class GreshkaRazchitane extends Error {
 }
 
 /** Думите, по които се познава главата на таблица с разходи. */
-export const DUMI_RAZHODI = ['достав', 'сума', 'дата'] as const;
+const DUMI_RAZHODI = ['достав', 'сума', 'дата'] as const;
 
 export interface NastroykiRazchitane {
   readonly tablitsa: Tablitsa;
@@ -62,7 +62,7 @@ export function dataOtKletka(surovo: string): string {
  * ключът, граден от суровия файл, се разминаваше при NFD-клавиатура — редът
  * минаваше за НОВ и се раждаше дубъл вместо съвпадение.
  */
-export function klyuchNaRazhod(r: {
+function klyuchNaRazhod(r: {
   dokument: string;
   data: string;
   koy: string;

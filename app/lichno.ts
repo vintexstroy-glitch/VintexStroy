@@ -58,9 +58,9 @@ import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
 /** Ключът на погледа · свои такт, филтри и сгънати (И98 „собствените настройки"). */
-export const KLYUCH_POGLED = 'lichno';
+const KLYUCH_POGLED = 'lichno';
 /** Представка на формата · две `#forma-delo` на един документ се бият. */
-export const PREDSTAVKA = 'l-';
+const PREDSTAVKA = 'l-';
 
 /** Кои дела са отметнати за пренос · живее, докато екранът стои отворен. */
 const izbrani = new Set<string>();

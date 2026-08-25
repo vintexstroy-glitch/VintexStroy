@@ -388,7 +388,7 @@ export function grupiranaTablitsa<T>(
  * носи ключа и името си (`data-kolona` · `data-ime`) — скриването и
  * контекстното меню четат тях, не остъргват боядисания текст.
  */
-export function glavaSFiltar<T>(
+function glavaSFiltar<T>(
   tablitsa: string,
   k: KolonaSFiltar<T>,
   redove: readonly T[],

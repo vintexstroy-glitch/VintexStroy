@@ -45,7 +45,7 @@ import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 
 /** Четирите вида диаграма · и къде всеки лъже. */
-export const VIDOVE_DIAGRAMA = ['liniya', 'stalbove', 'ploshtta', 'tochki'] as const;
+const VIDOVE_DIAGRAMA = ['liniya', 'stalbove', 'ploshtta', 'tochki'] as const;
 
 export type VidDiagrama = (typeof VIDOVE_DIAGRAMA)[number];
 
@@ -62,7 +62,7 @@ export const IMENA_NA_DIAGRAMITE: Readonly<Record<VidDiagrama, string>> = Object
  * Площта внушава ОБЕМ — сборът под кривата. За отношение (процент, пъти) такъв
  * обем не съществува: 20 % през май и 20 % през юни не правят 40 %.
  */
-export function kadeLazhe(v: VidDiagrama, m: Merka): string {
+function kadeLazhe(v: VidDiagrama, m: Merka): string {
   if (v === 'ploshtta' && m !== 'pari') {
     return 'площта внушава сбор под кривата, а отношенията не се сборуват — 20 % и 20 % не правят 40 %';
   }

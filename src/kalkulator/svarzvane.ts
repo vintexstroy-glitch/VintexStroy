@@ -54,7 +54,7 @@ export function sashtiyat(a: KlyuchNaObekt | undefined, b: KlyuchNaObekt | undef
 }
 
 /** Низът, по който ключът се търси в карта. */
-export function nizNaKlyuch(k: KlyuchNaObekt): string {
+function nizNaKlyuch(k: KlyuchNaObekt): string {
   return `${k.vid}#${k.nomer}`;
 }
 

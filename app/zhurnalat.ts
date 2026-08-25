@@ -54,7 +54,7 @@ let sluchay = '';
 let greshka = '';
 
 /** Изчиства, когато екранът се напусне или промяната е записана. */
-export function zabraviTablitsata(): void {
+function zabraviTablitsata(): void {
   predlozheno = null;
   imeNaFayla = '';
   otpechatak = '';
@@ -292,7 +292,7 @@ export function zakachiZhurnalat(
  * СВРЪЗКАТА се записва НАКРАЯ, когато вече се знае колко реда са се променили:
  * свръзка, записана първа и после празна, би обещавала поправка, която я няма.
  */
-export async function zapishiPopravkite(
+async function zapishiPopravkite(
   k: Konteks,
   p: Predlozhenie,
 ): Promise<{ readonly popraveni: number; readonly svrazka: string }> {

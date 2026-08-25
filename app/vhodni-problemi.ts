@@ -82,7 +82,7 @@ export interface Svetnalo {
   readonly nahodki: readonly Nahodka[];
 }
 
-export function svetni(tekst: string, k: Kontekst): Svetnalo {
+function svetni(tekst: string, k: Kontekst): Svetnalo {
   const nahodki = proveriVhod(tekst, k, nastroyki);
   if (nahodki.length === 0) {
     return { klas: '', kazva: '', spira: false, nahodki };
