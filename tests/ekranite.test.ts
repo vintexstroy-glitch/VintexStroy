@@ -45,9 +45,12 @@ describe('регистърът на екраните', () => {
     expect(EKRANI.lichno.iskaRolya).toBeUndefined();
   });
 
-  it('заключените по роля са ТОЧНО четирите, изброени в И98', () => {
+  it('заключените по роля са ТОЧНО петте, изброени поименно', () => {
+    // Четирите от И98 плюс ТАБОВЕ: негова дума от И101 — табове, таблици и
+    // диаграми се създават и свързват само от Стопанина. Списъкът е поименен,
+    // за да пада на глас, когато утре някой заключи пети екран мимоходом.
     const zaklyucheni = KLYUCHOVE.filter((k) => EKRANI[k].iskaRolya !== undefined).sort();
-    expect(zaklyucheni).toEqual(['ii', 'nastroyki', 'smetki', 'stoynost']);
+    expect(zaklyucheni).toEqual(['ii', 'nastroyki', 'smetki', 'stoynost', 'tabove']);
   });
 
   it('имената са РАЗЛИЧНИ · два пункта с едно име не се различават в лентата', () => {

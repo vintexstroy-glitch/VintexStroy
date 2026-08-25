@@ -3794,6 +3794,22 @@ async function main() {
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.map((x) => x.value)))
         .includes('Нов Доставчик ООД'), true);
 
+    // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
+    razdel = '62 · Табовете от Таблото';
+    await naEkran(p, 'tablo', '[data-sektsiya=tablo-tabove]');
+    proveri('Таблото носи входа към изгледите',
+      Boolean(await p.$('[data-sektsiya=tablo-tabove]')), true);
+    proveri('и брои ДОБАВЕНИТЕ, не всички',
+      Number(await p.$eval('[data-pole="broy-tabove"] .chislo', (e) => e.textContent.trim())) >= 1,
+      true);
+    proveri('казва, че правото е само на Стопанина',
+      (await tekstNa(p, '[data-sektsiya=tablo-tabove]')).includes('само от Стопанина'), true);
+    // Бутонът е ПЪТ, не надпис: води на екрана, без да е част от лентата.
+    await deystvieSPrerisuvane(p, () => p.click('[data-sektsiya=tablo-tabove] [data-ekran=tabove]'));
+    proveri('и бутонът наистина отваря конструктора',
+      Boolean(await p.$('#izbor-tab')), true);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     // ══ 61 · ВЪЗСТАНОВЯВАНЕТО · запасният контакт (И100 · ADR-044) ══════════
     //
     // Пътят обратно се вписва ПРЕДИ да потрябва. Тук се проверява и най-важното

@@ -384,6 +384,44 @@ function kartaVrashtane(): string {
     </section>`;
 }
 
+/**
+ * ТАБОВЕТЕ ОТ ТАБЛОТО (И101 т.1) · входът към конструктора, там където е и
+ * всичко останало за „кой съм и какво мога".
+ *
+ * Негови думи: „Всеки клиент на приложението има възможност да създава нови
+ * табове **от таблото**… само от стопанина."
+ *
+ * Картата се вижда САМО на Стопанина — същото право, което пази и самия екран
+ * (`ekranite.ts`). Показва се и на него, когато няма нито един свой таб: тогава
+ * тя е покана, а не отчет.
+ */
+function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
+  if (!tozi) return '';
+  return `
+    <section class="karta" data-sektsiya="tablo-tabove">
+      <div class="dyalglava">
+        <h2>Твоите изгледи</h2>
+        <span>табове · секции · таблици и диаграми, вързани за източник</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="broy-tabove">
+          <div class="etiket">Добавени табове</div>
+          <div class="chislo malak" translate="no">${dobaveni}</div>
+          <div class="pod">${broy - dobaveni} стационарни са допълнени</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="glaven" data-ekran="tabove">
+          ${dobaveni === 0 ? 'Направи първия си таб' : 'Направи нов таб'}
+        </button>
+        <p class="drebno">
+          Табовете, секциите и връзките им се правят <b>само от Стопанина</b>: секция,
+          вързана за чужда таблица, мени какво ЧЕТАТ другите — едно действие, чужди числа.
+        </p>
+      </div>
+    </section>`;
+}
+
 export function narisuvayTablo(
   koj: Samolichnost,
   izbor: Izbor,
@@ -400,10 +438,14 @@ export function narisuvayTablo(
   stopanin = '',
   rolya: Rolya = koj.rolya,
   zapasen: { readonly imeyl: string; readonly poslednite: string } | null = null,
+  /** табовете · брой всички и брой ДОБАВЕНИ (И101 т.1) */
+  tabove: { readonly vsichki: number; readonly dobaveni: number } = { vsichki: 0, dobaveni: 0 },
 ): string {
+  const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
     kartaKoySam(koj, akaunt, stopanin, rolya) +
-    kartaZapasen(stopanin !== '' && stopanin === koj.imeyl, zapasen) +
+    kartaTabove(negov, tabove.vsichki, tabove.dobaveni) +
+    kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
     kartaOtmetki(izbor) +
