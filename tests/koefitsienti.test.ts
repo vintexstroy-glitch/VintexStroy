@@ -26,6 +26,9 @@ import {
   sDumiStoynost,
   smetniKoefitsient,
   zaStapka,
+  IMENA_NA_STAPKITE,
+  STAPKI,
+  razbiyNaStapki,
   type DanniZaPerioda,
 } from '../src/domein/koefitsienti.js';
 import { SHA } from './pomoshtni.js';
@@ -283,5 +286,46 @@ describe('делител нула дава ЛИПСА, не нула', () => {
     const s = smetniKoefitsient(koefitsient('noi'), prazno);
     expect(s.stoynost).toBe(0);
     expect(s.zashto).toBe('');
+  });
+});
+
+describe('стъпките · режат периода без да лъжат', () => {
+  it('петте са изброени поименно и всяка има име', () => {
+    expect([...STAPKI]).toEqual(['den', 'sedmitsa', 'mesets', 'trimesechie', 'godina']);
+    for (const st of STAPKI) expect(IMENA_NA_STAPKITE[st], st).not.toBe('');
+  });
+
+  it('месец по месец · всеки етикет е самият месец', () => {
+    const p = razbiyNaStapki('2026-01-01', '2026-03-31', 'mesets');
+    expect(p.map((x) => x.etiket)).toEqual(['2026-01', '2026-02', '2026-03']);
+    expect(p[0]).toEqual({ ot: '2026-01-01', do: '2026-01-31', etiket: '2026-01' });
+    expect(p[1]!.do).toBe('2026-02-28');
+  });
+
+  it('ПОСЛЕДНОТО парче се ПОДРЯЗВА до края на периода', () => {
+    // Иначе непълен месец застава наравно с пълните и последният стълб
+    // винаги изглежда спаднал — тиха лъжа, която всяка втора диаграма прави.
+    const p = razbiyNaStapki('2026-01-01', '2026-02-10', 'mesets');
+    expect(p).toHaveLength(2);
+    expect(p[1]!.do).toBe('2026-02-10');
+  });
+
+  it('седмицата е седем дни, а денят — един', () => {
+    expect(razbiyNaStapki('2026-01-01', '2026-01-14', 'sedmitsa')).toHaveLength(2);
+    expect(razbiyNaStapki('2026-01-01', '2026-01-05', 'den')).toHaveLength(5);
+  });
+
+  it('тримесечието носи номера си, годината — годината', () => {
+    const t = razbiyNaStapki('2026-01-01', '2026-12-31', 'trimesechie');
+    expect(t.map((x) => x.etiket)).toEqual(['2026 · Т1', '2026 · Т2', '2026 · Т3', '2026 · Т4']);
+    expect(razbiyNaStapki('2025-01-01', '2026-12-31', 'godina').map((x) => x.etiket)).toEqual([
+      '2025',
+      '2026',
+    ]);
+  });
+
+  it('един ден дава едно парче, а обърнат период се отказва С ДУМИ', () => {
+    expect(razbiyNaStapki('2026-05-05', '2026-05-05', 'mesets')).toHaveLength(1);
+    expect(() => razbiyNaStapki('2026-05-05', '2026-05-01', 'den')).toThrow(/преди началото/);
   });
 });

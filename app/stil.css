@@ -626,6 +626,47 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 440px;
 }
 
+/* ── чистата диаграма на коефициентите (И96 т.5 · т.6) ─────────────────── */
+.tablitsa.bez-ramka { border: none; background: none; padding: 4px 0; }
+.koef-diagrama { display: block; max-width: 100%; }
+.koef-nula { stroke: var(--liniya); stroke-width: 1; }
+.koef-liniya { fill: none; stroke: var(--aktsent); stroke-width: 2; stroke-linejoin: round; }
+.koef-tochka { fill: var(--aktsent); }
+.koef-stalb { fill: var(--aktsent); opacity: 0.82; }
+.koef-plosht { fill: var(--aktsent); opacity: 0.14; }
+.koef-etiket { font-size: 10.5px; fill: var(--mastilo2); }
+.koef-formula {
+  font-variant-numeric: tabular-nums; font-size: 12.5px;
+  background: var(--panel); border: 1px solid var(--liniya); border-radius: 4px;
+  padding: 6px 10px; display: inline-block;
+}
+.trevozhno { color: var(--aktsent); }
+.glava.koef-parametar, .red.koef-parametar {
+  grid-template-columns: minmax(0, 1fr) 160px;
+  min-width: 380px;
+}
+.red.koef-rezultat { background: var(--panel); }
+.glava.koef-red, .red.koef-red {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr) 140px 130px;
+  min-width: 820px;
+}
+.red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 12px; }
+
+/* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
+.gant-dvete {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.gant-dvete.bez-diagrama { grid-template-columns: minmax(0, 1fr); }
+.gant-tablitsata, .gant-diagramata { min-width: 0; }
+/* На тесен екран двете една до друга не се четат — падат една под друга,
+   таблицата първа, защото тя носи числата. */
+@media (max-width: 1100px) {
+  .gant-dvete { grid-template-columns: minmax(0, 1fr); }
+}
+
 /* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
 .glava.mesetsat, .red.mesetsat {
   grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;

@@ -237,6 +237,88 @@ export function zaStapka(stapka: 'mesets' | 'drug'): readonly Koefitsient[] {
   return KOEFITSIENTI.filter((k) => stapka === 'mesets' || !k.samoMesechen);
 }
 
+/**
+ * СТЪПКИТЕ · на колко парчета се реже периодът (И96 т.5).
+ *
+ * „Само показани суми за избрания период от време И СТЪПКАТА." Стъпката не е
+ * украса на диаграмата — тя решава КОИ коефициенти изобщо се показват: онези
+ * на месечна база се появяват само при месец (т.6).
+ */
+export const STAPKI = ['den', 'sedmitsa', 'mesets', 'trimesechie', 'godina'] as const;
+
+export type Stapka = (typeof STAPKI)[number];
+
+export const IMENA_NA_STAPKITE: Readonly<Record<Stapka, string>> = Object.freeze({
+  den: 'ден',
+  sedmitsa: 'седмица',
+  mesets: 'месец',
+  trimesechie: 'тримесечие',
+  godina: 'година',
+});
+
+/** Едно парче от периода · със свой етикет за оста. */
+export interface Parche {
+  readonly ot: string;
+  readonly do: string;
+  readonly etiket: string;
+}
+
+function denNapred(data: string, dni: number): string {
+  return new Date(Date.parse(`${data}T00:00:00Z`) + dni * 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Последният ден на месеца, в който пада датата. */
+function krayNaMesetsa(data: string): string {
+  const [g, m] = data.split('-').map(Number) as [number, number];
+  return new Date(Date.UTC(g, m, 0)).toISOString().slice(0, 10);
+}
+
+/**
+ * РЕЖЕ периода на парчета по стъпката.
+ *
+ * Последното парче се ПОДРЯЗВА до края на периода — иначе диаграмата показва
+ * непълен месец наравно с пълните и последният стълб винаги изглежда спаднал.
+ * Това е тиха лъжа, която всяка втора отчетна диаграма я прави.
+ */
+export function razbiyNaStapki(ot: string, doo: string, stapka: Stapka): readonly Parche[] {
+  if (doo < ot) throw new GreshkaKoefitsient('Краят на периода е преди началото.');
+  const parcheta: Parche[] = [];
+  let nachalo = ot;
+  let pazach = 0;
+
+  while (nachalo <= doo && pazach++ < 2000) {
+    let kraj: string;
+    let etiket: string;
+    switch (stapka) {
+      case 'den':
+        kraj = nachalo;
+        etiket = nachalo.slice(5);
+        break;
+      case 'sedmitsa':
+        kraj = denNapred(nachalo, 6);
+        etiket = nachalo.slice(5);
+        break;
+      case 'mesets':
+        kraj = krayNaMesetsa(nachalo);
+        etiket = nachalo.slice(0, 7);
+        break;
+      case 'trimesechie': {
+        const m = Number(nachalo.slice(5, 7));
+        kraj = krayNaMesetsa(`${nachalo.slice(0, 4)}-${String(Math.min(12, m + 2)).padStart(2, '0')}-01`);
+        etiket = `${nachalo.slice(0, 4)} · Т${Math.ceil(m / 3)}`;
+        break;
+      }
+      case 'godina':
+        kraj = `${nachalo.slice(0, 4)}-12-31`;
+        etiket = nachalo.slice(0, 4);
+        break;
+    }
+    parcheta.push(Object.freeze({ ot: nachalo, do: kraj > doo ? doo : kraj, etiket }));
+    nachalo = denNapred(kraj, 1);
+  }
+  return Object.freeze(parcheta);
+}
+
 /** Целочислено делене със закръгляне на половинката нагоре · и двете положителни. */
 function deliZakragleno(chislitel: number, znamenatel: number): number {
   const znak = chislitel < 0 !== znamenatel < 0 ? -1 : 1;

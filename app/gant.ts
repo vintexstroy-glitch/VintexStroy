@@ -62,7 +62,7 @@ let takt: Takt = chetiEkranno<Takt>('gant.takt', 'mesets');
 /** Кои дела са сгънати · само дела и поддела се сгъват (И88). */
 const sgunati = new Set<string>(chetiEkranno<string[]>('gant.sgunati', []));
 /** Показва ли се диаграмата вместо таблицата с оцветени полета. */
-let diagrama = chetiEkranno('gant.diagrama', false);
+let diagrama = chetiEkranno('gant.diagrama', true);
 let opIdDelo = crypto.randomUUID();
 let greshkaDelo = '';
 /** Трите филтъра на трите колони (И82) — плоско, не дърво. */
@@ -140,7 +140,7 @@ export function narisuvayGant(o: Ogledalo, dnes: string): string {
         </div>
         <button type="button" id="sega" class="vtorichen">СЕГА</button>
         <button type="button" id="kam-diagrama" class="vtorichen">${
-          diagrama ? 'Таблица с оцветени полета' : 'Диаграма'
+          diagrama ? 'Скрий диаграмата' : 'Покажи диаграмата'
         }</button>
       </div>
       <div class="poleta tesni">
@@ -163,9 +163,21 @@ export function narisuvayGant(o: Ogledalo, dnes: string): string {
     ${
       naEkrana.length === 0
         ? '<p class="prazno">Няма дела.<br>Времевият ред се пълни отдолу — Мястото е първата колона, Делото третата.</p>'
-        : diagrama
-          ? narisuvayDiagrama(naEkrana, r, dnes)
-          : tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes)
+        : // И96 т.4 · „Диаграмата на Ганта е ОТДЯСНО на таблицата в Управление."
+          //
+          // Дотук тук стоеше превключвател: таблица ИЛИ диаграма. Той иска
+          // ДВЕТЕ — и е прав по причина, която се вижда чак когато са една до
+          // друга: таблицата казва КОЛКО, диаграмата казва КОГА, и сравнението
+          // между тях е самата работа. Разменени, човек помни едното, докато
+          // гледа другото.
+          //
+          // Бутонът остава, но вече СКРИВА диаграмата, вместо да я разменя —
+          // на тесен екран двете една до друга не се побират, а скриването
+          // пипа само екрана (правило 23).
+          `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}">
+            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes)}</div>
+            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(naEkrana, r, dnes)}</div>` : ''}
+          </div>`
     }
 
     ${formaDelo(o, dnes)}`;

@@ -53,6 +53,7 @@ import {
   type RedNaMesetsa,
 } from '../src/domein/mesetsat.js';
 import { stalboveNaMesetsite } from './diagrami.js';
+import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
@@ -248,6 +249,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       </div>
       <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
+
+    ${narisuvayKoefitsientite(o, dnes)}
 
     ${blokMesetsatZaAgenta(o, mesets)}
 
@@ -895,6 +898,7 @@ export function zakachiSmetki(
 ): void {
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
+  zakachiKoefitsientite(koren, prerisuvay);
 
   // И95 · същата форма за дело работи и оттук — един механизъм, два екрана.
   zakachiFormataNaDelo(koren, k, prerisuvay);

@@ -1558,17 +1558,34 @@ async function main() {
       await p.$eval('.gant-lenta', (e) => e.draggable), false);
 
     // ДИАГРАМАТА · дизайнът на графиката, който И56 чака.
-    await deystvieSPrerisuvane(p, () => p.click('#kam-diagrama'));
-    proveri('диаграмата се появи', await p.$$eval('svg.diagrama', (e) => e.length), 1);
+    //
+    // И96 т.4: „Диаграмата на Ганта е ОТДЯСНО на таблицата в Управление."
+    // Дотук тук имаше превключвател — таблица ИЛИ диаграма — и проходът го
+    // натискаше, за да види диаграмата. Сега двете стоят ЗАЕДНО, а бутонът
+    // само СКРИВА диаграмата за тесен екран.
+    proveri('диаграмата стои БЕЗ да се натиска нищо',
+      await p.$$eval('svg.diagrama', (e) => e.length), 1);
+    proveri('и таблицата стои ЕДНОВРЕМЕННО с нея',
+      (await p.$$eval('.gant-lenta', (e) => e.length)) > 0, true);
+    proveri('диаграмата е ОТДЯСНО · вторият стълб на решетката',
+      await p.evaluate(() => {
+        const t = document.querySelector('.gant-tablitsata')?.getBoundingClientRect();
+        const d = document.querySelector('.gant-diagramata')?.getBoundingClientRect();
+        return Boolean(t) && Boolean(d) && d.left >= t.right - 1;
+      }), true);
     proveri('носи днешната линия', await p.$$eval('.diagrama-dnes', (e) => e.length), 1);
     proveri('лентите са ленти на време, не клетки',
       await p.$$eval('.diagrama-lenta', (e) => e.length), 3);
     proveri('и всяка носи title за четец на екран',
       await p.$eval('.diagrama-lenta title', (e) => e.textContent.includes('→')), true);
-    proveri('таблицата с оцветени полета отстъпи',
-      await p.$$eval('.gant-lenta', (e) => e.length), 0);
+
+    // Бутонът СКРИВА, не разменя — таблицата остава и в двете състояния.
     await deystvieSPrerisuvane(p, () => p.click('#kam-diagrama'));
-    proveri('и се връща с бутон', await p.$$eval('.gant-lenta', (e) => e.length), 3);
+    proveri('скрита диаграма НЕ отнема таблицата',
+      await p.$$eval('.gant-lenta', (e) => e.length), 3);
+    proveri('и диаграмата наистина я няма', await p.$$eval('svg.diagrama', (e) => e.length), 0);
+    await deystvieSPrerisuvane(p, () => p.click('#kam-diagrama'));
+    proveri('и се връща с бутон', await p.$$eval('svg.diagrama', (e) => e.length), 1);
 
     // БУТОНЪТ СЕГА · подрежда, не решава.
     const predSega = await broySabitiya(p);
@@ -2857,6 +2874,69 @@ async function main() {
     proveri('месецът се СМЯТА, не се записва', await broySabitiya(p), predTablitsa);
 
 
+
+    // ══ 49 · чистата диаграма на коефициентите (И96 т.5 · т.6) ═══════════════
+    //
+    // Негови думи: „чиста диаграма БЕЗ таблица… всички коефициенти изредени с
+    // формулата на един ред и под нея сметките за периода."
+    razdel = '49 · коефициентите';
+    await naEkran(p, 'smetki', '#koef-koefitsient');
+
+    proveri('диаграмата стои и е БЕЗ таблица под себе си',
+      await p.$$eval('svg.koef-diagrama', (e) => e.length), 1);
+    proveri('формулата е НА ЕДИН РЕД',
+      (await p.$eval('#formulata', (e) => e.textContent)).includes('\n'), false);
+    proveri('и е истинска формула, не име',
+      (await p.$eval('#formulata', (e) => e.textContent)).includes('='), true);
+    proveri('параметрите се показват ПОД нея',
+      (await p.$$eval('.red.koef-parametar', (r) => r.length)) >= 2, true);
+    proveri('всички коефициенти са изредени',
+      (await p.$$eval('.red.koef-red', (r) => r.length)) >= 8, true);
+    proveri('и всеки носи формулата си',
+      await p.$$eval('.red.koef-red .koef-formula', (r) => r.every((x) => x.textContent.includes('='))), true);
+
+    // МЕСЕЧНИТЕ се появяват САМО при стъпка месец
+    proveri('при месец събираемостта я ИМА',
+      Boolean(await p.$('.red.koef-red[data-koef="sabiraemost"]')), true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'godina'));
+    proveri('при година събираемостта я НЯМА',
+      await p.$('.red.koef-red[data-koef="sabiraemost"]'), null);
+    proveri('и екранът КАЗВА защо',
+      (await p.evaluate(() => document.body.textContent)).includes('нямат смисъл извън месец'), true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'mesets'));
+
+    // ПРИРАВНЯВАНЕТО · трите отговора, видими на екрана
+    const godishni = await p.$$eval('.red.koef-red', (r) =>
+      r.map((x) => `${x.dataset.koef}:${x.querySelector('.znachka')?.textContent.trim()}`));
+    proveri('сумата се приравнява', godishni.includes('noi:да'), true);
+    proveri('маржът НЕ ТРЯБВА да се приравнява', godishni.includes('marzh:не трябва'), true);
+    proveri('ликвидността НЕ МОЖЕ', godishni.includes('likvidnost:не може'), true);
+
+    // Отметката „към година" е ИЗКЛЮЧЕНА за онова, което не се приравнява
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', 'marzh'));
+    proveri('при марж отметката е заключена',
+      await p.$eval('#koef-godishna', (e) => e.disabled), true);
+    proveri('и казва ЗАЩО, вместо само да не работи',
+      (await p.$eval('#zashto-priravnyavane', (e) => e.textContent)).includes('НЕ зависи от периода'), true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', 'noi'));
+    proveri('при NOI отметката се отключва',
+      await p.$eval('#koef-godishna', (e) => e.disabled), false);
+
+    // ВИДЪТ диаграма · дават се всички, но лъжливият се КАЗВА
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-diagrama', 'stalbove'));
+    proveri('стълбовете се появиха', (await p.$$eval('.koef-stalb', (e) => e.length)) > 0, true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', 'oer'));
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-diagrama', 'ploshtta'));
+    proveri('площ върху ОТНОШЕНИЕ се казва, че лъже',
+      (await p.$eval('#kade-lazhe', (e) => e.textContent)).includes('не се сборуват'), true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', 'noi'));
+    proveri('а върху ПАРИ не лъже и предупреждението пада', await p.$('#kade-lazhe'), null);
+
+    // И нищо от това не пипа Журнала — всичко се СМЯТА при показване
+    const predKoef = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-diagrama', 'liniya'));
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'trimesechie'));
+    proveri('коефициентите не пишат нищо в Журнала', await broySabitiya(p), predKoef);
 
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
