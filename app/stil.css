@@ -470,7 +470,7 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
-.navred svg { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+.navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
 .navred.tuk svg { stroke: var(--hartiya); }
 .broyach {
   margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
@@ -489,6 +489,36 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .suma.duljimo { color: var(--aktsent); }
 .suma.plateno { color: var(--zeleno); }
 .vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 12.5px; }
+
+/* ── ТЕМАТИЧНИТЕ ИКОНИ · знак до всяко управление (И101 т.2 · ADR-045) ───
+   Един стил за всички: само контур, цветът идва от текста до тях. Икона със
+   свой цвят заживява отделен живот при първата смяна на палитрата. */
+.ikona {
+  width: 15px; height: 15px; flex-shrink: 0;
+  stroke: currentColor; fill: none; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ikona.golyama { width: 19px; height: 19px; stroke-width: 1.5; }
+button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
+.dyalglava.sIkona { display: flex; align-items: flex-start; gap: 10px; }
+.dyalglava.sIkona > div { min-width: 0; }
+.dyalglava.sIkona .ikona { margin-top: 3px; color: var(--mastilo2); }
+
+/* На тесен екран остава ЗНАКЪТ, а думата се свива — но не изчезва от четеца
+   на екран: `aria-label` я носи цяла (`app/ikoni.ts`). */
+@media (max-width: 620px) {
+  /* Проходът §11 пази обещанието „нищо не излиза встрани". Знакът добави
+     ширина на всеки лост — затова на тесен екран остава ТОЙ, а думата се свива
+     до четеца на екран (`aria-label` я носи цяла). Мястото се пести там,
+     където го няма, а не навсякъде. */
+  /* `display: none`, а НЕ „скрито с absolute": извадената от потока дума се
+     позиционира спрямо най-близкия позициониран прародител и бута документа
+     настрани — проходът го хвана. Достъпността не страда: `aria-label` на
+     самия бутон носи думата цяла и бие съдържанието му. */
+  .butoni button.sIkona .duma,
+  .desno-gore button.sIkona .duma { display: none; }
+  .butoni button.sIkona, .desno-gore button.sIkona { padding: 6px 9px; gap: 0; }
+}
 .karta.izbrana { border-color: var(--aktsent); background: var(--toplo); }
 .karta.izbrana .pole input, .karta.izbrana .pole select { background: #FFFFFF; }
 

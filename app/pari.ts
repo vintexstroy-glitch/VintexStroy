@@ -24,6 +24,7 @@ import {
 } from '../src/domein/nachislyavane.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { butonIstoriya } from './istoriya.js';
+import { butonSIkona } from './ikoni.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { poleSIzbor } from './menyu.js';
@@ -332,7 +333,7 @@ function redVzemane(o: Ogledalo, v: Vzemane, dni: number): string {
         <button type="button" class="vtorichen malak" data-plati="${ekraniraj(v.id)}">
           ${izbrano === v.id ? 'Затвори' : 'Приеми плащане'}
         </button>
-        <button type="button" class="vtorichen malak" data-storno-vzemane="${v.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-vzemane': String(v.seq) } })}
         ${butonIstoriya('vzemane', v.id)}
       </span>
     </div>`;
@@ -348,7 +349,7 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
       <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
       <span class="suma plateno" data-st="${p.suma_st}">${pishi(p.suma_st)}</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-storno="${p.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { storno: String(p.seq) } })}
         ${butonIstoriya('plashtane', p.id)}
       </span>
     </div>`;

@@ -11,6 +11,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { EKRANI } from '../app/ekranite.js';
+import { imaIkona } from '../app/ikoni.js';
 
 const KLYUCHOVE = Object.keys(EKRANI) as (keyof typeof EKRANI & string)[];
 
@@ -20,7 +21,10 @@ describe('регистърът на екраните', () => {
       const e = EKRANI[koy];
       expect(e.ime, `${koy} · име`).toBeTruthy();
       expect(e.podnaslov, `${koy} · поднаслов`).toBeTruthy();
-      expect(e.ikona, `${koy} · икона`).toContain('<');
+      // Иконата е ИМЕ от единствения си дом (ADR-045), не вграден път: дотук
+      // всеки екран носеше свой SVG на място и двата регистъра се разминаваха
+      // по стил. Тестът пита ЖИВИЯ регистър, не низа.
+      expect(imaIkona(e.ikona), `${koy} · икона`).toBe(true);
       expect(typeof e.narisuvay, `${koy} · рисуване`).toBe('function');
       expect(typeof e.zakachi, `${koy} · закачане`).toBe('function');
     }

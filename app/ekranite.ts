@@ -177,21 +177,21 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   imoti: {
     ime: 'Имоти',
     podnaslov: 'записва вместо да помни · всичко минава през Вратата',
-    ikona: '<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M9.5 21v-6.5h5V21"></path>',
+    ikona: 'ekran-imoti',
     narisuvay: (r) => narisuvayImoti({ ogledalo: r.ogledalo, sabitiya: r.broySabitiya }),
     zakachi: (z) => zakachiFormite(z.koren, z.k, z.prerisuvay),
   },
   pari: {
     ime: 'Пари',
     podnaslov: 'какво ти дължат, кой закъснява, какво е влязло',
-    ikona: '<rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path>',
+    ikona: 'ekran-pari',
     narisuvay: (r) => narisuvayPari(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiPari(z.koren, z.k, z.prerisuvay),
   },
   smetki: {
     ime: 'Сметки',
     podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
-    ikona: '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
+    ikona: 'ekran-smetki',
     iska: 'smetki-dds',
     iskaRolya: 'redaktor',
     narisuvay: (r) => narisuvaySmetki(r.ogledalo, r.dnes),
@@ -200,7 +200,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   nastroyki: {
     ime: 'Настройки',
     podnaslov: 'бутоните са модели на пътища · нищо не е константа',
-    ikona: '<circle cx="12" cy="12" r="3"></circle><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.2 5.2l2.1 2.1M16.7 16.7l2.1 2.1M18.8 5.2l-2.1 2.1M7.3 16.7l-2.1 2.1"></path>',
+    ikona: 'nastroyki',
     iska: 'iztochnitsi',
     iskaRolya: 'sobstvenik',
     narisuvay: (r) => narisuvayNastroyki(r.ogledalo, r.broySabitiya, r.izbor),
@@ -209,7 +209,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   stoynost: {
     ime: 'Стойност на Състояние',
     podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
-    ikona: '<path d="M4 20V9"></path><path d="M9.5 20V4"></path><path d="M15 20v-7"></path><path d="M20.5 20V7"></path><path d="M2.5 20h19"></path>',
+    ikona: 'ekran-stoynost',
     iskaRolya: 'sobstvenik',
     narisuvay: () => narisuvayStoynost(),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
@@ -217,14 +217,14 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   gant: {
     ime: 'Управление',
     podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
-    ikona: '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
+    ikona: 'ekran-gant',
     narisuvay: (r) => narisuvayGant(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiGant(z.koren, z.k, z.prerisuvay),
   },
   ii: {
     ime: 'ИИ',
     podnaslov: 'агентът чете, смята и ПРЕДЛАГА · записва човекът',
-    ikona: '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
+    ikona: 'ekran-ii',
     // ИИ-таблото иска ПРАВОТО (планът). Отметката и кранът се показват ВЪТРЕ,
     // поотделно (правило 15) — иначе изключената отметка би скрила екрана, на
     // който пише защо е скрит.
@@ -262,14 +262,14 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      * може да СТРОИ изгледи, колонното право не го докосва.
      */
     iskaRolya: 'sobstvenik',
-    ikona: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
+    ikona: 'ekran-tabove',
     narisuvay: (r) => narisuvayTabove(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiTabove(z.koren, z.k, z.prerisuvay),
   },
   lichno: {
     ime: 'Лично',
     podnaslov: 'същата таблица за собствени нужди · ОТДЕЛЕН Журнал, който никога не се смесва',
-    ikona: '<path d="M12 21s-7.5-4.4-7.5-9.6A4.4 4.4 0 0 1 12 8.3a4.4 4.4 0 0 1 7.5 3.1C19.5 16.6 12 21 12 21z"></path>',
+    ikona: 'lichno',
     narisuvay: (r) =>
       r.lichnoOgledalo && r.lichnoOgledalo.lichnoVklyucheno
         ? narisuvayLichno(r.lichnoOgledalo, r.ogledalo, r.dnes, r.lichenAkaunt, r.broyLichni)
@@ -283,7 +283,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
-    ikona: '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
+    ikona: 'ekran-tablo',
     // ТАБЛОТО НЯМА нито `iska`, нито `iskaRolya`, и това е НАРОЧНО: там се
     // връща изключеното и там стои ключът на личното. Екран, който може да се
     // самозаключи, заключва и пътя обратно.

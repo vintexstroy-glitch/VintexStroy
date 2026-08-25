@@ -19,6 +19,7 @@ import { zakachiStornoButoni } from './storno.js';
 import { poImot } from '../src/ogledalo/izgledi.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { butonSIkona } from './ikoni.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import {
   menyuOtZhivi,
@@ -503,8 +504,8 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
             : '<span class="znachka tiha">свободен</span>'
       }</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-popravi-imot="${ekraniraj(imot.id)}">Поправи</button>
-        <button type="button" class="vtorichen malak" data-storno-imot="${imot.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
         ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;
@@ -527,9 +528,9 @@ function redNaem(naem: Naem, o: Ogledalo): string {
           : '<span class="znachka dobre">жив</span>'
       }</span>
       <span class="butoni">
-        ${naem.prekraten ? '' : `<button type="button" class="vtorichen malak" data-prekrati="${ekraniraj(naem.id)}">Прекрати</button>`}
-        <button type="button" class="vtorichen malak" data-popravi-naem="${ekraniraj(naem.id)}">Поправи</button>
-        <button type="button" class="vtorichen malak" data-storno-naem="${naem.seq}">Сторно</button>
+        ${naem.prekraten ? '' : butonSIkona({ ikona: 'mahni', tekst: 'Прекрати', danni: { prekrati: naem.id } })}
+        ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-naem': naem.id } })}
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-naem': String(naem.seq) } })}
         ${butonIstoriya('naem', naem.id)}
       </span>
     </div>`;

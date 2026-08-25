@@ -33,6 +33,7 @@ import { sha256Web } from '../src/nositel/hash-web.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { duljimo, fold, prosrocheni, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { pregledayIznos, vnesiZhurnal } from '../src/domein/vnos.js';
+import { butonSIkona, ikona } from './ikoni.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
@@ -598,20 +599,29 @@ async function trugvay(): Promise<void> {
               ekran === 'lichno'
                 ? '<span class="drebno">Личният Журнал се изнася и проверява в секцията си долу — отделно от служебния.</span>'
                 : `${mozhe(izbor, 'iztochnitsi') ? narisuvayButona([...ogledalo.butoni.values()]) : ''}
-            <button type="button" class="vtorichen" id="proveri">Провери веригата</button>
+            ${
+              /**
+               * ЧЕТИРИТЕ ЛОСТА · знак отпред, дума до него (И101 т.2 · ADR-045).
+               *
+               * Дотук бяха четири еднакви правоъгълника с думи — окото ги четеше
+               * едно по едно всеки път. Знакът дава посоката отдалеч (стрелка
+               * нагоре = навън, надолу = навътре), думата остава за точността.
+               */
+              butonSIkona({ ikona: 'veriga', tekst: 'Провери веригата', klas: 'vtorichen', id: 'proveri' })
+            }
             ${
               mozhe(izbor, 'iznos-vnos')
-                ? '<button type="button" class="vtorichen" id="iznesi">Изнеси Журнала</button>'
+                ? butonSIkona({ ikona: 'iznos', tekst: 'Изнеси Журнала', klas: 'vtorichen', id: 'iznesi' })
                 : ''
             }
             ${
               mozhe(izbor, 'arhiv-eksel')
-                ? '<button type="button" class="vtorichen" id="arhiv">Архив за Ексел</button>'
+                ? butonSIkona({ ikona: 'arhiv', tekst: 'Архив за Ексел', klas: 'vtorichen', id: 'arhiv' })
                 : ''
             }
             ${
               mozhe(izbor, 'iznos-vnos')
-                ? '<button type="button" class="vtorichen" id="vnesi">Внеси Журнал</button>'
+                ? butonSIkona({ ikona: 'vnos', tekst: 'Внеси Журнал', klas: 'vtorichen', id: 'vnesi' })
                 : ''
             }
             <input translate="no" type="file" id="fayl" accept="application/json,.json" hidden>`
@@ -751,7 +761,7 @@ function strana(
         ? `<span class="broyach">${zakasneli}</span>`
         : '';
       return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
-        <svg viewBox="0 0 24 24">${e.ikona}</svg>${e.ime}${znachka}
+        ${ikona(e.ikona, 'ikona navikona')}${e.ime}${znachka}
       </button>`;
     })
     .join('');

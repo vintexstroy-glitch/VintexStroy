@@ -14,13 +14,21 @@
 
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
+import { butonSIkona } from './ikoni.js';
 import type { Sabitie } from '../src/yadro/index.js';
 import type { Konteks } from './ekranite.js';
 
 /** Малкият бутон в реда · `vid` и `id` са същността от Журнала. */
 export function butonIstoriya(vid: string, id: string): string {
-  return `<button type="button" class="butoncheto-istoriya" data-istoriya="${ekraniraj(vid)}·${ekraniraj(id)}"
-    aria-label="История на реда" title="История · кой, какво, кога">История</button>`;
+  // Знак отпред, дума до него (И101 т.2 · ADR-045). Класът остава същият —
+  // проходът и CSS-ът го познават по него, а не по разметката вътре.
+  return butonSIkona({
+    ikona: 'istoriya',
+    tekst: 'История',
+    title: 'История · кой, какво, кога',
+    klas: 'butoncheto-istoriya',
+    danni: { istoriya: `${vid}·${id}` },
+  });
 }
 
 /**

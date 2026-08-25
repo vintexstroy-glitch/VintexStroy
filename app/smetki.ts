@@ -61,6 +61,7 @@ import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { butonSIkona } from './ikoni.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
   menyuOtZhivi,
@@ -655,7 +656,7 @@ function redNaRazhod(r: Razhod): string {
       <span class="suma duljimo" data-st="${razbivka.obshta_st}">${kakvoPishe(razbivka.obshta_st)}</span>
       <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-storno-razhod="${r.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-razhod': String(r.seq) } })}
         ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;

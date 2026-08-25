@@ -554,8 +554,35 @@ async function main() {
     await p.setViewportSize({ width: 390, height: 844 });
     for (const [koy, znak] of [['imoti', '#forma-imot'], ['pari', '#forma-nachisli'], ['smetki', '#forma-period']]) {
       await naEkran(p, koy, znak);
-      const izliza = await p.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth + 1);
-      proveri(`${koy}: нищо не излиза встрани`, izliza, false);
+      /**
+       * КАЗВА КОЙ ПРЕЛИВА, не само че прелива.
+       *
+       * Дотук връщаше `true` и толкова — а после половин час се гадае кой
+       * елемент е виновен. Проверка, която знае отговора и го премълчава, е
+       * по-скъпа от липсваща: тя спира работата, без да я насочи.
+       */
+      const izliza = await p.evaluate(() => {
+        const koren = document.documentElement;
+        // МЯРКАТА си остава същата: скролва ли САМИЯТ документ. Широка таблица
+        // в свой скролер не е вина — тя нарочно се дърпа настрани.
+        if (koren.scrollWidth <= koren.clientWidth + 1) return 'нищо';
+        // Пада ли — казва КОЙ, вместо да остави гадаене. Търси се последният
+        // прародител, който НЕ скролва: той е онзи, който бута документа.
+        const vinovni = [];
+        for (const e of koren.querySelectorAll('*')) {
+          const r = e.getBoundingClientRect();
+          if (r.width === 0 || r.right <= koren.clientWidth + 1) continue;
+          let vRoditel = false;
+          for (let g = e.parentElement; g && g !== koren; g = g.parentElement) {
+            if (getComputedStyle(g).overflowX !== 'visible') { vRoditel = true; break; }
+          }
+          if (!vRoditel) {
+            vinovni.push(`${e.tagName.toLowerCase()}.${(e.className || '-').toString().split(' ')[0]}`);
+          }
+        }
+        return [...new Set(vinovni)].slice(0, 4).join(' · ') || 'документът скролва, но виновник не се намери';
+      });
+      proveri(`${koy}: нищо не излиза встрани`, izliza, 'нищо');
     }
     await p.setViewportSize({ width: 1280, height: 900 });
 
@@ -3683,6 +3710,13 @@ async function main() {
     proveri('всяко звено е на ЛИЧНИЯ наемател',
       izneseniLichni.every((x) => x.naematel.endsWith('#lichen')), true);
     proveri('и броят съвпада с личния Журнал', izneseniLichni.length, await broyLichni(p));
+    // ЧАКА ПРЕРИСУВАНЕТО, не го предполага. Белегът се пише при клика и екранът
+    // се прерисува СЛЕД това — прочетен веднага, текстът е още старият. Тази
+    // проверка падаше веднъж на няколко пускания и изглеждаше като случайност;
+    // случайността беше състезание, не флейк.
+    await p.waitForFunction(() =>
+      document.querySelector('[data-sektsiya=lichen-iznos]')?.textContent?.includes('Изнесен днес'),
+    );
     proveri('лентата помни ЛИЧНИЯ износ',
       (await p.$eval('[data-sektsiya=lichen-iznos]', (e) => e.textContent)).includes('Изнесен днес'), true);
 
