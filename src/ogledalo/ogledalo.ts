@@ -23,6 +23,7 @@ import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
+import type { LichenDostap } from '../domein/lichen-dostap.js';
 import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
@@ -44,6 +45,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
+  PayloadLichenDostapZapisan,
   PayloadDeloPrehvarleno,
   PayloadPrenosOtcheten,
   PayloadStorno,
@@ -242,6 +244,16 @@ export interface Ogledalo {
    * от последното `ЛичноПревключено`; празният Журнал е „не е активирано".
    */
   readonly lichnoVklyucheno: boolean;
+  /**
+   * МЯСТОТО в личния драйв, с което личното е активирано (И99).
+   * Празно значи „активирано преди това поле" — старият запис си е валиден.
+   */
+  readonly lichnoMyasto: string;
+  /**
+   * КОЙ Е ДОПУСНАТ до личното · споделянето в обратната посока (И99).
+   * Ключът е имейлът; отнетите СТОЯТ в картата с `otnet: true` (правило 1).
+   */
+  readonly lichniDostapi: ReadonlyMap<string, LichenDostap>;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -340,6 +352,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
   let lichnoVklyucheno = false;
+  let lichnoMyasto = '';
+  const lichniDostapi = new Map<string, LichenDostap>();
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -466,6 +480,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ЛичноПревключено': {
         const p = s.payload as unknown as PayloadLichnoPrevklyucheno;
         lichnoVklyucheno = p.vklyucheno; // последната дума бие
+        // Мястото се пази и след прибиране: прибраното не е изтрито, а при
+        // повторно пускане човекът не бива да го посочва наново.
+        if (p.myasto) lichnoMyasto = p.myasto;
+        break;
+      }
+
+      case 'ЛиченДостъпЗаписан': {
+        const p = s.payload as unknown as PayloadLichenDostapZapisan;
+        lichniDostapi.set(p.imeyl, {
+          imeyl: p.imeyl,
+          rolya: chetiRolya(p.rolya),
+          kakvo: p.kakvo as LichenDostap['kakvo'],
+          kakav: p.kakav as LichenDostap['kakav'],
+          otnet: p.otnet,
+        });
         break;
       }
 
@@ -703,6 +732,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prehvarleni,
     prenosi,
     lichnoVklyucheno,
+    lichnoMyasto,
+    lichniDostapi,
     sverki,
     prilozheni,
     pogaseni,

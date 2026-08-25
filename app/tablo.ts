@@ -270,10 +270,11 @@ export function narisuvayTablo(
   izbor: Izbor,
   akaunt: string,
   lichnoVklyucheno = false,
+  lichnoPipnato = false,
 ): string {
   return (
     kartaKoySam(koj, akaunt) +
-    kartaLichno(lichnoVklyucheno) +
+    kartaLichno(lichnoVklyucheno, lichnoPipnato) +
     kartaOtmetki(izbor) +
     kartaSravnenie(izbor, koj)
   );
@@ -292,7 +293,11 @@ export function narisuvayTablo(
  * не ред в `masterbook:izbor` — localStorage е на БРАУЗЪРА и би казал
  * „включено" тук и „изключено" там, докато данните лежат на диска.
  */
-function kartaLichno(vklyucheno: boolean): string {
+function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
+  // ТРИ състояния, не две: „не е пипано" ≠ „прибрано" ≠ „включено".
+  // Първото пускане иска МЯСТО в личния драйв и става на самия екран „Лично"
+  // (И99); тук се връща само вече записаното.
+  const sastoyanie = vklyucheno ? 'включено' : pipnato ? 'прибрано' : 'не е пускано';
   return `
     <section class="karta" data-sektsiya="tablo-lichno">
       <div class="dyalglava">
@@ -300,10 +305,14 @@ function kartaLichno(vklyucheno: boolean): string {
         <span>второстепенна настройка · твоя, не на наемателя</span>
       </div>
       <div class="deystviya">
-        <span class="znachka ${vklyucheno ? 'dobre' : 'tiha'}">${vklyucheno ? 'включено' : 'прибрано'}</span>
-        <button type="button" class="vtorichen" id="tablo-lichno">${
-          vklyucheno ? 'Прибери личното' : 'Пусни личното'
-        }</button>
+        <span class="znachka ${vklyucheno ? 'dobre' : 'tiha'}">${sastoyanie}</span>
+        ${
+          pipnato
+            ? `<button type="button" class="vtorichen" id="tablo-lichno">${
+                vklyucheno ? 'Прибери личното' : 'Върни личното'
+              }</button>`
+            : '<span class="drebno">пуска се от пункта <b>Лично</b> — там се посочва мястото в твоя драйв</span>'
+        }
       </div>
       <p class="drebno">Личният таб е <b>същата таблица</b> от Управление за собствени нужди, с
       <b>отделен Журнал</b>, който никога не се смесва със служебния. Прибирането сваля пункта от

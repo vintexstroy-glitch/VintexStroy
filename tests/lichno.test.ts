@@ -31,6 +31,17 @@ import {
   svediImeyl,
 } from '../src/domein/akaunt.js';
 import { GreshkaPrenos, mozheLiDaSePrenese, nedovarsheni, prenesiDela } from '../src/domein/prenos.js';
+import {
+  GreshkaDostap,
+  type LichenDostap,
+  dopusnati,
+  dopusnatiImeyli,
+  mozheDaPishe,
+  napraviDostap,
+  pishatImeyli,
+  proveriMyasto,
+} from '../src/domein/lichen-dostap.js';
+import type { Rolya } from '../src/yadro/samolichnost.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import type { PayloadDeloZapisano } from '../src/domein/sabitiya.js';
 import { SHA } from './pomoshtni.js';
@@ -38,6 +49,8 @@ import { SHA } from './pomoshtni.js';
 const IMEYL = 'ivo@example.bg';
 const SLUZHEBEN = 'firma.bg';
 const LICHEN = `${IMEYL}${NASTAVKA_LICHEN}`;
+/** И99: личното се активира с МЯСТО в личния драйв, не с гол бутон. */
+const MYASTO = 'MasterBook/Лично';
 
 function stend(pravata = new VsichkoRazresheno()) {
   const dnevnik = new DnevnikVPametta();
@@ -98,7 +111,7 @@ describe('активирането · Журналът СЪЩЕСТВУВА ⟺ 
     const { dnevnik, zaKlyuch } = stend();
     const lichni = zaKlyuch(LICHEN);
     await lichni.prevklyuchiLichno(
-      { vklyucheno: true, sluzhebniyat: SLUZHEBEN },
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
       { opId: 'lichno-1' },
     );
     const sabitiya = await dnevnik.chetiVsichki(LICHEN);
@@ -111,7 +124,7 @@ describe('активирането · Журналът СЪЩЕСТВУВА ⟺ 
   it('прибирането НЕ трие нищо — само сваля пункта', async () => {
     const { dnevnik, zaKlyuch } = stend();
     const lichni = zaKlyuch(LICHEN);
-    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN }, { opId: 'l1' });
+    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO }, { opId: 'l1' });
     await lichni.zapishiDelo('D1', DELO('лекар'), { opId: 'd1' });
     await lichni.prevklyuchiLichno({ vklyucheno: false, sluzhebniyat: SLUZHEBEN }, { opId: 'l2' });
 
@@ -124,7 +137,7 @@ describe('активирането · Журналът СЪЩЕСТВУВА ⟺ 
   it('включването НЕ оставя нито един ред в служебния Журнал', async () => {
     const { dnevnik, zaKlyuch } = stend();
     await zaKlyuch(LICHEN).prevklyuchiLichno(
-      { vklyucheno: true, sluzhebniyat: SLUZHEBEN },
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
       { opId: 'l1' },
     );
     // „този човек си е пуснал личен живот" е метаданна; служебният се изнася
@@ -140,7 +153,7 @@ describe('двата Журнала · НИКОГА не се смесват', (
     const lichni = zaKlyuch(LICHEN);
     await sluzhebni.zapishiDelo('S1', DELO('Акт 16'), { opId: 's1' });
     await sluzhebni.zapishiDelo('S2', DELO('Ремонт'), { opId: 's2' });
-    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN }, { opId: 'l1' });
+    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO }, { opId: 'l1' });
     await lichni.zapishiDelo('L1', DELO('зъболекар'), { opId: 'l2' });
     return { dnevnik, sluzhebni, lichni, zaKlyuch };
   }
@@ -172,7 +185,7 @@ describe('двата Журнала · НИКОГА не се смесват', (
     // Своят си пише
     await expect(
       zaKlyuch(LICHEN, IMEYL).prevklyuchiLichno(
-        { vklyucheno: true, sluzhebniyat: SLUZHEBEN },
+        { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
         { opId: 'a' },
       ),
     ).resolves.toBeDefined();
@@ -194,7 +207,7 @@ describe('преносът · ИЗПРАЩАНЕ, не преместване', 
     const lichni = zaKlyuch(LICHEN);
     await sluzhebni.zapishiDelo('D1', DELO('преглед при лекар'), { opId: 's1' });
     await sluzhebni.zapishiDelo('D2', DELO('Акт 16'), { opId: 's2' });
-    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN }, { opId: 'l1' });
+    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO }, { opId: 'l1' });
     return { dnevnik, sluzhebni, lichni };
   }
 
@@ -389,5 +402,206 @@ describe('сторнираното дело не се връща от собст
       'delo',
     );
     expect((await d.ogledalo()).dela.has('D1')).toBe(false);
+  });
+});
+
+// ══ И99 · споделянето в ОБРАТНАТА посока ═══════════════════════════════════
+
+describe('мястото в личния драйв · активацията не е гол бутон (И99)', () => {
+  it('без МЯСТО личното не тръгва', async () => {
+    const { zaKlyuch } = stend();
+    await expect(
+      zaKlyuch(LICHEN).prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN }, { opId: 'x' }),
+    ).rejects.toThrow(/МЯСТО/);
+    await expect(
+      zaKlyuch(LICHEN).prevklyuchiLichno(
+        { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: '   ' },
+        { opId: 'y' },
+      ),
+    ).rejects.toThrow(/МЯСТО/);
+  });
+
+  it('мястото се подравнява, но регистърът НЕ се пипа', () => {
+    // „Лично" не е „лично" — имената на папки в драйва различават двете.
+    expect(proveriMyasto('  /MasterBook//Лично/  ')).toBe('MasterBook/Лично');
+    expect(proveriMyasto('MasterBook\\Лично')).toBe('MasterBook/Лично');
+    expect(proveriMyasto('MasterBook/ЛИЧНО')).toBe('MasterBook/ЛИЧНО');
+    expect(() => proveriMyasto('x'.repeat(201))).toThrow(GreshkaDostap);
+  });
+
+  it('мястото ОСТАВА след прибиране — не се посочва наново', async () => {
+    const { zaKlyuch } = stend();
+    const lichni = zaKlyuch(LICHEN);
+    await lichni.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+    await lichni.prevklyuchiLichno({ vklyucheno: false, sluzhebniyat: SLUZHEBEN }, { opId: 'l2' });
+    expect((await lichni.ogledalo()).lichnoMyasto).toBe(MYASTO);
+    // и повторното пускане минава БЕЗ ново място
+    await expect(
+      lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN }, { opId: 'l3' }),
+    ).resolves.toBeDefined();
+  });
+});
+
+describe('обратната посока · служителят раздава (И99)', () => {
+  async function sLichno() {
+    const { dnevnik, zaKlyuch } = stend();
+    const lichni = zaKlyuch(LICHEN);
+    await lichni.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+    return { dnevnik, lichni, zaKlyuch };
+  }
+
+  const DOSTAP = (imeyl: string, kakav: 'rabotodatel' | 'vanshen', rolya: Rolya = 'nablyudatel') => ({
+    imeyl,
+    rolya,
+    kakvo: 'dvete',
+    kakav,
+    otnet: false,
+  });
+
+  it('дава се на РАБОТОДАТЕЛЯ и на ВЪНШЕН имейл — двата се различават', async () => {
+    const { lichni } = await sLichno();
+    await lichni.zapishiLichenDostap(DOSTAP('shef@firma.bg', 'rabotodatel'), { opId: 'd1' });
+    await lichni.zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen', 'redaktor'), { opId: 'd2' });
+
+    const o = await lichni.ogledalo();
+    expect(o.lichniDostapi.size).toBe(2);
+    expect(o.lichniDostapi.get('shef@firma.bg')!.kakav).toBe('rabotodatel');
+    // Външният НЕ е служител на наемателя и не влиза в екипа му.
+    expect(o.lichniDostapi.get('zhena@example.bg')!.kakav).toBe('vanshen');
+    expect(o.sluzhiteli.size).toBe(0);
+  });
+
+  it('и НИЩО от това не влиза в служебния Журнал', async () => {
+    const { dnevnik, lichni } = await sLichno();
+    await lichni.zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen'), { opId: 'd1' });
+    expect(await dnevnik.chetiVsichki(SLUZHEBEN)).toHaveLength(0);
+  });
+
+  it('от СЛУЖЕБНИЯ Журнал личен достъп НЕ се дава', async () => {
+    const { zaKlyuch } = await sLichno();
+    await expect(
+      zaKlyuch(SLUZHEBEN).zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen'), { opId: 'd1' }),
+    ).rejects.toThrow(/ЛИЧНИЯ Журнал/);
+  });
+
+  it('на СЕБЕ СИ не се дава достъп', async () => {
+    const { lichni } = await sLichno();
+    await expect(
+      lichni.zapishiLichenDostap(DOSTAP(IMEYL, 'vanshen'), { opId: 'd1' }),
+    ).rejects.toThrow(/На себе си/);
+  });
+
+  it('отнемането е НОВО събитие — редът остава в Журнала', async () => {
+    const { dnevnik, lichni } = await sLichno();
+    await lichni.zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen'), { opId: 'd1' });
+    await lichni.zapishiLichenDostap(
+      { ...DOSTAP('zhena@example.bg', 'vanshen'), otnet: true },
+      { opId: 'd2' },
+    );
+    const o = await lichni.ogledalo();
+    expect(o.lichniDostapi.get('zhena@example.bg')!.otnet).toBe(true);
+    expect(dopusnati(o.lichniDostapi.values())).toHaveLength(0);
+    // „дадох ѝ достъп, после го отнех" — историята стои
+    expect((await dnevnik.chetiVsichki(LICHEN)).filter((s) => s.type === 'ЛиченДостъпЗаписан'))
+      .toHaveLength(2);
+  });
+
+  it('ВРАТАТА пуска допуснатия и спира отнетия — не екранът', async () => {
+    // Правото се пита от ядрото; иначе „никога не се смесват" е надпис.
+    let dopusnatite: ReadonlySet<string> = new Set();
+    const pravata = new LichnoESamoTvoe(
+      NASTAVKA_LICHEN,
+      svediImeyl,
+      () => dopusnatite,
+      () => dopusnatite,
+    );
+    const { zaKlyuch } = stend(pravata as never);
+    const az = zaKlyuch(LICHEN, IMEYL);
+    await az.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+
+    // преди даването — чуждият не пише
+    const zhena = zaKlyuch(LICHEN, 'zhena@example.bg');
+    await expect(zhena.zapishiDelo('Z1', DELO('годишнина'), { opId: 'z1' })).rejects.toThrow();
+
+    // след даването — пише
+    await az.zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen', 'redaktor'), { opId: 'd1' });
+    dopusnatite = dopusnatiImeyli((await az.ogledalo()).lichniDostapi.values());
+    await expect(zhena.zapishiDelo('Z1', DELO('годишнина'), { opId: 'z1' })).resolves.toBeDefined();
+
+    // след отнемането — пак не пише
+    await az.zapishiLichenDostap(
+      { ...DOSTAP('zhena@example.bg', 'vanshen', 'redaktor'), otnet: true },
+      { opId: 'd2' },
+    );
+    dopusnatite = dopusnatiImeyli((await az.ogledalo()).lichniDostapi.values());
+    await expect(zhena.zapishiDelo('Z2', DELO('второ'), { opId: 'z2' })).rejects.toThrow();
+  });
+
+  it('НАБЛЮДАТЕЛЯТ вижда, но не пише · трите релета важат и тук', async () => {
+    const { lichni } = await sLichno();
+    await lichni.zapishiLichenDostap(DOSTAP('shef@firma.bg', 'rabotodatel', 'nablyudatel'), { opId: 'd1' });
+    await lichni.zapishiLichenDostap(DOSTAP('zhena@example.bg', 'vanshen', 'redaktor'), { opId: 'd2' });
+    const dostapi = (await lichni.ogledalo()).lichniDostapi.values();
+    expect(mozheDaPishe(dostapi, 'shef@firma.bg')).toBe(false);
+    expect(mozheDaPishe((await lichni.ogledalo()).lichniDostapi.values(), 'zhena@example.bg')).toBe(true);
+    // ВИЖДАТ и двамата · разликата е само в писането
+    const vsichki = [...(await lichni.ogledalo()).lichniDostapi.values()];
+    expect([...dopusnatiImeyli(vsichki)].sort()).toEqual(['shef@firma.bg', 'zhena@example.bg']);
+    expect([...pishatImeyli(vsichki)]).toEqual(['zhena@example.bg']);
+  });
+
+  /**
+   * ДВАТА ЧЕТЕЦА НА ВРАТАТА · намерено при писането на ADR-037.
+   *
+   * `mozheDaPishe` от домейна знаеше за ролята, но живееше САМО в тестовете:
+   * приложението подаваше на Вратата ЕДИН списък „допуснати" и за двата ѝ
+   * въпроса. Тоест наблюдателят пишеше — тихо, и без нито един червен тест,
+   * защото никой не питаше Вратата вместо домейна.
+   *
+   * Затова тук се пита ВРАТАТА, с двата списъка така, както ги подава
+   * приложението.
+   */
+  it('наблюдателят ИЗНАСЯ, но Вратата не го пуска да ПИШЕ', async () => {
+    let vsichki: readonly LichenDostap[] = [];
+    const pravata = new LichnoESamoTvoe(
+      NASTAVKA_LICHEN,
+      svediImeyl,
+      () => dopusnatiImeyli(vsichki),
+      () => pishatImeyli(vsichki),
+    );
+    const { zaKlyuch } = stend(pravata as never);
+    const az = zaKlyuch(LICHEN, IMEYL);
+    await az.prevklyuchiLichno(
+      { vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO },
+      { opId: 'l1' },
+    );
+    await az.zapishiLichenDostap(DOSTAP('shef@firma.bg', 'rabotodatel', 'nablyudatel'), { opId: 'd1' });
+    vsichki = [...(await az.ogledalo()).lichniDostapi.values()];
+
+    const shefat = zaKlyuch(LICHEN, 'shef@firma.bg');
+    await expect(shefat.zapishiDelo('S1', DELO('среща'), { opId: 's1' })).rejects.toThrow();
+    // но ВИЖДА — четенето и износът минават
+    await expect(pravata.mozheDaIznasya('shef@firma.bg', LICHEN)).resolves.toBe(true);
+    await expect(pravata.mozheDaPishe('shef@firma.bg', LICHEN)).resolves.toBe(false);
+  });
+
+  it('сгрешен имейл и непозната роля се отказват С ДУМИ', () => {
+    expect(() => napraviDostap({ imeyl: 'не-е-имейл', rolya: 'redaktor', kakvo: 'tab', kakav: 'vanshen' }))
+      .toThrow(/не прилича на имейл/);
+    expect(() =>
+      napraviDostap({ imeyl: 'a@b.bg', rolya: 'цар' as never, kakvo: 'tab', kakav: 'vanshen' }),
+    ).toThrow(/Непозната роля/);
+    // и имейлът се свежда, за да не станат двама от един човек
+    expect(napraviDostap({ imeyl: ' Zhena@Example.BG ', rolya: 'redaktor', kakvo: 'tab', kakav: 'vanshen' }).imeyl)
+      .toBe('zhena@example.bg');
   });
 });

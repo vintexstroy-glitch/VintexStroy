@@ -11,7 +11,7 @@ import {
   proveriKotvata,
   proveriVerigata,
   Vrata,
-  VsichkoRazresheno,
+  LichnoESamoTvoe,
 } from '../src/yadro/index.js';
 import {
   klyuchalkaMezhduRazdeli,
@@ -50,7 +50,15 @@ import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
-import { KLYUCH_OT_ALFA, klyuchNaLichniya, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt.js';
+import {
+  KLYUCH_OT_ALFA,
+  NASTAVKA_LICHEN,
+  klyuchNaLichniya,
+  koyZhurnal,
+  sDumiZaAkaunta,
+  svediImeyl,
+} from '../src/domein/akaunt.js';
+import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { narisuvayLichno, pokanaZaLichno, zabraviIzbora, zakachiLichno } from './lichno.js';
 
 /**
@@ -378,7 +386,24 @@ async function trugvay(): Promise<void> {
   const kotva = new KotvaVLocalStorage();
   // Един писач и МЕЖДУ разделите, не само в този.
   const klyuchalka = klyuchalkaMezhduRazdeli();
-  const pravata = new VsichkoRazresheno();
+  /**
+   * ПРАВОТО · служебният минава както досега, личният — само на своя човек
+   * и на онези, на които той е дал (И98 · И99).
+   *
+   * Допуснатите се четат от ЛИЧНОТО Огледало и се обновяват при всяко
+   * прерисуване. Ядрото пита функция; домейнът я пълни.
+   *
+   * ДВА списъка, защото Вратата пита два въпроса: наблюдателят ВИЖДА личното
+   * и може да го изнесе, но не мени сроковете в него.
+   */
+  let vizhdatLichnoto: ReadonlySet<string> = new Set();
+  let pishatVLichnoto: ReadonlySet<string> = new Set();
+  const pravata = new LichnoESamoTvoe(
+    NASTAVKA_LICHEN,
+    svediImeyl,
+    () => vizhdatLichnoto,
+    () => pishatVLichnoto,
+  );
   const vrata = new Vrata({
     dnevnik,
     pravata,
@@ -467,8 +492,14 @@ async function trugvay(): Promise<void> {
       const buton = e.target as HTMLButtonElement;
       buton.disabled = true;
       try {
+        // МЯСТОТО · при пускане се чете от полето; при прибиране не трябва.
+        const poleto = koren.querySelector<HTMLInputElement>('#lichno-myasto');
         await lichen.deystviya.prevklyuchiLichno(
-          { vklyucheno, sluzhebniyat: akaunt },
+          {
+            vklyucheno,
+            sluzhebniyat: akaunt,
+            ...(vklyucheno && poleto ? { myasto: poleto.value } : {}),
+          },
           { opId: crypto.randomUUID() },
         );
         zabraviIzbora();
@@ -494,6 +525,9 @@ async function trugvay(): Promise<void> {
     const lichniteSabitiya = await dnevnik.chetiVsichki(lichen.akaunt);
     const lichnoOgledalo = lichniteSabitiya.length > 0 ? await lichen.deystviya.ogledalo() : null;
     const lichnoVklyucheno = lichnoOgledalo?.lichnoVklyucheno ?? false;
+    const lichniDostapi = lichnoOgledalo ? [...lichnoOgledalo.lichniDostapi.values()] : [];
+    vizhdatLichnoto = dopusnatiImeyli(lichniDostapi);
+    pishatVLichnoto = pishatImeyli(lichniDostapi);
     const dnes = dnesKato();
     // Изключен екран не се показва празен — връщаме се на Имоти.
     const iska = EKRAN_ISKA[ekran];
@@ -501,7 +535,7 @@ async function trugvay(): Promise<void> {
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
-      ${strana(ogledalo, dnes, lichnoVklyucheno, kojSam.rolya)}
+      ${strana(ogledalo, dnes, lichnoVklyucheno, kojSam.rolya, lichnoOgledalo !== null)}
       <main class="glavno">
         <header class="shapka">
           <div>
@@ -560,8 +594,8 @@ async function trugvay(): Promise<void> {
                             : ekran === 'lichno'
                               ? lichnoOgledalo && lichnoOgledalo.lichnoVklyucheno
                                 ? narisuvayLichno(lichnoOgledalo, ogledalo, dnes)
-                                : pokanaZaLichno(lichen.akaunt)
-                              : narisuvayTablo(kojSam, izbor, akaunt, lichnoVklyucheno)
+                                : pokanaZaLichno(lichen.akaunt, lichnoOgledalo?.lichnoMyasto ?? '')
+                              : narisuvayTablo(kojSam, izbor, akaunt, lichnoVklyucheno, lichnoOgledalo !== null)
           }
         </div>
       </main>`;
@@ -588,6 +622,9 @@ async function trugvay(): Promise<void> {
         },
         prerisuvay,
       );
+      // Таблото ВРЪЩА прибраното (мястото вече е записано) и ПРИБИРА
+      // включеното. Първото пускане е на самия екран „Лично" — там е полето
+      // за мястото, без което личното не тръгва (И99).
       zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
       koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
         await vhod.izlez();
@@ -618,6 +655,7 @@ function strana(
   dnes: string,
   lichnoVklyucheno = false,
   rolya: Rolya = 'sobstvenik',
+  lichnoPipnato = false,
 ): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
@@ -629,9 +667,14 @@ function strana(
 
   const punktove = (Object.keys(EKRANI) as KoyEkran[])
     .filter((koy) => {
-      // ЛИЧНОТО се вижда само когато е пуснато · пуска се от Таблото, където
-      // изключеното се връща (И98 · „добавка по избор").
-      if (koy === 'lichno') return lichnoVklyucheno;
+      // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
+      // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
+      // драйв, а полето за него живее на самия екран).
+      //
+      // ПРИБРАНОТО пада от лентата и се връща от Таблото, където изключеното
+      // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
+      // ≠ „включено", и това е причината да не е един булев.
+      if (koy === 'lichno') return lichnoVklyucheno || !lichnoPipnato;
       const iska = EKRAN_ISKA[koy];
       if (iska && !mozhe(izbor, iska)) return false;
       return dostapenLiE(koy, rolya);

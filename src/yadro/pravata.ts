@@ -48,23 +48,57 @@ export class VsichkoRazresheno implements Pravata {
 export class LichnoESamoTvoe implements Pravata {
   readonly #nastavka: string;
   readonly #svedi: (imeyl: string) => string;
+  readonly #vizhdat: (naematel: string) => ReadonlySet<string>;
+  readonly #pishat: (naematel: string) => ReadonlySet<string>;
 
-  constructor(nastavka: string, svedi: (imeyl: string) => string) {
+  /**
+   * Допуснатите идват ОТВЪН · ядрото не чете домейна (И99).
+   *
+   * Кой е допуснат до един личен Журнал живее в самия него като събития
+   * (`ЛиченДостъпЗаписан`). Да ги чете Вратата би значело ядрото да сгъва
+   * Огледало — и да пита за право, за да прочете правото. Затова
+   * приложението подава ЧЕТЕЦ и го обновява при всяко прерисуване; същият
+   * ред на зависимостите като при `imaZhurnalOtAlfa`.
+   *
+   * ДВА ЧЕТЕЦА, не един. Вратата пита два различни въпроса — „може ли да
+   * пише" и „може ли да изнася" — и наблюдателят отговаря различно на тях:
+   * вижда таба, не мени сроковете. Един общ списък би направил всеки допуснат
+   * писач МЪЛЧАЛИВО, а точно мълчаливото право е онова, което никой не
+   * забелязва, докато не стане.
+   *
+   * Празните четци по подразбиране значат „никой освен собственика" — най-
+   * тясното допускане, ако някой забрави да ги подаде.
+   */
+  constructor(
+    nastavka: string,
+    svedi: (imeyl: string) => string,
+    vizhdat: (naematel: string) => ReadonlySet<string> = () => new Set(),
+    pishat: (naematel: string) => ReadonlySet<string> = () => new Set(),
+  ) {
     this.#nastavka = nastavka;
     this.#svedi = svedi;
+    this.#vizhdat = vizhdat;
+    this.#pishat = pishat;
   }
 
-  #negovoLiE(actor: string, naematel: string): boolean {
+  #negovoLiE(
+    actor: string,
+    naematel: string,
+    koito: (naematel: string) => ReadonlySet<string>,
+  ): boolean {
     if (!naematel.endsWith(this.#nastavka)) return true; // служебен — както досега
-    return naematel === `${this.#svedi(actor)}${this.#nastavka}`;
+    const sveden = this.#svedi(actor);
+    if (naematel === `${sveden}${this.#nastavka}`) return true; // собственикът
+    // …или онзи, на когото собственикът е дал ТОВА право — обратната посока (И99).
+    return koito(naematel).has(sveden);
   }
 
   async mozheDaPishe(actor: string, naematel: string): Promise<boolean> {
-    return this.#negovoLiE(actor, naematel);
+    return this.#negovoLiE(actor, naematel, this.#pishat);
   }
 
   async mozheDaIznasya(actor: string, naematel: string): Promise<boolean> {
-    return this.#negovoLiE(actor, naematel);
+    return this.#negovoLiE(actor, naematel, this.#vizhdat);
   }
 }
 

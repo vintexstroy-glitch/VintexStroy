@@ -17,6 +17,8 @@ import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
+import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
+import { eLichenKlyuch } from './akaunt.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -26,6 +28,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
+  PayloadLichenDostapZapisan,
   PayloadDeloPrehvarleno,
   PayloadPrenosOtcheten,
   PayloadNaemPopraven,
@@ -237,7 +240,53 @@ export class Deystviya {
    * false`; Журналът остава непокътнат, само пунктът пада от лентата.
    */
   async prevklyuchiLichno(danni: PayloadLichnoPrevklyucheno, z: Zayavka): Promise<Rezultat> {
+    // МЯСТОТО Е ЧАСТ ОТ АКТИВАЦИЯТА (И99): „личният екран се активира с
+    // ДАВАНЕ НА ДОСТЪП ДО МЯСТО в личния драйв". Изисква се при ВКЛЮЧВАНЕ;
+    // при прибиране няма какво да се посочва.
+    //
+    // Проверката е ТУК, не в типа: запис, направен преди това поле, е също
+    // толкова валиден запис и Журналът не се преписва (правило 1).
+    if (danni.vklyucheno) {
+      const veche = (await this.ogledalo()).lichnoMyasto;
+      if (proveriMyasto(danni.myasto ?? veche) === '') {
+        throw new GreshkaDostap('Личното иска МЯСТО в твоя драйв, преди да тръгне.');
+      }
+    }
     return this.#pusni('ЛичноПревключено', VID.lichno, `LICHNO:${this.#naematel}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ЛИЧЕН ДОСТЪП · споделянето в ОБРАТНАТА посока (И99).
+   *
+   * Негово: „ако иска да даде достъп на работодателя си… или да сподели на
+   * външен имейл личната си папка и личен таб. Например на жена си."
+   *
+   * Отнемането е СЪЩОТО действие с `otnet: true` — ново събитие върху същия
+   * човек, не изтрит ред. „Дадох ѝ достъп през август, отнех го през ноември"
+   * е история, която триенето би направило недоказуема (правило 1).
+   *
+   * ПИША СЕ САМО В ЛИЧЕН ЖУРНАЛ. Кой е допуснат до личното е част от личното;
+   * в служебния такъв запис няма какво да прави и не бива да го има (И98).
+   */
+  async zapishiLichenDostap(
+    danni: PayloadLichenDostapZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    if (!eLichenKlyuch(this.#naematel)) {
+      throw new GreshkaDostap(
+        'Личен достъп се дава само от ЛИЧНИЯ Журнал. В служебния такъв запис не влиза — ' +
+          'кой е допуснат до личното е част от личното.',
+      );
+    }
+    const dostap = napraviDostap({
+      imeyl: danni.imeyl,
+      rolya: danni.rolya,
+      kakvo: danni.kakvo as never,
+      kakav: danni.kakav as never,
+      otnet: danni.otnet,
+    });
+    proveriNeSamSiAz(dostap, this.#actor);
+    return this.#pusni('ЛиченДостъпЗаписан', VID.dostap, `DOSTAP:${dostap.imeyl}`, dostap, z);
   }
 
   /**

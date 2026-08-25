@@ -36,6 +36,14 @@ import {
   zakachiGant,
 } from './gant.js';
 import { GreshkaPrenos, mozheLiDaSePrenese, prenesiDela } from '../src/domein/prenos.js';
+import {
+  IMENA_NA_KAKAV,
+  IMENA_NA_SPODELYANETO,
+  KAKAV,
+  VIDOVE_SPODELYANE,
+  dopusnati,
+} from '../src/domein/lichen-dostap.js';
+import { IMENA_NA_ROLITE, type Rolya } from '../src/yadro/samolichnost.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './main.js';
 
@@ -62,7 +70,7 @@ export function zabraviIzbora(): void {
  * „Добавка ПО ИЗБОР" — затова тук стои покана, не празна таблица. Празната
  * таблица би изглеждала като загубени данни.
  */
-export function pokanaZaLichno(imeyl: string): string {
+export function pokanaZaLichno(imeyl: string, myasto = ''): string {
   return `
     <section data-sektsiya="lichno-pokana">
       <div class="dyalglava">
@@ -79,6 +87,16 @@ export function pokanaZaLichno(imeyl: string): string {
         агента и не излиза в служебния износ.</p>
         <p class="drebno">Изнася се отделно и се проверява отделно. Кранът при инцидент е
         ОБЩ — Вратата е една: спре ли се записът заради подозрение, спира и тук.</p>
+        <div class="poleta">
+          <label class="pole">
+            <span>Място в твоя драйв</span>
+            <input type="text" id="lichno-myasto" value="${ekraniraj(myasto)}" placeholder="MasterBook/Лично">
+          </label>
+        </div>
+        <p class="drebno"><b>Личното се активира с място.</b> Там ще живее и оттам се споделя;
+        без място то би било Журнал, който никой не може да намери. Приложението <b>не създава</b>
+        папката и <b>не я споделя</b> — това става в самия драйв, с неговите средства (правило 14).
+        Тук се записва КЪДЕ е, за да го знае връзката с драйва, когато дойде.</p>
         <div class="deystviya">
           <button type="button" class="glaven" id="lichno-pusni">Пусни личното</button>
         </div>
@@ -96,6 +114,7 @@ export function narisuvayLichno(
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
     ${narisuvayGant(lichnoOgledalo, dnes, KLYUCH_POGLED, NADPISI_LICHNI, PREDSTAVKA)}
     ${sektsiyaPrenos(lichnoOgledalo, sluzhebnoOgledalo)}
+    ${sektsiyaDostapi(lichnoOgledalo)}
     <section>
       <div class="dyalglava">
         <h2>Личният Журнал</h2>
@@ -170,6 +189,91 @@ function sektsiyaPrenos(lichno: Ogledalo, sluzhebno: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * СПОДЕЛЯНЕТО В ОБРАТНАТА ПОСОКА (И99).
+ *
+ * Негово: „ако иска да даде достъп на работодателя си… или да сподели на
+ * външен имейл личната си папка и личен таб. Например на жена си."
+ *
+ * Дотук правата вървяха главен акаунт → служител. Тук раздава СОБСТВЕНИКЪТ НА
+ * ЛИЧНОТО — и работодателят не може да си вземе, може само да му бъде дадено.
+ */
+function sektsiyaDostapi(o: Ogledalo): string {
+  const vsichki = [...o.lichniDostapi.values()];
+  const zhivi = dopusnati(vsichki);
+  return `
+    <section data-sektsiya="lichni-dostapi">
+      <div class="dyalglava">
+        <h2>Кой вижда личното</h2>
+        <span>обратната посока · ТИ раздаваш, не работодателят</span>
+      </div>
+
+      ${
+        vsichki.length === 0
+          ? '<p class="drebno">Никой освен теб. Личното е твое, докато сам не дадеш достъп.</p>'
+          : `<div class="tablitsa" data-tablitsa="dostapi">
+              <div class="glava dostap">
+                <span>Имейл</span><span>Кой е</span><span>Може</span><span>Какво</span><span></span>
+              </div>
+              ${vsichki
+                .map(
+                  (d) => `<div class="red dostap${d.otnet ? ' mahnata' : ''}" translate="no">
+                    <span class="kletka"><b>${ekraniraj(d.imeyl)}</b></span>
+                    <span>${ekraniraj(IMENA_NA_KAKAV[d.kakav])}</span>
+                    <span>${ekraniraj(IMENA_NA_ROLITE[d.rolya])}</span>
+                    <span>${ekraniraj(IMENA_NA_SPODELYANETO[d.kakvo])}</span>
+                    <span>${
+                      d.otnet
+                        ? '<span class="znachka tiha">отнет</span>'
+                        : `<button type="button" class="vtorichen malak" data-otnemi="${ekraniraj(d.imeyl)}">Отнеми</button>`
+                    }</span>
+                  </div>`,
+                )
+                .join('')}
+            </div>
+            <p class="drebno">${zhivi.length} ${zhivi.length === 1 ? 'жив достъп' : 'живи достъпа'} от ${vsichki.length}. <b>Отнетият ред НЕ се трие</b> — „дадох ѝ достъп през август, отнех го през ноември" е история, която триенето би направило недоказуема (правило 1).</p>`
+      }
+
+      <div class="poleta">
+        <label class="pole">
+          <span>Имейл</span>
+          <input type="email" id="dostap-imeyl" placeholder="zhena@example.bg">
+        </label>
+        <label class="pole">
+          <span>Кой е</span>
+          <select id="dostap-kakav">
+            ${KAKAV.map((x) => `<option value="${x}">${ekraniraj(IMENA_NA_KAKAV[x])}</option>`).join('')}
+          </select>
+        </label>
+        <label class="pole">
+          <span>Може</span>
+          <select id="dostap-rolya">
+            <option value="nablyudatel">${ekraniraj(IMENA_NA_ROLITE['nablyudatel'])}</option>
+            <option value="redaktor">${ekraniraj(IMENA_NA_ROLITE['redaktor'])}</option>
+          </select>
+        </label>
+        <label class="pole">
+          <span>Какво</span>
+          <select id="dostap-kakvo">
+            ${VIDOVE_SPODELYANE.map(
+              (x) => `<option value="${x}"${x === 'dvete' ? ' selected' : ''}>${ekraniraj(IMENA_NA_SPODELYANETO[x])}</option>`,
+            ).join('')}
+          </select>
+        </label>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="dostap-day">Дай достъп</button>
+      </div>
+      <p class="drebno"><b>Приложението НЕ споделя папката в драйва.</b> „Не каним хора, не пазим
+      чужди пароли, не отнемаме достъп" (правило 14) — самата папка се споделя от драйва, с
+      неговите средства. Тук се записва кой е допуснат <b>вътре в приложението</b>, и това е
+      онова, което Вратата после проверява. Двете се правят поотделно и двете трябват.</p>
+      <p class="drebno"><b>Външният имейл НЕ става служител.</b> Той не влиза в екипа на фирмата,
+      не получава роля в служебния Журнал и не се брои никъде в него — вижда само личното, и то
+      само каквото си му дал.</p>
+    </section>`;
+}
+
 // ── закачането ─────────────────────────────────────────────────────────────
 
 export function zakachiLichno(
@@ -201,6 +305,58 @@ export function zakachiLichno(
   koren.querySelector<HTMLInputElement>('#prenos-prichina')?.addEventListener('input', (e) => {
     prichinaZaPrenos = (e.target as HTMLInputElement).value;
   });
+
+  // ── обратната посока · даване и отнемане на достъп (И99) ─────────────────
+  koren.querySelector<HTMLButtonElement>('#dostap-day')?.addEventListener('click', async (e) => {
+    const buton = e.target as HTMLButtonElement;
+    const vzemi = (znak: string) => koren.querySelector<HTMLInputElement>(znak)?.value ?? '';
+    buton.disabled = true;
+    try {
+      await lichen.deystviya.zapishiLichenDostap(
+        {
+          imeyl: vzemi('#dostap-imeyl'),
+          rolya: vzemi('#dostap-rolya') as Rolya,
+          kakvo: vzemi('#dostap-kakvo'),
+          kakav: vzemi('#dostap-kakav'),
+          otnet: false,
+        },
+        { opId: crypto.randomUUID() },
+      );
+      k.vest(
+        'dobre',
+        `Достъпът е записан. Не забравяй да споделиш и САМАТА папка от драйва — ` +
+          'приложението не я споделя вместо теб (правило 14).',
+      );
+      greshka = '';
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-otnemi]')) {
+    b.addEventListener('click', async () => {
+      const imeyl = b.dataset['otnemi']!;
+      b.disabled = true;
+      try {
+        const sega = (await lichen.deystviya.ogledalo()).lichniDostapi.get(imeyl);
+        if (!sega) return;
+        await lichen.deystviya.zapishiLichenDostap(
+          { ...sega, otnet: true },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest(
+          'dobre',
+          `Достъпът на „${imeyl}" е отнет ВЪТРЕ в приложението. Отнеми го и от драйва — ` +
+            'двете се правят поотделно. Редът остава в Журнала: историята се пази.',
+        );
+        greshka = '';
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   koren.querySelector<HTMLButtonElement>('#prenos-pusni')?.addEventListener('click', async (e) => {
     const buton = e.target as HTMLButtonElement;

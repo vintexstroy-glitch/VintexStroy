@@ -3214,24 +3214,34 @@ async function main() {
     // Негово: „Личния таб където имаш СЪЩАТА таблица от Управление… Има си и
     // отделен журнал когато се е активирал личния и НИКОГА не се смесват."
     razdel = '53 · Личното · преди активиране';
-    await naEkran(p, 'tablo', '#tablo-lichno');
-
-    proveri('пунктът „Лично" го НЯМА, докато не се пусне',
-      Boolean(await p.$('[data-ekran=lichno]')), false);
-    proveri('но плочката на Таблото го предлага',
-      (await p.$eval('[data-sektsiya=tablo-lichno]', (e) => e.textContent)).includes('прибрано'), true);
-
-    // АКТИВИРАНЕТО · първото събитие на ЛИЧНИЯ Журнал; служебният не мърда
-    razdel = '53 · Личното · активирането';
-    const predLichno = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => p.click('#tablo-lichno'));
-    proveri('служебният Журнал НЕ е помръднал', await broySabitiya(p), predLichno);
-    proveri('а пунктът „Лично" се появи',
+    await naEkran(p, 'tablo', '[data-sektsiya=tablo-lichno]');
+    proveri('Таблото казва, че личното НЕ Е ПУСКАНО · три състояния, не две',
+      (await p.$eval('[data-sektsiya=tablo-lichno]', (e) => e.textContent)).includes('не е пускано'), true);
+    proveri('и НЕ предлага бутон — първото пускане иска мястото',
+      Boolean(await p.$('#tablo-lichno')), false);
+    proveri('но пунктът „Лично" се вижда, за да може изобщо да се пусне',
       Boolean(await p.$('[data-ekran=lichno]')), true);
+
+    // И99 · АКТИВАЦИЯТА ИСКА МЯСТО В ЛИЧНИЯ ДРАЙВ, не гол бутон
+    razdel = '53 · Личното · активирането иска МЯСТО';
+    const predLichno = await broySabitiya(p);
+    await naEkran(p, 'lichno', '#lichno-pusni');
+    proveri('поканата иска МЯСТО в личния драйв',
+      Boolean(await p.$('#lichno-myasto')), true);
+    proveri('и КАЗВА, че приложението не споделя папката вместо теб',
+      (await p.$eval('[data-sektsiya=lichno-pokana]', (e) => e.textContent)).includes('не я споделя'), true);
+
+    // без място не тръгва
+    await p.click('#lichno-pusni');
+    await p.waitForFunction(() => document.body.textContent.includes('иска МЯСТО'));
+    proveri('без място личното НЕ тръгва', Boolean(await p.$('#l-forma-delo')), false);
+
+    await p.fill('#lichno-myasto', 'MasterBook/Лично');
+    await deystvieSPrerisuvane(p, () => p.click('#lichno-pusni'));
+    proveri('служебният Журнал НЕ е помръднал', await broySabitiya(p), predLichno);
 
     // СЪЩАТА ТАБЛИЦА · свои надписи, СВОЙ Журнал
     razdel = '53 · Личното · същата таблица';
-    await naEkran(p, 'lichno', '#l-forma-delo');
     const lichnoTekst = await p.evaluate(() => document.body.textContent);
     proveri('таблицата е СЪЩАТА, с лични надписи',
       lichnoTekst.includes('Моето време') && lichnoTekst.includes('Тема · Обект · Дело'), true);
@@ -3293,13 +3303,64 @@ async function main() {
       proveri(`нито едно чуждо събитие в „${zh.klyuch}"`, zh.chuzhdi, 0);
     }
 
+    // ══ 54 · ОБРАТНАТА ПОСОКА · кой вижда личното (И99) ═══════════════════
+    //
+    // Дотук правата вървяха в ЕДНА посока: главният акаунт → служителя. Тук
+    // раздава СОБСТВЕНИКЪТ НА ЛИЧНОТО — на работодателя си или на съвсем
+    // външен имейл („например на жена си"). Проверява се и обратното: че
+    // записът НЕ пада в служебния Журнал — кой вижда личното е част от
+    // личното, а не сведение за работодателя.
+    razdel = '54 · Личното · кой вижда личното';
+    await naEkran(p, 'lichno', '[data-sektsiya=lichni-dostapi]');
+    proveri('преди да е дадено · „никой освен теб"',
+      (await p.$eval('[data-sektsiya=lichni-dostapi]', (e) => e.textContent)).includes('Никой освен теб'), true);
+    proveri('и екранът КАЗВА, че приложението не споделя папката вместо теб',
+      (await p.$eval('[data-sektsiya=lichni-dostapi]', (e) => e.textContent)).includes('НЕ споделя папката'), true);
+
+    const predDostap = await broySabitiya(p);
+    await p.fill('#dostap-imeyl', 'zhena@example.bg');
+    await p.selectOption('#dostap-kakav', 'vanshen');
+    await p.selectOption('#dostap-rolya', 'nablyudatel');
+    await p.selectOption('#dostap-kakvo', 'dvete');
+    await deystvieSPrerisuvane(p, () => p.click('#dostap-day'));
+    proveri('външният имейл е записан · един ред в списъка',
+      await p.$$eval('.red.dostap', (r) => r.length), 1);
+    proveri('и се вижда с ролята и с това КАКВО е споделено',
+      (await p.$eval('.red.dostap', (e) => e.textContent)).includes('zhena@example.bg')
+        && (await p.$eval('.red.dostap', (e) => e.textContent)).includes('папката и таба'), true);
+    proveri('служебният Журнал НЕ е помръднал · записът е в ЛИЧНИЯ',
+      await broySabitiya(p), predDostap);
+    proveri('екранът казва, че външният НЕ става служител',
+      (await p.$eval('[data-sektsiya=lichni-dostapi]', (e) => e.textContent)).includes('НЕ става служител'), true);
+
+    // НА СЕБЕ СИ НЕ СЕ ДАВА · иначе отнемането изглежда като заключване
+    // извън собствения Журнал.
+    await p.fill('#dostap-imeyl', 'vintexstroy@gmail.com');
+    await deystvieSPrerisuvane(p, () => p.click('#dostap-day'));
+    proveri('на СЕБЕ СИ не се дава достъп',
+      (await p.evaluate(() => document.body.textContent)).includes('На себе си не се дава достъп'), true);
+    proveri('и списъкът НЕ порасна', await p.$$eval('.red.dostap', (r) => r.length), 1);
+
+    // ОТНЕМАНЕТО · ново събитие, не изтрит ред (правило 1)
+    await deystvieSPrerisuvane(p, () => p.click('[data-otnemi]'));
+    proveri('редът ОСТАНА след отнемането — историята се пази',
+      await p.$$eval('.red.dostap', (r) => r.length), 1);
+    proveri('но е белязан като отнет',
+      (await p.$eval('.red.dostap', (e) => e.textContent)).includes('отнет'), true);
+    proveri('и вече няма кой да отнема',
+      Boolean(await p.$('[data-otnemi]')), false);
+
     // ПРИБИРАНЕТО · пунктът пада, Журналът остава
     razdel = '53 · Личното · прибирането';
     const predPribirane = lichniyat.broy;
     await naEkran(p, 'tablo', '#tablo-lichno');
+    proveri('Таблото вече предлага ПРИБИРАНЕ',
+      (await p.$eval('#tablo-lichno', (e) => e.textContent)).includes('Прибери'), true);
     await deystvieSPrerisuvane(p, () => p.click('#tablo-lichno'));
     proveri('пунктът падна от лентата',
       Boolean(await p.$('[data-ekran=lichno]')), false);
+    proveri('и Таблото предлага да го ВЪРНЕ — мястото вече е записано',
+      (await p.$eval('#tablo-lichno', (e) => e.textContent)).includes('Върни'), true);
     const sledPribirane = await p.evaluate(async () => {
       const db = await new Promise((da) => {
         const z = indexedDB.open('masterbook');
