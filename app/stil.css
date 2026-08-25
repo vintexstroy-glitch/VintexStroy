@@ -626,6 +626,37 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   min-width: 440px;
 }
 
+/* ── проблемите при въвеждане · цвят, знак, дума (И96 т.1 · т.9) ───────── */
+.problem-zhalto   { --problem: #B8860B; }
+.problem-oranzhevo{ --problem: #C05621; }
+.problem-cherveno { --problem: #A02B1F; }
+.problem-terakota { --problem: #8C4A32; }
+.problem-sinio    { --problem: #2B5C8A; }
+.problem-sivo     { --problem: #6B6560; }
+.problem-lilavo   { --problem: #6B3F8C; }
+
+/* Полето свети с РАМКА и лента отляво — не само с цвят на текста: цветът е
+   помощ за окото, а лентата се вижда и при слаб контраст. */
+.problem-pole {
+  border-color: var(--problem) !important;
+  box-shadow: inset 3px 0 0 var(--problem);
+}
+.problem-znak {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: var(--problem); color: #FFFFFF;
+  font-size: 12px; line-height: 1;
+}
+.kazva-problem { font-size: 12px; color: var(--problem); margin-top: 4px; }
+.kazva-problem[data-spira="da"] { font-weight: 500; }
+
+.legenda-vhod { margin: 10px 0; }
+.legenda-vhod summary { cursor: pointer; font-size: 13px; color: var(--mastilo2); }
+.glava.legenda, .red.legenda {
+  grid-template-columns: 56px minmax(0, 1.2fr) 150px minmax(0, 2.4fr);
+  min-width: 720px;
+}
+
 /* ── чистата диаграма на коефициентите (И96 т.5 · т.6) ─────────────────── */
 .tablitsa.bez-ramka { border: none; background: none; padding: 4px 0; }
 .koef-diagrama { display: block; max-width: 100%; }

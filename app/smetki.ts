@@ -54,6 +54,7 @@ import {
 } from '../src/domein/mesetsat.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
+import { legendata, zakachiPole } from './vhodni-problemi.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
@@ -535,6 +536,7 @@ function formaRazhod(mesets: string): string {
           <div class="pole">
             <label for="razhod-dostavchik">Доставчик или получател</label>
             <input translate="no" id="razhod-dostavchik" name="dostavchik" required placeholder="напр. Материали ООД" autocomplete="off">
+            <p class="kazva-problem" id="kazva-dostavchik" data-spira="ne"></p>
           </div>
           <div class="pole">
             <label for="razhod-opis">За какво</label>
@@ -559,6 +561,7 @@ function formaRazhod(mesets: string): string {
             <input translate="no" id="razhod-dokument" name="dokument" placeholder="номер на фактура" autocomplete="off">
           </div>
         </div>
+        ${legendata()}
         <p class="greshka" id="greshka-razhod"></p>
         <div class="deystviya">
           <button type="submit" class="glaven">Запиши разхода</button>
@@ -899,6 +902,15 @@ export function zakachiSmetki(
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
   zakachiKoefitsientite(koren, prerisuvay);
+
+  // ЦВЕТОВЕТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · т.9) · полето свети, ДОКАТО се пише.
+  // Доставчикът е текстово поле, което човек пише на ръка и в което най-често
+  // влиза чужд знак или залепен невидим — затова е първото закачено.
+  const poleDostavchik = koren.querySelector<HTMLInputElement>('#razhod-dostavchik');
+  const kazvaDostavchik = koren.querySelector<HTMLElement>('#kazva-dostavchik');
+  if (poleDostavchik && kazvaDostavchik) {
+    zakachiPole(poleDostavchik, { azbuka: 'kirilitsa' }, kazvaDostavchik);
+  }
 
   // И95 · същата форма за дело работи и оттук — един механизъм, два екрана.
   zakachiFormataNaDelo(koren, k, prerisuvay);

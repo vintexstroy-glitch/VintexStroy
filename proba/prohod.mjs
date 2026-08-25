@@ -2938,6 +2938,73 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'trimesechie'));
     proveri('коефициентите не пишат нищо в Журнала', await broySabitiya(p), predKoef);
 
+    // ══ 50 · цветовете при въвеждане (И96 т.1 · т.9) ═════════════════════════
+    //
+    // Негово: „ако има несъответствие от нея + английски и някаква друга азбука
+    // да светне в ЖЪЛТ цвят… да оцветява в различен цвят и с текст да дава
+    // ЛЕГЕНДА на цветовете и защо не допуска."
+    razdel = '50 · цветовете при въвеждане';
+    await naEkran(p, 'smetki', '#razhod-dostavchik');
+
+    // ЛЕГЕНДАТА · осемте вида, всеки с цвят, ЗНАК и дума
+    proveri('легендата стои на екрана, не в помощ',
+      await p.$$eval('.red.legenda', (r) => r.length), 8);
+    proveri('всеки вид носи ЗНАК, не само цвят',
+      await p.$$eval('.red.legenda .problem-znak', (r) => r.every((x) => x.textContent.trim() !== '')), true);
+    // Легендата стои в СГЪНАТО `<details>`, а сгънатото няма `innerText` — то е
+    // празен низ, в който всяка проверка „по-дълго от" минава сама (урокът от §41).
+    proveri('и всеки казва ЗАЩО',
+      await p.$$eval('.red.legenda', (r) => r.every((x) => x.textContent.length > 40)), true);
+
+    // ЧИСТОТО не свети
+    await p.fill('#razhod-dostavchik', 'Материали ООД');
+    proveri('чиста кирилица не свети',
+      await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-')), false);
+    proveri('и не казва нищо', await p.$eval('#kazva-dostavchik', (e) => e.textContent.trim()), '');
+
+    // ЧУЖДАТА АЗБУКА · ЖЪЛТО и само предупреждава.
+    //
+    // Пробата е с ЙЕРОГЛИФИ, не с гръцко: гръцкият знак, НАПИСАН от човека, е
+    // законен вход, и браузърът с право дотегля гръцкия подпакет, за да го
+    // покаже. §48 пази ЧЕРУПКАТА на приложението — надписи, бутони, глави — а
+    // не онова, което човекът въвежда. Йероглифите нямат наш подпакет и падат
+    // на системен шрифт, тъй че пробата не мърда джоба.
+    await p.fill('#razhod-dostavchik', '株式会社 ЕООД');
+    proveri('чуждата азбука свети ЖЪЛТО',
+      await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-zhalto')), true);
+    proveri('и КАЗВА кой знак е',
+      (await p.$eval('#kazva-dostavchik', (e) => e.textContent)).includes('株'), true);
+    proveri('но НЕ спира — тя е предупреждение',
+      await p.$eval('#kazva-dostavchik', (e) => e.dataset.spira), 'ne');
+
+    // СМЕСЕНИТЕ АЗБУКИ · ОРАНЖЕВО и СПИРА
+    await p.evaluate(() => {
+      const pole = document.getElementById('razhod-dostavchik');
+      // „Стройпласт" с ЛАТИНСКО „o" · сглобено, за да не влезе смесена дума в кода
+      pole.value = `Стр${String.fromCodePoint(0x6f)}йпласт`;
+      pole.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    proveri('смесените азбуки светят ОРАНЖЕВО',
+      await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-oranzhevo')), true);
+    proveri('и СПИРАТ — правило 11, преместено на входа',
+      await p.$eval('#kazva-dostavchik', (e) => e.dataset.spira), 'da');
+    proveri('казва се КОЯ дума е',
+      (await p.$eval('#kazva-dostavchik', (e) => e.textContent)).includes('смесва кирилица и латиница'), true);
+
+    // НЕВИДИМИЯТ ЗНАК · сиво, и се казва КОЙ е
+    await p.evaluate(() => {
+      const pole = document.getElementById('razhod-dostavchik');
+      pole.value = `Цимент${String.fromCodePoint(0x200b)}ООД`;
+      pole.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    proveri('невидимият знак се хваща и се назовава',
+      (await p.$eval('#kazva-dostavchik', (e) => e.textContent)).includes('U+200B'), true);
+
+    // И нищо от светенето НЕ пипа Журнала
+    const predSvetene = await broySabitiya(p);
+    await p.fill('#razhod-dostavchik', 'Материали ООД');
+    proveri('светенето не пише нищо в Журнала', await broySabitiya(p), predSvetene);
+
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
     // §16 гледа джоба РАНО — а знак от чужда азбука, сложен на екран, който се
