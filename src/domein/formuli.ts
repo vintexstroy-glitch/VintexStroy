@@ -200,13 +200,13 @@ export function sDumiFormula(m: ModelNaTablitsa, f: Formula): string {
 }
 
 /** Един смятан ред: номерът му в таблицата и стойността на формулата. */
-export interface SmetnatRed {
+interface SmetnatRed {
   readonly red: number;
   /** цели най-малки единици · `null` при недописан ред */
   readonly stoynost: number | null;
 }
 
-export interface SmetnataKolona {
+interface SmetnataKolona {
   readonly kolona: number;
   readonly ime: string;
   readonly vid: VidStoynost;

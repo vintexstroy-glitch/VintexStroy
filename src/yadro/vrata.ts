@@ -20,7 +20,7 @@ import { eStotinki } from './pari.js';
 import type { Pravata } from './pravata.js';
 import type { Operatsiya, Sabitie } from './sabitie.js';
 
-export type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY' | 'NESAVMESTIM';
+type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY' | 'NESAVMESTIM';
 
 export class GreshkaVrata extends Error {
   readonly kod: KodGreshka;
@@ -52,7 +52,7 @@ export interface Rezultat {
   readonly povtoreno: boolean;
 }
 
-export interface RezultatVazstanovyavane {
+interface RezultatVazstanovyavane {
   /** колко събития са влезли сега */
   readonly vneseni: number;
   /** колко вече са били тук — общото начало на двете редици */
@@ -60,7 +60,7 @@ export interface RezultatVazstanovyavane {
   readonly posledenHash: string;
 }
 
-export interface NastroykiVrata {
+interface NastroykiVrata {
   readonly dnevnik: Dnevnik;
   readonly pravata: Pravata;
   readonly sha: Sha256;
@@ -193,7 +193,19 @@ export class Vrata {
       // каквото не е NFC, се ОТКАЗВА с думи (правило 12), не се поправя тихо.
       try {
         proveriValidnost(s);
-        proveriNFC(s.payload, `събитие ${s.seq}`);
+        /**
+         * ЦЯЛОТО събитие, не само товарът му.
+         *
+         * Дотук се проверяваше `payload` и нищо друго — а при ЗАПИС
+         * `normalizirayNFC` привежда ЦЯЛАТА операция рекурсивно. Пипнат файл
+         * можеше да върне `actor` или `sashtnost.id` в NFD, минеше ли хешовете:
+         * тогава един и същ човек има два вида, а една и съща същност — два
+         * ключа, и то в Журнал, който вече е приет за цял.
+         *
+         * `seq`, `ts` и хешовете също минават оттук, и това е безобидно —
+         * `proveriNFC` пропуска всичко, което не е низ.
+         */
+        proveriNFC(s, `събитие ${s.seq}`);
       } catch (e) {
         throw new GreshkaVrata(
           'NEVALIDNO',

@@ -368,7 +368,7 @@ function litseHedari(
   return `
     <label class="pole">
       <span>Хедър</span>
-      <select id="izbor-hedar">
+      <select translate="no" id="izbor-hedar">
         <option value="">— избери —</option>
         ${modeli
           .map(
@@ -435,7 +435,7 @@ function obrazetsatNa(m: ModelNaTablitsa): string {
       колона сменя главата, и файлът става непознаваем на връщане.</p>
       <div class="poleta">
         <label class="pole"><span>Празни редове</span>
-          <input type="number" min="1" max="500" step="1" id="obrazets-redove" value="12"></label>
+          <input translate="no" type="number" min="1" max="500" step="1" id="obrazets-redove" value="12"></label>
       </div>
       <div class="deystviya">
         <button type="button" class="vtorichen" id="svali-obrazets">Свали образец</button>

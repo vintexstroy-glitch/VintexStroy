@@ -82,7 +82,7 @@ export interface Vhod {
   readonly naemOt: 'zhurnal' | 'matritsa';
 }
 
-export interface Razbivka {
+interface Razbivka {
   readonly vhod: Vhod;
   /** ГРАФА А · за колко се ПРОДАВА */
   readonly a: readonly RedNaRazbivka[];
@@ -313,7 +313,7 @@ function vBT(osnova_st: number, drugo_st: number): number {
 // ── ЛЕГЕНДАТА И ПРИМЕРЪТ ───────────────────────────────────────────────────
 
 /** Един ред от примера: стъпка, коефициент, и колко ПАРИ мени тя тук. */
-export interface PrimerenRed {
+interface PrimerenRed {
   readonly stapka: Stapka;
   /** с колко процента мени · „−8,00 %" */
   readonly meni: string;

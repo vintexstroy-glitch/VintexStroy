@@ -205,6 +205,43 @@ describe('връщането · какво се е променило', () => {
     expect(p.sverka).toEqual({ vhod: 3, izhod: 3, razlika: 0 });
   });
 
+  /**
+   * ДРУГОТО ПИСАНЕ НА ЕДНО „й" НЕ Е ПРОМЯНА.
+   *
+   * Човек изнася Журнала, отваря го на друга машина, не пипа НИЩО и го връща.
+   * Ако клетките се сравняваха байт по байт, всеки ред с „й" се обявяваше за
+   * променен — и сверката раждаше сторно плюс нов запис за промяна, каквато
+   * никой не е правил. Журнал, който порасва с измислена история.
+   *
+   * Намерено от независим сверител. Главата вече минаваше през NFC
+   * (`svedenaGlava`); съдържанието — не.
+   */
+  it('РАЗЛОЖЕНО „й" в клетка не е промяна · правило 12', () => {
+    // Журнал с ЕДНО събитие, чието описание носи „й" — буквата, която се пише
+    // по два начина и изглежда еднакво и в двата.
+    const sSKratka: readonly Sabitie[] = Object.freeze([
+      sabitie({
+        seq: 1,
+        opId: 'op-й',
+        type: 'РазходЗаписан',
+        payload: { dostavchik: 'Строй ООД', suma_st: 100_00, opis: 'ремонт на покрива' },
+      }),
+    ]);
+
+    const izneseno = listNaZhurnala(sSKratka);
+    const kakvotoSeVrashta = [
+      GLAVA_NA_ZHURNALA.join(';'),
+      // Върнатият файл е ДОСЛОВНО същият, само разложен — както го дава друга
+      // машина или друга клавиатура. Нищо не е пипано от човек.
+      izneseno.redove[0]!.map(String).join(';').normalize('NFD'),
+    ].join('\n');
+    expect(kakvotoSeVrashta).not.toBe(kakvotoSeVrashta.normalize('NFC'));
+
+    const p = sveriTablitsata(sSKratka, otCSV(kakvotoSeVrashta, 'ЖУРНАЛ'));
+    expect(p.promeni, p.promeni.map((x) => `${x.kolona}: ${x.bilo}`).join(' · ')).toHaveLength(0);
+    expect(p.sashti).toBe(1);
+  });
+
   it('поправена СУМА се хваща, с „било" и „става"', () => {
     const p = sveriTablitsata(ZHURNALAT, tablitsa({ 'op-1': { Сума: '560,00' } }));
     expect(p.promeni).toHaveLength(1);

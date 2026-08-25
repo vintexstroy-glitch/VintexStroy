@@ -265,6 +265,53 @@ describe('приключващата статия на ДДС', () => {
     expect(statiyaOtSpravka('2026-07', 0, 0, '2026-08-14')).toBeUndefined();
   });
 
+  /**
+   * НАЙ-ОБИКНОВЕНИЯТ СЛУЧАЙ ЗА ЦЕЛЕВИЯ КЛИЕНТ · наемодател само с ЖИЛИЩНИ наеми.
+   *
+   * Там ставката е 0%, изходящият и входящият ДДС са нула, и приключваща статия
+   * НЕ се ражда. Дотук сверката „източници ↔ статии" пак броеше справката и
+   * обявяваше разлика от един запис — а одитният файл пишеше „Главната книга не
+   * затваря" върху книга с равни дебит и кредит.
+   *
+   * Намерено от независим сверител, не от този тест — затова тестът го има сега.
+   */
+  it('справка БЕЗ ДДС не разминава броя · книгата пак затваря', async () => {
+    const { deystviya, ogledalo } = await knigata();
+    await deystviya.dobaviImot('imot-1', { adres: 'ул. Първа 1', edinitsa: 'А', ploshtad_kvsm: 60 }, { opId: 'op-i' });
+    await deystviya.dobaviNaem(
+      'naem-1',
+      {
+        imotId: 'imot-1',
+        naemetel: 'Иван Наемател',
+        telefon: '',
+        imeyl: '',
+        naem_st: 60000,
+        padezhDen: 5,
+        ot: '2026-01-01',
+        do: '2026-12-31',
+        depozit_st: 0,
+        sektor: 'naem-zhilishten',
+      },
+      { opId: 'op-n' },
+    );
+    await deystviya.nachisliVzemane(
+      'vz-1',
+      { naemId: 'naem-1', period: '2026-07', osnovanie: 'наем', suma_st: 60000, padezh: '2026-07-05' },
+      { opId: 'op-v' },
+    );
+    const predi = glavnaKniga(await ogledalo(), '2026-07', KOGATO);
+    expect(predi.nared).toBe(true);
+
+    await deystviya.podaySpravka(
+      { period: '2026-07', dds_deklarirano_st: 0, data: '2026-08-10', belezhka: '' },
+      { opId: 'op-sp' },
+    );
+    const sled = glavnaKniga(await ogledalo(), '2026-07', KOGATO);
+    expect(sled.statii.length).toBe(predi.statii.length);
+    expect(sled.debit_st).toBe(sled.kredit_st);
+    expect(sled.nared, sled.sverki.filter((s) => !s.nared).map((s) => s.kakvo).join(' · ')).toBe(true);
+  });
+
   it('подадена справка добавя приключващата статия в книгата', async () => {
     const { deystviya, ogledalo } = await mesets();
     await deystviya.podaySpravka(

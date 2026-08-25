@@ -24,6 +24,7 @@
  */
 
 import { ekraniraj } from './obshto.js';
+import { otvoriProzorets } from './prozorets.js';
 import { ikona } from './ikoni.js';
 import {
   IMENA_NA_GLEDASHTITE,
@@ -170,28 +171,13 @@ export function zakachiMenyutoNaNastroykite(
   }
 }
 
-/** Изскачащият прозорец · същият похват като панела на историята. */
+/**
+ * Изскачащият прозорец · механиката е ЕДНА (`app/prozorets.ts`).
+ *
+ * Дотук тук стоеше свое копие на фона, `Escape`-а и бутона. Обходът за чистота
+ * го намери дословно еднакво с онова в историята на реда — а обещанието
+ * „клавиатурата не остава в капан" (ADR-045) не бива да живее на две места.
+ */
 function pokazhiProzoretsa(t: TemaNastroyka): void {
-  const fon = document.createElement('div');
-  fon.className = 'istoriya-fon';
-  fon.innerHTML = `
-    <div class="istoriya-karta" role="dialog" aria-label="${ekraniraj(t.ime)}">
-      <h3>${ekraniraj(t.ime)}</h3>
-      <p class="pod">${ekraniraj(t.opis)}</p>
-      ${tyaloNaProzoretsa(t)}
-      <button type="button" class="vtorichen istoriya-zatvori">Затвори</button>
-    </div>`;
-  const zatvori = () => {
-    fon.remove();
-    document.removeEventListener('keydown', priKlavish);
-  };
-  const priKlavish = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') zatvori();
-  };
-  fon.addEventListener('click', (e) => {
-    if (e.target === fon) zatvori();
-  });
-  fon.querySelector('.istoriya-zatvori')!.addEventListener('click', zatvori);
-  document.addEventListener('keydown', priKlavish);
-  document.body.append(fon);
+  otvoriProzorets({ zaglavie: t.ime, pod: t.opis, tyalo: tyaloNaProzoretsa(t) });
 }

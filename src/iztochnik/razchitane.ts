@@ -27,7 +27,7 @@ class GreshkaRazchitane extends Error {
 /** Думите, по които се познава главата на таблица с разходи. */
 const DUMI_RAZHODI = ['достав', 'сума', 'дата'] as const;
 
-export interface NastroykiRazchitane {
+interface NastroykiRazchitane {
   readonly tablitsa: Tablitsa;
   readonly izvor: Izvor;
   readonly period: string;
@@ -147,6 +147,30 @@ function naychestiyatMesets(surovi: readonly string[]): string {
   return [...broy.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? '';
 }
 
+/**
+ * СУМАТА И ДАТАТА на един ред · и че датата Е В ПЕРИОДА.
+ *
+ * Двата четеца — по глава и по модел — правеха това поотделно, дословно
+ * еднакво. Обходът за чистота (`npm run chistota`) го хвана.
+ *
+ * ЕДНА ПРОМЯНА В ПОВЕДЕНИЕТО, и тя е към по-простото: „извън периода" вече е
+ * ОТКАЗ С ДУМИ, както всеки друг, вместо отделен изход от цикъла. Изходът
+ * стигаше до същото място — `propusnati` с причина — само по втори път; а два
+ * пътя до един резултат се разминават точно когато някой поправи единия.
+ */
+function sumaIData(
+  surovaSuma: string,
+  surovaData: string,
+  period: string,
+): { readonly suma_st: number; readonly data: string } {
+  const suma_st = sumaOtKletka(surovaSuma);
+  const data = dataOtKletka(surovaData);
+  if (data.slice(0, 7) !== period) {
+    throw new GreshkaRazchitane(`Датата ${data} е извън ${period}.`);
+  }
+  return { suma_st, data };
+}
+
 export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
   const glava = nameriGlavata(n.tablitsa, [...DUMI_RAZHODI]);
   if (glava < 0) {
@@ -179,12 +203,7 @@ export function razchetiRazhodi(n: NastroykiRazchitane): Snimka {
     if (koy === '' && surovaSuma === '' && surovaData === '') continue;
 
     try {
-      const suma_st = sumaOtKletka(surovaSuma);
-      const data = dataOtKletka(surovaData);
-      if (data.slice(0, 7) !== n.period) {
-        propusnati.push({ red: nomer, zashto: `Датата ${data} е извън ${n.period}.` });
-        continue;
-      }
+      const { suma_st, data } = sumaIData(surovaSuma, surovaData, n.period);
       if (koy === '') throw new GreshkaRazchitane('Няма доставчик.');
 
       const dokument = vzemi(kolona.dokument);
@@ -292,12 +311,7 @@ export function razchetiPoModel(n: {
     if (surovaSuma === '' && surovaData === '' && koy === '' && osnovanie === '') continue;
 
     try {
-      const suma_st = sumaOtKletka(surovaSuma);
-      const data = dataOtKletka(surovaData);
-      if (data.slice(0, 7) !== n.period) {
-        propusnati.push({ red: nomer, zashto: `Датата ${data} е извън ${n.period}.` });
-        continue;
-      }
+      const { suma_st, data } = sumaIData(surovaSuma, surovaData, n.period);
 
       // Кой е отсреща: контрагентът, ако таблицата го дава; иначе основанието.
       // Празно НЕ минава — ред без нито едно от двете не се разпознава после.

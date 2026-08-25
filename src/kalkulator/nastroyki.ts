@@ -212,9 +212,9 @@ export function stapka(k: Koefitsient, klyuch: string): Stapka {
  */
 const VIDOVE_DOBAVKA = ['broy', 'plosht'] as const;
 
-export type VidDobavka = (typeof VIDOVE_DOBAVKA)[number];
+type VidDobavka = (typeof VIDOVE_DOBAVKA)[number];
 
-export interface Dobavka {
+interface Dobavka {
   readonly klyuch: string;
   readonly ime: string;
   readonly vid: VidDobavka;
@@ -272,7 +272,7 @@ export function dobavka_st(d: Dobavka, n: { readonly broy: number; readonly kvsm
  * доста под скалата. Числото не казва „грешка"; то казва, че тук се плаща за
  * запазване на стойност, не за доход.
  */
-export interface Klas {
+interface Klas {
   readonly klyuch: string;
   readonly ime: string;
   readonly ot_bt: number;

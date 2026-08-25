@@ -66,7 +66,7 @@ export const TEZHEST: Readonly<Record<Otsenka, number>> = Object.freeze({
  * надживени са само шестте избора за ЗНАЧИМОСТТА.
  */
 export const SASTOYANIYA = ['чака', 'в процес', 'завършено'] as const;
-export type SastoyanieDelo = (typeof SASTOYANIYA)[number];
+type SastoyanieDelo = (typeof SASTOYANIYA)[number];
 
 export interface Delo {
   readonly id: string;
@@ -118,7 +118,7 @@ export function dniDoKraya(d: Delo, dnes: string): number {
  *
  * Праговете са НЕГОВИ числа: 7 дни и 2 дни. Не се закръглят и не се „оправят".
  */
-export type Svetofar = 'normalno' | 'zhalto' | 'cherveno' | 'prosrocheno';
+type Svetofar = 'normalno' | 'zhalto' | 'cherveno' | 'prosrocheno';
 
 export function svetofar(d: Delo, dnes: string): Svetofar {
   if (d.sastoyanie === 'завършено' || d.otsenka === 'завършено') return 'normalno';

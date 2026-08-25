@@ -34,7 +34,7 @@ import { smetki } from './smetki.js';
 import { prihodnaChast, razhodnaChast } from './lichni-pari.js';
 
 /** Двата джоба, назовани от него: „Банка — салдо, Трезор — салдо". */
-export type Dzhob = 'banka' | 'trezor';
+type Dzhob = 'banka' | 'trezor';
 
 export const IMENA_NA_DZHOBOVETE: Readonly<Record<Dzhob, string>> = Object.freeze({
   banka: 'Банка',
@@ -42,7 +42,7 @@ export const IMENA_NA_DZHOBOVETE: Readonly<Record<Dzhob, string>> = Object.freez
 });
 
 /** Една съставка на едно поле — какво влиза и откъде се чете. */
-export interface Sastavka {
+interface Sastavka {
   readonly ime: string;
   /** цели стотинки · знакът е ИСТИНСКИ: отрицателното се вади */
   readonly suma_st: number;
@@ -293,7 +293,7 @@ export function otcheti(
 }
 
 /** Двете суми за един ден · приход и разход, поотделно. */
-export interface DenSPari {
+interface DenSPari {
   readonly data: string;
   readonly prihod_st: number;
   readonly razhod_st: number;

@@ -76,7 +76,7 @@ import type {
   TipSabitie,
 } from './sabitiya.js';
 
-export interface NastroykiDeystviya {
+interface NastroykiDeystviya {
   readonly vrata: Vrata;
   readonly dnevnik: Dnevnik;
   readonly naematel: string;
@@ -85,7 +85,7 @@ export interface NastroykiDeystviya {
   readonly chasovnik: () => string;
 }
 
-export interface Zayavka {
+interface Zayavka {
   readonly opId: string;
   /** rev-предпазител: seq на последното събитие за същността, което си видял */
   readonly expectedRev?: number;

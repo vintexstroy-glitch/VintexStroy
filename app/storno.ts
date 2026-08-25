@@ -10,7 +10,7 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { VID, type Vid } from '../src/domein/sabitiya.js';
 import type { Konteks } from './ekranite.js';
 
-export interface Izhod {
+interface Izhod {
   readonly stana: boolean;
   readonly kazano: string;
   readonly vid: 'dobre' | 'zle';

@@ -20,7 +20,7 @@ import { sborNaSnimka, type RedOtSnimka, type Snimka } from '../iztochnik/snimka
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
 import type { Deystviya } from './deystviya.js';
 
-export type KakvoStava = 'nov' | 'promenen' | 'izchezval' | 'bezPromyana';
+type KakvoStava = 'nov' | 'promenen' | 'izchezval' | 'bezPromyana';
 
 export interface Razlika {
   readonly klyuch: string;
@@ -117,7 +117,7 @@ export function imaShtoDaSePravi(plan: Plan): boolean {
   return plan.redove.some((r) => r.kakvo !== 'bezPromyana');
 }
 
-export interface RezultatAktualizatsiya {
+interface RezultatAktualizatsiya {
   readonly zapisani: number;
   readonly stornirani: number;
   readonly bezPromyana: number;

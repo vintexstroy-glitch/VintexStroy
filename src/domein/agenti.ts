@@ -36,7 +36,7 @@ export class GreshkaAgent extends Error {
 /** Трите състояния на агента. Спрян ≠ изключен: кранът е трети контрол. */
 const SASTOYANIYA_NA_AGENT = ['izklyuchen', 'vklyuchen', 'spryan', 'zakrit'] as const;
 
-export type SastoyanieNaAgent = (typeof SASTOYANIYA_NA_AGENT)[number];
+type SastoyanieNaAgent = (typeof SASTOYANIYA_NA_AGENT)[number];
 
 export const IMENA_NA_SASTOYANIYATA: Readonly<Record<SastoyanieNaAgent, string>> = Object.freeze({
   izklyuchen: 'изключен',
@@ -67,7 +67,7 @@ export const IMENA_NA_OBHVATITE: Readonly<Record<Obhvat, string>> = Object.freez
  * Claude Code: забрана → питане → позволение, първото съвпадение печели.
  * Подразбраното е ЗАБРАНА (правило 18), докато някой не намери начин.
  */
-export interface Zakon {
+interface Zakon {
   readonly klyuch: string;
   readonly kakvo: string;
   /** къде живее правилото, което го поражда — за следата назад */
@@ -120,7 +120,7 @@ export const ZAKONITE: readonly Zakon[] = Object.freeze([
  * не се изключва. Така има ЕДИН списък вместо две полета (правило 17): без
  * него длъжностната живее отделно и се разминава с уменията, които я описват.
  */
-export interface Umenie {
+interface Umenie {
   readonly klyuch: string;
   readonly ime: string;
   /** какво носи умението, с думи — влиза в промпта, когато е включено */

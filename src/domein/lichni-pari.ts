@@ -298,7 +298,7 @@ export function pogasenLiE(k: LichenKredit, dvizheniya: Iterable<LichnoDvizhenie
 
 // ── СБОРОВЕТЕ ──────────────────────────────────────────────────────────────
 
-export interface SborPoTema {
+interface SborPoTema {
   readonly temaId: string;
   readonly ime: string;
   readonly grupa: string;

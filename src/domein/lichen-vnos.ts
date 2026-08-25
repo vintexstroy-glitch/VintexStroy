@@ -38,9 +38,9 @@ class GreshkaLichenVnos extends Error {
   }
 }
 
-export type KakvoStavaLichno = 'nov' | 'promenen' | 'bezPromyana' | 'lipsva';
+type KakvoStavaLichno = 'nov' | 'promenen' | 'bezPromyana' | 'lipsva';
 
-export interface RedNaPlana {
+interface RedNaPlana {
   readonly klyuch: string;
   readonly kakvo: KakvoStavaLichno;
   readonly nov?: RedOtKarta;
@@ -211,7 +211,7 @@ export function zaPisane(plan: PlanZaVnos): readonly RedNaPlana[] {
   return plan.redove.filter((r) => r.kakvo === 'nov' || r.kakvo === 'promenen');
 }
 
-export interface SverkaNaVnos {
+interface SverkaNaVnos {
   readonly redove: number;
   readonly nov: number;
   readonly promenen: number;
@@ -259,7 +259,3 @@ export function imaShtoDaSePravi(plan: PlanZaVnos): boolean {
   return zaPisane(plan).length > 0;
 }
 
-/** Ключът на един ред · за екрана, който трябва да го сочи. */
-export function klyuchNaRed(r: RedOtKarta): string {
-  return klyuchNaLichnoDvizhenie(r);
-}

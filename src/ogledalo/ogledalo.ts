@@ -103,7 +103,7 @@ export interface Naem {
   readonly kraj?: string;
 }
 
-export type SastoyanieVzemane = 'отворено' | 'частично' | 'затворено' | 'надплатено';
+type SastoyanieVzemane = 'отворено' | 'частично' | 'затворено' | 'надплатено';
 
 export interface Vzemane {
   readonly id: string;
@@ -153,7 +153,7 @@ export interface Razhod {
 }
 
 /** Подадената ДДС-справка — ключалката на периода. */
-export interface Spravka {
+interface Spravka {
   readonly period: string;
   readonly seq: number;
   /** каквото реално е декларирано — на ръка, не преизчислено */
@@ -163,7 +163,7 @@ export interface Spravka {
 }
 
 /** Едно внасяне на ДДС — от платежното, на ръка. */
-export interface PlashtaneDDS {
+interface PlashtaneDDS {
   readonly id: string;
   readonly seq: number;
   readonly period: string;
@@ -1006,7 +1006,7 @@ export function sabrano(o: Ogledalo): number {
   return sbor;
 }
 
-export interface ProsrocheneVzemane extends Vzemane {
+interface ProsrocheneVzemane extends Vzemane {
   readonly dniZakasnenie: number;
 }
 

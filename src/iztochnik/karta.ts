@@ -43,7 +43,7 @@ const DUMI_KREDIT = ['кредит', 'credit', 'вход', 'захранване
 const DUMI_REFERENTSIYA = ['референц', 'reference', 'документ', 'номер'] as const;
 const DUMI_SALDO = ['салдо', 'balance', 'остатък'] as const;
 
-export interface KoloniNaKartata {
+interface KoloniNaKartata {
   readonly glava: number;
   readonly data: number;
   readonly opisanie: number;

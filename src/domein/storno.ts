@@ -16,17 +16,13 @@
 import type { Sabitie } from '../yadro/index.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 
-export interface Otgovor {
-  readonly mozhe: boolean;
-  /** празно, когато може; иначе — с думи, защо не */
-  readonly prichina: string;
-}
+/**
+ * ОТГОВОРЪТ „може ли" е ЕДИН (`otgovor.ts`) и се изнася наново оттук: който
+ * пита този модул, го пита за СВОЙ въпрос и не бива да търси формата другаде.
+ */
+import { MOZHE, ne, type Otgovor } from './otgovor.js';
 
-const MOZHE: Otgovor = { mozhe: true, prichina: '' };
-
-function ne(prichina: string): Otgovor {
-  return { mozhe: false, prichina };
-}
+export type { Otgovor };
 
 function broy(n: number, edno: string, mnogo: string): string {
   return `${n} ${n === 1 ? edno : mnogo}`;

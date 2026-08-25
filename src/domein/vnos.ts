@@ -23,7 +23,7 @@ export class GreshkaVnos extends Error {
   }
 }
 
-export interface RezultatVnos {
+interface RezultatVnos {
   readonly vneseni: number;
   readonly veche: number;
   readonly vsichko: number;
@@ -32,7 +32,7 @@ export interface RezultatVnos {
   readonly nared: boolean;
 }
 
-export interface NastroykiVnos {
+interface NastroykiVnos {
   readonly vrata: Vrata;
   readonly dnevnik: Dnevnik;
   readonly naematel: string;

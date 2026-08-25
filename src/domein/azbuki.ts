@@ -32,7 +32,7 @@ export type Podmnozhestvo =
   | 'greek-ext'
   | 'vietnamese';
 
-export interface Paket {
+interface Paket {
   readonly klyuch: string;
   readonly ime: string;
   /** кои страни и езици покрива — това е рекламният му смисъл */

@@ -40,7 +40,7 @@ import type { Period } from './nachislyavane.js';
 /** Трите раздела на месеца. Нов се добавя ТУК, където се вижда. */
 export const RAZDELI = ['potok', 'akumulator', 'pokazatel'] as const;
 
-export type Razdel = (typeof RAZDELI)[number];
+type Razdel = (typeof RAZDELI)[number];
 
 export const IMENA_NA_RAZDELITE: Readonly<Record<Razdel, string>> = Object.freeze({
   potok: 'Поток',
@@ -79,7 +79,7 @@ export function deltaProtsentiDeseti(r: RedNaMesetsa): number | undefined {
   return Math.round((delta(r) * 1000) / Math.abs(r.predi_st));
 }
 
-export interface MesetsatKatoTablitsa {
+interface MesetsatKatoTablitsa {
   readonly period: Period;
   readonly predishniyat: Period;
   readonly glavi: readonly string[];

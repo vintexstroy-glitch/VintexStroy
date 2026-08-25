@@ -70,6 +70,8 @@ import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
   menyuOtZhivi,
   novoteVSpisatsite,
+  optsiiNaNachina,
+  optsiiNaStavkata,
   poleSIzbor,
   poleSMenyu,
   rechnitsite,
@@ -672,9 +674,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
             etiket: 'Ставка на ТАЗИ фактура',
             spisak: 'stavka',
             zadalzhitelno: true,
-            opcii: STAVKI.map(
-              (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
-            ).join(''),
+            opcii: optsiiNaStavkata(),
           })}
           ${
             /**
@@ -714,9 +714,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
             ime: 'nachin',
             etiket: 'Платено',
             spisak: 'nachin',
-            opcii: NACHINI_NA_PLASHTANE.map(
-              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
-            ).join(''),
+            opcii: optsiiNaNachina(),
           })}
           <div class="pole">
             <label for="razhod-data">Дата</label>
@@ -844,9 +842,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
             ime: 'nachin',
             etiket: 'Начин',
             spisak: 'nachin',
-            opcii: NACHINI_NA_PLASHTANE.map(
-              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
-            ).join(''),
+            opcii: optsiiNaNachina(),
           })}
         </div>
         <p class="greshka" id="greshka-dds"></p>
@@ -1022,9 +1018,7 @@ function kalkulator(): string {
             etiket: 'Ставка',
             spisak: 'stavka',
             zadalzhitelno: true,
-            opcii: STAVKI.map(
-              (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
-            ).join(''),
+            opcii: optsiiNaStavkata(),
           })}
         </div>
         <p class="greshka" id="greshka-smyatane"></p>

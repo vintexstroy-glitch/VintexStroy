@@ -14,6 +14,7 @@
 
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
+import { otvoriProzorets } from './prozorets.js';
 import { butonSIkona } from './ikoni.js';
 import type { Sabitie } from '../src/yadro/index.js';
 import type { Konteks } from './ekranite.js';
@@ -71,35 +72,16 @@ async function pokazhi(k: Konteks, vid: string, id: string): Promise<void> {
     id,
   });
 
-  const fon = document.createElement('div');
-  fon.className = 'istoriya-fon';
-  fon.innerHTML = `
-    <div class="istoriya-karta" role="dialog" aria-label="История на реда">
-      <h3>История</h3>
-      <p class="pod" translate="no">${ekraniraj(id)} · ${sabitiya.length} ${
-        sabitiya.length === 1 ? 'събитие' : 'събития'
-      } · Журналът пази всичко, завинаги</p>
-      ${
-        sabitiya.length === 0
-          ? '<p class="prazno">Няма нито едно събитие — това не би трябвало да се вижда на екрана.</p>'
-          : sabitiya.map(redNaSabitie).join('')
-      }
-      <button type="button" class="vtorichen istoriya-zatvori">Затвори</button>
-    </div>`;
-
-  const zatvori = () => {
-    fon.remove();
-    document.removeEventListener('keydown', priKlavish);
-  };
-  const priKlavish = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') zatvori();
-  };
-  fon.addEventListener('click', (e) => {
-    if (e.target === fon) zatvori();
+  otvoriProzorets({
+    zaglavie: 'История',
+    pod: `${id} · ${sabitiya.length} ${
+      sabitiya.length === 1 ? 'събитие' : 'събития'
+    } · Журналът пази всичко, завинаги`,
+    tyalo:
+      sabitiya.length === 0
+        ? '<p class="prazno">Няма нито едно събитие — това не би трябвало да се вижда на екрана.</p>'
+        : sabitiya.map(redNaSabitie).join(''),
   });
-  fon.querySelector('.istoriya-zatvori')!.addEventListener('click', zatvori);
-  document.addEventListener('keydown', priKlavish);
-  document.body.append(fon);
 }
 
 /** Закача се веднъж на екран — обслужва всички редове с история в него. */

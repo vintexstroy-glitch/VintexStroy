@@ -148,11 +148,11 @@ function predlozhenieto(p: Predlozhenie): string {
           ? `<div class="poleta">
               <label class="pole">
                 <span>Дата на файла</span>
-                <input type="date" id="zhurnal-data" value="${ekraniraj(dataNaFayla)}">
+                <input translate="no" type="date" id="zhurnal-data" value="${ekraniraj(dataNaFayla)}">
               </label>
               <label class="pole">
                 <span>Случаят на промяна</span>
-                <input type="text" id="zhurnal-sluchay" value="${ekraniraj(sluchay)}" placeholder="сгрешена сума по вноска 1">
+                <input translate="no" type="text" id="zhurnal-sluchay" value="${ekraniraj(sluchay)}" placeholder="сгрешена сума по вноска 1">
               </label>
             </div>
             <div class="deystviya">

@@ -27,7 +27,7 @@ export class GreshkaNachislyavane extends Error {
   }
 }
 
-export interface RezultatNachislyavane {
+interface RezultatNachislyavane {
   readonly period: Period;
   readonly sverki: readonly Sverka[];
   /** нови вземания, създадени сега */
@@ -37,7 +37,7 @@ export interface RezultatNachislyavane {
   readonly nared: boolean;
 }
 
-export interface NastroykiNachislyavane {
+interface NastroykiNachislyavane {
   readonly deystviya: Deystviya;
   readonly period: Period;
   /** ISO време на начисляването */

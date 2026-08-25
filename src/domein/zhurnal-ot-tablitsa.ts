@@ -265,7 +265,7 @@ export function listNaZhurnala(sabitiya: readonly Sabitie[], ime = 'ЖУРНАЛ
 /** Съдбата на един ред от върнатата таблица. Изброена поименно. */
 export const SADBI = ['sasht', 'promenen', 'nov', 'lipsva', 'zaklyuchen'] as const;
 
-export type Sadba = (typeof SADBI)[number];
+type Sadba = (typeof SADBI)[number];
 
 export const IMENA_NA_SADBITE: Readonly<Record<Sadba, string>> = Object.freeze({
   sasht: 'непипнат',
@@ -276,7 +276,7 @@ export const IMENA_NA_SADBITE: Readonly<Record<Sadba, string>> = Object.freeze({
 });
 
 /** Една намерена промяна · вече проверена срещу Журнала. */
-export interface Promyana {
+interface Promyana {
   readonly seq: number;
   readonly opId: string;
   /** коя колона е пипната · „Описание" или „Сума" */
@@ -290,7 +290,7 @@ export interface Promyana {
 }
 
 /** Пипната заключена колона · казва се КОЯ и КАКВО е било. */
-export interface PipnatoZaklyucheno {
+interface PipnatoZaklyucheno {
   readonly red: number;
   readonly seq: number;
   readonly kolona: string;

@@ -81,9 +81,9 @@ export function eStopanin(imeyl: string, o: Ogledalo): boolean {
  * защото приложението е писало Журнали преди този резен, и то не е нито
  * грешка, нито нормално състояние: то е ЗАДАЧА, която някой трябва да свърши.
  */
-export type SastoyanieNaStopanina = 'ima' | 'prazen-zhurnal' | 'chaka-dopisvane';
+type SastoyanieNaStopanina = 'ima' | 'prazen-zhurnal' | 'chaka-dopisvane';
 
-export interface KakvoSStopanina {
+interface KakvoSStopanina {
   readonly sastoyanie: SastoyanieNaStopanina;
   /** може ли ТОЗИ имейл да го запише сега */
   readonly mozheDaZapishe: boolean;
@@ -172,7 +172,7 @@ export function zapasniyat(o: Ogledalo): PayloadZapasenKontaktZapisan | null {
   return o.zapasenKontakt;
 }
 
-export interface OtgovorZaSmyana {
+interface OtgovorZaSmyana {
   readonly mozhe: boolean;
   readonly kazva: string;
 }

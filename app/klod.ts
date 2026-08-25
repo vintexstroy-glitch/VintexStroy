@@ -82,7 +82,7 @@ export function opashkataNaKlyucha(): string {
   }
 }
 
-export interface OtgovorNaKlod {
+interface OtgovorNaKlod {
   /** какво предлага, с думи */
   readonly kakvo: string;
   /** колко му е струвало · за да се вижда цената, не да се гадае */

@@ -51,7 +51,7 @@ export class GreshkaDostap extends Error {
 /** Какво се споделя · папката в драйва, табът в приложението, или двете. */
 export const VIDOVE_SPODELYANE = ['papka', 'tab', 'dvete'] as const;
 
-export type VidSpodelyane = (typeof VIDOVE_SPODELYANE)[number];
+type VidSpodelyane = (typeof VIDOVE_SPODELYANE)[number];
 
 export const IMENA_NA_SPODELYANETO: Readonly<Record<VidSpodelyane, string>> = Object.freeze({
   papka: 'папката в драйва',
@@ -68,7 +68,7 @@ export const IMENA_NA_SPODELYANETO: Readonly<Record<VidSpodelyane, string>> = Ob
  */
 export const KAKAV = ['rabotodatel', 'vanshen'] as const;
 
-export type Kakav = (typeof KAKAV)[number];
+type Kakav = (typeof KAKAV)[number];
 
 export const IMENA_NA_KAKAV: Readonly<Record<Kakav, string>> = Object.freeze({
   rabotodatel: 'работодателят · има роля и в служебния',

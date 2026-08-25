@@ -385,7 +385,7 @@ function redNaKredita(
   return `<div class="red kredit${pogasen ? ' mahnata' : ''}" translate="no">
     <span class="kletka"><b>${ekraniraj(k.ime)}</b></span>
     <span>${ekraniraj(IMENA_NA_VIDOVETE_KREDIT[k.vid])}</span>
-    <span class="chislo">${(k.lihva_bp / 100).toFixed(2).replace('.', ',')} %</span>
+    <span class="chislo">${lihvaSDumi(k.lihva_bp)}</span>
     <span class="chislo">${chislo(k.vnoska_st)}</span>
     <span class="chislo">${pogasen ? '<span class="znachka dobre">погасен</span>' : chislo(ostava)}</span>
     <span>${

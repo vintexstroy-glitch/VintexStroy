@@ -75,7 +75,7 @@ import type { Konteks } from './ekranite.js';
  * същи ключове. Личният таб иска СВОИ настройки („таблото там с собствените
  * настройки"), значи погледът иска свой дом за всеки поглед.
  */
-export interface PogledNaGanta {
+interface PogledNaGanta {
   readonly klyuch: string;
   takt: Takt;
   readonly sgunati: Set<string>;
@@ -86,7 +86,7 @@ export interface PogledNaGanta {
 }
 
 /** Четирите полета на делото, чиито речници живеят в самите дела. */
-export type KlyuchNaMenyu = 'myasto' | 'obekt' | 'ime' | 'otgovornik';
+type KlyuchNaMenyu = 'myasto' | 'obekt' | 'ime' | 'otgovornik';
 
 /**
  * РЕЧНИКЪТ НА ЕДНО ПОЛЕ · изведен от живите дела, без нито едно ново събитие.
@@ -150,7 +150,7 @@ function zapomniPogleda(p: PogledNaGanta): void {
  * остават едни и същи. „По теми" (И96 т.10) е дума на екрана, а не втори
  * начин на подреждане — иначе двата погледа почват да се разминават в данните.
  */
-export interface NadpisiNaGanta {
+interface NadpisiNaGanta {
   readonly zaglavie: string;
   readonly glavaNaImenata: string;
   readonly podnaslovNaFormata: string;

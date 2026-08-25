@@ -105,7 +105,7 @@ export function sektoriNaRazhod(): readonly Akumulator[] {
   return AKUMULATORI.filter((a) => !a.klyuch.startsWith('naem-'));
 }
 
-export interface RazbivkaDDS {
+interface RazbivkaDDS {
   readonly obshta_st: Stotinki;
   readonly osnova_st: Stotinki;
   readonly dds_st: Stotinki;

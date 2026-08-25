@@ -36,7 +36,7 @@ import { fokusVPole } from './klaviatura.js';
 /** Стекът не расте до безкрай — под тавана старото пада мълчаливо. */
 const TAVAN_NA_STEKA = 20;
 
-export interface Chernova {
+interface Chernova {
   /** ключът: id на формата · нейните data-* атрибути (същността) */
   readonly klyuch: string;
   readonly id: string;

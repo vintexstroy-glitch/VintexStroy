@@ -50,20 +50,20 @@ export interface PodadenFayl {
 }
 
 /** Лист, който никой позволен модел не познава — брои се, не се преглъща. */
-export interface NepoznatList {
+interface NepoznatList {
   readonly fayl: string;
   readonly list: string;
 }
 
 /** Един прочетен лист заедно с модела, през който е минал. */
-export interface Dvoyka {
+interface Dvoyka {
   readonly fayl: string;
   readonly list: string;
   readonly model: ModelNaTablitsa;
   readonly tablitsa: Tablitsa;
 }
 
-export interface Partida {
+interface Partida {
   readonly plan: Plan;
   /** кои листове са прочетени и с кой модел — оттук се вадят числовите колони */
   readonly dvoyki: readonly Dvoyka[];
@@ -173,7 +173,7 @@ export async function sgloviPartida(n: {
  * от два файла и се броят веднъж" и решава. Мълчаливото сливане и мълчаливото
  * удвояване са еднакво лоши — и двете решават вместо него.
  */
-export async function sleiSnimki(
+async function sleiSnimki(
   snimki: readonly Snimka[],
   sha: Sha256,
 ): Promise<Snimka> {
@@ -226,7 +226,7 @@ export async function sleiSnimki(
   };
 }
 
-export interface RezultatSveryavane {
+interface RezultatSveryavane {
   readonly zapisani: number;
   readonly stornirani: number;
   readonly bezPromyana: number;

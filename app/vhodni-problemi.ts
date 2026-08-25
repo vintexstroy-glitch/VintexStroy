@@ -31,10 +31,6 @@ import { ekraniraj } from './obshto.js';
 /** Настройките живеят в паметта на екрана, докато Настройки ги запише. */
 let nastroyki: NastroykiNaVhoda = nastroykiPoPodrazbirane();
 
-export function nastroykiteNaVhoda(): NastroykiNaVhoda {
-  return nastroyki;
-}
-
 export function smeniNastroykiteNaVhoda(n: NastroykiNaVhoda): void {
   nastroyki = n;
 }
@@ -52,7 +48,7 @@ export function legendata(otvorena = false): string {
       <div class="tablitsa" data-tablitsa="legenda">
         <div class="glava legenda"><span>Знак</span><span>Какво е</span><span>Сила</span><span>Защо</span></div>
         ${OPISI.map(
-          (o) => `<div class="red legenda" data-vid-problem="${o.vid}">
+          (o) => `<div class="red legenda" translate="no" data-vid-problem="${o.vid}">
           <span><span class="problem-znak problem-${o.tsvyat}" aria-hidden="true">${o.znak}</span></span>
           <span><b>${ekraniraj(o.ime)}</b></span>
           <span><span class="znachka ${nastroyki[o.vid].sila === 'spira' ? 'trevoga' : 'tiha'}">${

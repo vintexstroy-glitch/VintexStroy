@@ -27,7 +27,7 @@ import { butonIstoriya } from './istoriya.js';
 import { butonSIkona } from './ikoni.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
-import { poleSIzbor } from './menyu.js';
+import { optsiiNaNachina, poleSIzbor } from './menyu.js';
 import type { Konteks } from './ekranite.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
@@ -377,9 +377,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
             ime: 'nachin',
             etiket: 'Начин',
             spisak: 'nachin',
-            opcii: NACHINI_NA_PLASHTANE.map(
-              (n) => `<option value="${n.klyuch}">${n.ime}</option>`,
-            ).join(''),
+            opcii: optsiiNaNachina(),
           })}
           <div class="pole">
             <label for="pl-data">Дата</label>

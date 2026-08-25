@@ -44,7 +44,7 @@ export const IMENA_NA_GLEDASHTITE: Readonly<Record<KoyGleda, string>> = Object.f
 });
 
 /** Къде живее управлението на една тема. */
-export type KadeZhivee =
+type KadeZhivee =
   | { readonly vid: 'sektsiya'; readonly ekran: string; readonly sektsiya: string }
   | { readonly vid: 'prozorets' };
 

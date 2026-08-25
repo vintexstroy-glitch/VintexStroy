@@ -52,7 +52,7 @@ function menyutoNaNaemite(o: Ogledalo): Menyu {
   );
 }
 
-export interface SastoyanieNaEkrana {
+interface SastoyanieNaEkrana {
   readonly ogledalo: Ogledalo;
   readonly sabitiya: number;
 }

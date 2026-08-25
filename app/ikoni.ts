@@ -104,8 +104,6 @@ export const IKONI: Readonly<Record<string, string>> = Object.freeze({
   kontragent: '<path d="M4 20.5V6a1 1 0 0 1 1-1h7a1 1 0 0 1 1 1v14.5"></path><path d="M13 10h6a1 1 0 0 1 1 1v9.5"></path><path d="M2.5 20.5h19"></path><path d="M7 9h3M7 13h3M16 14h1"></path>',
 });
 
-export type ImeNaIkona = keyof typeof IKONI;
-
 /** Има ли такъв знак · за да пада на глас, а не мълчешком (правило 17). */
 export function imaIkona(ime: string): boolean {
   return Object.hasOwn(IKONI, ime);
@@ -124,7 +122,7 @@ export function ikona(ime: string, klas = 'ikona'): string {
   return `<svg class="${ekraniraj(klas)}" viewBox="0 0 24 24" aria-hidden="true">${patishta}</svg>`;
 }
 
-export interface ButonSIkona {
+interface ButonSIkona {
   readonly ikona: string;
   /** id-то на бутона · закачането го търси по него, не по разметката вътре */
   readonly id?: string;

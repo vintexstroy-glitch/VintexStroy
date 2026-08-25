@@ -47,7 +47,7 @@ import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 /** Четирите вида диаграма · и къде всеки лъже. */
 const VIDOVE_DIAGRAMA = ['liniya', 'stalbove', 'ploshtta', 'tochki'] as const;
 
-export type VidDiagrama = (typeof VIDOVE_DIAGRAMA)[number];
+type VidDiagrama = (typeof VIDOVE_DIAGRAMA)[number];
 
 export const IMENA_NA_DIAGRAMITE: Readonly<Record<VidDiagrama, string>> = Object.freeze({
   liniya: 'линия',
@@ -380,9 +380,4 @@ export function zakachiKoefitsientite(koren: HTMLElement, prerisuvay: () => Prom
     zapomniEkranno('koef.godishna', kamGodina);
     await prerisuvay();
   });
-}
-
-/** За прохода и за тестовете: кой коефициент се гледа сега. */
-export function izbraniyatKoefitsient(): Koefitsient {
-  return koefitsient(izbran);
 }

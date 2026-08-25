@@ -51,7 +51,7 @@ import { mozheDaRedaktira, type Rolya as RolyaNaChovek } from '../yadro/samolich
  * на ЧОВЕК, а `Rolya` в `model.ts` е роля на КОЛОНА. Колонното право е точно
  * пресечната им точка — затова тук човешката се внася преименувана.
  */
-export type VidKolona = 'promenlyva' | 'zatvorena';
+type VidKolona = 'promenlyva' | 'zatvorena';
 
 export const IMENA_NA_VIDOVETE: Readonly<Record<VidKolona, string>> = Object.freeze({
   promenlyva: 'променяща се',
@@ -59,7 +59,7 @@ export const IMENA_NA_VIDOVETE: Readonly<Record<VidKolona, string>> = Object.fre
 });
 
 /** Какво може ЕДИН СЛУЖИТЕЛ да прави с една колона. Две, не три — вж. шапката. */
-export type PravoNaKolona = 'vizhda' | 'skrito';
+type PravoNaKolona = 'vizhda' | 'skrito';
 
 export class GreshkaPravo extends Error {
   constructor(message: string) {

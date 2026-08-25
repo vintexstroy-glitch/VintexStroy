@@ -46,9 +46,9 @@ export class GreshkaKniga extends Error {
 
 // ── СМЕТКОПЛАНЪТ ──────────────────────────────────────────────────────────
 
-export type VidSmetka = 'aktiv' | 'pasiv' | 'prihod' | 'razhod';
+type VidSmetka = 'aktiv' | 'pasiv' | 'prihod' | 'razhod';
 
-export interface Smetka {
+interface Smetka {
   /** номерът, както се пише в статията: „411", „4532" */
   readonly nomer: string;
   readonly ime: string;
@@ -107,7 +107,7 @@ export function nemapnati(): readonly Smetka[] {
  *
  * Непознат сектор пада на 602 „външни услуги" — най-широкото, което не лъже.
  */
-export const SMETKA_NA_SEKTORA: Readonly<Record<string, string>> = Object.freeze({
+const SMETKA_NA_SEKTORA: Readonly<Record<string, string>> = Object.freeze({
   'pokupki-materiali': '601',
   'pokupki-uslugi': '602',
   'uslugi-stroitelni': '602',
@@ -132,9 +132,9 @@ export function smetkataNaParite(nachin: string): string {
 
 // ── СТАТИИТЕ ──────────────────────────────────────────────────────────────
 
-export type Strana = 'debit' | 'kredit';
+type Strana = 'debit' | 'kredit';
 
-export interface RedNaStatiya {
+interface RedNaStatiya {
   readonly smetka: string;
   readonly strana: Strana;
   readonly suma_st: number;
@@ -159,9 +159,9 @@ export interface Statiya {
  * Изброени поименно, защото името им отива във файла и НАП ги чете. Пети
  * дневник = пето решение, не пета константа мимоходом.
  */
-export const DNEVNITSI = ['prodazhbi', 'pokupki', 'pari', 'dds'] as const;
+const DNEVNITSI = ['prodazhbi', 'pokupki', 'pari', 'dds'] as const;
 
-export type VidDnevnik = (typeof DNEVNITSI)[number];
+type VidDnevnik = (typeof DNEVNITSI)[number];
 
 export const IMENA_NA_DNEVNITSITE: Readonly<Record<VidDnevnik, string>> = Object.freeze({
   prodazhbi: 'Продажби · начислени вземания',
@@ -212,7 +212,7 @@ export function proveriStatiya(s: Statiya): void {
  * ВАДИ, а не се смята отделно — иначе стотинката се губи и статията не
  * затваря.
  */
-export function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya {
+function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya {
   const naem = o.naemi.get(v.naemId);
   const razbivka = ddsOtObshta(v.nachisleno_st, stavkaNaReda(naem?.sektor));
   const s: Statiya = {
@@ -232,7 +232,7 @@ export function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya {
 }
 
 /** ПРИЕТО ПЛАЩАНЕ → Дт 501/503 / Кт 411. */
-export function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya {
+function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya {
   const vzemane = o.vzemaniya.get(p.vzemaneId);
   const naem = vzemane ? o.naemi.get(vzemane.naemId) : undefined;
   const s: Statiya = {
@@ -258,7 +258,7 @@ export function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya {
  * днес няма събитие — и измислена статия през 401 щеше да покаже пред НАП
  * дълг, който го няма.
  */
-export function statiyaOtRazhod(r: Razhod): Statiya {
+function statiyaOtRazhod(r: Razhod): Statiya {
   const stavka = stavkaNaReda(r.sektor, r.stavka);
   const razbivka = ddsOtObshta(r.suma_st, stavka);
   const s: Statiya = {
@@ -317,7 +317,7 @@ export function statiyaOtSpravka(
 }
 
 /** ВНЕСЕН ДДС → Дт 4539 / Кт 501/503. */
-export function statiyaOtPlateno(p: {
+function statiyaOtPlateno(p: {
   readonly id: string;
   readonly data: string;
   readonly period: string;
@@ -361,7 +361,7 @@ function sumaNa(statii: readonly Statiya[], strana: Strana): number {
 }
 
 /** Оборотът по ЕДНА сметка за периода · дебит и кредит поотделно. */
-export interface OborotNaSmetka {
+interface OborotNaSmetka {
   readonly smetka: Smetka;
   readonly debit_st: number;
   readonly kredit_st: number;
@@ -412,6 +412,7 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
    * поправи само единия (правило 17).
    */
   const spravka = o.spravki.get(period);
+  let priklyuchvashta = 0;
   if (spravka) {
     const ddsOt = (nomer: string, strana: Strana) =>
       statii.reduce(
@@ -420,7 +421,10 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
         0,
       );
     const zatvarya = statiyaOtSpravka(period, ddsOt('4532', 'kredit'), ddsOt('4531', 'debit'), spravka.data);
-    if (zatvarya) statii.push(zatvarya);
+    if (zatvarya) {
+      statii.push(zatvarya);
+      priklyuchvashta = 1;
+    }
   }
 
   statii.sort((a, b) => a.data.localeCompare(b.data) || a.dnevnik.localeCompare(b.dnevnik) || a.id.localeCompare(b.id));
@@ -432,10 +436,24 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
   dnevnik.zapishi(
     sverka(`Главна книга ${period} · дебит ↔ кредит`, debit_st, kredit_st, kogato, MERKA.pari),
   );
+  /**
+   * СПРАВКАТА СЕ БРОИ САМО КОГАТО Е РОДИЛА СТАТИЯ.
+   *
+   * Дотук тук стоеше `(spravka ? 1 : 0)` — и това беше ЛЪЖЛИВА ТРЕВОГА при
+   * най-обикновения случай за целевия клиент: наемодател само с ЖИЛИЩНИ наеми.
+   * Там ставката е 0%, изходящият и входящият ДДС са нула, `statiyaOtSpravka`
+   * връща `undefined` (празна статия не се ражда) — а сверката пак броеше
+   * справката и обявяваше разлика от ЕДИН запис.
+   *
+   * Последицата не беше козметична: `nared` падаше на `false`, а одитният
+   * файл пишеше „Главната книга не затваря" върху книга, чиито дебит и кредит
+   * са равни до стотинка. Проверка, която крещи при вярно състояние, се научава
+   * да се пренебрегва — и тогава мълчи и когато трябва да крещи.
+   */
   dnevnik.zapishi(
     sverka(
       `Главна книга ${period} · източници ↔ статии`,
-      vzemaniya.length + plashtaniya.length + razhodi.length + platenoDDS.length + (spravka ? 1 : 0),
+      vzemaniya.length + plashtaniya.length + razhodi.length + platenoDDS.length + priklyuchvashta,
       statii.length,
       kogato,
       MERKA.broy,

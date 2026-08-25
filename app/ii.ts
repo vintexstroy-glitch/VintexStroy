@@ -301,10 +301,10 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
         <span>единственият дом на длъжностната · промптът се СГЛОБЯВА оттук</span>
       </div>
       <div class="tablitsa">
-        <div class="red opis"><span><b>Характеристика</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')} <span class="znachka tiha">умение · постоянно</span></span></div>
-        <div class="red opis"><span><b>Обхват · чете</b></span><span>${ekraniraj(a.obhvat.map((x) => IMENA_NA_OBHVATITE[x]).join(' · ') || 'нищо')}</span></div>
-        <div class="red opis"><span><b>Забрани</b></span><span>${ekraniraj(a.zabrani.join(' · '))}</span></div>
-        <div class="red opis"><span><b>Умения</b></span><span>${
+        <div class="red opis" translate="no"><span><b>Характеристика</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')} <span class="znachka tiha">умение · постоянно</span></span></div>
+        <div class="red opis" translate="no"><span><b>Обхват · чете</b></span><span>${ekraniraj(a.obhvat.map((x) => IMENA_NA_OBHVATITE[x]).join(' · ') || 'нищо')}</span></div>
+        <div class="red opis" translate="no"><span><b>Забрани</b></span><span>${ekraniraj(a.zabrani.join(' · '))}</span></div>
+        <div class="red opis" translate="no"><span><b>Умения</b></span><span>${
           a.umeniya.length === 1
             ? 'само характеристиката — добави умения отдолу'
             : ekraniraj(
@@ -314,8 +314,8 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
                   .join(' · '),
               )
         }</span></div>
-        <div class="red opis"><span><b>Отговорник</b></span><span>${ekraniraj(a.otgovornik)} · неговият имейл е <code>actor</code></span></div>
-        <div class="red opis"><span><b>Включен от</b></span><span>${ekraniraj(a.ot || '—')}</span></div>
+        <div class="red opis" translate="no"><span><b>Отговорник</b></span><span>${ekraniraj(a.otgovornik)} · неговият имейл е <code>actor</code></span></div>
+        <div class="red opis" translate="no"><span><b>Включен от</b></span><span>${ekraniraj(a.ot || '—')}</span></div>
       </div>
       <details class="drebno">
         <summary>Промптът, сглобен от този документ</summary>
@@ -476,20 +476,20 @@ function kartaSaglasie(a: Agent): string {
         <span>какво ще прави · какво НЯМА да прави · и какво може да се обърка</span>
       </div>
       <div class="tablitsa">
-        <div class="red opis"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
-        <div class="red opis"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
+        <div class="red opis" translate="no"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
+        <div class="red opis" translate="no"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
       </div>
       <div class="tablitsa">
         <div class="glava opis"><span>Рискът</span><span>какво значи</span></div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Подхвърлен текст</b></span>
           <span>Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той няма път към запис — но предложение, прието на доверие, пренася грешката. Затова всяко предложение носи сверка, и тя се гледа.</span>
         </div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Умора от съгласия</b></span>
           <span>Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" няма и няма да има — присъдата е ред по ред.</span>
         </div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Сгрешена сметка</b></span>
           <span>Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не го запишеш — и записът носи ТВОЯ имейл, не неговото име.</span>
         </div>

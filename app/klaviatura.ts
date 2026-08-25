@@ -77,13 +77,13 @@ function mahniZnaka(): void {
 }
 
 // ── сметката на избора · чиста, за да има тест ────────────────────────────
-export interface KletkaVIzbora {
+interface KletkaVIzbora {
   readonly tekst: string;
   /** стотинките от `data-st`, или null — клетката не е пари */
   readonly st: number | null;
 }
 
-export interface SmetkaNaIzbora {
+interface SmetkaNaIzbora {
   /** непразните клетки — както Excel брои */
   readonly broy: number;
   readonly broyPari: number;

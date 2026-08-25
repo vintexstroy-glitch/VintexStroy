@@ -49,20 +49,13 @@ import { kod, prechkiOtShemata, proveriShema, SHEMA, type Shema } from './saf-t-
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { Period } from '../domein/nachislyavane.js';
 
-export class GreshkaSAFT extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'GreshkaSAFT';
-  }
-}
-
 /** Кой прави файла · стои в `Header`, за да знае НАП с какво е писан. */
-export const SOFTUER = Object.freeze({
+const SOFTUER = Object.freeze({
   ime: 'MasterBook',
   proizvoditel: 'VintexStroy',
 });
 
-export interface RezultatSAFT {
+interface RezultatSAFT {
   readonly period: Period;
   readonly xml: string;
   /** името на файла · период и ЕИК, за да се различават два месеца в папката */
@@ -130,6 +123,60 @@ function kontragentXML(etiket: string, k: Kontragent, smetka: string): string {
     (k.ddsNomer ? el('TaxRegistrationNumber', k.ddsNomer) : '') +
     adresXML(k) +
     `</${etiket}>`
+  );
+}
+
+/**
+ * ЕДНА ФАКТУРА · продажба и покупка се пишат с ЕДИН израз.
+ *
+ * Дотук двата блока стояха дословно еднакви, различни само по четири думи:
+ * `CustomerID`/`SupplierID`, сметката, посоката на сумата и откъде идват
+ * числата. Обходът за чистота (`npm run chistota`) ги хвана.
+ *
+ * Разликата НЕ е козметична: този блок носи разбивката на ДДС-то, а тя трябва
+ * да е една и съща и от двете страни. Поправена на едното място, тя щеше да
+ * остави другото — и файлът щеше да декларира различна аритметика за продажба
+ * и за покупка.
+ */
+interface EdnaFaktura {
+  readonly nomer: string;
+  readonly data: string;
+  readonly strana: 'CustomerID' | 'SupplierID';
+  readonly kontragent: string;
+  readonly smetka: string;
+  readonly opis: string;
+  readonly posoka: 'DebitAmount' | 'CreditAmount';
+  readonly obshta_st: number;
+  readonly stavka: number;
+  readonly vidDokument: string;
+}
+
+function fakturaXML(f: EdnaFaktura): string {
+  const razbivka = ddsOtObshta(f.obshta_st, f.stavka);
+  return (
+    '<Invoice>' +
+    el('InvoiceNo', f.nomer) +
+    el('InvoiceDate', f.data) +
+    el('InvoiceType', f.vidDokument) +
+    el(f.strana, f.kontragent) +
+    '<Line>' +
+    el('LineNumber', '1') +
+    el('AccountID', f.smetka) +
+    el('Description', f.opis) +
+    el(f.posoka, sumaXML(razbivka.osnova_st)) +
+    '<Tax>' +
+    el('TaxType', 'VAT') +
+    el('TaxCode', String(f.stavka)) +
+    el('TaxPercentage', String(f.stavka)) +
+    el('TaxAmount', sumaXML(razbivka.dds_st)) +
+    '</Tax>' +
+    '</Line>' +
+    '<DocumentTotals>' +
+    el('TaxPayable', sumaXML(razbivka.dds_st)) +
+    el('NetTotal', sumaXML(razbivka.osnova_st)) +
+    el('GrossTotal', sumaXML(f.obshta_st)) +
+    '</DocumentTotals>' +
+    '</Invoice>'
   );
 }
 
@@ -315,64 +362,34 @@ export function safT(
   // ── SOURCEDOCUMENTS ──────────────────────────────────────────────────────
   const prodazhbi = vzemaniya.map((v) => {
     const naem = o.naemi.get(v.naemId);
-    const stavka = stavkaNaReda(naem?.sektor);
-    const razbivka = ddsOtObshta(v.nachisleno_st, stavka);
-    return (
-      '<Invoice>' +
-      el('InvoiceNo', v.id) +
-      el('InvoiceDate', v.padezh) +
-      el('InvoiceType', kod(shema.vidoveDokument, 'faktura')) +
-      el('CustomerID', klyuchNaKontragent(naem?.naemetel ?? '')) +
-      '<Line>' +
-      el('LineNumber', '1') +
-      el('AccountID', '703') +
-      el('Description', `${v.osnovanie} · ${v.period}`) +
-      el('CreditAmount', sumaXML(razbivka.osnova_st)) +
-      '<Tax>' +
-      el('TaxType', 'VAT') +
-      el('TaxCode', String(stavka)) +
-      el('TaxPercentage', String(stavka)) +
-      el('TaxAmount', sumaXML(razbivka.dds_st)) +
-      '</Tax>' +
-      '</Line>' +
-      '<DocumentTotals>' +
-      el('TaxPayable', sumaXML(razbivka.dds_st)) +
-      el('NetTotal', sumaXML(razbivka.osnova_st)) +
-      el('GrossTotal', sumaXML(v.nachisleno_st)) +
-      '</DocumentTotals>' +
-      '</Invoice>'
-    );
+    return fakturaXML({
+      nomer: v.id,
+      data: v.padezh,
+      strana: 'CustomerID',
+      kontragent: klyuchNaKontragent(naem?.naemetel ?? ''),
+      smetka: '703',
+      opis: `${v.osnovanie} · ${v.period}`,
+      posoka: 'CreditAmount',
+      obshta_st: v.nachisleno_st,
+      stavka: stavkaNaReda(naem?.sektor),
+      vidDokument: kod(shema.vidoveDokument, 'faktura'),
+    });
   });
 
-  const pokupkiXML = pokupki.map((r) => {
-    const stavka = stavkaNaReda(r.sektor, r.stavka);
-    const razbivka = ddsOtObshta(r.suma_st, stavka);
-    return (
-      '<Invoice>' +
-      el('InvoiceNo', r.dokument || r.id) +
-      el('InvoiceDate', r.data) +
-      el('InvoiceType', kod(shema.vidoveDokument, 'faktura')) +
-      el('SupplierID', klyuchNaKontragent(r.dostavchik)) +
-      '<Line>' +
-      el('LineNumber', '1') +
-      el('AccountID', '602') +
-      el('Description', r.opis) +
-      el('DebitAmount', sumaXML(razbivka.osnova_st)) +
-      '<Tax>' +
-      el('TaxType', 'VAT') +
-      el('TaxCode', String(stavka)) +
-      el('TaxPercentage', String(stavka)) +
-      el('TaxAmount', sumaXML(razbivka.dds_st)) +
-      '</Tax>' +
-      '</Line>' +
-      '<DocumentTotals>' +
-      el('TaxPayable', sumaXML(razbivka.dds_st)) +
-      el('NetTotal', sumaXML(razbivka.osnova_st)) +
-      el('GrossTotal', sumaXML(r.suma_st)) +
-      '</DocumentTotals>' +
-      '</Invoice>'
-    );
-  });
+  const pokupkiXML = pokupki.map((r) =>
+    fakturaXML({
+      nomer: r.dokument || r.id,
+      data: r.data,
+      strana: 'SupplierID',
+      kontragent: klyuchNaKontragent(r.dostavchik),
+      smetka: '602',
+      opis: r.opis,
+      posoka: 'DebitAmount',
+      obshta_st: r.suma_st,
+      stavka: stavkaNaReda(r.sektor, r.stavka),
+      vidDokument: kod(shema.vidoveDokument, 'faktura'),
+    }),
+  );
 
   const plashtaniyaXML = plashtaniya.map((p) => {
     const vzemane = o.vzemaniya.get(p.vzemaneId);

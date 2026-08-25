@@ -228,7 +228,7 @@ export function nastroykiPoPodrazbirane(): NastroykiNaVhoda {
 /** Азбуките, между които приложението избира СВОЯТА. Английската е ВИНАГИ позволена. */
 export const AZBUKI = ['kirilitsa', 'latinitsa'] as const;
 
-export type Azbuka = (typeof AZBUKI)[number];
+type Azbuka = (typeof AZBUKI)[number];
 
 export const IMENA_NA_AZBUKITE: Readonly<Record<Azbuka, string>> = Object.freeze({
   kirilitsa: 'кирилица',

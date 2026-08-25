@@ -16,7 +16,7 @@
 import type { Sha256 } from '../yadro/index.js';
 
 export type VidIzvor = 'csv' | 'xlsx' | 'pdf' | 'raka';
-export type VidSnimka = 'razhodi' | 'naemi';
+type VidSnimka = 'razhodi' | 'naemi';
 
 export interface Izvor {
   readonly vid: VidIzvor;

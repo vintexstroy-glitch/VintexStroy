@@ -54,7 +54,7 @@ export const IMENA_NA_VIDOVETE_VHOD: Readonly<Record<VidVhod, string>> = Object.
 });
 
 /** Една стойност в речника. Сгрешената спира да се предлага, но НЕ се трие. */
-export interface Stoynost {
+interface Stoynost {
   readonly tekst: string;
   /** предлага ли се още · false значи „стои в старите редове, но не в менюто" */
   readonly predlagaSe: boolean;
@@ -95,7 +95,7 @@ export function veche(m: Menyu, tekst: string): boolean {
 /** Какво е направил човекът · четири състояния, не две. */
 export const SASTOYANIYA = ['prazno', 'izbrano', 'novo', 'otkazano'] as const;
 
-export type Sastoyanie = (typeof SASTOYANIYA)[number];
+type Sastoyanie = (typeof SASTOYANIYA)[number];
 
 export interface Rezultat {
   readonly sastoyanie: Sastoyanie;
@@ -219,27 +219,29 @@ export function dobaviStoynost(m: Menyu, tekst: string, eStopanin = false): Meny
  * триенето би пренаписало минали записи" (правило 1, приложено към речника).
  */
 export function spriDaSePredlaga(m: Menyu, tekst: string): Menyu {
-  const t = podravni(tekst);
-  if (!veche(m, t)) throw new GreshkaMenyu(`„${t}" го няма в „${m.ime}".`);
-  return Object.freeze({
-    ...m,
-    stoynosti: Object.freeze(
-      m.stoynosti.map((s) =>
-        podravni(s.tekst) === t ? Object.freeze({ ...s, predlagaSe: false }) : s,
-      ),
-    ),
-  });
+  return sPredlagane(m, tekst, false);
 }
 
 /** И обратното · спряна стойност се връща в списъка. */
 export function varniVSpisaka(m: Menyu, tekst: string): Menyu {
+  return sPredlagane(m, tekst, true);
+}
+
+/**
+ * ЕДНАТА ДУМА, която дели двете · спиране и връщане са едно действие с два знака.
+ *
+ * Дотук двете стояха дословно еднакви освен `predlagaSe: false` срещу `true`.
+ * Обходът за чистота ги хвана. Слети тук, отказът „няма я в списъка" е един —
+ * а точно той се разминаваше най-лесно, защото се пише два пъти.
+ */
+function sPredlagane(m: Menyu, tekst: string, predlagaSe: boolean): Menyu {
   const t = podravni(tekst);
   if (!veche(m, t)) throw new GreshkaMenyu(`„${t}" го няма в „${m.ime}".`);
   return Object.freeze({
     ...m,
     stoynosti: Object.freeze(
       m.stoynosti.map((s) =>
-        podravni(s.tekst) === t ? Object.freeze({ ...s, predlagaSe: true }) : s,
+        podravni(s.tekst) === t ? Object.freeze({ ...s, predlagaSe }) : s,
       ),
     ),
   });

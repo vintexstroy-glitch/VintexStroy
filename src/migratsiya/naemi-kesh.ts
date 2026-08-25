@@ -35,7 +35,7 @@ export interface ObyavenoOtLista {
   readonly totali_st: Readonly<Record<string, number>>;
 }
 
-export interface RezultatMigratsiya {
+interface RezultatMigratsiya {
   readonly sverki: readonly Sverka[];
   readonly zapisani: number;
   readonly povtoreni: number;
@@ -87,7 +87,7 @@ export function sveriRegistara(
   return sverki;
 }
 
-export interface NastroykiMigratsiya {
+interface NastroykiMigratsiya {
   readonly deystviya: Deystviya;
   readonly redove: readonly RedOtRegistara[];
   readonly obyaveno: ObyavenoOtLista;

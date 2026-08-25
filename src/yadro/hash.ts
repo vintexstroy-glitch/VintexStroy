@@ -17,7 +17,7 @@ export type Sha256 = (danni: string) => Promise<string>;
  * Ключовете на payload се подреждат, за да не зависи хешът от реда им.
  * `actor` НЕ влиза в хеша: самоличността се записва, но не заключва веригата.
  */
-export function kanonichno(s: ZaHeshirane): string {
+function kanonichno(s: ZaHeshirane): string {
   return JSON.stringify([
     s.seq,
     s.opId,
@@ -47,7 +47,7 @@ export async function izchisliHash(s: ZaHeshirane, sha: Sha256): Promise<string>
   return sha(kanonichno(s));
 }
 
-export interface RezultatOtProverka {
+interface RezultatOtProverka {
   readonly tsyala: boolean;
   /** seq на първото счупено звено; липсва, ако веригата е цяла */
   readonly parvoSchupeno?: number;

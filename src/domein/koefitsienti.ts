@@ -72,7 +72,7 @@ export const IMENA_NA_VIDOVETE: Readonly<Record<Vid, string>> = Object.freeze({
 });
 
 /** Трите отговора на въпроса „а на годишна база?" */
-export type Priravnyavane = 'mnozhi' | 'nenuzhno' | 'nevazmozhno';
+type Priravnyavane = 'mnozhi' | 'nenuzhno' | 'nevazmozhno';
 
 export const PRIRAVNYAVANETO: Readonly<Record<Vid, Priravnyavane>> = Object.freeze({
   'suma-potok': 'mnozhi',
@@ -258,7 +258,7 @@ export const IMENA_NA_STAPKITE: Readonly<Record<Stapka, string>> = Object.freeze
 });
 
 /** Едно парче от периода · със свой етикет за оста. */
-export interface Parche {
+interface Parche {
   readonly ot: string;
   readonly do: string;
   readonly etiket: string;
@@ -322,7 +322,7 @@ export function razbiyNaStapki(ot: string, doo: string, stapka: Stapka): readonl
 
 
 /** Един параметър, влязъл в сметката · показва се ПОД формулата (т.5). */
-export interface Parametar {
+interface Parametar {
   readonly ime: string;
   /** цели стотинки при пари, цяло число иначе */
   readonly stoynost: number;

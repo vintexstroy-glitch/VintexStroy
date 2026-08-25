@@ -44,16 +44,13 @@ export class GreshkaPrenos extends Error {
   }
 }
 
-export interface Otgovor {
-  readonly mozhe: boolean;
-  readonly prichina: string;
-}
+/**
+ * ОТГОВОРЪТ „може ли" е ЕДИН (`otgovor.ts`) и се изнася наново оттук: който
+ * пита този модул, го пита за СВОЙ въпрос и не бива да търси формата другаде.
+ */
+import { MOZHE, ne, type Otgovor } from './otgovor.js';
 
-const MOZHE: Otgovor = { mozhe: true, prichina: '' };
-
-function ne(prichina: string): Otgovor {
-  return { mozhe: false, prichina };
-}
+export type { Otgovor };
 
 /**
  * ВРАТАРЯТ на преноса · огледан на `mozheLiDaSeStornira`.
@@ -94,7 +91,7 @@ const OPID = {
   izpraten: (prenosId: string) => `prenos:${prenosId}:izpraten`,
 } as const;
 
-export interface RezultatPrenos {
+interface RezultatPrenos {
   readonly prenosId: string;
   readonly preneseni: number;
   /** сверката вход↔изход · разликата се връща дори когато е нула (правило 7) */

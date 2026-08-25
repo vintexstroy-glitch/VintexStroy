@@ -23,7 +23,7 @@
  * липсващият се вижда на екрана предварително.
  */
 
-export interface Nomenklatura {
+interface Nomenklatura {
   readonly klyuch: string;
   readonly ime: string;
   /** кодът по номенклатурата на НАП · празно значи „не е свалена" */

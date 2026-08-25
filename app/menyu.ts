@@ -37,6 +37,8 @@
  */
 
 import { ekraniraj } from './obshto.js';
+import { NACHINI_NA_PLASHTANE } from '../src/domein/sabitiya.js';
+import { STAVKI } from '../src/domein/dds.js';
 import {
   predlagani,
   sastoyanieNaPoleto,
@@ -45,7 +47,7 @@ import {
 } from '../src/domein/padashti-menyuta.js';
 
 /** Какво знае екранът за едно поле с меню. */
-export interface PoleSMenyu {
+interface PoleSMenyu {
   readonly id: string;
   /** име на полето във формата (`name`) · по подразбиране същото като id-то */
   readonly ime?: string;
@@ -223,7 +225,32 @@ export const ZAKLYUCHENITE: Readonly<Record<string, ZaklyuchenSpisak>> = Object.
   }),
 });
 
-export interface PoleSIzbor {
+/**
+ * ДВАТА ЗАКЛЮЧЕНИ СПИСЪКА, изписани веднъж (правило 17).
+ *
+ * „Начин на плащане" стоеше в две форми (плащане и разход), „Ставка" — също в
+ * две (фактура и Калкулатор). И четирите изписваха `<option>`-ите си на ръка,
+ * от един и същ домейнен списък. Обходът за чистота (`npm run chistota`) ги
+ * хвана като дословно еднакви.
+ *
+ * Изборът НЕ е козметичен: списъкът тук е ЗАКЛЮЧЕН (ADR-033) — нова стойност
+ * в него значи ново решение в домейна. Четири места, които го рисуват, са
+ * четири места, в които едно от тях ще изостане.
+ */
+export function optsiiNaNachina(): string {
+  return NACHINI_NA_PLASHTANE.map(
+    (n) => `<option value="${n.klyuch}">${ekraniraj(n.ime)}</option>`,
+  ).join('');
+}
+
+/** Ставките · цял процент, и подразбраната е избрана предварително. */
+export function optsiiNaStavkata(podrazbirana = 20): string {
+  return STAVKI.map(
+    (st) => `<option value="${st}"${st === podrazbirana ? ' selected' : ''}>${st}%</option>`,
+  ).join('');
+}
+
+interface PoleSIzbor {
   readonly id: string;
   /** име на полето във формата (`name`) · по подразбиране същото като id-то */
   readonly ime?: string;
