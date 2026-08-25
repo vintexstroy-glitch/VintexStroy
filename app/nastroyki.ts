@@ -18,7 +18,9 @@
 import { pishi } from '../src/yadro/pari.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { ekraniraj } from './obshto.js';
+import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import { rabotnaKniga } from '../src/iznos/excel.js';
+import { obrazetsOtModel, ZNAK_ZATVORENA } from '../src/iznos/ot-model.js';
 import {
   belegNaButon,
   DEYSTVIYA,
@@ -74,6 +76,7 @@ import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './main.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
+import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -100,7 +103,7 @@ let dobavyamKolona = false;
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
-export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0): string {
+export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izborPoPodrazbirane()): string {
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
 
@@ -134,7 +137,20 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0): string {
     ${dobavyam ? formaNaButon(modeli) : ''}
     ${blokNaModelite(modeli)}
     ${blokNaRedaktora(modeli)}
-    ${blokNaPravata(o, modeli)}
+    ${
+      /**
+       * ТРИТЕ ВЪЗМОЖНОСТИ, КОИТО ДОТУК НЕ ПИПАХА НИЩО (ADR-041).
+       *
+       * „Други имейли", „Роли за достъп" и „Колонно право" стояха в Таблото с
+       * отметки, които НЕ ВЛИЯЕХА на нито един екран. Отметка без последица е
+       * НАДПИС, а правило 15 иска точно обратното: „изключено ≠ липсващо".
+       *
+       * Трите се сливат в ЕДИН блок нарочно — те са една функция, разказана на
+       * три части: кого добавяш, каква роля му даваш, коя колона му скриваш.
+       * Изключиш ли добавянето на хора, другите две нямат върху кого да важат.
+       */
+      mozhe(izbor, 'drugi-imeyli') ? blokNaPravata(o, modeli, izbor) : ''
+    }
     ${blokNaSverkite(o)}
     ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}`;
@@ -359,7 +375,54 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
       <button type="button" class="glaven" id="nova-kolona"${dobavyamKolona ? ' disabled' : ''}>Нова колона</button>
       <p class="drebno">Работеща таблица само расте: „колони не се трият, а само се добавят" — празна колона без роля е единственото изключение, и то само за управителите.</p>
     </div>
+    ${obrazetsatNa(m)}
     ${dobavyamKolona ? formaNaKolona(m, modeli) : ''}`;
+}
+
+/**
+ * ОБРАЗЕЦЪТ · път №4 от десетте („Създаване на таблица", ADR-010).
+ *
+ * Негови думи: „ФУНКЦИОНАЛНОСТТА ДАВА ВЪЗМОЖНОСТ ДА ПРЕТВОРИШ МОДЕЛА НА
+ * ТАБЛИЦАТА, ОТ КОЯТО ЧЕТЕШ. Така ще се напълнят контейнерите с таблици за
+ * експеримент."
+ *
+ * Мостът (`src/iznos/ot-model.ts`) беше построен в резен 14 и оттогава го
+ * викаха само тестовете — пътят нямаше бутон. Ето го.
+ *
+ * ОБРАЗЕЦЪТ Е ЦЯЛ · всички колони, включително скритите за някого. Това НЕ е
+ * изключение от колонното право, а негово следствие: правило 23 казва, че
+ * скриването пипа ЕКРАНА и нищо друго — „нито сбор, нито Журнал, нито износ".
+ * И тук то е не просто правило, а МЕХАНИКА: главата на файла е отпечатъкът, по
+ * който `poznavaLi` го разпознава на връщане. Образец с махната колона е файл,
+ * който самото приложение после отказва да прочете.
+ */
+function obrazetsatNa(m: ModelNaTablitsa): string {
+  const zatvoreni = m.glavi.filter((_, k) => vidNaKolona(m, k) === 'zatvorena').length;
+  return `
+    <div class="karta" data-sektsiya="obrazets">
+      <div class="dyalglava">
+        <h3>Образец по този модел</h3>
+        <span>път №4 · „претвори модела на таблицата, от която четеш"</span>
+      </div>
+      <p class="drebno">Сваля празна таблица с <b>точно тези ${m.glavi.length} колони</b> и с
+      ролите им в заглавието. Попълниш ли я и я върнеш, същият модел я познава — главата ѝ е
+      отпечатъкът.${
+        zatvoreni > 0
+          ? ` <b>${zatvoreni}</b> ${zatvoreni === 1 ? 'затворена колона носи' : 'затворени колони носят'}
+             знак ${ekraniraj(ZNAK_ZATVORENA)} и остават празни: те се <b>смятат</b>, не се пишат.`
+          : ''
+      }</p>
+      <p class="drebno"><b>Образецът е ЦЯЛ</b> — носи и колоните, скрити за някой служител.
+      Скриването пипа екрана и нищо друго (правило 23), а тук това е и механика: махната
+      колона сменя главата, и файлът става непознаваем на връщане.</p>
+      <div class="poleta">
+        <label class="pole"><span>Празни редове</span>
+          <input type="number" min="1" max="500" step="1" id="obrazets-redove" value="12"></label>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="svali-obrazets">Свали образец</button>
+      </div>
+    </div>`;
 }
 
 function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
@@ -563,7 +626,7 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
  * Затова тук няма отметка „редактира": тя се СМЯТА от ролята и от вида на
  * колоната (`mozheDaRedaktiraKolona`), а не се раздава.
  */
-function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string {
+function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: Izbor): string {
   const hora = podredeni(o.sluzhiteli.values());
   const izbran = hora.find((h) => h.imeyl === izbranSluzhitel);
 
@@ -584,17 +647,40 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string 
         </select>
       </label>`
       }
-      ${izbran === undefined ? '' : hedariteNa(izbran, o, modeli)}
+      ${
+        // КОЛОННОТО ПРАВО е СВОЯ възможност: може да добавяш хора и да им
+        // даваш роли, без изобщо да скриваш колони. Изключено, матрицата
+        // изчезва — а СКРИТИТЕ ВЕЧЕ колони си остават записани в Журнала.
+        izbran === undefined || !mozhe(izbor, 'kolonno-pravo')
+          ? ''
+          : hedariteNa(izbran, o, modeli)
+      }
+      ${
+        izbran !== undefined && !mozhe(izbor, 'kolonno-pravo')
+          ? `<p class="drebno"><b>Колонното право е изключено</b> от Таблото. Вече скритите колони
+             СТОЯТ записани в Журнала и важат — изключването маха матрицата, не решенията
+             (правило 15: „изключено ≠ липсващо").</p>`
+          : ''
+      }
       <form id="forma-sluzhitel" class="forma">
         <label class="pole"><span>Имейл</span><input name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
         <label class="pole"><span>Име</span><input name="ime" required placeholder="как му казваш"></label>
-        <label class="pole"><span>Роля</span>
-          <select name="rolya">
-            <option value="redaktor">редактира</option>
-            <option value="nablyudatel">наблюдава</option>
-            <option value="sobstvenik">собственик</option>
-          </select>
-        </label>
+        ${
+          // РОЛИТЕ са трета възможност. Изключени, всеки нов човек влиза като
+          // НАБЛЮДАТЕЛ — най-тясното, а не най-широкото: забравена отметка не
+          // бива да раздава повече права, отколкото е поискано.
+          mozhe(izbor, 'roli-za-dostap')
+            ? `<label class="pole"><span>Роля</span>
+                 <select name="rolya">
+                   <option value="redaktor">редактира</option>
+                   <option value="nablyudatel">наблюдава</option>
+                   <option value="sobstvenik">собственик</option>
+                 </select>
+               </label>`
+            : `<input type="hidden" name="rolya" value="nablyudatel">
+               <p class="drebno">Ролите за достъп са изключени — новият влиза като
+               <b>наблюдава</b>. Най-тясното, не най-широкото.</p>`
+        }
         <div class="dugmeta">
           <button type="submit" class="glavno">Запиши служителя</button>
           <span id="greshka-sluzhitel" class="greshka"></span>
@@ -863,6 +949,45 @@ export function zakachiNastroyki(
   koren.querySelector<HTMLButtonElement>('#otkazhi-kolona')?.addEventListener('click', async () => {
     dobavyamKolona = false;
     await prerisuvay();
+  });
+
+  /**
+   * ПЪТ №4 · образецът от модела (ADR-010 · ADR-041).
+   *
+   * Не пише НИЩО в Журнала — той е път „pishe" към ФАЙЛ, не към записа.
+   * Затова тук няма `opId`, няма сверка и няма събитие: нищо не се е случило
+   * с истината, само е слязъл лист хартия.
+   */
+  koren.querySelector<HTMLButtonElement>('#svali-obrazets')?.addEventListener('click', async (e) => {
+    const buton = e.target as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const m = await hedarSega();
+      if (!m) {
+        k.vest('zle', 'Първо избери хедър — образецът се прави от модел, не от нищото.');
+        return;
+      }
+      const poleto = koren.querySelector<HTMLInputElement>('#obrazets-redove');
+      const iskani = Number(poleto?.value ?? 12);
+      // Празните редове са УДОБСТВО: човек пише в тях. Извън разумното те само
+      // правят файла тежък, затова се подрязват мълчаливо — това не е данна.
+      const redove = Number.isSafeInteger(iskani) ? Math.min(Math.max(iskani, 1), 500) : 12;
+      const bayove = rabotnaKniga([obrazetsOtModel(m, redove)]);
+      svaliFayl(
+        new Blob([bayove.slice().buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `obrazets-${bezopasnoIme(m.klyuch)}-${dnesKato()}.xlsx`,
+      );
+      k.vest(
+        'dobre',
+        `Образецът по „${m.klyuch}" е свален · ${m.glavi.length} колони, ${redove} празни реда. ` +
+          'Попълни го и го върни през същия бутон — главата му е отпечатъкът, по който се познава.',
+      );
+    } finally {
+      buton.disabled = false;
+      await prerisuvay();
+    }
   });
 
   /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */

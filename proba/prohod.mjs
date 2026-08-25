@@ -1291,6 +1291,29 @@ async function main() {
       'без падащо меню',
     );
 
+    // ══ 58 · ПЪТ №4 · ОБРАЗЕЦЪТ ОТ МОДЕЛА (ADR-041) ═══════════════════════
+    //
+    // `src/iznos/ot-model.ts` беше построен в резен 14 и оттогава го викаха
+    // само тестовете — пътят „Създаване на таблица" нямаше бутон.
+    razdel = '58 · Образецът от модела';
+    proveri('секцията за образец стои под хедъра',
+      Boolean(await p.$('[data-sektsiya=obrazets]')), true);
+    proveri('и КАЗВА, че образецът е ЦЯЛ · махната колона го прави непознаваем',
+      (await p.$eval('[data-sektsiya=obrazets]', (e) => e.textContent)).includes('непознаваем'), true);
+
+    const predObrazets = await broySabitiya(p);
+    await p.fill('#obrazets-redove', '5');
+    const [obrazets] = await Promise.all([p.waitForEvent('download'), p.click('#svali-obrazets')]);
+    // ИМЕТО НА ФАЙЛА Е АДРЕС, не надпис: моделът се казва „Банка ОББ", а
+    // атрибутът `download` не оцелява с кирилица по този път — човекът получава
+    // „download", „download (1)"… Затова името се преписва на латиница.
+    proveri('името казва „образец" И кой модел е',
+      obrazets.suggestedFilename(), `obrazets-Banka-OBB-${new Date().toISOString().slice(0, 10)}.xlsx`);
+    // ПЪТЯТ „pishe" води до ФАЙЛ, не до записа: нищо не влиза в Журнала.
+    proveri('образецът НЕ пише нищо в Журнала', await broySabitiya(p), predObrazets);
+    proveri('и го КАЗВА след свалянето',
+      (await tekstNa(p, '.vest')).includes('празни реда'), true);
+
     // Нова колона с ГОТОВО меню от Описа — вторият вид номенклатура
     await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
     await p.fill('#kolona-ime', 'Начин');
@@ -1670,6 +1693,31 @@ async function main() {
       vestZaMenyuta.includes('Николай Петков'), false);
     proveri('и речникът вече го носи',
       (await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => x.value))).includes('Банишора'), true);
+
+    // ══ 58б · ОЩЕ ДВЕ ОГЛЕДАЛА · по обект и по контрагент (ADR-041) ═══════
+    //
+    // `src/ogledalo/izgledi.ts` също стоеше построен и без екран — възможността
+    // „Изгледи по имот и по контрагент" беше отметка, която не пипаше нищо.
+    razdel = '58 · Още огледала · по обект';
+    await naEkran(p, 'imoti', '[data-sektsiya=po-imot]');
+    proveri('изгледът „По обект" се показва',
+      (await p.$$eval('.red.po-imot', (r) => r.length)) > 0, true);
+    const sboraNaImotite = await p.$eval('.red.po-imot.sbor', (e) => e.textContent);
+    proveri('и има ред „Всичко", който затваря', sboraNaImotite.includes('Всичко'), true);
+    // Сборът на редовете трябва да е СБОРЪТ отдолу — иначе наем сочи изчезнал имот.
+    const kolonaNachisleno = await p.$$eval('.red.po-imot:not(.sbor)', (r) =>
+      r.map((x) => x.children[2].textContent.replace(/[^0-9,]/g, '').replace(',', '.')).map(Number));
+    const sboratDolu = await p.$eval('.red.po-imot.sbor', (e) =>
+      Number(e.children[2].textContent.replace(/[^0-9,]/g, '').replace(',', '.')));
+    proveri('сборът затваря с колоната над него',
+      Math.abs(kolonaNachisleno.reduce((a, b) => a + b, 0) - sboratDolu) < 0.02, true);
+
+    razdel = '58 · Още огледала · по контрагент';
+    await naEkran(p, 'pari', '[data-sektsiya=po-kontragent]');
+    proveri('изгледът „По контрагент" се показва',
+      (await p.$$eval('.red.po-kontragent', (r) => r.length)) > 0, true);
+    proveri('и КАЗВА кой как плаща · числото, което не се вижда отникъде другаде',
+      (await p.$eval('[data-tablitsa=po-kontragent]', (e) => e.textContent)).includes('Плаща'), true);
 
     // ══ 25 · контактите и писмото при закъснение ═════════════════════════
     razdel = '25 · писмото при закъснение';

@@ -13,6 +13,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { bezopasnoIme } from '../app/obshto.js';
 import {
   filtriray,
   grupiraj,
@@ -391,5 +392,39 @@ describe('паметта на екрана', () => {
     expect(() => zapomniEkranno('x', 1)).not.toThrow();
     expect(chetiEkranno('x', 'zhivo')).toBe('zhivo');
     expect(() => zabraviEkranno('x')).not.toThrow();
+  });
+});
+
+/**
+ * ИМЕТО НА ФАЙЛА Е АДРЕС, НЕ НАДПИС (ADR-041).
+ *
+ * Намерено в прохода с истински браузър: модел „Банка ОББ" сваляше файл на име
+ * `download`, защото атрибутът `download` не оцелява с кирилица по този път.
+ * Три образеца → „download", „download (1)", „download (2)", и после не се знае
+ * кой от кой модел е.
+ */
+describe('безопасното име на файл', () => {
+  it('преписва кирилицата на латиница и пази главните букви', () => {
+    expect(bezopasnoIme('Банка ОББ')).toBe('Banka-OBB');
+    expect(bezopasnoIme('Наеми КЕШ')).toBe('Naemi-KESH');
+    expect(bezopasnoIme('Площообразуване')).toBe('Ploshtoobrazuvane');
+  });
+
+  it('маха всичко, което чужда файлова система не приема', () => {
+    expect(bezopasnoIme('Извлечения / ОББ: 2026')).toBe('Izvlecheniya-OBB-2026');
+    expect(bezopasnoIme('  ..тире--тире..  ')).toBe('..tire--tire..');
+  });
+
+  it('латиницата минава непокътната · тя вече е адрес', () => {
+    expect(bezopasnoIme('zhurnal-lichen')).toBe('zhurnal-lichen');
+  });
+
+  it('празното дава РОДОВО име · файл „-.xlsx" не се отваря никъде', () => {
+    expect(bezopasnoIme('!!!')).toBe('fayl');
+    expect(bezopasnoIme('   ')).toBe('fayl');
+  });
+
+  it('дългото се реже · чужди системи имат таван на името', () => {
+    expect(bezopasnoIme('щ'.repeat(100)).length).toBe(80);
   });
 });

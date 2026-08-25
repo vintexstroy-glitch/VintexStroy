@@ -78,3 +78,56 @@ export function zapishiBelegZaIznos(klyuch: string, beleg: BelegZaIznos): void {
     // Частен прозорец или забранени данни — износът пак стана, само не се помни.
   }
 }
+
+/**
+ * БЕЗОПАСНО ИМЕ НА ФАЙЛ · един дом (правило 17).
+ *
+ * ИЗМЕРЕНО, не предположено: същият бутон с име „obrazets-PROBA.xlsx" сваля
+ * файл с това име; със „obrazets-Банка-ОББ-….xlsx" браузърът връща файл на име
+ * `download`. Атрибутът `download` не оцелява с кирилица по този път, и човекът
+ * получава „download", „download (1)", „download (2)" — три образеца, за които
+ * после не се знае кой от кой модел е.
+ *
+ * ADR-039 вече беше стигнал дотук от другата страна: „ivo@example.bg#lichen" е
+ * невалидно име на файл на половината системи. Оттам и правилото:
+ *
+ *   ИМЕТО НА ФАЙЛА Е АДРЕС, НЕ НАДПИС. То пътува през чужди файлови системи,
+ *   пощи и драйвове; съдържанието е нашето, името е тяхно.
+ *
+ * Затова тук кирилицата се преписва на латиница по БДС-подобната таблица за
+ * превод на имена, а всичко останало става тире. Никъде другаде в приложението
+ * не се прави такова превръщане — данните си остават на кирилица.
+ */
+const NA_LATINITSA: Readonly<Record<string, string>> = Object.freeze({
+  а: 'a', б: 'b', в: 'v', г: 'g', д: 'd', е: 'e', ж: 'zh', з: 'z', и: 'i',
+  й: 'y', к: 'k', л: 'l', м: 'm', н: 'n', о: 'o', п: 'p', р: 'r', с: 's',
+  т: 't', у: 'u', ф: 'f', х: 'h', ц: 'ts', ч: 'ch', ш: 'sh', щ: 'sht',
+  ъ: 'a', ь: 'y', ю: 'yu', я: 'ya',
+});
+
+/** Главна ли е буквата · и на кирилица, и на латиница. */
+function eGlavna(z: string | undefined): boolean {
+  return z !== undefined && z !== z.toLowerCase() && z === z.toUpperCase();
+}
+
+export function bezopasnoIme(tekst: string): string {
+  const znatsi = [...tekst.normalize('NFC')];
+  const latinitsa = znatsi
+    .map((z, i) => {
+      const malko = z.toLowerCase();
+      const preveden = NA_LATINITSA[malko];
+      if (preveden === undefined) return z;
+      if (!eGlavna(z)) return preveden;
+      // ЕДНОБУКВЕНИТЕ са лесни; многобуквените („ш" → „sh") искат въпроса
+      // „това главна буква В ДУМА ли е, или част от изцяло главна дума".
+      // „Банка" → „Banka", но „КЕШ" → „KESH", не „KESh".
+      const vGlavnaDuma = eGlavna(znatsi[i - 1]) || eGlavna(znatsi[i + 1]);
+      return vGlavnaDuma
+        ? preveden.toUpperCase()
+        : preveden.charAt(0).toUpperCase() + preveden.slice(1);
+    })
+    .join('');
+  const chisto = latinitsa.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
+  // Празното име е по-лошо от родово: файл на име „-.xlsx" не се отваря никъде.
+  return chisto === '' ? 'fayl' : chisto.slice(0, 80);
+}

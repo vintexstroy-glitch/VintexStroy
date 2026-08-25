@@ -7,6 +7,7 @@
 
 import { SUMATA_NAD_NULA, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { poKontragent } from '../src/ogledalo/izgledi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import {
@@ -180,7 +181,66 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     }
 
     ${narisuvayPlashtaniyata(o, dnes)}
+    ${sektsiyaPoKontragent(o)}
   `;
+}
+
+/**
+ * ОЩЕ ЕДНО ОГЛЕДАЛО · „кой ми дължи, кой плаща навреме, на кого плащам".
+ *
+ * Вторият изглед от `izgledi.ts` (възможност `ogledala`), който също стоеше
+ * построен и без екран. Чиста функция върху Огледалото — нула ново състояние.
+ *
+ * СРЕДНОТО ЗАКЪСНЕНИЕ е числото, което не се вижда отникъде другаде: то не
+ * казва КОЛКО дължи някой, а КАКЪВ Е. Отрицателното значи „плаща предсрочно",
+ * и това е информация, за която иначе се пита счетоводител.
+ */
+function sektsiyaPoKontragent(o: Ogledalo): string {
+  const redove = poKontragent(o);
+  if (redove.length === 0) return '';
+  return `
+    <section data-sektsiya="po-kontragent">
+      <div class="dyalglava">
+        <h2>По контрагент</h2>
+        <span>кой дължи · кой плаща навреме · на кого плащам</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="po-kontragent">
+        <div class="glava po-kontragent">
+          <span>Име</span><span>Кой е</span><span>Начислено</span><span>Платено</span><span>Дължимо</span><span>Плаща</span>
+        </div>
+        ${redove
+          .map(
+            (r) => `<div class="red po-kontragent${r.duljimo_st > 0 ? ' trevoga' : ''}" translate="no">
+              <span class="kletka"><b>${ekraniraj(r.ime)}</b> <span class="drebno">${r.broySledi}</span></span>
+              <span>${ekraniraj(r.rolya)}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.nachisleno_st))}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.plateno_st))}</span>
+              <span class="chislo" translate="no">${r.duljimo_st === 0 ? '—' : ekraniraj(pishi(r.duljimo_st))}</span>
+              <span class="chislo" translate="no">${sDumiZaZakasnenieto(r.srednoZakasnenie)}</span>
+            </div>`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno">Имената се сравняват без разлика в главните букви и в разстоянията, докато
+      <b>Контактите</b> не станат истинска същност — „Стройпласт ЕООД" и „стройпласт еоод " са
+      един контрагент. Малкото число до името е колко следи носи той.</p>
+    </section>`;
+}
+
+/**
+ * Средното закъснение, изписано за човек.
+ *
+ * `null` значи „още няма нито едно плащане" — и това НЕ е нула. Нула значи
+ * „плаща точно на падежа"; празното значи „не се знае". Двете изглеждат
+ * еднакво само ако някой ги слее.
+ */
+function sDumiZaZakasnenieto(dni: number | null): string {
+  if (dni === null) return '—';
+  const kragli = Math.round(dni);
+  if (kragli === 0) return 'на падежа';
+  return kragli > 0
+    ? `+${kragli} ${kragli === 1 ? 'ден' : 'дни'}`
+    : `${kragli} ${kragli === -1 ? 'ден' : 'дни'}`;
 }
 
 function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {

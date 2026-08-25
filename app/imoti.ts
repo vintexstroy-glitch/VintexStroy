@@ -16,6 +16,7 @@ import { otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
+import { poImot } from '../src/ogledalo/izgledi.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
@@ -327,7 +328,67 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
     </section>`
     }
+    ${sektsiyaPoImot(ogledalo)}
   `;
+}
+
+/**
+ * ОЩЕ ЕДНО ОГЛЕДАЛО · „кой обект колко носи и колко яде" (възможност `ogledala`).
+ *
+ * `src/ogledalo/izgledi.ts` беше построен в резен 9 и оттогава го викаха само
+ * тестовете — възможността „Изгледи по имот и по контрагент" стоеше в Таблото
+ * с отметка, която не пипаше нищо. Отметка без последица е НАДПИС, а правило 15
+ * иска обратното: „изключено ≠ липсващо".
+ *
+ * Изгледът е ЧИСТА ФУНКЦИЯ върху Огледалото — нула ново състояние, нула нови
+ * събития. Истината е една (Журналът); ъглите към нея са колкото трябват.
+ */
+function sektsiyaPoImot(o: Ogledalo): string {
+  const redove = poImot(o);
+  if (redove.length === 0) return '';
+  const sbor = redove.reduce(
+    (s, r) => ({
+      nachisleno: s.nachisleno + r.nachisleno_st,
+      sabrano: s.sabrano + r.sabrano_st,
+      duljimo: s.duljimo + r.duljimo_st,
+    }),
+    { nachisleno: 0, sabrano: 0, duljimo: 0 },
+  );
+  return `
+    <section data-sektsiya="po-imot">
+      <div class="dyalglava">
+        <h2>По обект</h2>
+        <span>кой носи и кой дължи · смята се от Журнала, не се пази</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="po-imot">
+        <div class="glava po-imot">
+          <span>Обект</span><span>Живи наеми</span><span>Начислено</span><span>Събрано</span><span>Дължимо</span>
+        </div>
+        ${redove
+          .map(
+            (r) => `<div class="red po-imot${r.duljimo_st > 0 ? ' trevoga' : ''}" translate="no">
+              <span class="kletka"><b>${ekraniraj(r.adres)}</b>${
+                r.edinitsa ? ` <span class="drebno">${ekraniraj(r.edinitsa)}</span>` : ''
+              }</span>
+              <span class="chislo" translate="no">${r.zhiviNaemi}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.nachisleno_st))}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.sabrano_st))}</span>
+              <span class="chislo" translate="no">${r.duljimo_st === 0 ? '—' : ekraniraj(pishi(r.duljimo_st))}</span>
+            </div>`,
+          )
+          .join('')}
+        <div class="red po-imot sbor" translate="no">
+          <span class="kletka"><b>Всичко</b></span>
+          <span class="chislo" translate="no">${redove.reduce((n, r) => n + r.zhiviNaemi, 0)}</span>
+          <span class="chislo" translate="no">${ekraniraj(pishi(sbor.nachisleno))}</span>
+          <span class="chislo" translate="no">${ekraniraj(pishi(sbor.sabrano))}</span>
+          <span class="chislo" translate="no">${sbor.duljimo === 0 ? '—' : ekraniraj(pishi(sbor.duljimo))}</span>
+        </div>
+      </div>
+      <p class="drebno"><b>Начислено</b> е онова, което е ПАДЕЖИРАЛО, не онова, което е влязло —
+      затова „Дължимо" е разликата, а не отделно число. Сборът долу затваря с колоните над него:
+      ако не затваряше, някой наем щеше да сочи изчезнал имот.</p>
+    </section>`;
 }
 
 function polePrichina(koe: string): string {
