@@ -25,6 +25,9 @@ import type {
   PayloadModelZapisan,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
+  PayloadLichnoPrevklyucheno,
+  PayloadDeloPrehvarleno,
+  PayloadPrenosOtcheten,
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
@@ -161,7 +164,80 @@ export class Deystviya {
     danni: PayloadDeloZapisano,
     z: Zayavka,
   ): Promise<Rezultat> {
+    // ПРЕХВЪРЛЕНОТО дело не се записва наново тук (И98): то живее в другия
+    // Журнал. Единственият вход, който го връща, е обратният пренос
+    // (`priemiPrehvarleno` в другата посока) — иначе следващият внос от МД
+    // или невнимателна форма би го възкресила мълчаливо.
+    const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
+    if (prehvarleno) {
+      throw new GreshkaTablitsa(
+        `Това дело е ПРЕХВЪРЛЕНО към „${prehvarleno.kam}" (пренос ${prehvarleno.prenosId.slice(0, 8)}…). ` +
+          'Върни го с обратен пренос, не със запис наново.',
+      );
+    }
     return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ПРЕХВЪРЛЯ дело към ДРУГ Журнал · половината на ИЗПРАЩАЧА (И98).
+   *
+   * Свое събитие, НЕ сторно: сторно значи „грешка", а прехвърленото дело е
+   * живо и вярно — само че вече не е тук. Причината е задължителна (И97).
+   *
+   * Това действие пише САМО в своя Журнал. Другата половина
+   * (`priemiPrehvarleno`) пише в получателя, със своя Deystviya — и редът е
+   * ПЪРВО получателят, ПОСЛЕДЕН изпращачът (`src/domein/prenos.ts` го държи).
+   */
+  async prehvarliDelo(id: string, danni: PayloadDeloPrehvarleno, z: Zayavka): Promise<Rezultat> {
+    if (danni.prichina.trim() === '') {
+      throw new GreshkaTablitsa(
+        'Пренос без ПРИЧИНА не се записва — следа, която не обяснява нищо, е по-лоша от липсваща.',
+      );
+    }
+    return this.#pusni('ДелоПрехвърлено', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ПРИЕМА прехвърлено дело · половината на ПОЛУЧАТЕЛЯ (И98).
+   *
+   * Записва делото със СЪЩИЯ id — детерминиран е, повторното пускане не ражда
+   * второ дело, а id-то не живее на две места ЕДНОВРЕМЕННО, а последователно.
+   * Заобикаля вратаря на `zapishiDelo` нарочно: обратният пренос е
+   * ЕДИНСТВЕНИЯТ вход, който връща прехвърлено дело.
+   */
+  async priemiPrehvarleno(
+    id: string,
+    danni: PayloadDeloZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * РАЗПИСКАТА на един пренос · сверката вход↔изход (правило 7).
+   *
+   * По една във всеки Журнал; разликата се записва ДОРИ когато е нула —
+   * проверената нула е различна от нулата, за която никой не е питал.
+   */
+  async zapishiPrenos(danni: PayloadPrenosOtcheten, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'ПреносОтчетен',
+      VID.prenos,
+      `PRENOS:${danni.prenosId}:${danni.posoka}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ПРЕВКЛЮЧВА личното · първото събитие на личния Журнал (И98).
+   *
+   * „Има си и отделен журнал когато се е активирал личния" — съществуването
+   * на Журнала Е активацията. Прибирането е ново събитие с `vklyucheno:
+   * false`; Журналът остава непокътнат, само пунктът пада от лентата.
+   */
+  async prevklyuchiLichno(danni: PayloadLichnoPrevklyucheno, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('ЛичноПревключено', VID.lichno, `LICHNO:${this.#naematel}`, danni, z);
   }
 
   /**

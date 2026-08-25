@@ -83,13 +83,48 @@ export function koyZhurnal(s: Samolichnost, imaZhurnalOtAlfa: boolean): string {
 }
 
 /**
+ * ЛИЧНИЯТ КЛЮЧ · вторият Журнал на СЪЩИЯ човек (И98).
+ *
+ * Негово: „Има си и отделен журнал когато се е активирал личния и НИКОГА не
+ * се смесват." Отделен журнал значи отделен НАЕМАТЕЛ: `naematel` влиза в хеша
+ * (правило 4), носителят е ключиран по него, Вратата отказва чужд наемател —
+ * смесването става ФИЗИЧЕСКИ невъзможно, не „непрепоръчително".
+ *
+ * НАСТАВКА В КРАЯ, не представка. „#" е позволен знак в ЛОКАЛНАТА част на
+ * имейл (RFC 5322), но НЕ и в домейна — значи легален имейл никога не
+ * ЗАВЪРШВА на „#lichen" и сблъсък между сведен имейл и личен ключ е
+ * невъзможен по конструкция, не по договорка. И наредбата помага: в носителя
+ * (keyPath по наемател) личният Журнал ляга ДО служебния си близнак.
+ *
+ * СТРОИ СЕ ОТ ИМЕЙЛА НА ЧОВЕКА, никога от ключа на отворения Журнал: на това
+ * устройство отвореният може да е Алфа-ключът на ФИРМАТА (`vintexstroy`), а
+ * личното е на ВСЕКИ служител поотделно (И98 т.3).
+ */
+export const NASTAVKA_LICHEN = '#lichen';
+
+export function klyuchNaLichniya(s: Samolichnost): string {
+  return `${klyuchNaAkaunta(s)}${NASTAVKA_LICHEN}`;
+}
+
+export function eLichenKlyuch(klyuch: string): boolean {
+  return klyuch.endsWith(NASTAVKA_LICHEN);
+}
+
+/** Служебният близнак на един личен ключ — за разписките на преноса. */
+export function sluzhebniyatNa(lichenKlyuch: string): string {
+  return eLichenKlyuch(lichenKlyuch)
+    ? lichenKlyuch.slice(0, -NASTAVKA_LICHEN.length)
+    : lichenKlyuch;
+}
+
+/**
  * Кратко за екрана: под кой ключ работи приложението в момента.
  *
  * Показва се в Таблото. Ключ, който не се вижда никъде, е точно онова, което
  * прави „къде ми отидоха данните" неотговорим въпрос.
  */
 export function sDumiZaAkaunta(klyuch: string): string {
-  return klyuch === KLYUCH_OT_ALFA
-    ? `${klyuch} · първият Журнал, от Стартъп Алфа`
-    : `${klyuch} · акаунт по имейл`;
+  if (klyuch === KLYUCH_OT_ALFA) return `${klyuch} · първият Журнал, от Стартъп Алфа`;
+  if (eLichenKlyuch(klyuch)) return `${klyuch} · ЛИЧНИЯТ Журнал · никога не се смесва със служебния`;
+  return `${klyuch} · акаунт по имейл`;
 }

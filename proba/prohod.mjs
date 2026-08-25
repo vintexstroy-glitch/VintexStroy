@@ -1485,14 +1485,19 @@ async function main() {
 
     // ══ 24 · Гантът · решетката, лентите и диаграмата ════════════════════
     razdel = '24 · Гант';
-    await naEkran(p, 'gant', '#forma-delo');
+    await naEkran(p, 'gant', '#d-forma-delo');
 
     proveri('седмият екран носи неговото име',
       await p.$eval('.shapka h1', (e) => e.textContent.trim()), 'Управление');
     proveri('и подзаглавието е дословно негово',
       (await p.$eval('.shapka p', (e) => e.textContent)).includes('Времевия Ред в Делата'), true);
+    // Празният екран КАЗВА и кой е (И98): дотук заглавието се рисуваше само
+    // вътре в таблицата, а при нула дела таблица нямаше — празният личен
+    // екран не казваше дори че е личен.
     proveri('празният екран го КАЗВА',
-      (await p.$eval('.prazno', (e) => e.textContent)).includes('Мястото е първата колона'), true);
+      (await p.$eval('.prazno', (e) => e.textContent)).includes('Място · Обект · Дело'), true);
+    proveri('и се представя, вместо да мълчи',
+      (await p.$eval('.prazno', (e) => e.closest('section').textContent)).includes('Времевия Ред'), true);
 
     // ТРИТЕ КОЛОНИ · дело БЕЗ обект е нормално (негов случай).
     await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Акт 15',
@@ -2147,7 +2152,7 @@ async function main() {
     await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="imoti"]'));
 
     // и Управление вижда делата — с Акт 16 към самата сграда
-    await naEkran(p, 'gant', '#forma-delo');
+    await naEkran(p, 'gant', '#d-forma-delo');
     const gantTekst = await p.evaluate(() => document.body.textContent);
     proveri('Гант носи Акт 16', gantTekst.includes('Акт 16'), true);
     proveri('и огледите за продажба или наем', gantTekst.includes('Оглед за продажба или Наем'), true);
@@ -2166,7 +2171,7 @@ async function main() {
       await p.$$eval('#ekran button.sgavach', (r) => r.length), 0);
     // И95 обърна старото „няма форма": „да създаваш както като в Управление".
     proveri('и формата за дело Е там (И95) — един механизъм, два екрана',
-      Boolean(await p.$('#forma-delo')), true);
+      Boolean(await p.$('#d-forma-delo')), true);
 
     // диаграмата в Отчетите: 12 месеца, стълбовете носят числата си
     proveri('Отчетите носят стълбовете на месеците',
@@ -2495,7 +2500,7 @@ async function main() {
     // И95 · копието в Сметки: формата за дело Е там, и цифрите носят ключ
     await naEkran(p, 'smetki', '#forma-period');
     proveri('в Сметки може да се СЪЗДАВА — формата от Управление е там',
-      Boolean(await p.$('#forma-delo')), true);
+      Boolean(await p.$('#d-forma-delo')), true);
     proveri('и редът Приходи·Разходи се вижда',
       await p.$$eval('.gant-red.sumi', (r) => r.length), 1);
     const predKlyuch = await broySabitiya(p);
@@ -2513,7 +2518,7 @@ async function main() {
       otgovornik: 'Иво', ot: denOtDnes(0), do: denOtDnes(3), otsenka: 'важно-неспешно',
     });
     proveri('делото от Сметки влиза в Журнала', await broySabitiya(p), predDelo + 1);
-    await naEkran(p, 'gant', '#forma-delo');
+    await naEkran(p, 'gant', '#d-forma-delo');
     proveri('и Управление го вижда — един механизъм, два екрана',
       (await p.evaluate(() => document.body.textContent)).includes('Проба от Сметки'), true);
 
@@ -3204,6 +3209,111 @@ async function main() {
       (await tekstNa(p, '.karta.izbrana .vest.zle')).includes('изнеси я наново'), true);
     proveri('нищо не е влязло в Журнала', await broySabitiya(p), predRazbarkan);
 
+    // ══ 53 · Личният таб · отделният Журнал и преносът (И98) ════════════════
+    //
+    // Негово: „Личния таб където имаш СЪЩАТА таблица от Управление… Има си и
+    // отделен журнал когато се е активирал личния и НИКОГА не се смесват."
+    razdel = '53 · Личното · преди активиране';
+    await naEkran(p, 'tablo', '#tablo-lichno');
+
+    proveri('пунктът „Лично" го НЯМА, докато не се пусне',
+      Boolean(await p.$('[data-ekran=lichno]')), false);
+    proveri('но плочката на Таблото го предлага',
+      (await p.$eval('[data-sektsiya=tablo-lichno]', (e) => e.textContent)).includes('прибрано'), true);
+
+    // АКТИВИРАНЕТО · първото събитие на ЛИЧНИЯ Журнал; служебният не мърда
+    razdel = '53 · Личното · активирането';
+    const predLichno = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#tablo-lichno'));
+    proveri('служебният Журнал НЕ е помръднал', await broySabitiya(p), predLichno);
+    proveri('а пунктът „Лично" се появи',
+      Boolean(await p.$('[data-ekran=lichno]')), true);
+
+    // СЪЩАТА ТАБЛИЦА · свои надписи, СВОЙ Журнал
+    razdel = '53 · Личното · същата таблица';
+    await naEkran(p, 'lichno', '#l-forma-delo');
+    const lichnoTekst = await p.evaluate(() => document.body.textContent);
+    proveri('таблицата е СЪЩАТА, с лични надписи',
+      lichnoTekst.includes('Моето време') && lichnoTekst.includes('Тема · Обект · Дело'), true);
+    proveri('и почва ПРАЗНА — служебните дела не се виждат тук',
+      await p.$$eval('.gant-delo', (r) => r.length), 0);
+    proveri('формата носи СВОЯ представка · две „#forma-delo" се бият',
+      Boolean(await p.$('#l-myasto')) && Boolean(await p.$('#d-myasto')) === false, true);
+
+    // ПРЕНОСЪТ · служебно дело отива в личното
+    razdel = '53 · Личното · преносът';
+    // ПЪРВОТО, което МОЖЕ да пътува: делата с поддела са изключени от вратаря
+    // („сирак под липсващо дело не се оставя") и техните кутийки са disabled.
+    const zaPrenos = await p.$eval(
+      '[data-prenesi]:not([disabled])',
+      (e) => e.dataset.prenesi,
+    );
+    await deystvieSPrerisuvane(p, () => p.check(`[data-prenesi="${zaPrenos}"]`));
+    await p.fill('#prenos-prichina', 'това е мое, не на фирмата');
+    await deystvieSPrerisuvane(p, () => p.click('#prenos-pusni'));
+    const vestPrenos = await tekstNa(p, '.vest');
+    proveri('преносът казва сверката си · разликата дори когато е нула',
+      vestPrenos.includes('разлика 0'), true);
+    proveri('и че старото стои непокътнато',
+      vestPrenos.includes('непокътнати'), true);
+    proveri('делото се появи в ЛИЧНАТА таблица',
+      await p.$$eval('.gant-delo', (r) => r.length), 1);
+
+    // И ГО НЯМА в служебното Управление
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('и ГО НЯМА в служебното Управление',
+      await p.$$eval(`.gant-delo[data-ime="${zaPrenos}"]`, (r) => r.length), 0);
+
+    // ДВАТА ЖУРНАЛА · всеки със своята цяла верига
+    razdel = '53 · Личното · двата Журнала не се смесват';
+    const dvata = await p.evaluate(async () => {
+      const db = await new Promise((da, ne) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      const vsichki = await new Promise((da, ne) => {
+        const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      const po = {};
+      for (const s of vsichki) (po[s.naematel] ??= []).push(s);
+      return Object.entries(po).map(([klyuch, redica]) => ({
+        klyuch,
+        broy: redica.length,
+        parviSeq: Math.min(...redica.map((s) => s.seq)),
+        chuzhdi: redica.filter((s) => s.naematel !== klyuch).length,
+      }));
+    });
+    const lichniyat = dvata.find((x) => x.klyuch.endsWith('#lichen'));
+    proveri('личният Журнал СЪЩЕСТВУВА, под свой ключ', Boolean(lichniyat), true);
+    proveri('и тръгва от seq 1 · своя верига, от нулата', lichniyat?.parviSeq, 1);
+    for (const zh of dvata) {
+      proveri(`нито едно чуждо събитие в „${zh.klyuch}"`, zh.chuzhdi, 0);
+    }
+
+    // ПРИБИРАНЕТО · пунктът пада, Журналът остава
+    razdel = '53 · Личното · прибирането';
+    const predPribirane = lichniyat.broy;
+    await naEkran(p, 'tablo', '#tablo-lichno');
+    await deystvieSPrerisuvane(p, () => p.click('#tablo-lichno'));
+    proveri('пунктът падна от лентата',
+      Boolean(await p.$('[data-ekran=lichno]')), false);
+    const sledPribirane = await p.evaluate(async () => {
+      const db = await new Promise((da) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+      });
+      const vsichki = await new Promise((da) => {
+        const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+        z.onsuccess = () => da(z.result);
+      });
+      return vsichki.filter((s) => s.naematel.endsWith('#lichen')).length;
+    });
+    proveri('но Журналът ОСТАНА — прибраното не е изтрито',
+      sledPribirane > predPribirane, true);
+
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
     // §16 гледа джоба РАНО — а знак от чужда азбука, сложен на екран, който се
@@ -3449,7 +3559,7 @@ async function zapishiDelo(p, { myasto, obekt, ime, otgovornik, ot, do: doData, 
   await p.fill('#d-do', doData);
   await p.selectOption('#d-otsenka', otsenka);
   if (nad) await p.selectOption('#d-nad', { label: nad });
-  await sSabitie(p, () => p.click('#forma-delo button[type=submit]'));
+  await sSabitie(p, () => p.click('#d-forma-delo button[type=submit]'));
 }
 
 async function smetni(p, opis, suma, stavka) {

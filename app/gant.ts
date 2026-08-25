@@ -57,29 +57,90 @@ import type { Konteks } from './main.js';
  * Погледът на Ганта СЕ ПОМНИ (ADR-022): тактът, трите филтъра, сгънатите дела
  * и изборът таблица/диаграма се отварят както са оставени. Екранно огледало —
  * какво се гледа, не какво е вярно; делата са си в Журнала.
+ *
+ * ПО КЛЮЧ, не модулно (И98). Дотук шестте бяха file-scope променливи и една
+ * таблица можеше да служи само на ЕДИН екран: смениш такта в Личното — сменил
+ * си го и в Управление, при това МЪЛЧЕШКОМ, защото и двата пишеха в едни и
+ * същи ключове. Личният таб иска СВОИ настройки („таблото там с собствените
+ * настройки"), значи погледът иска свой дом за всеки поглед.
  */
-let takt: Takt = chetiEkranno<Takt>('gant.takt', 'mesets');
-/** Кои дела са сгънати · само дела и поддела се сгъват (И88). */
-const sgunati = new Set<string>(chetiEkranno<string[]>('gant.sgunati', []));
-/** Показва ли се диаграмата вместо таблицата с оцветени полета. */
-let diagrama = chetiEkranno('gant.diagrama', true);
-let opIdDelo = crypto.randomUUID();
-let greshkaDelo = '';
-/** Трите филтъра на трите колони (И82) — плоско, не дърво. */
-let filtarMyasto = chetiEkranno('gant.myasto', '');
-let filtarObekt = chetiEkranno('gant.obekt', '');
-let filtarOtsenka = chetiEkranno('gant.otsenka', '');
-
-function zapomniPogleda(): void {
-  zapomniEkranno('gant.takt', takt);
-  zapomniEkranno('gant.sgunati', [...sgunati]);
-  zapomniEkranno('gant.diagrama', diagrama);
-  zapomniEkranno('gant.myasto', filtarMyasto);
-  zapomniEkranno('gant.obekt', filtarObekt);
-  zapomniEkranno('gant.otsenka', filtarOtsenka);
+export interface PogledNaGanta {
+  readonly klyuch: string;
+  takt: Takt;
+  readonly sgunati: Set<string>;
+  diagrama: boolean;
+  filtarMyasto: string;
+  filtarObekt: string;
+  filtarOtsenka: string;
 }
 
-export function narisuvayGant(o: Ogledalo, dnes: string): string {
+const POGLEDI = new Map<string, PogledNaGanta>();
+
+export function pogled(klyuch = 'gant'): PogledNaGanta {
+  const veche = POGLEDI.get(klyuch);
+  if (veche) return veche;
+  const nov: PogledNaGanta = {
+    klyuch,
+    takt: chetiEkranno<Takt>(`${klyuch}.takt`, 'mesets'),
+    sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
+    diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
+    filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
+    filtarObekt: chetiEkranno(`${klyuch}.obekt`, ''),
+    filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
+  };
+  POGLEDI.set(klyuch, nov);
+  return nov;
+}
+
+let opIdDelo = crypto.randomUUID();
+let greshkaDelo = '';
+
+function zapomniPogleda(p: PogledNaGanta): void {
+  zapomniEkranno(`${p.klyuch}.takt`, p.takt);
+  zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
+  zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
+  zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
+  zapomniEkranno(`${p.klyuch}.obekt`, p.filtarObekt);
+  zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
+}
+
+/**
+ * НАДПИСИТЕ · същата таблица говори с различни думи (И98).
+ *
+ * Само НАДПИС, не втора структура: групирането по място, колоните и филтрите
+ * остават едни и същи. „По теми" (И96 т.10) е дума на екрана, а не втори
+ * начин на подреждане — иначе двата погледа почват да се разминават в данните.
+ */
+export interface NadpisiNaGanta {
+  readonly zaglavie: string;
+  readonly glavaNaImenata: string;
+  readonly podnaslovNaFormata: string;
+  readonly imeNaFormata: string;
+}
+
+export const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
+  zaglavie: 'Управление на Времевия Ред в Делата',
+  glavaNaImenata: 'Място · Обект · Дело',
+  podnaslovNaFormata: 'Място · Обект · Дело — трите колони',
+  imeNaFormata: 'Ново дело',
+});
+
+export const NADPISI_LICHNI: NadpisiNaGanta = Object.freeze({
+  zaglavie: 'Моето време · личните дела',
+  glavaNaImenata: 'Тема · Обект · Дело',
+  podnaslovNaFormata: 'Тема · Обект · Дело — същите три колони',
+  imeNaFormata: 'Ново лично дело',
+});
+
+export function narisuvayGant(
+  o: Ogledalo,
+  dnes: string,
+  klyuch = 'gant',
+  nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
+  predstavka = 'd-',
+): string {
+  const p = pogled(klyuch);
+  const { takt, sgunati, diagrama, filtarMyasto, filtarObekt, filtarOtsenka } = p;
   const vsichki = [...o.dela.values()];
   const podredeni = podredi(vsichki, dnes);
   const filtrirani = podredeni.filter(
@@ -162,7 +223,16 @@ export function narisuvayGant(o: Ogledalo, dnes: string): string {
 
     ${
       naEkrana.length === 0
-        ? '<p class="prazno">Няма дела.<br>Времевият ред се пълни отдолу — Мястото е първата колона, Делото третата.</p>'
+        ? // ПРАЗНОТО ПАК СЕ ПРЕДСТАВЯ. Платено с находка в прохода: празният
+          // личен екран не казваше дори че е личен — заглавието на дяла се
+          // рисуваше само ВЪТРЕ в таблицата, а при нула дела таблица нямаше.
+          `<section>
+            <div class="dyalglava">
+              <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
+              <span>нито едно дело · първата колона е ДНЕС</span>
+            </div>
+            <p class="prazno">Няма дела.<br>Времевият ред се пълни отдолу — ${ekraniraj(nadpisi.glavaNaImenata)}.</p>
+          </section>`
         : // И96 т.4 · „Диаграмата на Ганта е ОТДЯСНО на таблицата в Управление."
           //
           // Дотук тук стоеше превключвател: таблица ИЛИ диаграма. Той иска
@@ -175,12 +245,12 @@ export function narisuvayGant(o: Ogledalo, dnes: string): string {
           // на тесен екран двете една до друга не се побират, а скриването
           // пипа само екрана (правило 23).
           `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}">
-            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes)}</div>
+            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes, true, true, sgunati, nadpisi)}</div>
             ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(naEkrana, r, dnes)}</div>` : ''}
           </div>`
     }
 
-    ${formaDelo(o, dnes)}`;
+    ${formaDelo(o, dnes, predstavka, nadpisi)}`;
 }
 
 function broyPo(dela: readonly Delo[], dnes: string, kakvo: string): number {
@@ -234,6 +304,9 @@ export function tablitsataSOcveteniPoleta(
   sasSgavachi = true,
   /** И95: Приходите и Разходите носят ключ — скрити ПАК се смятат (пр. 23) */
   sasTsifrite = true,
+  /** сгънатите на ТОЗИ поглед · празно при копието в Сметки */
+  sgunati: ReadonlySet<string> = new Set<string>(),
+  nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -246,17 +319,17 @@ export function tablitsataSOcveteniPoleta(
   return `
     <section>
       <div class="dyalglava">
-        <h2>Управление на Времевия Ред в Делата</h2>
+        <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
         <span>${dela.length} дела · първата колона е ДНЕС</span>
       </div>
       <div class="gant" data-koloni="${r.koloni.length}">
         <div class="gant-imena">
-          <div class="gant-glava">Място · Обект · Дело</div>
+          <div class="gant-glava">${ekraniraj(nadpisi.glavaNaImenata)}</div>
           ${[...poMyasto.entries()]
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati)).join('')}`,
             )
             .join('')}
           ${sasTsifrite ? '<div class="gant-sbor">Приход · Разход</div>' : ''}
@@ -317,7 +390,20 @@ function kletka(dnes: boolean): string {
   return `<span class="gant-kletka${dnes ? ' dnes' : ''}"></span>`;
 }
 
-function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string, sasSgavachi = true): string {
+/**
+ * Сгънатите идват като ПАРАМЕТЪР, не от модула.
+ *
+ * Дотук тази уж чиста рисуваща функция четеше модулния `sgunati` — а Сметки я
+ * вика през `tablitsataSOcveteniPoleta`. Латентен дефект и без личния таб:
+ * втори поглед със свои сгънати щеше да рисува чуждите.
+ */
+function imeNaDeloto(
+  d: Delo,
+  vsichki: readonly Delo[],
+  dnes: string,
+  sasSgavachi: boolean,
+  sgunati: ReadonlySet<string>,
+): string {
   // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
   const sgavaemo = sasSgavachi && imaPoddela(vsichki, d.id);
   return `<div class="gant-delo ${svetofar(d, dnes)}${d.nadDelo ? ' poddelo' : ''}" data-ime="${ekraniraj(d.id)}">
@@ -337,51 +423,57 @@ function imeNaDeloto(d: Delo, vsichki: readonly Delo[], dnes: string, sasSgavach
  * Изнесена: Сметки я рисува СЪЩАТА (И95 — „да създаваш както като в
  * Управление"). Един механизъм, два екрана — не втора форма.
  */
-export function formaDelo(o: Ogledalo, dnes: string): string {
+export function formaDelo(
+  o: Ogledalo,
+  dnes: string,
+  predstavka = 'd-',
+  nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
+): string {
+  const id = (kratko: string) => `${predstavka}${kratko}`;
   return `
     <section class="karta">
-      <div class="dyalglava"><h2>Ново дело</h2><span>Място · Обект · Дело — трите колони</span></div>
-      <form id="forma-delo">
+      <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
+      <form id="${id('forma-delo')}">
         <div class="poleta">
           <div class="pole">
-            <label for="d-myasto">Място</label>
-            <input id="d-myasto" name="myasto" required placeholder="Малинова">
+            <label for="${id('myasto')}">Място</label>
+            <input id="${id('myasto')}" name="myasto" required placeholder="Малинова">
           </div>
           <div class="pole">
-            <label for="d-obekt">Обект</label>
-            <input id="d-obekt" name="obekt" placeholder="може да е празно">
+            <label for="${id('obekt')}">Обект</label>
+            <input id="${id('obekt')}" name="obekt" placeholder="може да е празно">
           </div>
           <div class="pole">
-            <label for="d-ime">Дело</label>
-            <input id="d-ime" name="ime" required placeholder="Акт 15">
+            <label for="${id('ime')}">Дело</label>
+            <input id="${id('ime')}" name="ime" required placeholder="Акт 15">
           </div>
           <div class="pole">
-            <label for="d-otgovornik">Отговорник</label>
-            <input id="d-otgovornik" name="otgovornik" required placeholder="Николай Петков">
+            <label for="${id('otgovornik')}">Отговорник</label>
+            <input id="${id('otgovornik')}" name="otgovornik" required placeholder="Николай Петков">
           </div>
           <div class="pole">
-            <label for="d-ot">От</label>
-            <input translate="no" id="d-ot" name="ot" type="date" value="${dnes}" required>
+            <label for="${id('ot')}">От</label>
+            <input translate="no" id="${id('ot')}" name="ot" type="date" value="${dnes}" required>
           </div>
           <div class="pole">
-            <label for="d-do">До</label>
-            <input translate="no" id="d-do" name="do" type="date" value="${dnes}" required>
+            <label for="${id('do')}">До</label>
+            <input translate="no" id="${id('do')}" name="do" type="date" value="${dnes}" required>
           </div>
           <div class="pole">
-            <label for="d-otsenka">Оценка</label>
-            <select id="d-otsenka" name="otsenka">
+            <label for="${id('otsenka')}">Оценка</label>
+            <select id="${id('otsenka')}" name="otsenka">
               ${OTSENKI.map((x) => `<option value="${x}">${IMENA_NA_OTSENKITE[x]}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
-            <label for="d-sastoyanie">Състояние</label>
-            <select id="d-sastoyanie" name="sastoyanie">
+            <label for="${id('sastoyanie')}">Състояние</label>
+            <select id="${id('sastoyanie')}" name="sastoyanie">
               ${SASTOYANIYA.map((x) => `<option value="${x}">${x}</option>`).join('')}
             </select>
           </div>
           <div class="pole">
-            <label for="d-nad">Поддело на</label>
-            <select id="d-nad" name="nadDelo">
+            <label for="${id('nad')}">Поддело на</label>
+            <select id="${id('nad')}" name="nadDelo">
               <option value="">— самостоятелно —</option>
               ${[...o.dela.values()]
                 .map((d) => `<option value="${ekraniraj(d.id)}">${ekraniraj(d.ime)}</option>`)
@@ -391,7 +483,7 @@ export function formaDelo(o: Ogledalo, dnes: string): string {
         </div>
         <div class="deystviya">
           <button type="submit">Запиши делото</button>
-          <p class="greshka" id="greshka-delo">${ekraniraj(greshkaDelo)}</p>
+          <p class="greshka" id="${id('greshka-delo')}">${ekraniraj(greshkaDelo)}</p>
         </div>
         <p class="drebno">Мястото и Обектът са КОЛОНИ, не нива: дело без обект е нормално.
         Сгъва се само дело с поддела — „Имотите не се сгъват, сгъват се само делата и поддела."</p>
@@ -426,13 +518,16 @@ export function zakachiGant(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
+  klyuch = 'gant',
+  predstavka = 'd-',
 ): void {
   slozhiShirinite(koren);
+  const p = pogled(klyuch);
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {
-      takt = b.dataset.takt as Takt;
-      zapomniPogleda();
+      p.takt = b.dataset.takt as Takt;
+      zapomniPogleda(p);
       await prerisuvay();
     });
   }
@@ -440,9 +535,9 @@ export function zakachiGant(
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-sgavi]')) {
     b.addEventListener('click', async () => {
       const id = b.dataset.sgavi!;
-      if (sgunati.has(id)) sgunati.delete(id);
-      else sgunati.add(id);
-      zapomniPogleda();
+      if (p.sgunati.has(id)) p.sgunati.delete(id);
+      else p.sgunati.add(id);
+      zapomniPogleda(p);
       await prerisuvay();
     });
   }
@@ -455,11 +550,11 @@ export function zakachiGant(
    * нито едно дело (правило 18).
    */
   koren.querySelector<HTMLButtonElement>('#sega')?.addEventListener('click', async () => {
-    filtarMyasto = '';
-    filtarObekt = '';
-    filtarOtsenka = 'спешно-важно';
-    sgunati.clear();
-    zapomniPogleda();
+    p.filtarMyasto = '';
+    p.filtarObekt = '';
+    p.filtarOtsenka = 'спешно-важно';
+    p.sgunati.clear();
+    zapomniPogleda(p);
     await prerisuvay();
     koren.querySelector<HTMLElement>('#gant-vreme .dnes')?.scrollIntoView({
       inline: 'start',
@@ -468,8 +563,8 @@ export function zakachiGant(
   });
 
   koren.querySelector<HTMLButtonElement>('#kam-diagrama')?.addEventListener('click', async () => {
-    diagrama = !diagrama;
-    zapomniPogleda();
+    p.diagrama = !p.diagrama;
+    zapomniPogleda(p);
     await prerisuvay();
   });
 
@@ -480,19 +575,19 @@ export function zakachiGant(
     });
   };
   vrazhi('#f-myasto', (v) => {
-    filtarMyasto = v;
-    zapomniPogleda();
+    p.filtarMyasto = v;
+    zapomniPogleda(p);
   });
   vrazhi('#f-obekt', (v) => {
-    filtarObekt = v;
-    zapomniPogleda();
+    p.filtarObekt = v;
+    zapomniPogleda(p);
   });
   vrazhi('#f-otsenka', (v) => {
-    filtarOtsenka = v;
-    zapomniPogleda();
+    p.filtarOtsenka = v;
+    zapomniPogleda(p);
   });
 
-  zakachiFormataNaDelo(koren, k, prerisuvay);
+  zakachiFormataNaDelo(koren, k, prerisuvay, predstavka);
 }
 
 /**
@@ -503,11 +598,19 @@ export function zakachiFormataNaDelo(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
+  /**
+   * ПРЕДСТАВКА на всички id-та във формата (И98).
+   *
+   * Две форми на един документ значат две `#forma-delo`: `querySelector`
+   * хваща ПЪРВАТА, а втората изглежда работеща и не записва нищо. Затова
+   * личната носи своя представка — и своята `Deystviya` през `k`.
+   */
+  predstavka = 'd-',
 ): void {
-  const forma = koren.querySelector<HTMLFormElement>('#forma-delo');
+  const forma = koren.querySelector<HTMLFormElement>(`#${predstavka}forma-delo`);
   forma?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    const izhod = koren.querySelector<HTMLElement>('#greshka-delo')!;
+    const izhod = koren.querySelector<HTMLElement>(`#${predstavka}greshka-delo`)!;
     izhod.textContent = '';
     const d = new FormData(forma);
     const buton = forma.querySelector<HTMLButtonElement>('button[type=submit]')!;

@@ -265,8 +265,51 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     </section>`;
 }
 
-export function narisuvayTablo(koj: Samolichnost, izbor: Izbor, akaunt: string): string {
-  return kartaKoySam(koj, akaunt) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
+export function narisuvayTablo(
+  koj: Samolichnost,
+  izbor: Izbor,
+  akaunt: string,
+  lichnoVklyucheno = false,
+): string {
+  return (
+    kartaKoySam(koj, akaunt) +
+    kartaLichno(lichnoVklyucheno) +
+    kartaOtmetki(izbor) +
+    kartaSravnenie(izbor, koj)
+  );
+}
+
+/**
+ * ВТОРОСТЕПЕННИТЕ настройки НА СЛУЖИТЕЛЯ · личният таб (И98).
+ *
+ * Негови думи: „Може ако служителят не иска да го ползва, от неговите
+ * ВТОРОСТЕПЕННИ настройки."
+ *
+ * ЗАЩО НЕ Е ОТМЕТКА ДО ОСТАНАЛИТЕ. Другите отметки на Таблото са
+ * `Vazmozhnost` — тоест ПРАВО, което планът дава или не дава (правило 15).
+ * Личното не е право: то не се плаща, не се раздава и никой не го отнема.
+ * Затова стои в СВОЯ карта и превключвателят му е СЪБИТИЕ в личния Журнал,
+ * не ред в `masterbook:izbor` — localStorage е на БРАУЗЪРА и би казал
+ * „включено" тук и „изключено" там, докато данните лежат на диска.
+ */
+function kartaLichno(vklyucheno: boolean): string {
+  return `
+    <section class="karta" data-sektsiya="tablo-lichno">
+      <div class="dyalglava">
+        <h2>Лично</h2>
+        <span>второстепенна настройка · твоя, не на наемателя</span>
+      </div>
+      <div class="deystviya">
+        <span class="znachka ${vklyucheno ? 'dobre' : 'tiha'}">${vklyucheno ? 'включено' : 'прибрано'}</span>
+        <button type="button" class="vtorichen" id="tablo-lichno">${
+          vklyucheno ? 'Прибери личното' : 'Пусни личното'
+        }</button>
+      </div>
+      <p class="drebno">Личният таб е <b>същата таблица</b> от Управление за собствени нужди, с
+      <b>отделен Журнал</b>, който никога не се смесва със служебния. Прибирането сваля пункта от
+      лентата и <b>не трие нищо</b> — „изключено ≠ липсващо" (правило 15). Ключът на личния Журнал
+      е твоят имейл с наставка; чете го само той.</p>
+    </section>`;
 }
 
 /**

@@ -45,12 +45,13 @@ import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
 import { narisuvayTabove, zakachiTabove } from './tabove.js';
-import { type Samolichnost } from '../src/yadro/samolichnost.js';
+import { type Rolya, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
 import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
-import { KLYUCH_OT_ALFA, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt.js';
+import { KLYUCH_OT_ALFA, klyuchNaLichniya, koyZhurnal, sDumiZaAkaunta } from '../src/domein/akaunt.js';
+import { narisuvayLichno, pokanaZaLichno, zabraviIzbora, zakachiLichno } from './lichno.js';
 
 /**
  * КЛЮЧЪТ НА АКАУНТА · вече не е закован ред.
@@ -91,6 +92,7 @@ export type KoyEkran =
   | 'nastroyki'
   | 'ii'
   | 'tabove'
+  | 'lichno'
   | 'tablo';
 
 /**
@@ -106,6 +108,49 @@ const EKRAN_ISKA: Readonly<Partial<Record<KoyEkran, Vazmozhnost>>> = {
   ii: 'svarzhi-ii',
 };
 
+/**
+ * КОИ ПУНКТОВЕ ЗАВИСЯТ ОТ ДОСТЪПА · неговата поръчка, изпълнена поименно.
+ *
+ * Негови думи (И98): „**прецени ти** кои от основното меню са свързани с
+ * достъпа естествено."
+ *
+ * КРИТЕРИЯТ, който избрах, е ЕДИН: екран се заключва по роля САМО когато носи
+ * действие, което **колонното право не може да ограничи** — необратимо,
+ * харчещо пари, или менящо ЧУЖДИ числа (И97 т.6). Всичко, което се стеснява с
+ * изключен ред или скрита колона (правило 23), НЕ се заключва: скритото пак се
+ * смята, а скритият ПУНКТ значи празен екран.
+ *
+ * | екран | зависи ли | защо |
+ * | :---- | :----: | :---- |
+ * | **Настройки** | ДА · собственик | оттам се раздава самото колонно право — не може да се ограничи от него |
+ * | **Сметки** | ДА · редактор | ДДС-справката ЗАМРАЗЯВА месеца (правило 9); скрита колона не го спира |
+ * | **ИИ** | ДА · собственик | агентът ХАРЧИ ПАРИ с ключ (ADR-029) |
+ * | **Стойност** | ДА · собственик | базовата цена и коефициентите са изрично негови (И97 т.6); числото Е екранът, колона няма какво да скрие |
+ * | Имоти | не | падането по подразбиране — скрито падане значи празен екран или цикъл |
+ * | Пари | не | ежедневната работа на редактора; сумите се крият по КОЛОНА |
+ * | Управление | не | скрит пункт значи човек, който не вижда какво му е възложено |
+ * | Табове | не | конструкторът рисува от вече позволеното |
+ * | **Лично** | не | зависи само от СОБСТВЕНИЯ превключвател, не от чужд достъп |
+ * | **Табло** | НИКОГА | там се връща изключеното и там стои ключът на личното — не бива да може да се самозаключи |
+ *
+ * НЕ СЕ СЛИВА с `mozhe()`: правило 15 казва, че правото (планът) и отметката
+ * не се сливат; трети въпрос вътре в същата функция би направил същото.
+ */
+const EKRAN_ISKA_ROLYA: Readonly<Partial<Record<KoyEkran, Rolya>>> = {
+  nastroyki: 'sobstvenik',
+  smetki: 'redaktor',
+  ii: 'sobstvenik',
+  stoynost: 'sobstvenik',
+};
+
+/** Стига ли ролята · наблюдател < редактор < собственик. */
+function dostapenLiE(koy: KoyEkran, rolya: Rolya): boolean {
+  const iska = EKRAN_ISKA_ROLYA[koy];
+  if (!iska) return true;
+  if (iska === 'redaktor') return rolya !== 'nablyudatel';
+  return rolya === 'sobstvenik';
+}
+
 export interface Konteks {
   readonly deystviya: Deystviya;
   readonly dnevnik: DnevnikVIndexedDB;
@@ -113,6 +158,14 @@ export interface Konteks {
   readonly pravata: Pravata;
   /** под кой ключ е отвореният Журнал (ADR-020) — историята на реда чете по него */
   readonly akaunt: string;
+  /**
+   * КОЙ Е ВЛЯЗЪЛ · самоличността, не ключът на Журнала (И98).
+   *
+   * Дотук стигаше само до `main.ts`. Първият екран, който трябва да пита
+   * „този служител може ли", я налага — а личният ключ се строи именно от
+   * имейла, не от отворения акаунт.
+   */
+  readonly kojSam: Samolichnost;
   readonly vest: (vid: 'dobre' | 'zle', tekst: string) => void;
 }
 
@@ -258,6 +311,11 @@ const EKRANI: Record<KoyEkran, { ime: string; podnaslov: string; ikona: string }
     podnaslov: 'стационарни и добавени · секции с таблици и графики, комбинират се',
     ikona: '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
   },
+  lichno: {
+    ime: 'Лично',
+    podnaslov: 'същата таблица за собствени нужди · ОТДЕЛЕН Журнал, който никога не се смесва',
+    ikona: '<path d="M12 21s-7.5-4.4-7.5-9.6A4.4 4.4 0 0 1 12 8.3a4.4 4.4 0 0 1 7.5 3.1C19.5 16.6 12 21 12 21z"></path>',
+  },
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
@@ -367,15 +425,75 @@ async function trugvay(): Promise<void> {
     vrata,
     pravata,
     akaunt,
+    kojSam,
     vest: (vid, tekst) => {
       poslednaVest = { vid, tekst };
     },
   };
 
+  /**
+   * ВТОРИЯТ КОНТЕКСТ · личният Журнал (И98).
+   *
+   * Същата Врата и същият носител: опашката, ключалката и котвата ВЕЧЕ са по
+   * наемател, тъй че ядрото не се пипа с нито един ред. Различава се само
+   * `naematel` — и точно това прави смесването физически невъзможно.
+   *
+   * Ключът се строи от ИМЕЙЛА на човека, никога от `akaunt`: на това
+   * устройство `akaunt` може да е Алфа-ключът на ФИРМАТА, а личното е на
+   * всеки служител поотделно (И98 т.3).
+   */
+  const lichenKlyuch = klyuchNaLichniya(kojSam);
+  const lichen: Konteks = {
+    ...k,
+    akaunt: lichenKlyuch,
+    deystviya: new Deystviya({
+      vrata,
+      dnevnik,
+      naematel: lichenKlyuch,
+      actor: kojSam.imeyl,
+      chasovnik: () => new Date().toISOString(),
+    }),
+  };
+
+  /**
+   * ПРЕВКЛЮЧВА личното · едно събитие в ЛИЧНИЯ Журнал (И98).
+   *
+   * Пускането е ПЪРВОТО събитие на този Журнал — съществуването му Е
+   * активацията, огледано на И97 („стопанинът е първото събитие"). Затова
+   * няма отделно „създай Журнал": Вратата тръгва от seq 1 сама.
+   */
+  function zakachiPrevklyuchvaneto(koren: HTMLElement, znak: string, vklyucheno: boolean): void {
+    koren.querySelector<HTMLButtonElement>(znak)?.addEventListener('click', async (e) => {
+      const buton = e.target as HTMLButtonElement;
+      buton.disabled = true;
+      try {
+        await lichen.deystviya.prevklyuchiLichno(
+          { vklyucheno, sluzhebniyat: akaunt },
+          { opId: crypto.randomUUID() },
+        );
+        zabraviIzbora();
+        k.vest(
+          'dobre',
+          vklyucheno
+            ? `Личното е пуснато. Журналът му живее под „${lichen.akaunt}" и никога не се смесва със служебния.`
+            : 'Личното е прибрано. Журналът остава непокътнат — прибраното не е изтрито.',
+        );
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      }
+      await prerisuvay();
+    });
+  }
+
   async function prerisuvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(akaunt);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
+    // ЛИЧНОТО · чете се ОТДЕЛНО и никога не влиза в служебното Огледало.
+    // `null` значи „не е активирано" — липсващ контур, не празен екран.
+    const lichniteSabitiya = await dnevnik.chetiVsichki(lichen.akaunt);
+    const lichnoOgledalo = lichniteSabitiya.length > 0 ? await lichen.deystviya.ogledalo() : null;
+    const lichnoVklyucheno = lichnoOgledalo?.lichnoVklyucheno ?? false;
     const dnes = dnesKato();
     // Изключен екран не се показва празен — връщаме се на Имоти.
     const iska = EKRAN_ISKA[ekran];
@@ -383,7 +501,7 @@ async function trugvay(): Promise<void> {
     const opis = EKRANI[ekran];
 
     koren.innerHTML = `
-      ${strana(ogledalo, dnes)}
+      ${strana(ogledalo, dnes, lichnoVklyucheno, kojSam.rolya)}
       <main class="glavno">
         <header class="shapka">
           <div>
@@ -439,7 +557,11 @@ async function trugvay(): Promise<void> {
                             )
                           : ekran === 'tabove'
                             ? narisuvayTabove(ogledalo, dnes)
-                            : narisuvayTablo(kojSam, izbor, akaunt)
+                            : ekran === 'lichno'
+                              ? lichnoOgledalo && lichnoOgledalo.lichnoVklyucheno
+                                ? narisuvayLichno(lichnoOgledalo, ogledalo, dnes)
+                                : pokanaZaLichno(lichen.akaunt)
+                              : narisuvayTablo(kojSam, izbor, akaunt, lichnoVklyucheno)
           }
         </div>
       </main>`;
@@ -453,7 +575,11 @@ async function trugvay(): Promise<void> {
     else if (ekran === 'nastroyki') zakachiNastroyki(koren, k, prerisuvay);
     else if (ekran === 'ii') zakachiII(koren, k, prerisuvay);
     else if (ekran === 'tabove') zakachiTabove(koren, k, prerisuvay);
-    else {
+    else if (ekran === 'lichno') {
+      zakachiLichno(koren, k, lichen, prerisuvay);
+      zakachiPrevklyuchvaneto(koren, '#lichno-pusni', true);
+      zakachiPrevklyuchvaneto(koren, '#lichno-priberi', false);
+    } else {
       zakachiTablo(
         koren,
         () => izbor,
@@ -462,6 +588,7 @@ async function trugvay(): Promise<void> {
         },
         prerisuvay,
       );
+      zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
       koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
         await vhod.izlez();
         // Презареждането е нарочно: следващото тръгване минава по целия път на
@@ -486,7 +613,12 @@ async function trugvay(): Promise<void> {
   await zakachiDzhoba(prerisuvay);
 }
 
-function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
+function strana(
+  o: Parameters<typeof duljimo>[0],
+  dnes: string,
+  lichnoVklyucheno = false,
+  rolya: Rolya = 'sobstvenik',
+): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
     ? 'Веригата не е проверявана в тази сесия'
@@ -497,8 +629,12 @@ function strana(o: Parameters<typeof duljimo>[0], dnes: string): string {
 
   const punktove = (Object.keys(EKRANI) as KoyEkran[])
     .filter((koy) => {
+      // ЛИЧНОТО се вижда само когато е пуснато · пуска се от Таблото, където
+      // изключеното се връща (И98 · „добавка по избор").
+      if (koy === 'lichno') return lichnoVklyucheno;
       const iska = EKRAN_ISKA[koy];
-      return !iska || mozhe(izbor, iska);
+      if (iska && !mozhe(izbor, iska)) return false;
+      return dostapenLiE(koy, rolya);
     })
     .map((koy) => {
       const e = EKRANI[koy];

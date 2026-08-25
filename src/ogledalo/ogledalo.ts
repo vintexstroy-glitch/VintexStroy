@@ -43,6 +43,9 @@ import type {
   PayloadSpravkaPodadena,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
+  PayloadLichnoPrevklyucheno,
+  PayloadDeloPrehvarleno,
+  PayloadPrenosOtcheten,
   PayloadStorno,
   PayloadVzemaneNachisleno,
 } from '../domein/sabitiya.js';
@@ -223,6 +226,22 @@ export interface Ogledalo {
    * ред". Поколението расте с всяко залепване; номерът стои.
    */
   readonly svrazki: ReadonlyMap<number, Svrazka>;
+  /**
+   * ПРЕХВЪРЛЕНИТЕ дела (И98) · id → следата на преноса.
+   *
+   * Делото го НЯМА в `dela` — то живее в другия Журнал. Тук стои следата:
+   * накъде е отишло и с кой пренос. Двойна служба: екранът обяснява празното
+   * място, а `zapishiDelo` и вносът от МД знаят какво да НЕ създават наново.
+   * Върне ли се делото (обратен пренос → ново `ДелоЗаписано`), следата пада.
+   */
+  readonly prehvarleni: ReadonlyMap<string, PayloadDeloPrehvarleno>;
+  /** разписките на преносите · prenosId+посока → разписката (правило 7) */
+  readonly prenosi: ReadonlyMap<string, PayloadPrenosOtcheten>;
+  /**
+   * ЛИЧНОТО · включено ли е (И98). Смисъл има само в ЛИЧЕН Журнал: пита се
+   * от последното `ЛичноПревключено`; празният Журнал е „не е активирано".
+   */
+  readonly lichnoVklyucheno: boolean;
   /** записаните сверки, най-новата последна — включително нулевите */
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
@@ -273,6 +292,32 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     }
   }
 
+  /**
+   * СТОРНИРАНОТО ДЕЛО НЕ СЕ ВЪЗКРЕСЯВА ОТ СОБСТВЕНАТА СИ ПОПРАВКА.
+   *
+   * Делото няма отделно събитие „Поправено": и създаването, и поправката са
+   * `ДелоЗаписано` върху същия id. Затова сторното на СЪЗДАВАНЕТО гасеше само
+   * неговия seq — а поправката после пак викаше `dela.set(id, …)` и делото
+   * СЕ ВРЪЩАШЕ, с чуждия seq на поправката.
+   *
+   * Имотът и наемът нямат тази дупка: там поправката е СВОЕ събитие и пази
+   * `if (imot)` — „поправка на несъществуващ имот не създава имот от нищото".
+   * Делото няма къде да провери същото, затова се брои тук, преди цикъла.
+   *
+   * ПЪРВОТО `ДелоЗаписано` за един id е СЪЗДАВАНЕТО; погасне ли то, делото не
+   * се брои — каквото и да пише след него.
+   */
+  const sazdadenoNaSeq = new Map<string, number>();
+  for (const s of sabitiya) {
+    if (s.type === 'ДелоЗаписано' && !sazdadenoNaSeq.has(s.sashtnost.id)) {
+      sazdadenoNaSeq.set(s.sashtnost.id, s.seq);
+    }
+  }
+  const stornirianiDela = new Set<string>();
+  for (const [id, seq] of sazdadenoNaSeq) {
+    if (pogaseni.has(seq)) stornirianiDela.add(id);
+  }
+
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
   const vzemaniya = new Map<string, Vzemane>();
@@ -292,6 +337,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const predlozheniya = new Map<string, Predlozhenie>();
   const zadachi = new Map<string, Zadacha>();
   const svrazki = new Map<number, Svrazka>();
+  const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
+  const prenosi = new Map<string, PayloadPrenosOtcheten>();
+  let lichnoVklyucheno = false;
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
@@ -398,6 +446,29 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ДелоПрехвърлено': {
+        // Делото ИЗЛИЗА от този Журнал: маха се от живите и остава следа.
+        // Едно махане тук го гаси наведнъж от Управление, копието в Сметки,
+        // диаграмата, секциите на конструктора и броя, който агентът чете —
+        // всичките четат `dela`.
+        const p = s.payload as unknown as PayloadDeloPrehvarleno;
+        dela.delete(s.sashtnost.id);
+        prehvarleni.set(s.sashtnost.id, p);
+        break;
+      }
+
+      case 'ПреносОтчетен': {
+        const p = s.payload as unknown as PayloadPrenosOtcheten;
+        prenosi.set(`${p.prenosId}:${p.posoka}`, p);
+        break;
+      }
+
+      case 'ЛичноПревключено': {
+        const p = s.payload as unknown as PayloadLichnoPrevklyucheno;
+        lichnoVklyucheno = p.vklyucheno; // последната дума бие
+        break;
+      }
+
       case 'СвръзкаЗаписана': {
         // Всяко залепване е СВОЙ запис със същия номер и порасналото поколение.
         // Огледалото ги събира: последният запис за един номер носи текущото
@@ -448,6 +519,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ДелоЗаписано': {
         const p = s.payload as unknown as PayloadDeloZapisano;
         const id = s.sashtnost.id;
+        // Сторнираното дело не се връща от поправка (виж горе).
+        if (stornirianiDela.has(id)) break;
+        // ВЪРНАТОТО дело (обратен пренос) сваля следата „прехвърлено":
+        // делото пак е тук и празното място вече няма какво да обяснява.
+        prehvarleni.delete(id);
         dela.set(id, {
           id,
           // seq-ът на СЪЗДАВАНЕТО не се мени от поправки — сторното сочи него
@@ -624,6 +700,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     predlozheniya,
     zadachi,
     svrazki,
+    prehvarleni,
+    prenosi,
+    lichnoVklyucheno,
     sverki,
     prilozheni,
     pogaseni,
