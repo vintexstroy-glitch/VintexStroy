@@ -11,8 +11,25 @@
  * `data-redakt` с името на редактора си и `data-surovo` със стойността от
  * модела. Редактируеми са само ОТВОРЕНИТЕ еднозначни колони — днес: наемът
  * на реда и площта на имота. Затворена колона (сметка, изведена стойност)
- * изобщо няма белег — правило 23 по конструкция. Клетка с няколко полета
- * (име + телефон + имейл) остава на формата — там ѝ е мястото.
+ * изобщо няма белег. Клетка с няколко полета (име + телефон + имейл) остава
+ * на формата — там ѝ е мястото.
+ *
+ * ═══ ПРАВИЛО 23 · и защо „по конструкция" беше ПОЛОВИН истина ═══
+ *
+ * Дотук тук пишеше „затворена колона изобщо няма белег — **правило 23 по
+ * конструкция**". Правило 23 обаче казва: *„'Редактира' не се раздава — то се
+ * СМЯТА от **ролята на човека** и от вида на колоната."* Двата множителя са
+ * ДВА. Белегът покриваше само единия — ВИДА.
+ *
+ * Ролята не я питаше никой, а екран Имоти нарочно НЕ иска роля
+ * (`ekranite.ts`: „падането по подразбиране"). Значи наблюдател отваря Имоти,
+ * щраква двойно върху наема, пише и натиска Enter — и записът влиза в Журнала
+ * с неговия имейл за `actor`. Вратата не го лови: за служебния Журнал
+ * `mozheDaPishe` връща истина (политиката чака П3, `docs/09` §3).
+ *
+ * `mozheDaRedaktiraKolona` е точно функцията, която събира двата множителя, и
+ * ADR-011 я обявява за „цялото разчертаване колона по колона" — но досега
+ * никой не я викаше. Обявено право без викащ е надпис. Оттук се вика.
  *
  * ЗАПИСВА ЧОВЕКЪТ, ЯВНО: единствено Enter пише. Клик другаде, Escape,
  * смяна на екрана — отказ. Blur-запис „като в Excel" би значел случаен клик
@@ -25,12 +42,39 @@
 import { otSuma, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
+import { mozheDaRedaktiraKolona } from '../src/domein/kolonno.js';
+import { MOZHE, ne, type Otgovor } from '../src/domein/otgovor.js';
+import type { Rolya } from '../src/yadro/samolichnost.js';
 import { aktivnataKletka, fokusVPole, kletkiteNaIzbora } from './klaviatura.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Причината, която влиза в Журнала — чиста, за да има тест. */
 export function prichinaZaRedaktsiya(bilo: string, stava: string): string {
   return `поправено от таблицата: ${bilo} → ${stava}`;
+}
+
+/**
+ * МОЖЕ ЛИ ТОЗИ ЧОВЕК ДА ПОПРАВИ КЛЕТКА · правило 23, СМЕТНАТО, не раздадено.
+ *
+ * Трите факта отиват в `mozheDaRedaktiraKolona` — и двата, които тук изглеждат
+ * заковани, са ИЗВЕДЕНИ от самата клетка, не подадени наслуки:
+ *
+ *   · **`vid: 'promenlyva'`** — белегът `data-redakt` го носят САМО отворени
+ *     колони; затворената няма как да стигне дотук (вж. шапката);
+ *   · **`pravo: 'vizhda'`** — клетка, която е на екрана, по определение се
+ *     вижда: скритата не се рисува (правило 23 · „колона се СКРИВА").
+ *
+ * Липсваше ТРЕТИЯТ — ролята. Затова решението минава оттук, а не се смята
+ * наум в коментар: коментарът не пада на червено, когато някой го надживее.
+ *
+ * ОТКАЗЪТ Е С ДУМИ, не мълчалив (`otgovor.ts`). Клетка, която просто „не се
+ * отваря", изглежда като счупено приложение; наблюдателят трябва да научи, че
+ * ГЛЕДА — това не е повреда, а неговата роля.
+ */
+export function mozheDaPopraviKletka(rolya: Rolya): Otgovor {
+  return mozheDaRedaktiraKolona({ rolya, vid: 'promenlyva', pravo: 'vizhda' })
+    ? MOZHE
+    : ne('Наблюдателят гледа и сваля, но не мърда Журнала. Поправката иска роля „редактира".');
 }
 
 /**
@@ -121,13 +165,29 @@ let konteks: Konteks | null = null;
 let prerisuvayEkrana: (() => Promise<void>) | null = null;
 let zakacheno = false;
 
+/**
+ * Ролята на влезлия · подава се при ВСЯКО прерисуване, не се чете при всяко
+ * отваряне на клетка.
+ *
+ * Двете се различават по цена и по нищо друго: `ogledalo()` сгъва целия Журнал,
+ * а прерисуването СЕ СЛУЧВА точно когато ролята може да се е сменила — след
+ * всеки запис. Прочетена при отварянето, тя щеше да струва по едно сгъване на
+ * двоен клик, и то заради стойност, която току-що е била пресметната.
+ *
+ * Подразбирането е НАЙ-ТЯСНОТО. Ако някой ден закачането се извика без роля,
+ * приложението отказва поправка, вместо да я разреши мълчаливо.
+ */
+let rolyata: Rolya = 'nablyudatel';
+
 export function zakachiRedaktsiya(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
+  rolya: Rolya,
 ): void {
   konteks = k;
   prerisuvayEkrana = prerisuvay;
+  rolyata = rolya;
   if (zakacheno) return;
   zakacheno = true;
 
@@ -197,6 +257,13 @@ async function zapishiVMnogo(
   if (!konteks || !prerisuvayEkrana) return;
   const redaktor = REDAKTORI[vid];
   if (!redaktor) return;
+  // Ctrl+D не минава през `otvori` — значи пазачът трябва да е и тук, иначе
+  // групата щеше да е отворената врата към заключената единична клетка.
+  const otgovor = mozheDaPopraviKletka(rolyata);
+  if (!otgovor.mozhe) {
+    konteks.vest('zle', otgovor.prichina);
+    return;
+  }
   let zapisani = 0;
   let ravni = 0;
   const otkazi: string[] = [];
@@ -235,6 +302,14 @@ function otvori(kletka: HTMLElement): void {
   if (!redaktor || !Number.isFinite(surovo)) return;
   const k = konteks;
   const prerisuvay = prerisuvayEkrana;
+
+  // Правило 23 · питаме ПРЕДИ да отворим поле. Поле, което се отваря и после
+  // отказва при Enter, обещава запис, който няма да стане.
+  const otgovor = mozheDaPopraviKletka(rolyata);
+  if (!otgovor.mozhe) {
+    k.vest('zle', otgovor.prichina);
+    return;
+  }
 
   const staroto = [...kletka.childNodes];
   const pole = document.createElement('input');

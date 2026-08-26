@@ -13,7 +13,7 @@
  * не — там менюто чака своя ред; бутоните на реда стоят и работят навсякъде.
  */
 
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 import { prilozhiSkritite, skriyKolona } from './skriti-koloni.js';
 import { KLIPBORDAT_OTKAZA, kopirayKletkite } from './klaviatura.js';
 

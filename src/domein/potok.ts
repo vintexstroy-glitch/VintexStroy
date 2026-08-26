@@ -39,7 +39,7 @@ import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Tablitsa } from '../iztochnik/tablitsa.js';
 
 /** Един сбор, тръгнал към Приходи или Разходи. */
-export interface RedZaIzprashtane {
+interface RedZaIzprashtane {
   /** номерът на колоната — тя СТОИ там, оттук се и разпознава */
   readonly kolona: number;
   /** заглавието ѝ, както го е написал източникът — това става име на реда */

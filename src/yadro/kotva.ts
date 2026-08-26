@@ -14,7 +14,7 @@
  * за другите машини е износът с неговия последен хеш.
  */
 
-export interface Kotva {
+interface Kotva {
   readonly seq: number;
   readonly hash: string;
   /** ISO — кога е забита */
@@ -68,7 +68,7 @@ export class KotvaVPametta implements DrajkaNaKotva {
   }
 }
 
-export interface ProverkaNaKotva {
+interface ProverkaNaKotva {
   readonly nared: boolean;
   /** празно при наред; иначе — с думи какво не съвпада */
   readonly prichina: string;

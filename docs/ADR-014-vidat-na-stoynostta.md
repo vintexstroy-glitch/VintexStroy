@@ -125,7 +125,7 @@ export type VidStoynost = 'evro' | 'protsent' | 'chislo' | 'tekst' | 'data';
 | `src/domein/chisla.ts` | пита вида, не гадае |
 | `src/yadro/valuta.ts` | една валута; закръглянето остава |
 | `app/filtri.ts` | чете домейновия вид, не свой |
-| `tests/valuta.test.ts` | презастроен · 14 теста |
+| `tests/valuta.test.ts` | презастроен · броят е в `docs/09` §4 |
 
 ## Какво ОСТАВА
 

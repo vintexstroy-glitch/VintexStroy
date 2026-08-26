@@ -16,6 +16,24 @@ import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
+import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
+import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
+import {
+  GreshkaLichniPari,
+  napraviTema,
+  proveriChastite,
+  VIDOVE_KREDIT,
+} from './lichni-pari.js';
+import { SUMATA_NAD_NULA } from '../yadro/pari.js';
+import { eLichenKlyuch, svediImeyl } from './akaunt.js';
+import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
+import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
+import {
+  GreshkaKontragent,
+  klyuchNaKontragent,
+  proveriKontragent,
+  type VidKontragent,
+} from './kontragenti.js';
 import type {
   PayloadImotDobaven,
   PayloadNaemDobaven,
@@ -23,12 +41,27 @@ import type {
   PayloadButonZapisan,
   PayloadModelZapisan,
   PayloadSverkaZapisana,
+  PayloadSvrazkaZapisana,
+  PayloadLichnoPrevklyucheno,
+  PayloadLichenDostapZapisan,
+  PayloadLichnaTemaZapisana,
+  PayloadLichnoDvizhenieZapisano,
+  PayloadLichenRedIzklyuchen,
+  PayloadLichenKreditZapisan,
+  PayloadLichnoIzvlechenieprieto,
+  PayloadDeloPrehvarleno,
+  PayloadPrenosOtcheten,
   PayloadNaemPopraven,
   PayloadNaemPrekraten,
   PayloadPlashtanePrieto,
   PayloadDDSPlateno,
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
+  PayloadParametarNaVhodaZapisan,
+  PayloadKontragentZapisan,
+  PayloadStopaninSmenen,
+  PayloadStopaninZapisan,
+  PayloadZapasenKontaktZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
@@ -43,7 +76,7 @@ import type {
   TipSabitie,
 } from './sabitiya.js';
 
-export interface NastroykiDeystviya {
+interface NastroykiDeystviya {
   readonly vrata: Vrata;
   readonly dnevnik: Dnevnik;
   readonly naematel: string;
@@ -52,7 +85,7 @@ export interface NastroykiDeystviya {
   readonly chasovnik: () => string;
 }
 
-export interface Zayavka {
+interface Zayavka {
   readonly opId: string;
   /** rev-предпазител: seq на последното събитие за същността, което си видял */
   readonly expectedRev?: number;
@@ -106,6 +139,7 @@ export class Deystviya {
     danni: PayloadVzemaneNachisleno,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Начислението');
     proveriZamrazen(await this.ogledalo(), danni.period, z.svereno);
     return this.#pusni('ВземанеНачислено', VID.vzemane, id, danni, z);
   }
@@ -115,6 +149,7 @@ export class Deystviya {
     danni: PayloadPlashtanePrieto,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Плащането');
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
   }
@@ -159,7 +194,274 @@ export class Deystviya {
     danni: PayloadDeloZapisano,
     z: Zayavka,
   ): Promise<Rezultat> {
+    // ПРЕХВЪРЛЕНОТО дело не се записва наново тук (И98): то живее в другия
+    // Журнал. Единственият вход, който го връща, е обратният пренос
+    // (`priemiPrehvarleno` в другата посока) — иначе следващият внос от МД
+    // или невнимателна форма би го възкресила мълчаливо.
+    const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
+    if (prehvarleno) {
+      throw new GreshkaTablitsa(
+        `Това дело е ПРЕХВЪРЛЕНО към „${prehvarleno.kam}" (пренос ${prehvarleno.prenosId.slice(0, 8)}…). ` +
+          'Върни го с обратен пренос, не със запис наново.',
+      );
+    }
     return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ПРЕХВЪРЛЯ дело към ДРУГ Журнал · половината на ИЗПРАЩАЧА (И98).
+   *
+   * Свое събитие, НЕ сторно: сторно значи „грешка", а прехвърленото дело е
+   * живо и вярно — само че вече не е тук. Причината е задължителна (И97).
+   *
+   * Това действие пише САМО в своя Журнал. Другата половина
+   * (`priemiPrehvarleno`) пише в получателя, със своя Deystviya — и редът е
+   * ПЪРВО получателят, ПОСЛЕДЕН изпращачът (`src/domein/prenos.ts` го държи).
+   */
+  async prehvarliDelo(id: string, danni: PayloadDeloPrehvarleno, z: Zayavka): Promise<Rezultat> {
+    if (danni.prichina.trim() === '') {
+      throw new GreshkaTablitsa(
+        'Пренос без ПРИЧИНА не се записва — следа, която не обяснява нищо, е по-лоша от липсваща.',
+      );
+    }
+    return this.#pusni('ДелоПрехвърлено', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ПРИЕМА прехвърлено дело · половината на ПОЛУЧАТЕЛЯ (И98).
+   *
+   * Записва делото със СЪЩИЯ id — детерминиран е, повторното пускане не ражда
+   * второ дело, а id-то не живее на две места ЕДНОВРЕМЕННО, а последователно.
+   * Заобикаля вратаря на `zapishiDelo` нарочно: обратният пренос е
+   * ЕДИНСТВЕНИЯТ вход, който връща прехвърлено дело.
+   */
+  async priemiPrehvarleno(
+    id: string,
+    danni: PayloadDeloZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * РАЗПИСКАТА на един пренос · сверката вход↔изход (правило 7).
+   *
+   * По една във всеки Журнал; разликата се записва ДОРИ когато е нула —
+   * проверената нула е различна от нулата, за която никой не е питал.
+   */
+  async zapishiPrenos(danni: PayloadPrenosOtcheten, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'ПреносОтчетен',
+      VID.prenos,
+      `PRENOS:${danni.prenosId}:${danni.posoka}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ПРЕВКЛЮЧВА личното · първото събитие на личния Журнал (И98).
+   *
+   * „Има си и отделен журнал когато се е активирал личния" — съществуването
+   * на Журнала Е активацията. Прибирането е ново събитие с `vklyucheno:
+   * false`; Журналът остава непокътнат, само пунктът пада от лентата.
+   */
+  async prevklyuchiLichno(danni: PayloadLichnoPrevklyucheno, z: Zayavka): Promise<Rezultat> {
+    // МЯСТОТО Е ЧАСТ ОТ АКТИВАЦИЯТА (И99): „личният екран се активира с
+    // ДАВАНЕ НА ДОСТЪП ДО МЯСТО в личния драйв". Изисква се при ВКЛЮЧВАНЕ;
+    // при прибиране няма какво да се посочва.
+    //
+    // Проверката е ТУК, не в типа: запис, направен преди това поле, е също
+    // толкова валиден запис и Журналът не се преписва (правило 1).
+    if (danni.vklyucheno) {
+      const veche = (await this.ogledalo()).lichnoMyasto;
+      if (proveriMyasto(danni.myasto ?? veche) === '') {
+        throw new GreshkaDostap('Личното иска МЯСТО в твоя драйв, преди да тръгне.');
+      }
+    }
+    return this.#pusni('ЛичноПревключено', VID.lichno, `LICHNO:${this.#naematel}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ЛИЧЕН ДОСТЪП · споделянето в ОБРАТНАТА посока (И99).
+   *
+   * Негово: „ако иска да даде достъп на работодателя си… или да сподели на
+   * външен имейл личната си папка и личен таб. Например на жена си."
+   *
+   * Отнемането е СЪЩОТО действие с `otnet: true` — ново събитие върху същия
+   * човек, не изтрит ред. „Дадох ѝ достъп през август, отнех го през ноември"
+   * е история, която триенето би направило недоказуема (правило 1).
+   *
+   * ПИША СЕ САМО В ЛИЧЕН ЖУРНАЛ. Кой е допуснат до личното е част от личното;
+   * в служебния такъв запис няма какво да прави и не бива да го има (И98).
+   */
+  async zapishiLichenDostap(
+    danni: PayloadLichenDostapZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    if (!eLichenKlyuch(this.#naematel)) {
+      throw new GreshkaDostap(
+        'Личен достъп се дава само от ЛИЧНИЯ Журнал. В служебния такъв запис не влиза — ' +
+          'кой е допуснат до личното е част от личното.',
+      );
+    }
+    const dostap = napraviDostap({
+      imeyl: danni.imeyl,
+      rolya: danni.rolya,
+      kakvo: danni.kakvo as never,
+      kakav: danni.kakav as never,
+      otnet: danni.otnet,
+    });
+    proveriNeSamSiAz(dostap, this.#actor);
+    return this.#pusni('ЛиченДостъпЗаписан', VID.dostap, `DOSTAP:${dostap.imeyl}`, dostap, z);
+  }
+
+  // ═══ ЛИЧНИТЕ ПАРИ (И96 т.10) ═══════════════════════════════════════════
+  //
+  // И ЧЕТИРИТЕ почват с един и същ вратар и НИТО ЕДНО не вика
+  // `proveriZamrazen`. Двете са нарочни и се обясняват веднъж тук:
+  //
+  // ВРАТАРЯТ: „Кредит", „Лечение", „Развод" не бива да влязат в СЛУЖЕБНИЯ
+  // Журнал от сгрешен екран. Разделянето на ДАННИТЕ не спасява ИМЕНАТА
+  // (ADR-036 §8) — служебният се изнася и минава пред служители.
+  //
+  // ЗАМРАЗЯВАНЕТО: правило 9 заключва месец, за който е подадена ДДС-справка.
+  // В личния Журнал `СправкаПодадена` няма и не бива да има — личният разход
+  // не се облага. Тоест правило 9 не важи тук ПО КОНСТРУКЦИЯ, а не защото
+  // някой го е изключил; нова забрана тук би изглеждала като че важи.
+
+  #samoLichno(kakvo: string): void {
+    if (!eLichenKlyuch(this.#naematel)) {
+      throw new GreshkaLichniPari(
+        `${kakvo} се записва само в ЛИЧНИЯ Журнал. В служебния такъв запис не влиза — ` +
+          'имената на личните теми не бива да минават пред служители.',
+      );
+    }
+  }
+
+  /**
+   * ЗАПИСВА ТЕМА · и преименуването, и спирането са това действие.
+   *
+   * Последният запис за същия номер ПОПРАВЯ. Затова номерът се пази стабилен
+   * при преименуване: редовете сочат него, не името, и една смяна на етикет
+   * не поражда запис за всеки ред, който го носи.
+   */
+  async zapishiLichnaTema(danni: PayloadLichnaTemaZapisana, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Лична тема');
+    const tema = napraviTema(danni);
+    return this.#pusni(
+      'ЛичнаТемаЗаписана',
+      VID.lichnaTema,
+      `LTEMA:${tema.temaId}`,
+      { ...tema },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ДВИЖЕНИЕ · приход, разход или вноска по кредит.
+   *
+   * Поправката е ПАК това действие върху същия номер — движението няма
+   * отделно събитие „Поправено", точно както делото. Огледалото пази срещу
+   * възкресяване на сторнирано (ADR-036 §9).
+   */
+  async zapishiLichnoDvizhenie(
+    danni: PayloadLichnoDvizhenieZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    this.#samoLichno('Лично движение');
+    if (danni.suma_st <= 0) {
+      throw new GreshkaLichniPari(
+        `${SUMATA_NAD_NULA} Посоката казва приход ли е, или разход — знакът не е в цифрата.`,
+      );
+    }
+    if (danni.posoka !== 'prihod' && danni.posoka !== 'razhod') {
+      throw new GreshkaLichniPari(`Непозната посока „${String(danni.posoka)}".`);
+    }
+    proveriChastite(danni);
+    return this.#pusni(
+      'ЛичноДвижениеЗаписано',
+      VID.lichnoDvizhenie,
+      `LDV:${danni.dvizhenieId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ИЗКЛЮЧВА или ВРЪЩА един ред · „ред се ИЗКЛЮЧВА" (правило 23).
+   *
+   * СВОЕ събитие, не поле в движението: повторният внос пренаписва реда от
+   * файла и би изтрил решението на човека, ако то живееше там.
+   */
+  async izklyuchiLichenRed(danni: PayloadLichenRedIzklyuchen, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Изключване на ред');
+    if (danni.izklyuchen && danni.prichina.trim() === '') {
+      throw new GreshkaLichniPari(
+        'Изключеният ред иска ПРИЧИНА. Следа без причина не обяснява нищо след половин година.',
+      );
+    }
+    return this.#pusni(
+      'ЛиченРедИзключен',
+      VID.lichnoDvizhenie,
+      `LDV:${danni.dvizhenieId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА КРЕДИТ · началният остатък и условията. Остатъкът се СМЯТА после.
+   */
+  async zapishiLichenKredit(danni: PayloadLichenKreditZapisan, z: Zayavka): Promise<Rezultat> {
+    this.#samoLichno('Личен кредит');
+    if (danni.ime.trim() === '') {
+      throw new GreshkaLichniPari('Кредитът иска име — „Ипотека · Пощенска", за да се различава.');
+    }
+    if (!VIDOVE_KREDIT.includes(danni.vid)) {
+      throw new GreshkaLichniPari(`Непознат вид кредит „${String(danni.vid)}".`);
+    }
+    if (danni.ostatak_st <= 0) {
+      throw new GreshkaLichniPari('Остатъкът по кредита трябва да е повече от нула.');
+    }
+    if (danni.vnoska_st <= 0) {
+      throw new GreshkaLichniPari('Вноската трябва да е повече от нула.');
+    }
+    if (!Number.isSafeInteger(danni.lihva_bp) || danni.lihva_bp < 0 || danni.lihva_bp > 10_000) {
+      throw new GreshkaLichniPari(
+        'Лихвата е в ЦЕЛИ базисни пунктове: 3,45 % се пише 345. Приема се от 0 до 10 000.',
+      );
+    }
+    if (!Number.isSafeInteger(danni.den) || danni.den < 1 || danni.den > 31) {
+      throw new GreshkaLichniPari('Денят на вноската е между 1 и 31.');
+    }
+    return this.#pusni(
+      'ЛиченКредитЗаписан',
+      VID.lichenKredit,
+      `LKRED:${danni.kreditId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * РАЗПИСКАТА НА ЕДНА ПАРТИДА ОТ ИЗВЛЕЧЕНИЕ (правило 7).
+   *
+   * Записва се и когато разликата е НУЛА: „няма разлика" иначе е неразличимо
+   * от „не е сверявано".
+   */
+  async zapishiLichnaPartida(
+    danni: PayloadLichnoIzvlechenieprieto,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    this.#samoLichno('Разписка на партида');
+    return this.#pusni(
+      'ЛичноИзвлечениеПрието',
+      VID.lichnoIzvlechenie,
+      `LPART:${danni.partidaId}`,
+      danni,
+      z,
+    );
   }
 
   /**
@@ -184,8 +486,157 @@ export class Deystviya {
     danni: PayloadRazhodZapisan,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Разходът');
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА СТОПАНИНА · първото събитие в Журнала на наемателя (И97 т.8).
+   *
+   * Тук няма проверка „има ли вече" — тя е при ВРАТАТА (ADR-043), защото
+   * правилото трябва да важи за всеки писач, не само за този. Действието само
+   * подава `expectedRev: 0`: Стопанинът е една същност и има точно едно
+   * събитие. Двете проверки се повтарят нарочно — една от тях е на пътя, по
+   * който се пише днес, другата е на пътя, по който ще се пише утре.
+   */
+  async zapishiStopanina(danni: PayloadStopaninZapisan, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni('СтопанинЗаписан', VID.stopanin, danni.imeyl, danni, {
+      ...z,
+      expectedRev: 0,
+    });
+  }
+
+  /**
+   * ВПИСВА ЗАПАСНИЯ КОНТАКТ · само Стопанинът, и то предварително (И100).
+   *
+   * Проверката „ти ли си Стопанинът" е ТУК, а не при Вратата: Вратата не чете
+   * Огледалото и не бива да го научава. Същият модел като при замразения
+   * период — предусловието живее в действието, записът минава през Вратата.
+   *
+   * Телефонът НЕ влиза: подава се вече сметнатият му отпечатък (`stopanin.ts`).
+   * Действието не смята — то записва, а какво е доказателство, решава домейнът.
+   */
+  async zapishiZapasenKontakt(
+    danni: PayloadZapasenKontaktZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Запасният контакт се вписва само от Стопанина — той е пътят обратно към ' +
+          'НЕГОВИЯ Журнал.',
+      );
+    }
+    if (svediImeyl(danni.imeyl) === svediImeyl(o.stopanin)) {
+      throw new GreshkaStopanin(
+        'Запасният контакт не може да е самият главен имейл: тогава загубата на ' +
+          'единия отнася и другия, а точно това трябва да предотврати.',
+      );
+    }
+    return this.#pusni('ЗапасенКонтактЗаписан', VID.zapasen, danni.imeyl, danni, z);
+  }
+
+  /**
+   * СМЕНЯ СТОПАНИНА · единственият път, и той минава само през запасния (И100).
+   *
+   * Тук се проверява ЦЯЛОТО условие, преди да се пише: кой го иска, съвпада ли
+   * със запасния имейл и знае ли телефона. Отказът носи думи, защото човекът от
+   * другата страна се опитва да си върне собствения Журнал.
+   *
+   * Действието НЕ пита „ти ли си Стопанинът" — точно обратното: то съществува
+   * за случая, в който Стопанинът вече не може да влезе.
+   */
+  async smeniStopanina(
+    danni: { readonly telefonOtpechatak: string; readonly prichina: string },
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const otgovor = mozheDaVzemeZhurnala({
+      imeyl: this.#actor,
+      telefonOtpechatak: danni.telefonOtpechatak,
+      o,
+    });
+    if (!otgovor.mozhe) throw new GreshkaStopanin(otgovor.kazva);
+    if (danni.prichina.trim() === '') {
+      throw new GreshkaStopanin('Смяната на Стопанина иска причина — тя остава в Журнала.');
+    }
+    const payload: PayloadStopaninSmenen = {
+      ot: o.stopanin,
+      kam: svediImeyl(this.#actor),
+      prichina: danni.prichina.trim(),
+    };
+    return this.#pusni('СтопанинСменен', VID.stopanin, payload.kam, payload, z);
+  }
+
+  /**
+   * ЗАПИСВА ПАРАМЕТЪР ПРИ ВЪВЕЖДАНЕ · само Стопанинът (И96 т.1 · ADR-046).
+   *
+   * Негови думи: „да може да ги контролираш от Настройки, и дори стопанинът да
+   * дава негова бележка, когато се случи."
+   *
+   * Правото е ТУК, както при запасния контакт: Вратата не чете Огледалото и не
+   * бива да го научава. Параметърът мени какво влиза през нея за ВСИЧКИ в
+   * бизнеса — това не е предпочитание на един служител.
+   *
+   * `opId` носи ДЕЙСТВИЕТО (правило 20), а същността е ВИДЪТ: повторното
+   * записване на същия вид ПОПРАВЯ реда, вместо да ражда втори.
+   */
+  async zapishiParametarNaVhoda(
+    danni: PayloadParametarNaVhodaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o) && o.stopanin !== '') {
+      throw new GreshkaVhod(
+        'Параметрите при въвеждане се менят само от Стопанина — те важат за ' +
+          'целия бизнес, не за един екран.',
+      );
+    }
+    proveriNastroyka(danni.vid, {
+      vklyuchen: danni.vklyuchen,
+      sila: danni.sila as Sila,
+      belezhka: danni.belezhka,
+    });
+    return this.#pusni('ПараметърНаВходаЗаписан', VID.parametar, danni.vid, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА КОНТРАГЕНТ · номерата, които одитният файл иска (И96 т.11).
+   *
+   * Само Стопанинът: ЕИК-ът и номерът по ДДС на собствената фирма отиват в
+   * `Header` на файла за НАП, а чуждите — в `MasterFiles`. Сбъркан номер там е
+   * отхвърлен файл и глоба по чл. 277а — това не е поле за всеки служител.
+   *
+   * Същността е СВЕДЕНОТО ИМЕ: втори запис за същия човек го ДОПЪЛВА, вместо
+   * да го удвои. Затова ключът минава през `klyuchNaKontragent`, а не през
+   * името както е написано — иначе „ЕООД Иван" и „еоод иван" стават двама.
+   */
+  async zapishiKontragent(danni: PayloadKontragentZapisan, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o) && o.stopanin !== '') {
+      throw new GreshkaKontragent(
+        'Контрагентите се вписват само от Стопанина — техните номера отиват в ' +
+          'одитния файл за НАП.',
+      );
+    }
+    proveriKontragent({
+      vid: danni.vid as VidKontragent,
+      ime: danni.ime,
+      eik: danni.eik,
+      ddsNomer: danni.ddsNomer,
+      adres: danni.adres,
+      grad: danni.grad,
+      poshtenskiKod: danni.poshtenskiKod,
+      darzhava: danni.darzhava,
+    });
+    return this.#pusni(
+      'КонтрагентЗаписан',
+      VID.kontragent,
+      klyuchNaKontragent(danni.ime),
+      danni,
+      z,
+    );
   }
 
   /**
@@ -205,6 +656,7 @@ export class Deystviya {
 
   /** Внесеното ДДС, от платежното. Нарочно НЕ иска отключен период. */
   async platiDDS(id: string, danni: PayloadDDSPlateno, z: Zayavka): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Внесеното ДДС');
     return this.#pusni('ДДСПлатено', VID.spravka, id, danni, z);
   }
 
@@ -331,6 +783,70 @@ export class Deystviya {
   }
 
   /**
+   * ПОВТАРЯ ПОПРАВЕНО СЪБИТИЕ · втората половина на сверената промяна (И96 т.8).
+   *
+   * Тесен нарочно: НЕ приема вид, същност и тип отвън — те се ПРЕПИСВАТ от
+   * събитието, което се поправя. Иначе това щеше да е „запиши каквото си
+   * искаш", а такъв път заобикаля всяка проверка, която другите действия
+   * правят (падеж, замразен период, закрит агент).
+   *
+   * Иска `svereno`: това е ПЪТЯТ НА СВЕРЕНАТА ПРОМЯНА от правило 9, не
+   * обикновено писане. Върви само след сторно на стария запис — първо се
+   * гаси, после се записва наново.
+   */
+  async povtoriPopraveno(
+    staro: Sabitie,
+    payload: Readonly<Record<string, unknown>>,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    if (z.svereno !== true) {
+      throw new GreshkaTablitsa(
+        'Повторният запис е част от СВЕРЕНА промяна и не се прави поотделно. ' +
+          'Мине ли без сверката, той става втори вход към Журнала (правило 2).',
+      );
+    }
+    return this.#pusni(
+      staro.type as TipSabitie,
+      staro.sashtnost.vid as Vid,
+      staro.sashtnost.id,
+      payload,
+      z,
+    );
+  }
+
+  /**
+   * Записва СВРЪЗКА · третият номер, който залепва файл за файл (И96 т.8).
+   *
+   * Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ **в журнала**."
+   * Затова свръзката е събитие, а не таблица встрани: свръзка извън Журнала не
+   * може да се докаже след година (правило 17).
+   *
+   * СЛУЧАЯТ Е ЗАДЪЛЖИТЕЛЕН. „Да се отчете в Журнала за случая на промяна" е
+   * негово изречение; свръзка без причина е следа, която не обяснява нищо —
+   * същото правило като при сторното (И97: „защо — свободен текст, задължителен").
+   *
+   * Не иска отключен период: свръзката НЕ мени число. Числата се менят от
+   * сторното и новия запис, всяко със своя път през Вратата.
+   */
+  async zapishiSvrazka(danni: PayloadSvrazkaZapisana, z: Zayavka): Promise<Rezultat> {
+    if (danni.sluchay.trim() === '') {
+      throw new GreshkaTablitsa(
+        'Свръзка без СЛУЧАЙ на промяна не се записва — следа, която не обяснява нищо, ' +
+          'е по-лоша от липсваща.',
+      );
+    }
+    // Ключът е номер И файл: всяко залепване е свой запис, не презапис на
+    // предишния. Иначе „кога дойде третият файл" би останало без отговор.
+    return this.#pusni(
+      'СвръзкаЗаписана',
+      VID.svrazka,
+      `${danni.nomer}:${danni.fayl}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
    * Поправка = НОВО събитие. Журналът не се пипа.
    * Сторното сочи seq-а, който погасява; и двете остават записани завинаги.
    */
@@ -403,7 +919,7 @@ export class Deystviya {
  * ги преглътне с Math.min/Math.max, раждайки падеж, който никой не е искал.
  * Границата е при записа, с думи — не при смятането, мълчешком.
  */
-export class GreshkaNaem extends Error {
+class GreshkaNaem extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaNaem';
@@ -413,5 +929,45 @@ export class GreshkaNaem extends Error {
 function proveriPadezhDen(den: number): void {
   if (!Number.isInteger(den) || den < 1 || den > 31) {
     throw new GreshkaNaem(`Падежът е ден от месеца, 1 до 31 — получено: ${den}.`);
+  }
+}
+
+/**
+ * СУМА, КОЯТО НАИСТИНА МЕСТИ ПАРИ · строго над нулата.
+ *
+ * ═══ ЗАЩО ПОИМЕННО, А НЕ ВЪРХУ ВСЯКО `_st` ═══
+ *
+ * Вратата пази, че всяко поле на `_st` е ЦЕЛИ стотинки (правило 3) — но нулата
+ * е цяло число и минава, а отрицателното също. За повечето суми това е ВЯРНО и
+ * общ пазач щеше да отхвърли точно верните случаи:
+ *
+ *   · **салдото** може да е отрицателно — овърдрафтът е дълг, не грешка;
+ *   · **сборът на колона** може да е отрицателен: знакът решава Приходи срещу
+ *     Разходи (правило 20);
+ *   · **декларираният ДДС** може да е нула (месец без обороти) и отрицателен
+ *     (данък за възстановяване);
+ *   · **разликата в сверка** е нула точно когато всичко е наред (правило 7);
+ *   · **депозитът** е нула при договор без депозит.
+ *
+ * Затова пазачът се вика ПОИМЕННО, там където нулата няма смисъл: плащане за
+ * нула не е плащане, начисление за нула не е задължение, разход за нула не е
+ * разход.
+ *
+ * ═══ ЗАЩО ТУК, А НЕ САМО ВЪВ ФОРМАТА ═══
+ *
+ * Формите вече отказват ≤ 0 (`SUMATA_NAD_NULA`), но формата е ЕДИН вход.
+ * Прочетена таблица, върнат архив и действие, писано утре, не минават през нея.
+ * Правило 2 казва, че Вратата е единственият вход — значи и проверката живее по
+ * пътя към нея, не пред екрана.
+ *
+ * Платено с находка: `platiDDS` нямаше нито пазач, нито форма, която да го
+ * пази — нулев ДДС-превод влизаше в Журнала и събаряше ЦЕЛИЯ екран Сметки,
+ * защото Главната книга не може да направи двустранна статия от нула.
+ */
+function proveriDvizhi(suma_st: number, koe: string): void {
+  if (!Number.isSafeInteger(suma_st) || suma_st <= 0) {
+    throw new GreshkaVhod(
+      `${koe}: ${SUMATA_NAD_NULA} Получено: ${String(suma_st)}.`,
+    );
   }
 }

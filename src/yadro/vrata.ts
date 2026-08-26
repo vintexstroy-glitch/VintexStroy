@@ -20,7 +20,7 @@ import { eStotinki } from './pari.js';
 import type { Pravata } from './pravata.js';
 import type { Operatsiya, Sabitie } from './sabitie.js';
 
-export type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY' | 'NESAVMESTIM';
+type KodGreshka = 'SPRYAN' | 'BEZ_PRAVO' | 'NEVALIDNO' | 'REPLAY' | 'NESAVMESTIM';
 
 export class GreshkaVrata extends Error {
   readonly kod: KodGreshka;
@@ -52,7 +52,7 @@ export interface Rezultat {
   readonly povtoreno: boolean;
 }
 
-export interface RezultatVazstanovyavane {
+interface RezultatVazstanovyavane {
   /** колко събития са влезли сега */
   readonly vneseni: number;
   /** колко вече са били тук — общото начало на двете редици */
@@ -60,7 +60,7 @@ export interface RezultatVazstanovyavane {
   readonly posledenHash: string;
 }
 
-export interface NastroykiVrata {
+interface NastroykiVrata {
   readonly dnevnik: Dnevnik;
   readonly pravata: Pravata;
   readonly sha: Sha256;
@@ -75,6 +75,18 @@ export interface NastroykiVrata {
    * без нея сблъсъкът се оправя с повторение (виж #zapishi).
    */
   readonly klyuchalka?: <T>(naematel: string, rabota: () => Promise<T>) => Promise<T>;
+  /**
+   * ОТКРИВАЩОТО СЪБИТИЕ · кой тип трябва да стои ПЪРВИ в Журнала.
+   *
+   * Стопанинът е първото събитие в Журнала на наемателя (И97 т.8 · ADR-043), но
+   * ядрото не знае имената на домейна — `type` тук е низ и това е нарочно
+   * (`sabitie.ts`). Затова правилото е ОБЩО, а името се ПОДАВА: „в празен
+   * Журнал влиза само това; и то влиза само веднъж".
+   *
+   * По избор, като котвата и ключалката: ядрото не измисля правила на домейна.
+   * Приложението го подава винаги, а тест го пази (ADR-043).
+   */
+  readonly parvoto?: string;
 }
 
 export class Vrata {
@@ -83,6 +95,7 @@ export class Vrata {
   readonly #sha: Sha256;
   readonly #kotva: DrajkaNaKotva | undefined;
   readonly #klyuchalka: (<T>(naematel: string, rabota: () => Promise<T>) => Promise<T>) | undefined;
+  readonly #parvoto: string | undefined;
 
   /** Спирателен кран (П1.4): спира записа, без да събаря приложението. */
   #zatvorena = false;
@@ -97,6 +110,7 @@ export class Vrata {
     this.#sha = n.sha;
     this.#kotva = n.kotva;
     this.#klyuchalka = n.klyuchalka;
+    this.#parvoto = n.parvoto;
   }
 
   get zatvorena(): boolean {
@@ -179,7 +193,19 @@ export class Vrata {
       // каквото не е NFC, се ОТКАЗВА с думи (правило 12), не се поправя тихо.
       try {
         proveriValidnost(s);
-        proveriNFC(s.payload, `събитие ${s.seq}`);
+        /**
+         * ЦЯЛОТО събитие, не само товарът му.
+         *
+         * Дотук се проверяваше `payload` и нищо друго — а при ЗАПИС
+         * `normalizirayNFC` привежда ЦЯЛАТА операция рекурсивно. Пипнат файл
+         * можеше да върне `actor` или `sashtnost.id` в NFD, минеше ли хешовете:
+         * тогава един и същ човек има два вида, а една и съща същност — два
+         * ключа, и то в Журнал, който вече е приет за цял.
+         *
+         * `seq`, `ts` и хешовете също минават оттук, и това е безобидно —
+         * `proveriNFC` пропуска всичко, което не е низ.
+         */
+        proveriNFC(s, `събитие ${s.seq}`);
       } catch (e) {
         throw new GreshkaVrata(
           'NEVALIDNO',
@@ -194,10 +220,23 @@ export class Vrata {
 
     const proverka = await proveriVerigata(sabitiya, this.#sha);
     if (!proverka.tsyala) {
+      /**
+       * СТАРИЯТ ПОДПИС получава СВОИ думи.
+       *
+       * „Веригата се къса (hash)" е вярно и безполезно: човекът не може да
+       * различи пипнат файл от файл, писан преди `actor` да влезе в хеша.
+       * Първото е нападение, второто е възраст — и двете искат различно
+       * действие от него.
+       */
       throw new GreshkaVrata(
         'NESAVMESTIM',
-        `Веригата във файла се къса на seq ${proverka.parvoSchupeno} (${proverka.prichina}). ` +
-          'Нищо не е внесено.',
+        proverka.prichina === 'star-podpis'
+          ? `Файлът е писан ПРЕДИ авторът да влиза в подписа (сече се на seq ${proverka.parvoSchupeno}). ` +
+            'Той не е пипнат — просто е от по-стар ред, при който „кой е записал" се е ' +
+            'редактирало без следа. Затова не се приема: Журнал, който не заключва автора си, ' +
+            'не е одитна следа. Нищо не е внесено.'
+          : `Веригата във файла се къса на seq ${proverka.parvoSchupeno} (${proverka.prichina}). ` +
+            'Нищо не е внесено.',
       );
     }
 
@@ -282,6 +321,67 @@ export class Vrata {
     return sled;
   }
 
+  /**
+   * ОТКРИВАЩОТО СЪБИТИЕ · три правила, и трите за едно и също нещо.
+   *
+   * Негови думи: „Той е **първото събитие в Журнала** на този наемател."
+   * Оттам следва повече, отколкото изглежда:
+   *
+   *   1. **ПРАЗЕН Журнал** приема само откриващото събитие. Иначе Журнал може
+   *      да се роди без стопанин — и после всеки, който го отвори пръв, да си
+   *      го присвои.
+   *   2. **Втори път не влиза.** Това е първата от двете му забрани: „не може
+   *      да назначи друг имейл за главен". Смяната иска трета страна и НЕ се
+   *      строи като бутон (правило 18: подразбраната забрана е забрана).
+   *   3. **Започнат Журнал** (от преди този резен) приема ЕДНО дописване, и то
+   *      само от АВТОРА НА ПЪРВОТО СЪБИТИЕ. Тоест стопанинът на стар Журнал не
+   *      се избира — ИЗВЕЖДА се от самата верига. Иначе всеки, който отвори
+   *      чужд износ, би могъл да се впише за стопанин на чужда история.
+   *
+   * ВЪЗСТАНОВЯВАНЕТО минава по друг път (`vazstanovi`) и нарочно НЕ пита тук:
+   * износ, направен преди този резен, започва с каквото е започвал тогава. Да
+   * му се откаже връщането значи да се загубят данни заради правило, което не
+   * е важало, когато файлът е бил направен.
+   */
+  async #proveriOtkrivashtoto(op: Operatsiya): Promise<void> {
+    if (this.#parvoto === undefined) return;
+    const otkrivashto = op.type === this.#parvoto;
+    const parvo = await this.#dnevnik.parvo(op.naematel);
+
+    if (!parvo) {
+      if (otkrivashto) return;
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `Празен Журнал се открива с „${this.#parvoto}" — то е първото събитие ` +
+          `на наемателя. Опитът да влезе „${op.type}" преди него е отказан.`,
+      );
+    }
+    if (!otkrivashto) return;
+
+    if (parvo.type === this.#parvoto) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `„${this.#parvoto}" се записва ВЕДНЪЖ и вече стои като първо събитие ` +
+          `на ${op.naematel}. Смяната не минава оттук.`,
+      );
+    }
+    if (op.actor !== parvo.actor) {
+      throw new GreshkaVrata(
+        'BEZ_PRAVO',
+        `Журналът е започнат преди „${this.#parvoto}". Дописва го само авторът ` +
+          `на първото събитие (${parvo.actor}), не ${op.actor}.`,
+      );
+    }
+    // И в стария Журнал влиза ЕДНО дописване: първото стои не като първо
+    // събитие, а като първо на СЪЩНОСТТА, и оттам се брои.
+    if ((await this.#dnevnik.tekushtRev(op.naematel, op.sashtnost)) > 0) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `„${this.#parvoto}" вече е дописано при ${op.naematel}. Влиза веднъж.`,
+      );
+    }
+  }
+
   async #zapishi(op: Operatsiya): Promise<Rezultat> {
     // Друг раздел може да пише в същия Журнал. Опашката в паметта не го
     // вижда; носителят обаче отказва сгрешен seq в своята транзакция.
@@ -295,6 +395,9 @@ export class Vrata {
       if (veche) {
         return { seq: veche.seq, hash: veche.hash, povtoreno: true };
       }
+
+      // 3б · ОТКРИВАЩОТО СЪБИТИЕ · Стопанинът е първи и е един (ADR-043)
+      await this.#proveriOtkrivashtoto(op);
 
       // 4 · rev-предпазител
       if (op.expectedRev !== undefined) {
@@ -348,7 +451,7 @@ export class Vrata {
  * Привежда всеки низ в стойността — рекурсивно, и ключовете на обектите —
  * към NFC. Едно „й" = един запис, независимо от клавиатурата, която го е писала.
  */
-export function normalizirayNFC(v: unknown): unknown {
+function normalizirayNFC(v: unknown): unknown {
   if (typeof v === 'string') return v.normalize('NFC');
   if (Array.isArray(v)) return v.map(normalizirayNFC);
   if (v !== null && typeof v === 'object') {
@@ -368,7 +471,7 @@ export function normalizirayNFC(v: unknown): unknown {
  * може — нормализираният байт мени хеша и къса веригата. Затова тук се пита,
  * не се поправя: едно „й" в NFD значи файл, който не е излизал оттук.
  */
-export function proveriNFC(v: unknown, pat: string): void {
+function proveriNFC(v: unknown, pat: string): void {
   if (typeof v === 'string') {
     if (v !== v.normalize('NFC')) {
       throw new Error(`${pat} носи текст извън NFC — файлът не е износ на Вратата.`);
@@ -388,9 +491,9 @@ export function proveriNFC(v: unknown, pat: string): void {
 }
 
 /** Полетата за пари завършват на `_st` и са ЦЕЛИ СТОТИНКИ. */
-export const NASTAVKA_PARI = '_st';
+const NASTAVKA_PARI = '_st';
 
-export function proveriValidnost(op: Operatsiya): void {
+function proveriValidnost(op: Operatsiya): void {
   neprazen(op.opId, 'opId');
   neprazen(op.naematel, 'naematel');
   neprazen(op.actor, 'actor');
@@ -413,19 +516,45 @@ export function proveriValidnost(op: Operatsiya): void {
   proveriParite(op.payload, 'payload');
 }
 
+/**
+ * ПАРИТЕ В PAYLOAD-А · всяко поле на `_st` е цели най-малки единици (правило 3).
+ *
+ * ВЛИЗА И В МАСИВИ. Дотук не влизаше — `!Array.isArray(...)` спираше слизането
+ * нарочно, от първия коммит на ядрото. Днес нито едно събитие не носи пари в
+ * масив, значи дефект не е имало; но правило 3 казва „Вратата ги проверява"
+ * БЕЗ уговорка, а проверка със сляпо петно е по-лоша от липсваща: тя изглежда
+ * като гаранция. Първият разделен ред („един ред от картата на две теми")
+ * щеше да мине с дробна стотинка и никой нямаше да разбере откъде идва.
+ *
+ * Индексът влиза в пътеката (`payload.chasti[1].suma_st`), за да казва
+ * отказът КОЯ част е сгрешена, а не само че някоя е.
+ */
 function proveriParite(v: Readonly<Record<string, unknown>>, pat: string): void {
   for (const [klyuch, stoynost] of Object.entries(v)) {
-    const pale = `${pat}.${klyuch}`;
-    if (klyuch.endsWith(NASTAVKA_PARI)) {
-      if (!eStotinki(stoynost)) {
-        throw new GreshkaVrata(
-          'NEVALIDNO',
-          `${pale} е поле за пари и трябва да е цели стотинки; получено: ${String(stoynost)}`,
-        );
-      }
-    } else if (stoynost !== null && typeof stoynost === 'object' && !Array.isArray(stoynost)) {
-      proveriParite(stoynost as Record<string, unknown>, pale);
+    proveriEdno(klyuch, stoynost, `${pat}.${klyuch}`);
+  }
+}
+
+function proveriEdno(klyuch: string, stoynost: unknown, pale: string): void {
+  // МАСИВЪТ СЕ ГЛЕДА ПРЪВ, и редът не е вкус. Гледа ли се пръв ключът, поле
+  // `sumi_st: [100, 200]` пада като „не е цели стотинки" — вярно за масива,
+  // безсмислено за човека. Ключът се НОСИ надолу към всеки член: така масив с
+  // наставка е масив ОТ СУМИ, а масив от обекти се обхожда по полетата им.
+  if (Array.isArray(stoynost)) {
+    stoynost.forEach((chlen, i) => proveriEdno(klyuch, chlen, `${pale}[${i}]`));
+    return;
+  }
+  if (klyuch.endsWith(NASTAVKA_PARI)) {
+    if (!eStotinki(stoynost)) {
+      throw new GreshkaVrata(
+        'NEVALIDNO',
+        `${pale} е поле за пари и трябва да е цели стотинки; получено: ${String(stoynost)}`,
+      );
     }
+    return;
+  }
+  if (stoynost !== null && typeof stoynost === 'object') {
+    proveriParite(stoynost as Record<string, unknown>, pale);
   }
 }
 

@@ -35,7 +35,7 @@ export interface ObyavenoOtLista {
   readonly totali_st: Readonly<Record<string, number>>;
 }
 
-export interface RezultatMigratsiya {
+interface RezultatMigratsiya {
   readonly sverki: readonly Sverka[];
   readonly zapisani: number;
   readonly povtoreni: number;
@@ -87,7 +87,7 @@ export function sveriRegistara(
   return sverki;
 }
 
-export interface NastroykiMigratsiya {
+interface NastroykiMigratsiya {
   readonly deystviya: Deystviya;
   readonly redove: readonly RedOtRegistara[];
   readonly obyaveno: ObyavenoOtLista;
@@ -175,11 +175,11 @@ export async function migrirajNaemiKesh(n: NastroykiMigratsiya): Promise<Rezulta
 }
 
 /** Стабилен ключ от място и единица — за да е повторното пускане безопасно. */
-export function idNaImot(r: RedOtRegistara): string {
+function idNaImot(r: RedOtRegistara): string {
   return `I:${klyuch(r.myasto)}:${klyuch(r.edinitsa)}`;
 }
 
-export function idNaNaem(r: RedOtRegistara): string {
+function idNaNaem(r: RedOtRegistara): string {
   return `N:${klyuch(r.myasto)}:${klyuch(r.edinitsa)}:${klyuch(r.kolona)}`;
 }
 

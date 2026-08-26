@@ -23,6 +23,7 @@
 import {
   IMENA_NA_DOSTAVCHITSITE,
   IMENA_NA_ROLITE,
+  type Rolya,
   type Samolichnost,
 } from '../src/yadro/samolichnost.js';
 import {
@@ -69,7 +70,7 @@ export function chetiIzbor(): Izbor {
   }
 }
 
-export function zapishiIzbor(izbor: Izbor): void {
+function zapishiIzbor(izbor: Izbor): void {
   try {
     const zapis: ZapisanIzbor = {
       plan: izbor.plan.klyuch,
@@ -98,13 +99,13 @@ const RED: readonly Vazmozhnost[] = [
   'svarzhi-ii',
 ];
 
-function kartaKoySam(koj: Samolichnost, akaunt: string): string {
+function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya: Rolya): string {
   const vrazki = koj.svarzani.length
     ? koj.svarzani.map((d) => IMENA_NA_DOSTAVCHITSITE[d]).join(' · ')
     : 'няма вързани';
 
   return `
-    <section class="karta">
+    <section class="karta" data-sektsiya="koy-sam">
       <div class="dyalglava">
         <h2>Кой съм</h2>
         <span>вход без парола · самоличността идва отвън</span>
@@ -129,8 +130,21 @@ function kartaKoySam(koj: Samolichnost, akaunt: string): string {
         </div>
         <div class="plochka">
           <div class="etiket">Роля</div>
-          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[koj.rolya]}</div>
+          <div class="chislo malak" translate="no">${IMENA_NA_ROLITE[rolya]}</div>
           <div class="pod">вързани акаунти: ${ekraniraj(vrazki)}</div>
+        </div>
+        <div class="plochka" data-pole="stopanin">
+          <div class="etiket">Стопанин</div>
+          <div class="chislo malak" translate="no">${
+            stopanin === '' ? '—' : ekraniraj(stopanin)
+          }</div>
+          <div class="pod">${
+            stopanin === ''
+              ? 'този Журнал е започнат, преди Стопанинът да се записва'
+              : stopanin === koj.imeyl
+                ? 'това си ти · първото събитие в Журнала'
+                : 'главният имейл на този Журнал'
+          }</div>
         </div>
         <div class="plochka">
           <div class="etiket">Кой Журнал</div>
@@ -195,7 +209,7 @@ function kartaOtmetki(izbor: Izbor): string {
             : `${izklyucheni} ${izklyucheni === 1 ? 'изключена' : 'изключени'} — планът пак ги дава`
         }</span>
       </div>
-      <div class="vazmozhnosti">${RED.map((v) => redNaOtmetka(izbor, v)).join('')}</div>
+      <div class="vazmozhnosti" data-sektsiya="vazmozhnosti">${RED.map((v) => redNaOtmetka(izbor, v)).join('')}</div>
       <p class="drebno">
         Изключената възможност изчезва от лентата и от бутоните веднага. Тя не е
         отнета — планът пак я дава и отметката я връща. Затова „изключена" и
@@ -265,8 +279,219 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
     </section>`;
 }
 
-export function narisuvayTablo(koj: Samolichnost, izbor: Izbor, akaunt: string): string {
-  return kartaKoySam(koj, akaunt) + kartaOtmetki(izbor) + kartaSravnenie(izbor, koj);
+/**
+ * ЗАПАСНИЯТ КОНТАКТ · пътят обратно, вписан ПРЕДВАРИТЕЛНО (И100 · ADR-044).
+ *
+ * Негови думи: „дай възможност за въстановяване на акаунт с добавен свързан за
+ * сигурност… от верификация на вкаран преди това имейл и телефон."
+ *
+ * Показва се САМО на Стопанина, защото само той може да го впише — това е
+ * пътят обратно към НЕГОВИЯ Журнал. На всеки друг картата липсва изцяло:
+ * телефонът, дори с две цифри, е чужд личен данни.
+ *
+ * ЛИПСАТА СЕ КАЗВА. Журнал без запасен контакт няма път назад, и това трябва
+ * да се научи ДНЕС, а не в деня, в който главният имейл вече го няма.
+ */
+function kartaZapasen(
+  tozi: boolean,
+  zapasen: { readonly imeyl: string; readonly poslednite: string } | null,
+): string {
+  if (!tozi) return '';
+  return `
+    <section class="karta" data-sektsiya="zapasen">
+      <div class="dyalglava">
+        <h2>Запасен контакт</h2>
+        <span>пътят обратно · вписва се ПРЕДИ да потрябва</span>
+      </div>
+      ${
+        zapasen
+          ? `<p class="drebno"><b>Вписан:</b> <span translate="no">${ekraniraj(zapasen.imeyl)}</span>
+             · телефон …${ekraniraj(zapasen.poslednite)}. Този имейл може да вземе Журнала,
+             ако твоят вече не отваря — с влизане при доставчика И знание на телефона.</p>`
+          : `<p class="drebno trevoga"><b>Няма вписан запасен контакт.</b> Без него този Журнал
+             няма път назад: изгуби ли се главният имейл, остава само износът, но никой не може
+             да го отвори под друго име.</p>`
+      }
+      <div class="poleta">
+        <div class="pole">
+          <label for="zapasen-imeyl">Запасен имейл</label>
+          <input translate="no" id="zapasen-imeyl" type="email" placeholder="zhena@example.bg" autocomplete="off">
+        </div>
+        <div class="pole">
+          <label for="zapasen-telefon">Телефон</label>
+          <input translate="no" id="zapasen-telefon" placeholder="0888 123 456" autocomplete="off">
+        </div>
+      </div>
+      <p class="greshka" id="greshka-zapasen"></p>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="zapishi-zapasen">${
+          zapasen ? 'Смени запасния контакт' : 'Впиши запасен контакт'
+        }</button>
+        <p class="drebno">
+          Телефонът <b>не влиза в Журнала</b> — влиза само отпечатъкът му, за да не
+          пътува личен номер в изнесения файл. Затова и не се показва: помни се, не се чете.
+          Кодове не се пращат (няма сървър и не се строи): това е <b>честна спирачка</b>,
+          която лови грешния човек, не професионалния крадец.
+        </p>
+      </div>
+    </section>`;
+}
+
+/**
+ * ВРЪЩАНЕ НА АРХИВ ОТ ДРУГ ИМЕЙЛ (И100 · ADR-044).
+ *
+ * Негови думи: „…и да се възстанови архив на друг имейл, от верификация на
+ * вкаран преди това имейл и телефон."
+ *
+ * Стои на ВСЕКИ Табло, не само при беда: човекът, който е загубил главния си
+ * имейл, влиза с ЗАПАСНИЯ и попада в празен Журнал — точно тогава пътят трябва
+ * да е пред очите му, а не скрит зад състояние, което той не може да достигне.
+ *
+ * Нищо тук не се обещава без файл: без износа няма какво да се върне. Затова и
+ * текстът го казва пръв — най-честното напомняне, че износът е задължение.
+ */
+function kartaVrashtane(): string {
+  return `
+    <section class="karta" data-sektsiya="vrashtane">
+      <div class="dyalglava">
+        <h2>Върни архив от друг имейл</h2>
+        <span>когато главният имейл вече не отваря</span>
+      </div>
+      <p class="drebno">
+        Носи износа на стария Журнал и телефона, вписан в него като запасен контакт.
+        Файлът сам казва чий е и кой има право върху него — веригата му пътува с него.
+        <b>Без износ няма връщане:</b> ако главният имейл го няма, а файл няма, няма и какво да се отвори.
+      </p>
+      <div class="poleta">
+        <div class="pole">
+          <label for="vrashtane-telefon">Телефонът, вписан като запасен</label>
+          <input translate="no" id="vrashtane-telefon" placeholder="0888 123 456" autocomplete="off">
+        </div>
+        <div class="pole">
+          <label for="vrashtane-prichina">Защо се връща</label>
+          <input translate="no" id="vrashtane-prichina" placeholder="акаунтът е закрит" autocomplete="off">
+        </div>
+      </div>
+      <p class="greshka" id="greshka-vrashtane"></p>
+      <div class="deystviya">
+        <input translate="no" type="file" id="vrashtane-fayl" accept=".json" hidden>
+        <button type="button" class="vtorichen" id="vrashtane-izberi">Избери износа</button>
+        <p class="drebno">
+          Проверява се <b>номерът</b>, не начинът на изписване. Смяната влиза в стария Журнал
+          като събитие с автор и причина — нищо не се презаписва и нищо не се трие.
+        </p>
+      </div>
+    </section>`;
+}
+
+/**
+ * ТАБОВЕТЕ ОТ ТАБЛОТО (И101 т.1) · входът към конструктора, там където е и
+ * всичко останало за „кой съм и какво мога".
+ *
+ * Негови думи: „Всеки клиент на приложението има възможност да създава нови
+ * табове **от таблото**… само от стопанина."
+ *
+ * Картата се вижда САМО на Стопанина — същото право, което пази и самия екран
+ * (`ekranite.ts`). Показва се и на него, когато няма нито един свой таб: тогава
+ * тя е покана, а не отчет.
+ */
+function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
+  if (!tozi) return '';
+  return `
+    <section class="karta" data-sektsiya="tablo-tabove">
+      <div class="dyalglava">
+        <h2>Твоите изгледи</h2>
+        <span>табове · секции · таблици и диаграми, вързани за източник</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="broy-tabove">
+          <div class="etiket">Добавени табове</div>
+          <div class="chislo malak" translate="no">${dobaveni}</div>
+          <div class="pod">${broy - dobaveni} стационарни са допълнени</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="glaven" data-ekran="tabove">
+          ${dobaveni === 0 ? 'Направи първия си таб' : 'Направи нов таб'}
+        </button>
+        <p class="drebno">
+          Табовете, секциите и връзките им се правят <b>само от Стопанина</b>: секция,
+          вързана за чужда таблица, мени какво ЧЕТАТ другите — едно действие, чужди числа.
+        </p>
+      </div>
+    </section>`;
+}
+
+export function narisuvayTablo(
+  koj: Samolichnost,
+  izbor: Izbor,
+  akaunt: string,
+  lichnoVklyucheno = false,
+  lichnoPipnato = false,
+  /**
+   * СТОПАНИНЪТ и СМЯТАНАТА роля (ADR-043).
+   *
+   * Ролята се ПОДАВА, а не се чете от `koj.rolya`: самоличността носи каквото
+   * е казал доставчикът, а какво може човекът в ТОЗИ Журнал решава Журналът.
+   * Дотук екранът показваше първото и то изглеждаше като второто.
+   */
+  stopanin = '',
+  rolya: Rolya = koj.rolya,
+  zapasen: { readonly imeyl: string; readonly poslednite: string } | null = null,
+  /** табовете · брой всички и брой ДОБАВЕНИ (И101 т.1) */
+  tabove: { readonly vsichki: number; readonly dobaveni: number } = { vsichki: 0, dobaveni: 0 },
+): string {
+  const negov = stopanin !== '' && stopanin === koj.imeyl;
+  return (
+    kartaKoySam(koj, akaunt, stopanin, rolya) +
+    kartaTabove(negov, tabove.vsichki, tabove.dobaveni) +
+    kartaZapasen(negov, zapasen) +
+    kartaVrashtane() +
+    kartaLichno(lichnoVklyucheno, lichnoPipnato) +
+    kartaOtmetki(izbor) +
+    kartaSravnenie(izbor, koj)
+  );
+}
+
+/**
+ * ВТОРОСТЕПЕННИТЕ настройки НА СЛУЖИТЕЛЯ · личният таб (И98).
+ *
+ * Негови думи: „Може ако служителят не иска да го ползва, от неговите
+ * ВТОРОСТЕПЕННИ настройки."
+ *
+ * ЗАЩО НЕ Е ОТМЕТКА ДО ОСТАНАЛИТЕ. Другите отметки на Таблото са
+ * `Vazmozhnost` — тоест ПРАВО, което планът дава или не дава (правило 15).
+ * Личното не е право: то не се плаща, не се раздава и никой не го отнема.
+ * Затова стои в СВОЯ карта и превключвателят му е СЪБИТИЕ в личния Журнал,
+ * не ред в `masterbook:izbor` — localStorage е на БРАУЗЪРА и би казал
+ * „включено" тук и „изключено" там, докато данните лежат на диска.
+ */
+function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
+  // ТРИ състояния, не две: „не е пипано" ≠ „прибрано" ≠ „включено".
+  // Първото пускане иска МЯСТО в личния драйв и става на самия екран „Лично"
+  // (И99); тук се връща само вече записаното.
+  const sastoyanie = vklyucheno ? 'включено' : pipnato ? 'прибрано' : 'не е пускано';
+  return `
+    <section class="karta" data-sektsiya="tablo-lichno">
+      <div class="dyalglava">
+        <h2>Лично</h2>
+        <span>второстепенна настройка · твоя, не на наемателя</span>
+      </div>
+      <div class="deystviya">
+        <span class="znachka ${vklyucheno ? 'dobre' : 'tiha'}">${sastoyanie}</span>
+        ${
+          pipnato
+            ? `<button type="button" class="vtorichen" id="tablo-lichno">${
+                vklyucheno ? 'Прибери личното' : 'Върни личното'
+              }</button>`
+            : '<span class="drebno">пуска се от пункта <b>Лично</b> — там се посочва мястото в твоя драйв</span>'
+        }
+      </div>
+      <p class="drebno">Личният таб е <b>същата таблица</b> от Управление за собствени нужди, с
+      <b>отделен Журнал</b>, който никога не се смесва със служебния. Прибирането сваля пункта от
+      лентата и <b>не трие нищо</b> — „изключено ≠ липсващо" (правило 15). Ключът на личния Журнал
+      е твоят имейл с наставка; чете го само той.</p>
+    </section>`;
 }
 
 /**

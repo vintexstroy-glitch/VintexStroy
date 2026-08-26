@@ -36,7 +36,7 @@ export type Dostavchik = 'google' | 'microsoft' | 'apple';
  * Паролата отсъства НАРОЧНО и това е свойство, не пропуск: каквото го няма,
  * не се краде, не се забравя и не се възстановява по имейл.
  */
-export type Nachin = 'dostavchik' | 'klyuch' | 'parola';
+type Nachin = 'dostavchik' | 'klyuch' | 'parola';
 
 /**
  * ПАРОЛАТА · изричен, ИНФОРМИРАН избор — не подразбиране.

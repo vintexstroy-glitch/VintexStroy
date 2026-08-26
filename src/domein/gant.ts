@@ -63,7 +63,7 @@ export const RESHETKA: Readonly<Record<Takt, { vidimi: number }>> = Object.freez
  */
 export const KRATNOST_NA_OBHVATA = 5;
 
-export interface KolonaNaGanta {
+interface KolonaNaGanta {
   /** YYYY-MM-DD · първият ден на колоната */
   readonly ot: string;
   /** YYYY-MM-DD · последният ден, включително */
@@ -75,7 +75,7 @@ export interface KolonaNaGanta {
 }
 
 /** Лентата на едно дело върху решетката. */
-export interface Lenta {
+interface Lenta {
   readonly deloId: string;
   /** индекс на първата колона, която делото покрива */
   readonly ot: number;
@@ -227,7 +227,7 @@ export function reshetka(dela: readonly Delo[], takt: Takt, dnes: string): Reshe
  * Сумите идват отвън (`sumiZaDen` в `otcheti.ts`), защото Гантът не знае за
  * пари и не бива да научава: смятачът остава чист.
  */
-export interface SumaVKolona {
+interface SumaVKolona {
   readonly prihod_st: number;
   readonly razhod_st: number;
 }

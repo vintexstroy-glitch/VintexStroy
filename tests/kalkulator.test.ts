@@ -24,6 +24,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { razlikaOtZakraglyane } from '../src/yadro/valuta.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import {
   eListSPloshti,
@@ -147,21 +148,26 @@ describe('матрицата · цели базисни точки', () => {
   it('липсващият коефициент е 1,00 — не се измисля и не се отказва', () => {
     expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, '')).toBe(EDINITSA_BT);
     expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, 'непознато')).toBe(EDINITSA_BT);
-    expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, 'Ю')).toBe(10_500);
+    // Осемте посоки от неговата листа падат в ТРИ стъпки (ADR-034): Ю · ЮИ · ЮЗ
+    // са една стъпка „юг" · 1,030. По-фино деление се преструва на точност,
+    // каквато пазарът няма — и до И96 стояха две числа за едно нещо.
+    expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, 'Ю')).toBe(10_300);
+    expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, 'ЮЗ')).toBe(10_300);
   });
 
   it('3000 €/м² · неговото число за разработка', () => {
-    // 100 м², втори етаж (1,00), без изложение (1,00) → 300 000 €
+    // 100 м², среден етаж (1,00), без изложение (1,00) → 300 000 €
     expect(
-      tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'втори', izlozhenie: '' }),
+      tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'трети', izlozhenie: '' }),
     ).toBe(300_000_00);
   });
 
   it('коефициентите не се закръглят по средата — умножава се, дели се веднъж', () => {
-    // трети етаж 1,02 × СИ 0,98 = 0,9996 · 100 м² × 3000 € = 299 880 €
+    // партер 0,92 × Ю 1,03 = 0,9476 · 100 м² × 3 000 € = 284 280 €.
+    // Точно този случай пада във float: 0.92 × 1.03 дава 0.9475999999999999.
     expect(
-      tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'трети', izlozhenie: 'СИ' }),
-    ).toBe(299_880_00);
+      tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'партер', izlozhenie: 'Ю' }),
+    ).toBe(284_280_00);
   });
 
   it('евро на квадрат е ЧАСТНО на цената и площта — както в неговата листа', () => {
@@ -213,6 +219,29 @@ describe('стойността на състоянието', () => {
     const s = stoynostNaSastoyanie(obekti, otLista());
     expect(s.obshto_st - s.obshto_tochno_st).toBe(s.razlika_st);
     expect(s.obshto_st % 10_000).toBe(0); // сборът е на цели стотици евро
+  });
+
+  /**
+   * И ЗА ДВЕТЕ КОЛОНИ · обещанието не е наполовина.
+   *
+   * Двете плочки стоят една до друга и показват сбор, закръглен по един и същи
+   * начин. Дотук А казваше „закръглено −33 €", а Б мълчеше за същото —
+   * обещание, спазено от едната, е по-лошо от неспазено и от двете, защото
+   * човекът се научава да вярва на надписа.
+   *
+   * И двете вече минават през ЕДНА функция (`razlikaOtZakraglyane`); дотук А
+   * я смяташе с ръчно изваждане, а именуваната нямаше нито един викащ извън
+   * теста си — макар ADR-012 да я обявява за построена.
+   */
+  it('и Б казва своето закръгляне · не само А', () => {
+    const { obekti } = prochetiPloshti(ploshti());
+    const s = stoynostNaSastoyanie(obekti, otLista());
+    expect(s.razlika_st).toBe(razlikaOtZakraglyane(s.obshto_tochno_st, 'stotitsi'));
+    expect(s.razlika_sastoyanie_st).toBe(
+      razlikaOtZakraglyane(s.sastoyanie_tochno_st, 'stotitsi'),
+    );
+    expect(s.sastoyanie_st - s.sastoyanie_tochno_st).toBe(s.razlika_sastoyanie_st);
+    expect(s.sastoyanie_st % 10_000).toBe(0);
   });
 
   it('СВЕРКА вход↔изход · N обекта влизат, N реда излизат', () => {
@@ -345,8 +374,8 @@ describe('двете колони, една до друга', () => {
     const { obekti } = prochetiPloshti(ploshtiSDve());
     const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()));
     const ap2 = s.redove.find((r) => r.obekt === 'Апартамент 2')!;
-    // А · по площ: 64,44 м² × 3 000 € × 0,97 (първи етаж) × 1,02 (И) = 191 250 €
-    expect(ap2.tsena_st).toBe(191_300_00);
+    // А · по площ: 64,44 м² × 3 000 € × 0,98 (първи етаж) × 1,00 (изток) = 189 453,60 €
+    expect(ap2.tsena_st).toBe(189_500_00);
     // Б · по състояние: 64,44 м² × 8,50 €/м²/мес = 547,74 €/мес →
     // × 12 × 0,92 (заетост) × 0,85 (чист доход) ÷ 3,20 % = 160 624,75 € →
     // нагоре до стотица
@@ -404,7 +433,7 @@ describe('износът · трите избора', () => {
     const list = listNaTsenite(redove(), 'ЦЕНИ', 'plosht');
     expect(list.koloni).toHaveLength(11);
     const ap2 = list.redove.find((r) => r[0] === 'Апартамент 2')!;
-    expect(ap2[9]).toBe('191 300,00'.replace(/ /g, ' '));
+    expect(ap2[9]).toBe('189 500,00'.replace(/ /g, ' '));
   });
 
   it('„само по състояние" слага ОЦЕНКАТА в неговата колона „Цена с ДДС"', () => {

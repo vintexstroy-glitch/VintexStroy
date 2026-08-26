@@ -30,7 +30,7 @@
 import type { Tablitsa } from '../iztochnik/tablitsa.js';
 import { kletka, svedenaGlava } from '../iztochnik/tablitsa.js';
 
-export class GreshkaChetene extends Error {
+class GreshkaChetene extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaChetene';
@@ -198,7 +198,7 @@ export function prochetiPloshti(t: Tablitsa): {
 }
 
 /** Кой лист да се чете — по име. Останалите носят друг обект или обобщения. */
-export const LISTOVE_S_PLOSHTI: readonly string[] = Object.freeze(['площо', 'земя']);
+const LISTOVE_S_PLOSHTI: readonly string[] = Object.freeze(['площо', 'земя']);
 
 export function eListSPloshti(ime: string): boolean {
   return LISTOVE_S_PLOSHTI.includes(svedenaGlava(ime));

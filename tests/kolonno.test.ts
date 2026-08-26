@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { otCSV } from '../src/iztochnik/csv.js';
@@ -111,6 +112,37 @@ describe('кой какво редактира', () => {
     expect(
       mozheDaRedaktiraKolona({ rolya: 'nablyudatel', vid: 'promenlyva', pravo: 'vizhda' }),
     ).toBe(false);
+  });
+});
+
+/**
+ * ПРАВИЛО 23 СТИГА ДО ЖИВИЯ КОД · и защо тестът чете ИЗВОРА.
+ *
+ * Дотук четирите теста горе минаваха, а правилото го нямаше на нито един
+ * екран: `mozheDaRedaktiraKolona` беше викана САМО от собствения си тест.
+ * Междувременно `app/redaktsiya.ts` отваряше поле в клетката, питаше за ВИДА
+ * на колоната (по конструкция — затворената няма белег) и НЕ питаше за
+ * ролята; а екран Имоти нарочно не иска роля. Тоест наблюдател щракваше два
+ * пъти върху наема и пишеше в Журнала.
+ *
+ * Никой тест върху СТОЙНОСТИ не може да хване това: дефектът беше ЛИПСА НА
+ * ВИКАЩ, а липсата не се наблюдава от стойност. Затова тук се чете изворът —
+ * същият похват като `imena.test.ts`, и по същата причина: правило, което
+ * живее в коментар, се надживява мълчаливо.
+ */
+describe('правило 23 има викащ в живия код', () => {
+  const IZVOR = readFileSync('app/redaktsiya.ts', 'utf8');
+
+  it('редакцията в клетката пита за ролята', () => {
+    expect(IZVOR).toContain("import { mozheDaRedaktiraKolona } from '../src/domein/kolonno.js'");
+    expect(IZVOR).toContain('mozheDaRedaktiraKolona({ rolya');
+  });
+
+  it('и двата входа са пазени · единичният И групата', () => {
+    // Ctrl+D не минава през отварянето на поле. Един пазач би оставил групата
+    // отворена врата към заключената единична клетка.
+    const pazachi = IZVOR.match(/mozheDaPopraviKletka\(rolyata\)/g) ?? [];
+    expect(pazachi.length).toBe(2);
   });
 });
 

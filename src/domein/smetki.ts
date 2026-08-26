@@ -24,7 +24,7 @@ import { platenoDDSZaPerioda } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 
 export type Posoka = 'приход' | 'разход';
-export type StranaDDS = 'изход' | 'вход';
+type StranaDDS = 'изход' | 'вход';
 
 /**
  * ПОТОЦИТЕ — декларирана таблица, за да е смяната един ред, не търсене из кода.
@@ -33,7 +33,7 @@ export type StranaDDS = 'изход' | 'вход';
  * събитие е падежът), а КЕШ и БАНКА показват как парите реално са влезли —
  * затова не се събират с него, иначе едно и също би се броило два пъти.
  */
-export interface Potok {
+interface Potok {
   readonly klyuch: string;
   readonly ime: string;
   readonly posoka: Posoka;
@@ -85,7 +85,7 @@ export interface RedDDS {
   readonly broi: number;
 }
 
-export interface Smetki {
+interface Smetki {
   readonly period: Period;
   readonly redove: readonly RedSmetka[];
   readonly dds: readonly RedDDS[];
@@ -275,7 +275,7 @@ function razbiy(
  * зададе: „веднага се хваща липсата и се намира по извлеченията или липсата
  * на кешови фактури."
  */
-export function otRaka(o: Ogledalo, period: Period): Razhod[] {
+function otRaka(o: Ogledalo, period: Period): Razhod[] {
   return razhodiZaPerioda(o, period).filter((r) => r.klyuch === '');
 }
 

@@ -179,7 +179,7 @@ export class GreshkaModel extends Error {
  *
  * Excel ражда по десет празни колони на всеки лист; те не са част от главата.
  */
-export function glaviNaRed(t: Tablitsa, redNaGlavata: number): string[] {
+function glaviNaRed(t: Tablitsa, redNaGlavata: number): string[] {
   const red = [...(t.redove[redNaGlavata] ?? [])].map((k) => k.trim());
   while (red.length && red[red.length - 1] === '') red.pop();
   return red;

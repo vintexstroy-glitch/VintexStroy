@@ -41,7 +41,7 @@ const MODEL = 'claude-opus-5';
 /** Версията на API-то · закована, за да не се мени поведението тихо. */
 const VERSIYA = '2023-06-01';
 
-export class GreshkaKlod extends Error {
+class GreshkaKlod extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaKlod';
@@ -82,7 +82,7 @@ export function opashkataNaKlyucha(): string {
   }
 }
 
-export interface OtgovorNaKlod {
+interface OtgovorNaKlod {
   /** какво предлага, с думи */
   readonly kakvo: string;
   /** колко му е струвало · за да се вижда цената, не да се гадае */

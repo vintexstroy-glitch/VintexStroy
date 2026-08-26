@@ -16,8 +16,27 @@
  */
 
 import { pishi } from '../src/yadro/pari.js';
+import {
+  OPISI,
+  type NastroykaNaProblem,
+  type OpisNaProblem,
+  type VidProblem,
+} from '../src/domein/vhodni-problemi.js';
+import { butonSIkona } from './ikoni.js';
+import {
+  // ПСЕВДОНИМ. „Видове" има и `vid-stoynost.ts` (евро · процент · число), и
+  // двете имена са верни в своя дом. Кръстени еднакво ТУК, те се бият — затова
+  // се различават на мястото, където се срещат, а не в домовете си.
+  IMENA_NA_VIDOVETE as IMENA_NA_KONTRAGENTITE,
+  kakvoLipsva,
+  VIDOVE_KONTRAGENT,
+  type Kontragent,
+} from '../src/domein/kontragenti.js';
+import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { ekraniraj } from './obshto.js';
+import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import { rabotnaKniga } from '../src/iznos/excel.js';
+import { obrazetsOtModel, ZNAK_ZATVORENA } from '../src/iznos/ot-model.js';
 import {
   belegNaButon,
   DEYSTVIYA,
@@ -71,8 +90,9 @@ import { klyuchNaPravo,
 import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
+import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -99,7 +119,7 @@ let dobavyamKolona = false;
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
-export function narisuvayNastroyki(o: Ogledalo): string {
+export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izborPoPodrazbirane()): string {
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
 
@@ -133,15 +153,31 @@ export function narisuvayNastroyki(o: Ogledalo): string {
     ${dobavyam ? formaNaButon(modeli) : ''}
     ${blokNaModelite(modeli)}
     ${blokNaRedaktora(modeli)}
-    ${blokNaPravata(o, modeli)}
+    ${
+      /**
+       * ТРИТЕ ВЪЗМОЖНОСТИ, КОИТО ДОТУК НЕ ПИПАХА НИЩО (ADR-041).
+       *
+       * „Други имейли", „Роли за достъп" и „Колонно право" стояха в Таблото с
+       * отметки, които НЕ ВЛИЯЕХА на нито един екран. Отметка без последица е
+       * НАДПИС, а правило 15 иска точно обратното: „изключено ≠ липсващо".
+       *
+       * Трите се сливат в ЕДИН блок нарочно — те са една функция, разказана на
+       * три части: кого добавяш, каква роля му даваш, коя колона му скриваш.
+       * Изключиш ли добавянето на хора, другите две нямат върху кого да важат.
+       */
+      mozhe(izbor, 'drugi-imeyli') ? blokNaPravata(o, modeli, izbor) : ''
+    }
+    ${blokNaParametrite(o)}
+    ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
+    ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}`;
 }
 
 // ── бутоните ───────────────────────────────────────────────────────────────
 function blokNaButonite(butoni: readonly Buton[]): string {
   return `
-    <section>
+    <section data-sektsiya="butoni">
       <div class="dyalglava">
         <h2>Бутоните</h2>
         <span>един бутон = един път · посоката е ЕДНА</span>
@@ -241,7 +277,7 @@ function formaNaButon(modeli: readonly ModelNaTablitsa[]): string {
 // ── моделите ───────────────────────────────────────────────────────────────
 function blokNaModelite(modeli: readonly ModelNaTablitsa[]): string {
   return `
-    <section>
+    <section data-sektsiya="modeli">
       <div class="dyalglava">
         <h2>Модели на таблици</h2>
         <span>по един на глава · правят се при първото непознато четене</span>
@@ -285,7 +321,7 @@ function redNaModel(m: ModelNaTablitsa): string {
 function blokNaRedaktora(modeli: readonly ModelNaTablitsa[]): string {
   const izbran = modeli.find((m) => m.klyuch === izbranHedar);
   return `
-    <section>
+    <section data-sektsiya="hedari">
       <div class="dyalglava">
         <h2>Редакторът на хедъри</h2>
         <span>и Описът на Подредба · две отделни, но свързани · едно място</span>
@@ -332,7 +368,7 @@ function litseHedari(
   return `
     <label class="pole">
       <span>Хедър</span>
-      <select id="izbor-hedar">
+      <select translate="no" id="izbor-hedar">
         <option value="">— избери —</option>
         ${modeli
           .map(
@@ -357,7 +393,54 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
       <button type="button" class="glaven" id="nova-kolona"${dobavyamKolona ? ' disabled' : ''}>Нова колона</button>
       <p class="drebno">Работеща таблица само расте: „колони не се трият, а само се добавят" — празна колона без роля е единственото изключение, и то само за управителите.</p>
     </div>
+    ${obrazetsatNa(m)}
     ${dobavyamKolona ? formaNaKolona(m, modeli) : ''}`;
+}
+
+/**
+ * ОБРАЗЕЦЪТ · път №4 от десетте („Създаване на таблица", ADR-010).
+ *
+ * Негови думи: „ФУНКЦИОНАЛНОСТТА ДАВА ВЪЗМОЖНОСТ ДА ПРЕТВОРИШ МОДЕЛА НА
+ * ТАБЛИЦАТА, ОТ КОЯТО ЧЕТЕШ. Така ще се напълнят контейнерите с таблици за
+ * експеримент."
+ *
+ * Мостът (`src/iznos/ot-model.ts`) беше построен в резен 14 и оттогава го
+ * викаха само тестовете — пътят нямаше бутон. Ето го.
+ *
+ * ОБРАЗЕЦЪТ Е ЦЯЛ · всички колони, включително скритите за някого. Това НЕ е
+ * изключение от колонното право, а негово следствие: правило 23 казва, че
+ * скриването пипа ЕКРАНА и нищо друго — „нито сбор, нито Журнал, нито износ".
+ * И тук то е не просто правило, а МЕХАНИКА: главата на файла е отпечатъкът, по
+ * който `poznavaLi` го разпознава на връщане. Образец с махната колона е файл,
+ * който самото приложение после отказва да прочете.
+ */
+function obrazetsatNa(m: ModelNaTablitsa): string {
+  const zatvoreni = m.glavi.filter((_, k) => vidNaKolona(m, k) === 'zatvorena').length;
+  return `
+    <div class="karta" data-sektsiya="obrazets">
+      <div class="dyalglava">
+        <h3>Образец по този модел</h3>
+        <span>път №4 · „претвори модела на таблицата, от която четеш"</span>
+      </div>
+      <p class="drebno">Сваля празна таблица с <b>точно тези ${m.glavi.length} колони</b> и с
+      ролите им в заглавието. Попълниш ли я и я върнеш, същият модел я познава — главата ѝ е
+      отпечатъкът.${
+        zatvoreni > 0
+          ? ` <b>${zatvoreni}</b> ${zatvoreni === 1 ? 'затворена колона носи' : 'затворени колони носят'}
+             знак ${ekraniraj(ZNAK_ZATVORENA)} и остават празни: те се <b>смятат</b>, не се пишат.`
+          : ''
+      }</p>
+      <p class="drebno"><b>Образецът е ЦЯЛ</b> — носи и колоните, скрити за някой служител.
+      Скриването пипа екрана и нищо друго (правило 23), а тук това е и механика: махната
+      колона сменя главата, и файлът става непознаваем на връщане.</p>
+      <div class="poleta">
+        <label class="pole"><span>Празни редове</span>
+          <input translate="no" type="number" min="1" max="500" step="1" id="obrazets-redove" value="12"></label>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="svali-obrazets">Свали образец</button>
+      </div>
+    </div>`;
 }
 
 function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
@@ -561,12 +644,12 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
  * Затова тук няма отметка „редактира": тя се СМЯТА от ролята и от вида на
  * колоната (`mozheDaRedaktiraKolona`), а не се раздава.
  */
-function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string {
+function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: Izbor): string {
   const hora = podredeni(o.sluzhiteli.values());
   const izbran = hora.find((h) => h.imeyl === izbranSluzhitel);
 
   return `
-    <section>
+    <section data-sektsiya="pravata">
       <div class="dyalglava">
         <h2>Кой какво вижда</h2>
         <span>колонно право · скрива, не редактира</span>
@@ -576,23 +659,46 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[]): string 
           ? `<p class="prazno">Още няма записан служител.<br>Достъпът се дава при доставчика; тук се записва кой работи и с каква роля.</p>`
           : `<label class="pole">
         <span>Служител</span>
-        <select id="izbor-sluzhitel">
+        <select translate="no" id="izbor-sluzhitel">
           <option value="">— избери —</option>
           ${hora.map((h) => optsiyaZaChovek(h, h.imeyl === izbranSluzhitel)).join('')}
         </select>
       </label>`
       }
-      ${izbran === undefined ? '' : hedariteNa(izbran, o, modeli)}
+      ${
+        // КОЛОННОТО ПРАВО е СВОЯ възможност: може да добавяш хора и да им
+        // даваш роли, без изобщо да скриваш колони. Изключено, матрицата
+        // изчезва — а СКРИТИТЕ ВЕЧЕ колони си остават записани в Журнала.
+        izbran === undefined || !mozhe(izbor, 'kolonno-pravo')
+          ? ''
+          : hedariteNa(izbran, o, modeli)
+      }
+      ${
+        izbran !== undefined && !mozhe(izbor, 'kolonno-pravo')
+          ? `<p class="drebno"><b>Колонното право е изключено</b> от Таблото. Вече скритите колони
+             СТОЯТ записани в Журнала и важат — изключването маха матрицата, не решенията
+             (правило 15: „изключено ≠ липсващо").</p>`
+          : ''
+      }
       <form id="forma-sluzhitel" class="forma">
-        <label class="pole"><span>Имейл</span><input name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
-        <label class="pole"><span>Име</span><input name="ime" required placeholder="как му казваш"></label>
-        <label class="pole"><span>Роля</span>
-          <select name="rolya">
-            <option value="redaktor">редактира</option>
-            <option value="nablyudatel">наблюдава</option>
-            <option value="sobstvenik">собственик</option>
-          </select>
-        </label>
+        <label class="pole"><span>Имейл</span><input translate="no" name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
+        <label class="pole"><span>Име</span><input translate="no" name="ime" required placeholder="как му казваш"></label>
+        ${
+          // РОЛИТЕ са трета възможност. Изключени, всеки нов човек влиза като
+          // НАБЛЮДАТЕЛ — най-тясното, а не най-широкото: забравена отметка не
+          // бива да раздава повече права, отколкото е поискано.
+          mozhe(izbor, 'roli-za-dostap')
+            ? `<label class="pole"><span>Роля</span>
+                 <select translate="no" name="rolya">
+                   <option value="redaktor">редактира</option>
+                   <option value="nablyudatel">наблюдава</option>
+                   <option value="sobstvenik">собственик</option>
+                 </select>
+               </label>`
+            : `<input type="hidden" name="rolya" value="nablyudatel">
+               <p class="drebno">Ролите за достъп са изключени — новият влиза като
+               <b>наблюдава</b>. Най-тясното, не най-широкото.</p>`
+        }
         <div class="dugmeta">
           <button type="submit" class="glavno">Запиши служителя</button>
           <span id="greshka-sluzhitel" class="greshka"></span>
@@ -658,10 +764,190 @@ function kletkaNaPravo(
     </label>`;
 }
 
+/**
+ * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ · осемте вида, настроени за ТОЗИ бизнес (И96 т.1).
+ *
+ * Негови думи: „Тези неща са **параметри при различни бизнеси** и да може да ги
+ * контролираш от Настройки, и дори стопанинът да дава **негова бележка**, когато
+ * се случи."
+ *
+ * Дотук `nastroykiteNaVhoda` и `smeniNastroykiteNaVhoda` бяха построени и НИКОЙ
+ * не ги викаше — същата болест като образеца в ADR-041: функция без екран.
+ * Одитът на И101 т.4 ги намери поименно; ето им екрана.
+ *
+ * ЗНАКЪТ И ЦВЕТЪТ стоят до всеки ред, за да се разпознае видът, без да се чете
+ * (ADR-032: цветът намира, знакът различава, думата обяснява).
+ */
+function blokNaParametrite(o: Ogledalo): string {
+  const n = o.parametriNaVhoda;
+  return `
+    <section data-sektsiya="parametri">
+      <div class="dyalglava">
+        <h2>Проверките при въвеждане</h2>
+        <span>осем вида · всеки със своя сила и своя бележка · важат за целия бизнес</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="parametri">
+        <div class="glava parametar">
+          <span>Вид</span><span>Включен</span><span>Сила</span><span>Твоята бележка</span><span></span>
+        </div>
+        ${OPISI.map((opis) => redNaParametar(opis, n[opis.vid])).join('')}
+      </div>
+      <p class="drebno">
+        <b>Силата</b> казва дали редът може изобщо да се запише: „спира" отказва при
+        Вратата, „предупреждава" оцветява и пуска. <b>Бележката</b> стои под легендата,
+        когато този вид се случи — тя не заменя обяснението, а го допълва с думи за
+        този бизнес. <b>Замразеният период</b> е единственият, който не се разхлабва:
+        подадената справка заключва месеца и това е закон, не параметър (правило 9).
+      </p>
+    </section>`;
+}
+
+function redNaParametar(opis: OpisNaProblem, n: NastroykaNaProblem): string {
+  const zakovan = opis.vid === 'zamrazen-period';
+  return `
+    <div class="red parametar" data-parametar="${ekraniraj(opis.vid)}" translate="no">
+      <span class="kletka">
+        <span class="znak-problem ${ekraniraj(opis.tsvyat)}">${ekraniraj(opis.znak)}</span>
+        <b>${ekraniraj(opis.ime)}</b>
+      </span>
+      <span>
+        <input type="checkbox" data-parametar-vklyuchen${n.vklyuchen ? ' checked' : ''}${
+          zakovan ? ' disabled' : ''
+        } aria-label="включен">
+      </span>
+      <span>
+        <select translate="no" data-parametar-sila${zakovan ? ' disabled' : ''} aria-label="сила">
+          <option value="spira"${n.sila === 'spira' ? ' selected' : ''}>спира</option>
+          <option value="preduprezhdava"${n.sila === 'preduprezhdava' ? ' selected' : ''}>предупреждава</option>
+        </select>
+      </span>
+      <span>
+        <input translate="no" data-parametar-belezhka value="${ekraniraj(n.belezhka)}"
+               maxlength="200" placeholder="${ekraniraj(opis.zashto)}" autocomplete="off">
+      </span>
+      <span class="butoni">
+        ${butonSIkona({
+          ikona: 'sverka',
+          tekst: 'Запиши',
+          title: 'Запиши параметъра в Журнала',
+          danni: { 'parametar-zapishi': opis.vid },
+        })}
+      </span>
+    </div>`;
+}
+
+/**
+ * КОНТРАГЕНТИТЕ · номерата, които одитният файл иска (И96 т.11 · ADR-047).
+ *
+ * ЕДНА ФОРМА, ТРИ ВИДА. Собствената фирма отива в `Header` на файла, клиентите
+ * и доставчиците — в `MasterFiles`. Полетата им са едни и същи; три отделни
+ * форми щяха да са три места, които се разминават при първото ново поле.
+ *
+ * ИМЕТО Е ВРЪЗКАТА. Наемът и разходът вече сочат контрагента по име — затова
+ * тук се вписва СЪЩОТО име, а сведеното му изписване ги слива. Нов ключ щеше
+ * да иска втора връзка, която никой не поддържа.
+ */
+function blokNaKontragentite(o: Ogledalo): string {
+  const spisak = [...o.kontragenti.values()].sort(
+    (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
+  );
+  return `
+    <section data-sektsiya="kontragenti">
+      <div class="dyalglava">
+        <h2>Контрагенти</h2>
+        <span>моята фирма · клиенти · доставчици — ЕИК и адрес за одитния файл</span>
+      </div>
+
+      <form id="forma-kontragent">
+        <div class="poleta">
+          <div class="pole">
+            <label for="kontragent-vid">Вид</label>
+            <select translate="no" id="kontragent-vid" name="vid">
+              ${VIDOVE_KONTRAGENT.map(
+                (v) => `<option value="${v}">${ekraniraj(IMENA_NA_KONTRAGENTITE[v])}</option>`,
+              ).join('')}
+            </select>
+          </div>
+          <div class="pole">
+            <label for="kontragent-ime">Име</label>
+            <input translate="no" id="kontragent-ime" name="ime" required maxlength="120"
+              placeholder="както е в наема или разхода" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-eik">ЕИК</label>
+            <input translate="no" id="kontragent-eik" name="eik" maxlength="13"
+              inputmode="numeric" placeholder="9 или 13 цифри" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-dds">Номер по ДДС</label>
+            <input translate="no" id="kontragent-dds" name="ddsNomer" maxlength="14"
+              placeholder="BG…" autocomplete="off">
+          </div>
+        </div>
+        <div class="poleta">
+          <div class="pole">
+            <label for="kontragent-adres">Адрес</label>
+            <input translate="no" id="kontragent-adres" name="adres" maxlength="160"
+              placeholder="улица и номер" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-grad">Град</label>
+            <input translate="no" id="kontragent-grad" name="grad" maxlength="80" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-kod">Пощенски код</label>
+            <input translate="no" id="kontragent-kod" name="poshtenskiKod" maxlength="12" autocomplete="off">
+          </div>
+          <div class="pole">
+            <label for="kontragent-darzhava">Държава</label>
+            <input translate="no" id="kontragent-darzhava" name="darzhava" maxlength="2"
+              value="BG" placeholder="BG" autocomplete="off">
+          </div>
+        </div>
+        <p class="greshka" id="greshka-kontragent"></p>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Запиши контрагента</button>
+          <p class="drebno">Контролната цифра на ЕИК се СМЯТА, не се брои — сбъркана при
+          преписване цифра пада тук, вместо в НАП. Празно поле минава: то значи „още не е
+          вписано" и одитният файл го брои като пречка с думи.</p>
+        </div>
+      </form>
+
+      ${
+        spisak.length === 0
+          ? '<p class="prazno">Още няма вписан контрагент.<br>Без данните на фирмата одитният файл няма кой да го подава.</p>'
+          : `<div class="tablitsa" data-tablitsa="kontragenti">
+        <div class="glava kontragent">
+          <span>Име</span><span>Вид</span><span>ЕИК</span><span>По ДДС</span><span>Липсва</span>
+        </div>
+        ${spisak.map(redNaKontragent).join('')}
+      </div>`
+      }
+    </section>`;
+}
+
+function redNaKontragent(kt: Kontragent): string {
+  const lipsva = kakvoLipsva(kt);
+  return `
+    <div class="red kontragent" translate="no">
+      <span class="kletka"><b>${ekraniraj(kt.ime)}</b><span>${ekraniraj(
+        [kt.adres, kt.grad, kt.darzhava].filter(Boolean).join(', ') || 'без адрес',
+      )}</span></span>
+      <span>${ekraniraj(IMENA_NA_KONTRAGENTITE[kt.vid] ?? kt.vid)}</span>
+      <span>${kt.eik === '' ? '—' : ekraniraj(kt.eik)}</span>
+      <span>${kt.ddsNomer === '' ? '—' : ekraniraj(kt.ddsNomer)}</span>
+      <span>${
+        lipsva.length === 0
+          ? '<span class="znachka dobre">пълен</span>'
+          : `<span class="znachka trevoga">${ekraniraj(lipsva.join(' · '))}</span>`
+      }</span>
+    </div>`;
+}
+
 function blokNaSverkite(o: Ogledalo): string {
   const posledni = [...o.sverki].reverse().slice(0, 12);
   return `
-    <section>
+    <section data-sektsiya="sverki">
       <div class="dyalglava">
         <h2>Записани сверки</h2>
         <span>всяка минала през бутон · и нулевите</span>
@@ -699,7 +985,7 @@ function redNaSverka(s: ZapisanaSverka): string {
 // ── честният списък ────────────────────────────────────────────────────────
 function blokNaDeystviyata(): string {
   return `
-    <section>
+    <section data-sektsiya="patishta">
       <div class="dyalglava">
         <h2>Десетте пътя</h2>
         <span>обявени поименно · построеното си личи</span>
@@ -729,6 +1015,80 @@ export function zakachiNastroyki(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  // Журналът от таблица (И96 т.8) · своя секция, свое закачане.
+  zakachiZhurnalat(koren, k, prerisuvay);
+
+  /**
+   * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · ADR-046).
+   *
+   * Записва се РЕД ПО РЕД, с изричен бутон: осемте вида менят какво влиза през
+   * Вратата за целия бизнес, и промяна „в движение", докато човек само гледа
+   * списъка, би влязла в Журнала, без той да е решил.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-parametar-zapishi]')) {
+    b.addEventListener('click', async () => {
+      const vid = b.dataset['parametarZapishi']!;
+      const red = koren.querySelector<HTMLElement>(`[data-parametar="${CSS.escape(vid)}"]`);
+      if (!red) return;
+      const vklyuchen = red.querySelector<HTMLInputElement>('[data-parametar-vklyuchen]')!.checked;
+      const sila = red.querySelector<HTMLSelectElement>('[data-parametar-sila]')!.value;
+      const belezhka = red.querySelector<HTMLInputElement>('[data-parametar-belezhka]')!.value;
+      b.disabled = true;
+      try {
+        await k.deystviya.zapishiParametarNaVhoda(
+          { vid, vklyuchen, sila, belezhka: belezhka.trim() },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest('dobre', `Проверката „${vid}" е записана. Важи за целия бизнес.`);
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      } finally {
+        b.disabled = false;
+      }
+      await prerisuvay();
+    });
+  }
+
+  /**
+   * КОНТРАГЕНТЪТ (И96 т.11) · вписва се от форма, записва се през Вратата.
+   *
+   * Отказът се ПОКАЗВА в полето за грешка, а не се преглъща: сбъркан ЕИК е
+   * точно онова, което човекът трябва да поправи веднага, докато номерът му
+   * е още пред очите му.
+   */
+  const formaKontragent = koren.querySelector<HTMLFormElement>('#forma-kontragent');
+  formaKontragent?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const izhod = koren.querySelector<HTMLElement>('#greshka-kontragent')!;
+    izhod.textContent = '';
+    const d = new FormData(formaKontragent);
+    const vzemi = (ime: string) => String(d.get(ime) ?? '').trim();
+    const buton = formaKontragent.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    buton.disabled = true;
+    try {
+      await k.deystviya.zapishiKontragent(
+        {
+          vid: vzemi('vid'),
+          ime: vzemi('ime'),
+          eik: vzemi('eik'),
+          ddsNomer: vzemi('ddsNomer').toUpperCase(),
+          adres: vzemi('adres'),
+          grad: vzemi('grad'),
+          poshtenskiKod: vzemi('poshtenskiKod'),
+          darzhava: vzemi('darzhava').toUpperCase(),
+        },
+        { opId: crypto.randomUUID() },
+      );
+      formaKontragent.reset();
+      k.vest('dobre', `Контрагентът „${vzemi('ime')}" е записан.`);
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = dumiZaGreshka(err);
+    } finally {
+      buton.disabled = false;
+    }
+  });
+
   koren.querySelector<HTMLButtonElement>('#nov-buton')?.addEventListener('click', async () => {
     dobavyam = true;
     greshka = '';
@@ -858,6 +1218,45 @@ export function zakachiNastroyki(
   koren.querySelector<HTMLButtonElement>('#otkazhi-kolona')?.addEventListener('click', async () => {
     dobavyamKolona = false;
     await prerisuvay();
+  });
+
+  /**
+   * ПЪТ №4 · образецът от модела (ADR-010 · ADR-041).
+   *
+   * Не пише НИЩО в Журнала — той е път „pishe" към ФАЙЛ, не към записа.
+   * Затова тук няма `opId`, няма сверка и няма събитие: нищо не се е случило
+   * с истината, само е слязъл лист хартия.
+   */
+  koren.querySelector<HTMLButtonElement>('#svali-obrazets')?.addEventListener('click', async (e) => {
+    const buton = e.target as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const m = await hedarSega();
+      if (!m) {
+        k.vest('zle', 'Първо избери хедър — образецът се прави от модел, не от нищото.');
+        return;
+      }
+      const poleto = koren.querySelector<HTMLInputElement>('#obrazets-redove');
+      const iskani = Number(poleto?.value ?? 12);
+      // Празните редове са УДОБСТВО: човек пише в тях. Извън разумното те само
+      // правят файла тежък, затова се подрязват мълчаливо — това не е данна.
+      const redove = Number.isSafeInteger(iskani) ? Math.min(Math.max(iskani, 1), 500) : 12;
+      const bayove = rabotnaKniga([obrazetsOtModel(m, redove)]);
+      svaliFayl(
+        new Blob([bayove.slice().buffer], {
+          type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        }),
+        `obrazets-${bezopasnoIme(m.klyuch)}-${dnesKato()}.xlsx`,
+      );
+      k.vest(
+        'dobre',
+        `Образецът по „${m.klyuch}" е свален · ${m.glavi.length} колони, ${redove} празни реда. ` +
+          'Попълни го и го върни през същия бутон — главата му е отпечатъкът, по който се познава.',
+      );
+    } finally {
+      buton.disabled = false;
+      await prerisuvay();
+    }
   });
 
   /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */

@@ -55,6 +55,9 @@ class DnevnikSasSpirashtTok implements Dnevnik {
   posledno(n: string) {
     return this.istinski.posledno(n);
   }
+  parvo(n: string) {
+    return this.istinski.parvo(n);
+  }
   poOpId(n: string, o: string) {
     return this.istinski.poOpId(n, o);
   }
@@ -222,8 +225,12 @@ describe('уникод-двойникът', () => {
       payload: { adres: `Ра${NFD}ково`, edinitsa: '1', ploshtad_kvsm: 0 },
     });
 
-    const parvi = await vrata.dobavi(op(`ра${NFD}on`));
-    const vtori = await vrata.dobavi(op(`ра${NFC}on`));
+    // „район" · ЦЯЛАТА дума е кирилица. Дотук опашката беше латинско „on" —
+    // смесена дума, която `tests/imena.test.ts` не вижда, защото `${` къса
+    // думата на две. Правило 11 важи и за тестовете; смисълът тук е ЕДИН и
+    // същ: две различни писания на едно „й" дават един и същ `opId`.
+    const parvi = await vrata.dobavi(op(`ра${NFD}он`));
+    const vtori = await vrata.dobavi(op(`ра${NFC}он`));
 
     expect(vtori.povtoreno).toBe(true);
     expect(vtori.seq).toBe(parvi.seq);

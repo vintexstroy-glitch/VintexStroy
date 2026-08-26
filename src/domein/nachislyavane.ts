@@ -27,7 +27,7 @@ export class GreshkaNachislyavane extends Error {
   }
 }
 
-export interface RezultatNachislyavane {
+interface RezultatNachislyavane {
   readonly period: Period;
   readonly sverki: readonly Sverka[];
   /** нови вземания, създадени сега */
@@ -37,7 +37,7 @@ export interface RezultatNachislyavane {
   readonly nared: boolean;
 }
 
-export interface NastroykiNachislyavane {
+interface NastroykiNachislyavane {
   readonly deystviya: Deystviya;
   readonly period: Period;
   /** ISO време на начисляването */
@@ -46,7 +46,7 @@ export interface NastroykiNachislyavane {
 
 const PERIOD = /^(\d{4})-(\d{2})$/;
 
-export function razglobi(period: Period): { godina: number; mesets: number } {
+function razglobi(period: Period): { godina: number; mesets: number } {
   const nameren = PERIOD.exec(period);
   if (!nameren) {
     throw new GreshkaNachislyavane(`Периодът трябва да е във вида „2026-08“: ${period}`, []);
@@ -85,11 +85,11 @@ export function seNachislyava(naem: Naem, period: Period): boolean {
 }
 
 /** Стабилният ключ на вземането — производен, за да е повторното пускане безопасно. */
-export function idNaVzemane(naemId: string, period: Period): string {
+function idNaVzemane(naemId: string, period: Period): string {
   return `V:${period}:${naemId}`;
 }
 
-export function opIdNaVzemane(naemId: string, period: Period): string {
+function opIdNaVzemane(naemId: string, period: Period): string {
   return `nachislyavane:${period}:${naemId}`;
 }
 

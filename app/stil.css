@@ -287,6 +287,13 @@
   --srok-prosrocheno: #8E2A16;
   /* „всички проекти с един цвят тъмно графитено" (р52·[221]) */
   --grafiteno: #3A3632;
+
+  /* ЗАКОНЪТ ЗА МЕНЮТАТА · неговите два цвята (И97 · ADR-040):
+     „СИН — избрал си съществуваща; ЧЕРЕН — написал си своя."
+     Синьото е ЕДИНСТВЕНОТО синьо в темата и стои само тук — ако утре потрябва
+     втори син, той се кръщава отделно, вместо този да се преизползва. */
+  --menyu-sinio: #2C5F8A;
+  --menyu-cherno: #1A1714;
 }
 
 * { box-sizing: border-box; }
@@ -422,7 +429,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
 .pole { display: flex; flex-direction: column; gap: 6px; }
-.pole label { font-size: 12.5px; color: var(--mastilo2); }
+/* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
+   „<label class=pole><span>". Втората е в личните форми; без този ред нейният
+   надпис остава с ръста на текста и полето до него изглежда от друг екран. */
+.pole label, .pole > span { font-size: 12.5px; color: var(--mastilo2); }
 .pole input, .pole select {
   font-family: inherit; font-size: 14px; color: var(--mastilo);
   border: 1px solid var(--liniya); border-radius: 4px; padding: 10px 12px;
@@ -460,7 +470,7 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
-.navred svg { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
+.navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
 .navred.tuk svg { stroke: var(--hartiya); }
 .broyach {
   margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
@@ -479,6 +489,83 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .suma.duljimo { color: var(--aktsent); }
 .suma.plateno { color: var(--zeleno); }
 .vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 12.5px; }
+
+/* ── ТЕМАТИЧНИТЕ ИКОНИ · знак до всяко управление (И101 т.2 · ADR-045) ───
+   Един стил за всички: само контур, цветът идва от текста до тях. Икона със
+   свой цвят заживява отделен живот при първата смяна на палитрата. */
+.ikona {
+  width: 15px; height: 15px; flex-shrink: 0;
+  stroke: currentColor; fill: none; stroke-width: 1.6;
+  stroke-linecap: round; stroke-linejoin: round;
+}
+.ikona.golyama { width: 19px; height: 19px; stroke-width: 1.5; }
+button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
+.dyalglava.sIkona { display: flex; align-items: flex-start; gap: 10px; }
+.dyalglava.sIkona > div { min-width: 0; }
+.dyalglava.sIkona .ikona { margin-top: 3px; color: var(--mastilo2); }
+
+/* На тесен екран остава ЗНАКЪТ, а думата се свива — но не изчезва от четеца
+   на екран: `aria-label` я носи цяла (`app/ikoni.ts`). */
+@media (max-width: 620px) {
+  /* Проходът §11 пази обещанието „нищо не излиза встрани". Знакът добави
+     ширина на всеки лост — затова на тесен екран остава ТОЙ, а думата се свива
+     до четеца на екран (`aria-label` я носи цяла). Мястото се пести там,
+     където го няма, а не навсякъде. */
+  /* `display: none`, а НЕ „скрито с absolute": извадената от потока дума се
+     позиционира спрямо най-близкия позициониран прародител и бута документа
+     настрани — проходът го хвана. Достъпността не страда: `aria-label` на
+     самия бутон носи думата цяла и бие съдържанието му. */
+  .butoni button.sIkona .duma,
+  .desno-gore button.sIkona .duma { display: none; }
+  .butoni button.sIkona, .desno-gore button.sIkona { padding: 6px 9px; gap: 0; }
+}
+/* ── ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045) ────────────────── */
+.menyu-nastroyki { display: flex; flex-direction: column; gap: 2px; }
+.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 11px; color: var(--mastilo2); }
+.menyu-nastroyki.otvoreno .strelka-dolu { transform: rotate(180deg); }
+.nastroyki-red {
+  display: flex; flex-direction: column; gap: 1px;
+  margin: 2px 0 6px 8px; padding-left: 8px;
+  border-left: 2px solid var(--liniya);
+}
+.nastroyki-red .za-kogo { margin: 2px 0 4px; }
+.nastroyki-red .tema {
+  display: flex; align-items: flex-start; gap: 8px; text-align: left;
+  background: none; border: none; border-radius: 4px; padding: 6px 8px;
+  color: var(--mastilo); font-family: inherit; font-size: 12.5px;
+}
+.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible { background: var(--panel); }
+.nastroyki-red .tema .ikona { margin-top: 2px; color: var(--mastilo2); }
+.nastroyki-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nastroyki-red .dvete b { font-weight: 600; }
+
+/* Темата, до която редът те е завел · подчертава се за миг, за да се види
+   къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */
+.podchertana { outline: 2px solid var(--aktsent); outline-offset: 3px; border-radius: 5px; }
+
+/* ── ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · осемте параметъра (И96 т.1 · ADR-046) ──── */
+.glava.parametar, .red.parametar {
+  grid-template-columns: minmax(0, 1.4fr) 84px 150px minmax(0, 2fr) 120px;
+  min-width: 760px;
+}
+.red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
+.red.parametar input[type="text"], .red.parametar input:not([type]) {
+  width: 100%; font-family: inherit; font-size: 12.5px;
+  border: 1px solid var(--liniya); border-radius: 4px; padding: 5px 8px; min-height: 30px;
+}
+.red.parametar select { font-family: inherit; font-size: 12.5px; padding: 5px 6px; min-height: 30px; }
+.znak-problem { font-size: 15px; line-height: 1; }
+
+/* ── ПОДРЕДБАТА · дребните бутончета до главата (И101 т.2 · ADR-045) ──── */
+.premestvane { margin-left: auto; display: inline-flex; gap: 2px; align-items: center; }
+.premestvach {
+  background: none; border: 1px solid transparent; border-radius: 4px;
+  color: var(--mastilo2); font-size: 10px; line-height: 1;
+  padding: 3px 5px; min-height: 22px; display: inline-flex; align-items: center; gap: 3px;
+}
+.premestvach:hover, .premestvach:focus-visible { border-color: var(--liniya); background: var(--panel); }
+.premestvach .ikona { width: 12px; height: 12px; }
+
 .karta.izbrana { border-color: var(--aktsent); background: var(--toplo); }
 .karta.izbrana .pole input, .karta.izbrana .pole select { background: #FFFFFF; }
 
@@ -519,6 +606,28 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .glava.sverka, .red.sverka {
   grid-template-columns: minmax(0, 2.4fr) 100px 100px 100px 128px;
   min-width: 700px;
+}
+/* Одитният файл (И96 т.11) · оборотната ведомост под секцията SAF-T. */
+.glava.saft, .red.saft {
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) 130px 130px;
+  min-width: 680px;
+}
+/* ПРЕЧКИТЕ · какво още спира подаването. Изречения, не флагове — затова
+   списък, а не таблица: те се четат, не се сравняват. */
+.prechki {
+  margin: 0 0 14px;
+  padding: 12px 16px 12px 30px;
+  list-style: disc;
+  border: 1px solid var(--aktsent);
+  border-radius: 8px;
+  background: var(--toplo);
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.prechki li + li { margin-top: 5px; }
+.glava.kontragent, .red.kontragent {
+  grid-template-columns: minmax(0, 2.2fr) 120px 130px 140px minmax(0, 1.4fr);
+  min-width: 820px;
 }
 .glava.smyatane, .red.smyatane {
   grid-template-columns: minmax(0, 2fr) 90px 120px 120px 120px;
@@ -586,6 +695,88 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   grid-template-columns: minmax(0, 1.6fr) 130px 84px 84px 96px 118px 128px 128px 78px;
   min-width: 1040px;
 }
+
+/* ── Личният таб · преносът и достъпите (И98 · И99) ─────────────────── */
+.glava.prenos, .red.prenos {
+  grid-template-columns: 44px minmax(0, 1.8fr) minmax(0, 1.4fr) 190px;
+  min-width: 640px;
+}
+.glava.dostap, .red.dostap {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr) 130px minmax(0, 1.4fr) 110px;
+  min-width: 780px;
+}
+
+/* ── Личните ПАРИ · теми, редове, кредити, план, партиди (И96 т.10) ─── */
+.glava.tema, .red.tema {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 130px 130px 90px;
+  min-width: 700px;
+}
+.glava.tema-opis, .red.tema-opis {
+  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 190px;
+  min-width: 560px;
+}
+.glava.dvizhenie, .red.dvizhenie {
+  grid-template-columns: 110px minmax(0, 1.8fr) 190px minmax(0, 1.4fr) 110px;
+  min-width: 820px;
+}
+.glava.kredit, .red.kredit {
+  grid-template-columns: minmax(0, 1.6fr) 130px 90px 130px 140px 140px;
+  min-width: 820px;
+}
+.glava.plan, .red.plan {
+  grid-template-columns: 150px 110px minmax(0, 1.6fr) 150px minmax(0, 1.4fr);
+  min-width: 820px;
+}
+.glava.partida, .red.partida {
+  grid-template-columns: minmax(0, 1.6fr) 90px 90px 130px 130px 130px;
+  min-width: 780px;
+}
+
+/* ── Журналът от таблица · промените и свръзките (И96 т.8) ──────────── */
+.glava.zhurnal-promyana, .red.zhurnal-promyana {
+  grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+  min-width: 560px;
+}
+.glava.svrazka, .red.svrazka {
+  grid-template-columns: 120px minmax(0, 1.4fr) 130px 120px minmax(0, 1.8fr) 90px;
+  min-width: 860px;
+}
+
+/* ── секция „Калкулатор" · входът, легендата и разбивката (И96 т.2) ──── */
+.glava.kalk-koef, .red.kalk-koef {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 100px 140px 110px;
+  min-width: 700px;
+}
+.red.kalk-koef select {
+  font-family: inherit; font-size: 13.5px; color: var(--mastilo);
+  border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 9px;
+  min-height: 34px; background: #FFFFFF; width: 100%;
+}
+/* Примерът за коефициент · разгъва се ПОД реда, не в изскачащ прозорец */
+.red.kalk-primer { display: block; background: var(--panel); padding: 0; }
+.primerblok { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
+table.primer, table.razbivka { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.primer th {
+  text-align: left; font-size: 11.5px; font-weight: 600; color: var(--mastilo2);
+  padding: 4px 8px; border-bottom: 1px solid var(--liniya);
+}
+table.primer td { padding: 5px 8px; border-bottom: 1px solid var(--liniya); }
+table.primer tr.izbran td { background: var(--toplo); }
+table.primer th.suma, table.primer td.suma { text-align: right; }
+
+/* Двете графи · една до друга, а на тесен екран — една под друга */
+.dve-grafi { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 1000px) { .dve-grafi { grid-template-columns: minmax(0, 1fr); } }
+.grafa {
+  border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
+  padding: 14px; display: flex; flex-direction: column; gap: 10px;
+}
+.grafaglava { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+table.razbivka td { padding: 6px 6px; border-bottom: 1px solid var(--liniya); vertical-align: top; }
+table.razbivka td.znak { width: 18px; color: var(--mastilo2); font-size: 15px; }
+table.razbivka td.suma { text-align: right; white-space: nowrap; }
+table.razbivka .drebno { font-size: 10.5px; }
+.suma.zle { color: var(--aktsent); }
 .pole.tyasno { min-width: 210px; }
 .pole.tyasno select { font-size: 13px; }
 .plochka.golyama .chislo { font-size: 30px; }
@@ -625,6 +816,85 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   grid-template-columns: 40px minmax(0, 2fr) 96px 120px;
   min-width: 440px;
 }
+
+/* ── проблемите при въвеждане · цвят, знак, дума (И96 т.1 · т.9) ───────── */
+.problem-zhalto   { --problem: #B8860B; }
+.problem-oranzhevo{ --problem: #C05621; }
+.problem-cherveno { --problem: #A02B1F; }
+.problem-terakota { --problem: #8C4A32; }
+.problem-sinio    { --problem: #2B5C8A; }
+.problem-sivo     { --problem: #6B6560; }
+.problem-lilavo   { --problem: #6B3F8C; }
+
+/* Полето свети с РАМКА и лента отляво — не само с цвят на текста: цветът е
+   помощ за окото, а лентата се вижда и при слаб контраст. */
+.problem-pole {
+  border-color: var(--problem) !important;
+  box-shadow: inset 3px 0 0 var(--problem);
+}
+.problem-znak {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 22px; height: 22px; border-radius: 4px;
+  background: var(--problem); color: #FFFFFF;
+  font-size: 12px; line-height: 1;
+}
+.kazva-problem { font-size: 12px; color: var(--problem); margin-top: 4px; }
+.kazva-problem[data-spira="da"] { font-weight: 500; }
+
+.legenda-vhod { margin: 10px 0; }
+.legenda-vhod summary { cursor: pointer; font-size: 13px; color: var(--mastilo2); }
+.glava.legenda, .red.legenda {
+  grid-template-columns: 56px minmax(0, 1.2fr) 150px minmax(0, 2.4fr);
+  min-width: 720px;
+}
+
+/* ── чистата диаграма на коефициентите (И96 т.5 · т.6) ─────────────────── */
+.tablitsa.bez-ramka { border: none; background: none; padding: 4px 0; }
+.koef-diagrama { display: block; max-width: 100%; }
+.koef-nula { stroke: var(--liniya); stroke-width: 1; }
+.koef-liniya { fill: none; stroke: var(--aktsent); stroke-width: 2; stroke-linejoin: round; }
+.koef-tochka { fill: var(--aktsent); }
+.koef-stalb { fill: var(--aktsent); opacity: 0.82; }
+.koef-plosht { fill: var(--aktsent); opacity: 0.14; }
+.koef-etiket { font-size: 10.5px; fill: var(--mastilo2); }
+.koef-formula {
+  font-variant-numeric: tabular-nums; font-size: 12.5px;
+  background: var(--panel); border: 1px solid var(--liniya); border-radius: 4px;
+  padding: 6px 10px; display: inline-block;
+}
+.trevozhno { color: var(--aktsent); }
+.glava.koef-parametar, .red.koef-parametar {
+  grid-template-columns: minmax(0, 1fr) 160px;
+  min-width: 380px;
+}
+.red.koef-rezultat { background: var(--panel); }
+.glava.koef-red, .red.koef-red {
+  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr) 140px 130px;
+  min-width: 820px;
+}
+.red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 12px; }
+
+/* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
+.gant-dvete {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.gant-dvete.bez-diagrama { grid-template-columns: minmax(0, 1fr); }
+.gant-tablitsata, .gant-diagramata { min-width: 0; }
+/* На тесен екран двете една до друга не се четат — падат една под друга,
+   таблицата първа, защото тя носи числата. */
+@media (max-width: 1100px) {
+  .gant-dvete { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
+.glava.mesetsat, .red.mesetsat {
+  grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;
+  min-width: 860px;
+}
+.red.mesetsat .suma .drebno { font-size: 10.5px; }
 
 /* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
 .glava.zadacha, .red.zadacha {
@@ -1036,3 +1306,31 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-size: 12.5px; color: var(--mastilo);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
+
+/* ── Живите падащи менюта (И97 · ADR-040) ────────────────────────────────
+   Цветът е негов закон и стои непокътнат. Думата до него е ВТОРИЯТ носител:
+   онзи, който не различава синьо от черно, чете „＋ нова стойност" (ADR-032 —
+   цветът намира, думата обяснява). */
+.menyu-sinio { color: var(--menyu-sinio); }
+.menyu-cherno { color: var(--menyu-cherno); font-weight: 600; }
+.menyu-otkazano { border-color: var(--srok-cherveno); }
+
+.znak-menyu {
+  display: block;
+  margin-top: 2px;
+  min-height: 1em;          /* мястото стои празно, за да не подскача полето */
+  font-size: 11px;
+  color: var(--mastilo2);
+}
+.znak-menyu.trevoga { color: var(--srok-cherveno); font-weight: 600; }
+
+/* ── Още огледала · по обект и по контрагент (ADR-041) ────────────────── */
+.glava.po-imot, .red.po-imot {
+  grid-template-columns: minmax(0, 2fr) 110px 140px 140px 140px;
+  min-width: 760px;
+}
+.glava.po-kontragent, .red.po-kontragent {
+  grid-template-columns: minmax(0, 1.8fr) 120px 140px 140px 140px 120px;
+  min-width: 840px;
+}
+.red.po-imot.sbor { font-weight: 600; border-top: 2px solid var(--liniya); }

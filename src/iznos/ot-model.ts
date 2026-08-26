@@ -42,7 +42,7 @@ export const ZNAK_ZATVORENA = '🔒';
  * износ; за претворяване той не става. Стар модел без `glavi` пада към него —
  * по-добре сведена глава, отколкото никаква.
  */
-export function glaviNaModel(m: ModelNaTablitsa): readonly string[] {
+function glaviNaModel(m: ModelNaTablitsa): readonly string[] {
   return m.glavi.length > 0 ? m.glavi : m.otpechatak.split('|');
 }
 
@@ -62,7 +62,7 @@ function poKolona(m: ModelNaTablitsa): ReadonlyMap<number, Rolya> {
  * защото образецът пътува: човек го отваря след седмица и трябва да види защо
  * тази колона значи пари, без да отваря приложението.
  */
-export function listOtModel(
+function listOtModel(
   m: ModelNaTablitsa,
   n: { ime?: string; redove?: readonly (readonly (string | number)[])[] } = {},
 ): List {

@@ -40,11 +40,11 @@ export interface Dvizhenie {
   readonly opisanie: string;
 }
 
-export type Prichina =
+type Prichina =
   | 'lipsva-faktura' // пари в банката, но няма фактура за тях
   | 'lipsvat-pari'; // фактура има, пари по нея — не
 
-export interface Nesvarshen {
+interface Nesvarshen {
   readonly prichina: Prichina;
   readonly dvizhenie: Dvizhenie;
 }

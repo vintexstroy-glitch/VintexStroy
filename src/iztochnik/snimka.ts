@@ -16,7 +16,7 @@
 import type { Sha256 } from '../yadro/index.js';
 
 export type VidIzvor = 'csv' | 'xlsx' | 'pdf' | 'raka';
-export type VidSnimka = 'razhodi' | 'naemi';
+type VidSnimka = 'razhodi' | 'naemi';
 
 export interface Izvor {
   readonly vid: VidIzvor;
@@ -50,6 +50,21 @@ export interface Propusnat {
   readonly zashto: string;
 }
 
+/**
+ * ЕДИН РЕД, ДОНЕСЕН ОТ ВТОРИ ФАЙЛ · препокриващи се извлечения.
+ *
+ * НЕ е `Propusnat`: пропуснатият не е разчетен, а този е разчетен отлично —
+ * просто вече го има. Сливат се в едно, но се БРОЯТ и се показват, защото
+ * еднаква сума на еднакъв ден при еднакъв търговец МОЖЕ да е и два истински
+ * разхода. От данните е неразличимо; човекът решава (правило 18).
+ */
+export interface Povtoren {
+  readonly klyuch: string;
+  /** името на файла, който го донесе ВТОРИ път */
+  readonly fayl: string;
+  readonly suma_st: number;
+}
+
 export interface Snimka {
   readonly vid: VidSnimka;
   readonly period: string;
@@ -57,6 +72,14 @@ export interface Snimka {
   readonly redove: readonly RedOtSnimka[];
   /** редовете, които не са разчетени — броят се, не се преглъщат */
   readonly propusnati: readonly Propusnat[];
+  /**
+   * Редовете, дошли ВТОРИ път от друг файл в същата партида (`sleiSnimki`).
+   *
+   * Незадължително, защото снимка от ЕДИН лист няма как да ги има: там втори
+   * еднакъв ред е втори истински ред и получава свой ключ. Празно и липсващо
+   * значат едно и също и никой не ги различава.
+   */
+  readonly povtoreni?: readonly Povtoren[];
 }
 
 export async function otpechatak(danni: Uint8Array, sha: Sha256): Promise<string> {

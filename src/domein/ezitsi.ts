@@ -29,7 +29,7 @@
 
 import type { Podmnozhestvo } from './azbuki.js';
 
-export interface Ezik {
+interface Ezik {
   readonly klyuch: string;
   /** името на СОБСТВЕНИЯ му език — не преведено */
   readonly ime: string;

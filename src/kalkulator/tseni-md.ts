@@ -21,7 +21,7 @@ import { GreshkaPari, stotinki, type Stotinki } from '../yadro/pari.js';
 import { kletka, type Tablitsa } from '../iztochnik/tablitsa.js';
 import { ploshtVKvSm } from './chetene.js';
 
-export interface RedOtTseniMD {
+interface RedOtTseniMD {
   readonly obekt: string;
   /** „етаж 1" от „етаж 1 - кота +/- 0.00" · празно при пренасяне */
   readonly etazh: string;
@@ -38,7 +38,7 @@ export interface RedOtTseniMD {
   readonly tsena_st: Stotinki | null;
 }
 
-export interface SverkaNaRed {
+interface SverkaNaRed {
   readonly obekt: string;
   readonly kakvo: string;
 }

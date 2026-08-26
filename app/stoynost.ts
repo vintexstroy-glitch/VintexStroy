@@ -39,7 +39,6 @@ import {
   type ProchetenObekt,
 } from '../src/kalkulator/chetene.js';
 import { eListTseniMD, prochetiTseniMD, type ProchetenoTseniMD } from '../src/kalkulator/tseni-md.js';
-import { MATRITSA_ZA_RAZRABOTKA } from '../src/kalkulator/matritsa.js';
 import {
   sverkaNaPartida,
   stoynostNaSastoyanie,
@@ -54,7 +53,14 @@ import {
 } from '../src/kalkulator/tsenova-lista.js';
 import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
-import type { Konteks } from './main.js';
+import {
+  nastroykiteNaKalkulatora,
+  pokazhiObekt,
+  sektsiyaKalkulator,
+  zakachiKalkulator,
+} from './kalkulator.js';
+import { matritsaOtNastroyki } from '../src/kalkulator/nastroyki.js';
+import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
 let obekti: readonly ProchetenObekt[] = [];
@@ -93,10 +99,29 @@ export function sboratZaKapitala(): number | undefined {
   return smetnato?.sastoyanie_tochno_st;
 }
 
+/**
+ * ДВЕТЕ СЕКЦИИ · неговото предложение в И96 т.2, изпълнено.
+ *
+ *   „Ако се налага направи **секция Калкулатор и секция Ценова листа**."
+ *
+ * Горе е ВХОДЪТ — матрицата, коефициентите, доходността и разбивката „как се
+ * смята". Долу е ИЗХОДЪТ — обект по обект, двете графи и разликата.
+ *
+ * Разделени, защото се гледат от различни хора в различен момент: матрицата се
+ * пипа веднъж на сезон, листата — всеки ден.
+ */
 export function narisuvayStoynost(): string {
+  const n = nastroykiteNaKalkulatora();
   return `
+    ${sektsiyaKalkulator()}
+
+    <div class="dyalglava">
+      <h2>Ценова листа</h2>
+      <span>изходът · тук се ПОКАЗВА и оттук се изнася</span>
+    </div>
+
     <div class="plochki">
-      <div class="plochka golyama">
+      <div class="plochka golyama" data-pole="stoynost-a">
         <span class="etiket">А · по площ</span>
         <span class="chislo" translate="no">${smetnato ? pishi(smetnato.obshto_st) : '—'}</span>
         <span class="pod">${
@@ -107,26 +132,28 @@ export function narisuvayStoynost(): string {
             : 'прочети площообразуването, за да се смята'
         }</span>
       </div>
-      <div class="plochka golyama">
+      <div class="plochka golyama" data-pole="stoynost-b">
         <span class="etiket">Б · по състояние</span>
         <span class="chislo" translate="no">${smetnato ? pishi(smetnato.sastoyanie_st) : '—'}</span>
         <span class="pod">${
           smetnato
-            ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ`
+            ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ · закръглено ${sZnak(
+                smetnato.razlika_sastoyanie_st,
+              )}`
             : 'оценката · годишен наем ÷ доходност'
         }</span>
       </div>
       <div class="plochka">
         <span class="etiket">Матрица</span>
-        <span class="chislo malka" translate="no">${ekraniraj(MATRITSA_ZA_RAZRABOTKA.rayon)}</span>
-        <span class="pod">база ${pishi(MATRITSA_ZA_RAZRABOTKA.baza_st.apartament)}/м² · доходност ${vProtsent(MATRITSA_ZA_RAZRABOTKA.dohodnost_bt)}</span>
+        <span class="chislo malka" translate="no">${ekraniraj(n.rayon)}</span>
+        <span class="pod">база ${pishi(n.baza_st.apartament)}/м² · доходност ${vProtsent(n.dohodnost_bt)} · сменя се горе</span>
       </div>
     </div>
 
     ${vest ? `<div class="vest dobre">${ekraniraj(vest)}</div>` : ''}
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
 
-    <section>
+    <section data-sektsiya="tsenova-lista">
       <div class="dyalglava">
         <h2>Двата пътя</h2>
         <span>посоката е ЕДНА · бутон, който чете, няма път към писане</span>
@@ -136,7 +163,7 @@ export function narisuvayStoynost(): string {
         <button type="button" class="vtorichen" id="cheti-tseni">Чети Ценова листа</button>
         <label class="pole tyasno">
           <span>Кои цени се пускат</span>
-          <select id="koya-tsena">
+          <select translate="no" id="koya-tsena">
             ${(['dvete', 'plosht', 'sastoyanie'] as const)
               .map(
                 (k) =>
@@ -152,8 +179,8 @@ export function narisuvayStoynost(): string {
             : ''
         }
       </div>
-      <input type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
-      <input type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
+      <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
+      <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
       <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
     </section>
@@ -177,7 +204,7 @@ function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number
     { klyuch: 'naem', ime: 'Наем', vid: 'evro', vzemi: (r) => r.naem_mesechen_st },
     { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
     { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
-    { klyuch: 'delta', ime: 'Δ', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+    { klyuch: 'delta', ime: 'Разлика', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
   ];
 }
 
@@ -271,11 +298,38 @@ export function zakachiStoynost(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * ЛИСТАТА СЕ СМЯТА С НАСТРОЙКИТЕ ОТ СЕКЦИЯ „КАЛКУЛАТОР".
+   *
+   * Това е връзката между двете секции и целият смисъл на разделянето: смени
+   * базата или коефициент горе — числата долу тръгват след него. Иначе
+   * секцията горе би била украса, а той поиска вход, не табло.
+   *
+   * И РАЗБИВКАТА тръгва след първия обект в движение: така „как се смята"
+   * говори за НЕГОВ обект, а не за примерния.
+   */
   const presmetni = (): void => {
-    smetnato =
-      obekti.length === 0
-        ? null
-        : stoynostNaSastoyanie(obekti, otLista, undefined, naemiOtZhurnala);
+    if (obekti.length === 0) {
+      smetnato = null;
+      return;
+    }
+    smetnato = stoynostNaSastoyanie(
+      obekti,
+      otLista,
+      matritsaOtNastroyki(nastroykiteNaKalkulatora()),
+      naemiOtZhurnala,
+    );
+    const parvi = smetnato.redove.find((r) => !r.prodaden) ?? smetnato.redove[0];
+    if (parvi) {
+      pokazhiObekt({
+        obekt: parvi.obekt,
+        vid: parvi.vid,
+        obshta_kvsm: parvi.obshta_kvsm,
+        dobavki: {},
+        naem_mesechen_st: parvi.naem_mesechen_st,
+        naemOt: parvi.naemOt,
+      });
+    }
   };
 
   /** Наемите от Журнала — четат се при всяко смятане, не се помнят стари. */
@@ -287,6 +341,12 @@ export function zakachiStoynost(
     });
     naemiOtZhurnala = kartaNaNaemite(imoti);
   };
+
+  // Секция „Калкулатор" · всяка промяна горе преизчислява листата долу.
+  zakachiKalkulator(koren, async () => {
+    presmetni();
+    await prerisuvay();
+  });
 
   const poleto = (id: string): HTMLInputElement | null =>
     koren.querySelector<HTMLInputElement>(`#${id}`);
@@ -363,7 +423,7 @@ export function zakachiStoynost(
         `Прочетени ${sv.vhod} обекта → ${sv.izhod} реда · разлика ${sv.razlika}` +
         (propusnati ? ` · ${propusnati} пропуснати реда без четими числа` : '') +
         (otMD
-          ? ` · листата носи цени за ${sTseni.length} обекта · Σ ${pishi(sborTseni)}` +
+          ? ` · листата носи цени за ${sTseni.length} обекта · сбор ${pishi(sborTseni)}` +
             (otMD.sverki.length
               ? ` · ${otMD.sverki.length} реда, при които площите на файла не се сверяват помежду си — за тях сметката ползва чиста + общи части`
               : '')
@@ -454,9 +514,9 @@ export function zakachiStoynost(
  * Идемпотентността е по ОГЛЕДАЛОТО: имот с този адрес и единица, или дело
  * със същото място·обект·име, не се вписва втори път — брои се и се казва.
  */
-export const MD_ADRES = 'Малинова Долина';
+const MD_ADRES = 'Малинова Долина';
 
-export async function vpishiMD(
+async function vpishiMD(
   k: Konteks,
   md: ProchetenoTseniMD,
 ): Promise<{ imoti: number; dela: number; veche: number }> {

@@ -113,7 +113,7 @@ function tekstOtSadarzhanie(sadarzhanie: string): string[] {
   return redove;
 }
 
-export interface ProchetenPDF {
+interface ProchetenPDF {
   readonly redove: readonly string[];
   /** излязла ли е поне една дума — иначе е сканиран или шифрован */
   readonly imaTekst: boolean;

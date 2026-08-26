@@ -19,9 +19,9 @@
  * четирите плана. Затова живеят в различни файлове и нищо не ги свързва.
  */
 
-export type Stepen = 'alfa' | 'beta' | 'prilozhenie';
+type Stepen = 'alfa' | 'beta' | 'prilozhenie';
 
-export interface Izdanie {
+interface Izdanie {
   readonly stepen: Stepen;
   readonly ime: string;
   /** какво носи ТОВА издание — казано на глас, включително непълнотата */

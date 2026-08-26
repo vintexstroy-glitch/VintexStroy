@@ -25,7 +25,7 @@
 import { vidPoIme, type VidObekt } from './chetene.js';
 
 /** Ключът, по който двете страни се познават: вид + номер. */
-export interface KlyuchNaObekt {
+interface KlyuchNaObekt {
   readonly vid: VidObekt;
   readonly nomer: number;
 }
@@ -54,12 +54,12 @@ export function sashtiyat(a: KlyuchNaObekt | undefined, b: KlyuchNaObekt | undef
 }
 
 /** Низът, по който ключът се търси в карта. */
-export function nizNaKlyuch(k: KlyuchNaObekt): string {
+function nizNaKlyuch(k: KlyuchNaObekt): string {
   return `${k.vid}#${k.nomer}`;
 }
 
 /** Един имот от Журнала, сведен до каквото свързването иска. */
-export interface ImotZaSvarzvane {
+interface ImotZaSvarzvane {
   /** единицата, както е записана: „АП. № 1" */
   readonly edinitsa: string;
   /** месечният наем в стотинки; 0 значи „няма действащ наем" */

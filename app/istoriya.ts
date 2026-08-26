@@ -14,13 +14,22 @@
 
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
+import { otvoriProzorets } from './prozorets.js';
+import { butonSIkona } from './ikoni.js';
 import type { Sabitie } from '../src/yadro/index.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Малкият бутон в реда · `vid` и `id` са същността от Журнала. */
 export function butonIstoriya(vid: string, id: string): string {
-  return `<button type="button" class="butoncheto-istoriya" data-istoriya="${ekraniraj(vid)}·${ekraniraj(id)}"
-    aria-label="История на реда" title="История · кой, какво, кога">История</button>`;
+  // Знак отпред, дума до него (И101 т.2 · ADR-045). Класът остава същият —
+  // проходът и CSS-ът го познават по него, а не по разметката вътре.
+  return butonSIkona({
+    ikona: 'istoriya',
+    tekst: 'История',
+    title: 'История · кой, какво, кога',
+    klas: 'butoncheto-istoriya',
+    danni: { istoriya: `${vid}·${id}` },
+  });
 }
 
 /**
@@ -63,35 +72,16 @@ async function pokazhi(k: Konteks, vid: string, id: string): Promise<void> {
     id,
   });
 
-  const fon = document.createElement('div');
-  fon.className = 'istoriya-fon';
-  fon.innerHTML = `
-    <div class="istoriya-karta" role="dialog" aria-label="История на реда">
-      <h3>История</h3>
-      <p class="pod" translate="no">${ekraniraj(id)} · ${sabitiya.length} ${
-        sabitiya.length === 1 ? 'събитие' : 'събития'
-      } · Журналът пази всичко, завинаги</p>
-      ${
-        sabitiya.length === 0
-          ? '<p class="prazno">Няма нито едно събитие — това не би трябвало да се вижда на екрана.</p>'
-          : sabitiya.map(redNaSabitie).join('')
-      }
-      <button type="button" class="vtorichen istoriya-zatvori">Затвори</button>
-    </div>`;
-
-  const zatvori = () => {
-    fon.remove();
-    document.removeEventListener('keydown', priKlavish);
-  };
-  const priKlavish = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') zatvori();
-  };
-  fon.addEventListener('click', (e) => {
-    if (e.target === fon) zatvori();
+  otvoriProzorets({
+    zaglavie: 'История',
+    pod: `${id} · ${sabitiya.length} ${
+      sabitiya.length === 1 ? 'събитие' : 'събития'
+    } · Журналът пази всичко, завинаги`,
+    tyalo:
+      sabitiya.length === 0
+        ? '<p class="prazno">Няма нито едно събитие — това не би трябвало да се вижда на екрана.</p>'
+        : sabitiya.map(redNaSabitie).join(''),
   });
-  fon.querySelector('.istoriya-zatvori')!.addEventListener('click', zatvori);
-  document.addEventListener('keydown', priKlavish);
-  document.body.append(fon);
 }
 
 /** Закача се веднъж на екран — обслужва всички редове с история в него. */

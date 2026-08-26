@@ -16,7 +16,7 @@ import type { Ogledalo } from './ogledalo.js';
 import { dniMezhdu } from './ogledalo.js';
 
 /** Единият обект: какво носи, какво дължат по него, какво е ял. */
-export interface PoImot {
+interface PoImot {
   readonly imotId: string;
   readonly adres: string;
   readonly edinitsa: string;
@@ -60,7 +60,7 @@ export function poImot(o: Ogledalo): PoImot[] {
 }
 
 /** Единият контрагент — наемател или доставчик, събран от всичките му следи. */
-export interface PoKontragent {
+interface PoKontragent {
   readonly ime: string;
   readonly rolya: 'наемател' | 'доставчик';
   readonly nachisleno_st: number;

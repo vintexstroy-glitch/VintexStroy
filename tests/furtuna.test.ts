@@ -23,6 +23,7 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
 import { duljimo, fold } from '../src/ogledalo/ogledalo.js';
+import { glavnaKniga } from '../src/domein/glavna-kniga.js';
 import { seyalka, SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -227,9 +228,132 @@ describe('фъртуна 2 · хиляда повредени операции',
     expect(otkazani).toBe(900);
     expect(prieti).toBe(100);
 
+    /**
+     * И ЕДНА ПОВРЕДА, КОЯТО НЕ МИНАВА ПРЕЗ ВРАТАТА · пипнат ИЗНОС.
+     *
+     * Останалите 900 се отказват на входа. Тази идва от друга посока: файл,
+     * чиито хешове са непокътнати, а е сменена САМО думата „кой е записал".
+     *
+     * Дотук минаваше. `actor` не влизаше в подписа — тоест кой какво е направил
+     * се редактираше без следа, в книга, чието първо правило е „само добавяне".
+     * И понеже ADR-043 извежда стопанина на започнат Журнал именно от `actor`
+     * на първото събитие, дупката се отваряше чак до присвояване на чужд Журнал.
+     */
+    const chestni = await dnevnik.chetiVsichki(NAEMATEL);
+    const pipnat = chestni.map((s) => ({ ...s, actor: 'chuzhd@example.bg' }));
+    const sledPipvane = await proveriVerigata(pipnat, SHA);
+    expect(sledPipvane.tsyala, 'сменен actor ТРЯБВА да къса веригата').toBe(false);
+    expect(sledPipvane.parvoSchupeno).toBe(1);
+
     // Нула поражения: точно здравите записи, верига цяла.
     const sabitiya = await dnevnik.chetiVsichki(NAEMATEL);
     expect(sabitiya).toHaveLength(100);
     expect((await proveriVerigata(sabitiya, SHA)).tsyala).toBe(true);
+  });
+});
+
+/**
+ * ФЪРТУНА 3 · ГЛАВНАТА КНИГА под същия обстрел.
+ *
+ * Книгата е ново сърце: тя е ПРОЕКЦИЯ, а проекция не бива да пада от онова,
+ * което вече стои в Журнала. В Журнала влизат и прочетена таблица, и върнат
+ * архив, и запис отпреди днешните пазачи — все неща, които не минават през
+ * формите.
+ *
+ * Тази буря е писана, след като сверител намери точно такъв случай: ДДС-превод
+ * за НУЛА влизаше през Вратата (правило 3 иска цели стотинки — нулата е цяла) и
+ * събаряше ЦЕЛИЯ екран Сметки, защото от нула не се прави двустранна статия.
+ * Единичният тест го пази, но само за онзи случай; тук се пази ПРАВИЛОТО.
+ *
+ * Двата инварианта, които книгата няма право да наруши при никакви данни:
+ *   1. НЕ ХВЪРЛЯ · какъвто и да е Журналът;
+ *   2. ЗАТВАРЯ · дебит = кредит, до стотинка, за всеки период поотделно.
+ */
+describe('фъртуна 3 · главната книга не пада и затваря', () => {
+  it('при стотици смесени записа, включително негодни суми', async () => {
+    const { dnevnik, vrata, deystviya } = stend();
+    const sluchayno = seyalka(20260826);
+    const izbroy = (n: number) => Math.floor(sluchayno() * n);
+    const MESETSI = ['2026-01', '2026-02', '2026-03'];
+
+    await deystviya.dobaviImot('I-1', { adres: 'Малинова', edinitsa: '№ 1', ploshtad_kvsm: 6000 }, { opId: 'op-i' });
+    for (const [i, sektor] of ['naem-zhilishten', 'naem-targovski'].entries()) {
+      await deystviya.dobaviNaem(
+        `N-${i}`,
+        { imotId: 'I-1', naemetel: `Наемател ${i}`, telefon: '', imeyl: '',
+          naem_st: 60000 + i * 7777, padezhDen: 5, ot: '2026-01-01', do: '2026-12-31',
+          depozit_st: 0, sektor },
+        { opId: `op-n-${i}` },
+      );
+    }
+
+    let n = 0;
+    for (let i = 0; i < 240; i += 1) {
+      const mesets = MESETSI[izbroy(MESETSI.length)]!;
+      const zar = sluchayno();
+      n += 1;
+      try {
+        if (zar < 0.35) {
+          await deystviya.nachisliVzemane(
+            `V-${n}`,
+            { naemId: `N-${izbroy(2)}`, period: mesets, osnovanie: 'наем',
+              suma_st: izbroy(300000) + 1, padezh: `${mesets}-05` },
+            { opId: `op-v-${n}` },
+          );
+        } else if (zar < 0.6) {
+          await deystviya.zapishiRazhod(
+            `R-${n}`,
+            { potok: izbroy(2) === 0 ? 'fakturi' : 'zaplati',
+              dostavchik: `Доставчик ${izbroy(5)}`, opis: 'нещо',
+              suma_st: izbroy(120000) + 1,
+              sektor: ['pokupki-materiali', 'pokupki-uslugi', 'zaplati'][izbroy(3)]!,
+              stavka: [0, 9, 20][izbroy(3)]!,
+              nachin: izbroy(2) === 0 ? 'в брой' : 'банка',
+              data: `${mesets}-1${izbroy(9)}`, dokument: `Ф-${n}` },
+            { opId: `op-r-${n}` },
+          );
+        } else if (zar < 0.8) {
+          // НЕГОДНА СУМА · влиза ПОКРАЙ действието, както влизат внесени данни
+          await vrata.dobavi({
+            opId: `op-nula-${n}`, ts: '2026-04-01T00:00:00.000Z', naematel: NAEMATEL,
+            actor: 'vintexstroy@gmail.com', type: 'ДДСПлатено',
+            sashtnost: { vid: VID.spravka, id: `DP-${n}` },
+            payload: { period: mesets, suma_st: izbroy(2) === 0 ? 0 : -izbroy(5000),
+              data: `${mesets}-2${izbroy(8)}`, nachin: 'банка' },
+          });
+        } else {
+          await deystviya.platiDDS(
+            `DP-ok-${n}`,
+            { period: mesets, suma_st: izbroy(40000) + 1, data: `${mesets}-25`, nachin: 'банка' },
+            { opId: `op-dp-${n}` },
+          );
+        }
+      } catch (greshka) {
+        // Замразен период и отказана сума са ВЕРНИ откази — бурята продължава.
+        if (!(greshka instanceof Error)) throw greshka;
+      }
+    }
+
+    const o = fold(await dnevnik.chetiVsichki(NAEMATEL));
+    let statii = 0;
+    let propusnati = 0;
+    for (const mesets of MESETSI) {
+      const k = glavnaKniga(o, mesets, '2026-04-01T00:00:00.000Z');
+      expect(k.debit_st, `${mesets} · дебит ↔ кредит`).toBe(k.kredit_st);
+      expect(
+        k.nared,
+        `${mesets} · ${k.sverki.filter((s) => !s.nared).map((s) => `${s.kakvo}: ${s.razlika}`).join(' · ')}`,
+      ).toBe(true);
+      for (const s of k.statii) {
+        const debit = s.redove.filter((r) => r.strana === 'debit').reduce((x, r) => x + r.suma_st, 0);
+        const kredit = s.redove.filter((r) => r.strana === 'kredit').reduce((x, r) => x + r.suma_st, 0);
+        expect(debit, `статия ${s.id}`).toBe(kredit);
+      }
+      statii += k.statii.length;
+      propusnati += k.bezDvizhenie;
+    }
+    // Бурята наистина е минала през двата пътя: и статии, и пропуснати.
+    expect(statii).toBeGreaterThan(30);
+    expect(propusnati).toBeGreaterThan(0);
   });
 });

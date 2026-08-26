@@ -246,7 +246,7 @@ export function sravnitel(vid: VidStoynost): (a: string | number, b: string | nu
 }
 
 // ── прилагането ───────────────────────────────────────────────────────────
-export interface Filtrirano<T> {
+interface Filtrirano<T> {
   readonly redove: T[];
   /** колко скриха филтърът и търсенето — казва се, не се премълчава */
   readonly skriti: number;
@@ -294,7 +294,7 @@ export function filtriray<T>(
 }
 
 // ── групирането · сборът се СМЯТА, не се записва (правило 20) ─────────────
-export interface Grupa<T> {
+interface Grupa<T> {
   readonly ime: string;
   readonly redove: readonly T[];
 }
@@ -388,7 +388,7 @@ export function grupiranaTablitsa<T>(
  * носи ключа и името си (`data-kolona` · `data-ime`) — скриването и
  * контекстното меню четат тях, не остъргват боядисания текст.
  */
-export function glavaSFiltar<T>(
+function glavaSFiltar<T>(
   tablitsa: string,
   k: KolonaSFiltar<T>,
   redove: readonly T[],

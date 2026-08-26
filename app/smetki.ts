@@ -44,15 +44,61 @@ import { podredi } from '../src/domein/dela.js';
 import { obobshtenRed, reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
+import {
+  IMENA_NA_RAZDELITE,
+  delta,
+  deltaProtsentiDeseti,
+  kamTekst,
+  mesetsatKatoTablitsa,
+  type RedNaMesetsa,
+} from '../src/domein/mesetsat.js';
 import { stalboveNaMesetsite } from './diagrami.js';
+import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
+import { legendata, zakachiPole } from './vhodni-problemi.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
 import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { butonSIkona } from './ikoni.js';
+import { safT } from '../src/iznos/saf-t.js';
+import { SHEMA } from '../src/iznos/saf-t-shema.js';
+import { oboroti } from '../src/domein/glavna-kniga.js';
+import { svaliFayl } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import type { Konteks } from './main.js';
+import {
+  menyuOtZhivi,
+  novoteVSpisatsite,
+  optsiiNaNachina,
+  optsiiNaStavkata,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
+import type { Konteks } from './ekranite.js';
+
+/** Ключът на речниците на този екран · формата на разхода е една. */
+const RECHNIK_RAZHOD = 'razhod';
+
+/**
+ * РЕЧНИЦИТЕ НА РАЗХОДА · изведени от записаните разходи, без ново събитие.
+ *
+ * Двете полета имат ЕДНА мярка и затова един помощник: и доставчикът, и „за
+ * какво" са свободен текст, който се повтаря — разликата е само от кое поле
+ * се чете.
+ */
+function menyutoNaRazhodite(o: Ogledalo, klyuch: 'dostavchik' | 'opis', ime: string): Menyu {
+  return menyuOtZhivi(
+    klyuch,
+    ime,
+    [...o.razhodi.values()].map((r) => r[klyuch]),
+  );
+}
 
 /** opId живее, докато формата стои отворена — двойно натискане дава един запис. */
 let opIdRazhod = crypto.randomUUID();
@@ -221,6 +267,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
 
+    ${blokNaOditniyaFayl(o, mesets)}
+
     <section>
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
@@ -241,7 +289,11 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
 
-    ${formaRazhod(mesets)}
+    ${narisuvayKoefitsientite(o, dnes)}
+
+    ${blokMesetsatZaAgenta(o, mesets)}
+
+    ${formaRazhod(o, mesets)}
 
     ${
       razhodi.length === 0
@@ -268,6 +320,98 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 }
 
 /**
+ * ОДИТНИЯТ ФАЙЛ · Главната книга и месечният XML за НАП (И96 т.11 · ADR-047).
+ *
+ * ЗАЩО В СМЕТКИ, а не в Настройки: това е ЧИСЛО ЗА МЕСЕЦ, като справката до
+ * него. Файлът за юли се прави от юлските данни и се сверява срещу тях —
+ * човекът, който гледа сметките на месеца, е и онзи, който подава.
+ *
+ * ЗАЩО ПРЕЧКИТЕ СА ГОРЕ: файл, обявен за готов, когато не е, се разбира от
+ * акта. Затова първото, което се вижда, е какво още липсва — поименно.
+ */
+function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
+  const r = safT(o, mesets, new Date().toISOString());
+  const ob = oboroti(r.kniga);
+  return `
+    <section class="karta" data-sektsiya="saf-t">
+      <div class="dyalglava">
+        <h2>Одитен файл (SAF-T)</h2>
+        <span>схема ${ekraniraj(SHEMA.versiya)} · в сила от ${ekraniraj(SHEMA.vSilaOt)} · ${ekraniraj(mesets)}</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">Статии</span>
+          <span class="chislo" translate="no">${r.broiStatii}</span>
+          <span class="pod">двустранни · дебит = кредит</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Продажби · покупки</span>
+          <span class="chislo" translate="no">${r.broiProdazhbi} · ${r.broiPokupki}</span>
+          <span class="pod">фактурите в SourceDocuments</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Плащания</span>
+          <span class="chislo" translate="no">${r.broiPlashtaniya}</span>
+          <span class="pod">Payments</span>
+        </div>
+        <div class="plochka${r.prechki.length === 0 ? '' : ' trevoga'}">
+          <span class="etiket">Готовност</span>
+          <span class="chislo" translate="no">${r.prechki.length === 0 ? '—' : r.prechki.length}</span>
+          <span class="pod">${r.prechki.length === 0 ? 'няма пречки за подаване' : 'пречки · изброени долу'}</span>
+        </div>
+      </div>
+
+      ${
+        r.prechki.length === 0
+          ? ''
+          : `<ul class="prechki">${r.prechki.map((p) => `<li>${ekraniraj(p)}</li>`).join('')}</ul>`
+      }
+
+      <div class="tablitsa">
+        <div class="glava saft">
+          <span>Сметка</span><span>Национален код</span>
+          <span class="suma">Дебит</span><span class="suma">Кредит</span>
+        </div>
+        ${
+          ob.length === 0
+            ? '<p class="prazno">Няма статии за този месец.<br>Празният месец пак дава валиден по структура файл.</p>'
+            : ob
+                .map(
+                  (r2) => `
+          <div class="red saft" translate="no">
+            <span class="kletka"><b>${ekraniraj(r2.smetka.nomer)}</b><span>${ekraniraj(r2.smetka.ime)}</span></span>
+            <span>${r2.smetka.nra === '' ? '<em>не е мапната</em>' : ekraniraj(r2.smetka.nra)}</span>
+            <span class="suma" data-st="${r2.debit_st}">${pishi(r2.debit_st)}</span>
+            <span class="suma" data-st="${r2.kredit_st}">${pishi(r2.kredit_st)}</span>
+          </div>`,
+                )
+                .join('')
+        }
+        <div class="red saft sbor" translate="no">
+          <span class="kletka"><b>Общо</b><span>дебит ↔ кредит</span></span>
+          <span></span>
+          <span class="suma" data-st="${r.kniga.debit_st}">${pishi(r.kniga.debit_st)}</span>
+          <span class="suma${r.kniga.debit_st === r.kniga.kredit_st ? '' : ' duljimo'}" data-st="${r.kniga.kredit_st}">${pishi(r.kniga.kredit_st)}</span>
+        </div>
+      </div>
+
+      <div class="deystviya">
+        ${butonSIkona({
+          ikona: 'iznos',
+          tekst: 'Свали файла',
+          title: 'Сглобява XML-а и го сваля на устройството',
+          klas: 'vtorichen',
+          danni: { 'svali-saft': mesets },
+        })}
+        <p class="drebno">Файлът се сглобява МЕСТНО и се сваля — приложението не го изпраща наникъде.
+        Той НЕ е проверен срещу самата XSD-схема на НАП: истинската проверка е ТЕСТОВОТО подаване
+        през портала им. ${ekraniraj(ZASHTO_I_NULATA)}</p>
+      </div>
+    </section>`;
+}
+
+/**
  * САЛДАТА · „Редактируеми отгоре в Сметки" *(р57·[18])*.
  *
  * Тук влиза САМО началото. Движенията се четат от Журнала — ако и двете се
@@ -286,13 +430,14 @@ function formaSalda(o: Ogledalo): string {
       </div>
       <form id="forma-saldo">
         <div class="poleta tesni">
-          <div class="pole">
-            <label for="saldo-kade">Джоб</label>
-            <select id="saldo-kade" name="kade">
-              <option value="banka">${IMENA_NA_DZHOBOVETE.banka} · сега ${pishi(banka_st)}</option>
-              <option value="trezor">${IMENA_NA_DZHOBOVETE.trezor} · сега ${pishi(trezor_st)}</option>
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'saldo-kade',
+            ime: 'kade',
+            etiket: 'Джоб',
+            spisak: 'dzhob',
+            opcii: `<option value="banka">${ekraniraj(IMENA_NA_DZHOBOVETE.banka)} · сега ${pishi(banka_st)}</option>
+              <option value="trezor">${ekraniraj(IMENA_NA_DZHOBOVETE.trezor)} · сега ${pishi(trezor_st)}</option>`,
+          })}
           <div class="pole">
             <label for="saldo-suma">Начално салдо</label>
             <input translate="no" id="saldo-suma" name="suma" inputmode="decimal" placeholder="10 000,00" required>
@@ -369,6 +514,72 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
  * (правило 20), пише се в Управление. Тактът е закован на месец: сверката
  * гледа месеци, не дни.
  */
+/**
+ * МЕСЕЦЪТ ЗА АГЕНТА · това, и НИЩО друго, тръгва навън (резен 15б · ADR-005).
+ *
+ * Негови думи: агентът „смята и предлага, и анализира финансовите показатели и
+ * отчети — оценява, предлага и показва" *(ADR-005 · И11)*, но „не записва"
+ * *(И12)*. За да анализира, му трябва ТАБЛИЦА, не сборове — от изречение
+ * „Приходи: 1 700,00 €" не се вижда накъде мърда нещо.
+ *
+ * ЗАЩО СТОИ НА ЕКРАНА. Защото съдържанието му напуска устройството. Бутон
+ * „анализирай", който не показва какво изпраща, иска доверие, което не е
+ * спечелено. Тук се вижда всеки ред — и `<details>`-ът долу показва
+ * ДОСЛОВНИЯ текст, дума по дума, какъвто го получава моделът.
+ *
+ * И се вижда какво НЕ излиза: имена на наематели и доставчици няма никъде
+ * (ADR-029), а `tests/mesetsat.test.ts` го пази вместо окото.
+ */
+function blokMesetsatZaAgenta(o: Ogledalo, mesets: string): string {
+  const t = mesetsatKatoTablitsa(o, mesets, new Date().toISOString());
+  return `
+    <section>
+      <div class="dyalglava">
+        <h2>Месецът за агента</h2>
+        <span>това — и нищо друго — напуска устройството</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="mesetsat">
+        <div class="glava mesetsat">
+          <span>Раздел</span><span>Ред</span><span class="suma">Сега</span>
+          <span class="suma">${ekraniraj(t.predishniyat)}</span><span class="suma">Разлика</span><span class="suma">Брой</span>
+        </div>
+        ${t.redove.map(redNaMesetsa).join('')}
+      </div>
+      <p class="drebno">Сравнява се с <b translate="no">${ekraniraj(t.predishniyat)}</b>.
+      Разликата се <b>СМЯТА</b> и не се записва — записана разлика се разминава със своите две числа
+      при първата поправка. „От нула на нещо" НЯМА процент: липсата се казва, вместо да се
+      запълни с измислено число.</p>
+      <p class="drebno">${
+        t.nared
+          ? 'Четирите сверки затварят — месецът е цял и агентът го вижда цял.'
+          : '<b>ВНИМАНИЕ:</b> сверка НЕ затваря. Агентът ще получи месеца ЗАЕДНО с това предупреждение — анализ върху непълен месец звучи също толкова убедено.'
+      }</p>
+      <details>
+        <summary>Дословният текст, който получава моделът</summary>
+        <pre id="mesetsat-tekst" translate="no">${ekraniraj(kamTekst(t))}</pre>
+      </details>
+      <p class="drebno"><b>Какво НЕ излиза:</b> имена на наематели и доставчици.
+      За да се прецени посока, редът на раздела стига; имената нямат работа на чужд сървър
+      (ADR-029). Агентът чете, смята и <b>предлага</b> — записва човекът (правило 18).</p>
+    </section>`;
+}
+
+function redNaMesetsa(r: RedNaMesetsa): string {
+  const d = delta(r);
+  const p = deltaProtsentiDeseti(r);
+  return `
+    <div class="red mesetsat" data-razdel="${r.razdel}" translate="no">
+      <span><span class="znachka tiha">${IMENA_NA_RAZDELITE[r.razdel]}</span></span>
+      <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.kakvo)}</span></span>
+      <span class="suma" data-st="${r.stoynost_st}">${pishi(r.stoynost_st)}</span>
+      <span class="suma" data-st="${r.predi_st}">${pishi(r.predi_st)}</span>
+      <span class="suma" data-delta-st="${d}">${d > 0 ? '+' : ''}${pishi(d)}${
+        p === undefined ? '' : `<span class="drebno"> ${p > 0 ? '+' : ''}${(p / 10).toFixed(1)}%</span>`
+      }</span>
+      <span class="suma">${r.broy}</span>
+    </div>`;
+}
+
 function blokDelata(o: Ogledalo, dnes: string): string {
   const dela = podredi([...o.dela.values()], dnes);
   if (dela.length === 0) return '';
@@ -422,55 +633,89 @@ function poleNaOtcheta(p: Pole): string {
     </article>`;
 }
 
-function formaRazhod(mesets: string): string {
+function formaRazhod(o: Ogledalo, mesets: string): string {
+  // Речникът се пълни при РИСУВАНЕ (тук е Огледалото) и се чете при ЗАКАЧАНЕ.
+  zapomniRechnitsite(
+    RECHNIK_RAZHOD,
+    new Map([
+      ['dostavchik', menyutoNaRazhodite(o, 'dostavchik', 'Доставчик')],
+      ['opis', menyutoNaRazhodite(o, 'opis', 'За какво')],
+    ]),
+  );
   return `
     <section class="karta">
       <div class="dyalglava"><h2>Нов разход</h2><span>сумата е обща цена с ДДС — както при наема</span></div>
       <form id="forma-razhod">
         <div class="poleta">
-          <div class="pole">
-            <label for="razhod-potok">Поток</label>
-            <select translate="no" id="razhod-potok" name="potok" required>
-              ${potototsiNaRazhod()
-                .map((p) => `<option value="${ekraniraj(p.klyuch)}">${ekraniraj(p.ime)}</option>`)
-                .join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-sektor">Сектор — важи за Фактури</label>
-            <select translate="no" id="razhod-sektor" name="sektor" required>
-              ${sektoriNaRazhod()
-                .filter((a) => a.stavka > 0)
-                .map((a) => `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
-                .join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-stavka">Ставка на ТАЗИ фактура</label>
-            <select translate="no" id="razhod-stavka" name="stavka" required>
-              ${STAVKI.map(
-                (st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`,
-              ).join('')}
-            </select>
-          </div>
-          <div class="pole">
-            <label for="razhod-dostavchik">Доставчик или получател</label>
-            <input translate="no" id="razhod-dostavchik" name="dostavchik" required placeholder="напр. Материали ООД" autocomplete="off">
-          </div>
-          <div class="pole">
-            <label for="razhod-opis">За какво</label>
-            <input translate="no" id="razhod-opis" name="opis" required placeholder="напр. цимент" autocomplete="off">
-          </div>
+          ${poleSIzbor({
+            id: 'razhod-potok',
+            ime: 'potok',
+            etiket: 'Поток',
+            spisak: 'potok',
+            zadalzhitelno: true,
+            opcii: potototsiNaRazhod()
+              .map((p) => `<option value="${ekraniraj(p.klyuch)}">${ekraniraj(p.ime)}</option>`)
+              .join(''),
+          })}
+          ${poleSIzbor({
+            id: 'razhod-sektor',
+            ime: 'sektor',
+            etiket: 'Сектор — важи за Фактури',
+            spisak: 'sektor',
+            zadalzhitelno: true,
+            opcii: sektoriNaRazhod()
+              .filter((a) => a.stavka > 0)
+              .map((a) => `<option value="${ekraniraj(a.klyuch)}">${ekraniraj(a.sektor)} · ${a.stavka}%</option>`)
+              .join(''),
+          })}
+          ${poleSIzbor({
+            id: 'razhod-stavka',
+            ime: 'stavka',
+            etiket: 'Ставка на ТАЗИ фактура',
+            spisak: 'stavka',
+            zadalzhitelno: true,
+            opcii: optsiiNaStavkata(),
+          })}
+          ${
+            /**
+             * ДОСТАВЧИКЪТ И „ЗА КАКВО" · двете живи менюта на разхода (ADR-042).
+             *
+             * Дотук и двете бяха голи текстови полета. Един и същ доставчик се
+             * изписваше по три начина в три месеца, а „ток" и „Ток" ставаха два
+             * различни разхода в очите на всеки изглед, който групира по име.
+             *
+             * И двете ОПИСВАТ — системата смята по ПОТОКА и по СЕКТОРА, не по
+             * името на доставчика — значи растат свободно от полето.
+             */
+            poleSMenyu({
+              id: 'razhod-dostavchik',
+              ime: 'dostavchik',
+              etiket: 'Доставчик или получател',
+              menyu: menyutoNaRazhodite(o, 'dostavchik', 'Доставчик'),
+              zadalzhitelno: true,
+              mestodarzhatel: 'напр. Материали ООД',
+              pod: '<p class="kazva-problem" id="kazva-dostavchik" data-spira="ne"></p>',
+            })
+          }
+          ${poleSMenyu({
+            id: 'razhod-opis',
+            ime: 'opis',
+            etiket: 'За какво',
+            menyu: menyutoNaRazhodite(o, 'opis', 'За какво'),
+            zadalzhitelno: true,
+            mestodarzhatel: 'напр. цимент',
+          })}
           <div class="pole">
             <label for="razhod-suma">Обща сума, € — с ДДС</label>
             <input translate="no" id="razhod-suma" name="suma" required inputmode="decimal" placeholder="600,00" autocomplete="off">
           </div>
-          <div class="pole">
-            <label for="razhod-nachin">Платено</label>
-            <select translate="no" id="razhod-nachin" name="nachin">
-              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'razhod-nachin',
+            ime: 'nachin',
+            etiket: 'Платено',
+            spisak: 'nachin',
+            opcii: optsiiNaNachina(),
+          })}
           <div class="pole">
             <label for="razhod-data">Дата</label>
             <input translate="no" id="razhod-data" name="data" type="date" value="${ekraniraj(mesets)}-01" required>
@@ -480,6 +725,7 @@ function formaRazhod(mesets: string): string {
             <input translate="no" id="razhod-dokument" name="dokument" placeholder="номер на фактура" autocomplete="off">
           </div>
         </div>
+        ${legendata()}
         <p class="greshka" id="greshka-razhod"></p>
         <div class="deystviya">
           <button type="submit" class="glaven">Запиши разхода</button>
@@ -506,7 +752,7 @@ function redNaRazhod(r: Razhod): string {
       <span class="suma duljimo" data-st="${razbivka.obshta_st}">${kakvoPishe(razbivka.obshta_st)}</span>
       <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-storno-razhod="${r.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-razhod': String(r.seq) } })}
         ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;
@@ -591,12 +837,13 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
             <label for="dds-data">Дата на плащането</label>
             <input translate="no" id="dds-data" name="data" type="date" required>
           </div>
-          <div class="pole">
-            <label for="dds-nachin">Начин</label>
-            <select translate="no" id="dds-nachin" name="nachin">
-              ${NACHINI_NA_PLASHTANE.map((n) => `<option value="${n.klyuch}">${n.ime}</option>`).join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'dds-nachin',
+            ime: 'nachin',
+            etiket: 'Начин',
+            spisak: 'nachin',
+            opcii: optsiiNaNachina(),
+          })}
         </div>
         <p class="greshka" id="greshka-dds"></p>
         <div class="deystviya">
@@ -765,13 +1012,14 @@ function kalkulator(): string {
             <label for="smyatane-suma">Обща цена, € — с ДДС</label>
             <input translate="no" id="smyatane-suma" name="suma" required inputmode="decimal" placeholder="1200,00" autocomplete="off">
           </div>
-          <div class="pole">
-            <label for="smyatane-stavka">Ставка</label>
-            <select translate="no" id="smyatane-stavka" name="stavka" required>
-              ${STAVKI.map((st) => `<option value="${st}"${st === 20 ? ' selected' : ''}>${st}%</option>`)
-                .join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'smyatane-stavka',
+            ime: 'stavka',
+            etiket: 'Ставка',
+            spisak: 'stavka',
+            zadalzhitelno: true,
+            opcii: optsiiNaStavkata(),
+          })}
         </div>
         <p class="greshka" id="greshka-smyatane"></p>
         <div class="deystviya">
@@ -819,6 +1067,38 @@ export function zakachiSmetki(
 ): void {
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
+
+  /**
+   * ОДИТНИЯТ ФАЙЛ (И96 т.11) · сглобява се при НАТИСКАНЕ, не при рисуване.
+   *
+   * XML-ът за месец с хиляди записи е мегабайти низ; сглобен при всяко
+   * прерисуване, той щеше да струва на всяко натискане на клавиш. Числата
+   * горе идват от същата функция, но екранът ги иска и без да се сваля —
+   * затова се сглобява два пъти само когато човекът наистина поиска файла.
+   */
+  koren.querySelector<HTMLButtonElement>('[data-svali-saft]')?.addEventListener('click', async (e) => {
+    const mesets = (e.currentTarget as HTMLElement).dataset['svaliSaft']!;
+    const r = safT(await k.deystviya.ogledalo(), mesets, new Date().toISOString());
+    svaliFayl(new Blob([r.xml], { type: 'application/xml' }), r.ime);
+    k.vest(
+      r.prechki.length === 0 ? 'dobre' : 'zle',
+      r.prechki.length === 0
+        ? `Файлът ${r.ime} е свален · ${r.broiStatii} статии`
+        : `Файлът е свален, но ${r.prechki.length} пречки още стоят — виж описа над бутона.`,
+    );
+  });
+  zakachiKoefitsientite(koren, prerisuvay);
+  // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
+  zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
+
+  // ЦВЕТОВЕТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · т.9) · полето свети, ДОКАТО се пише.
+  // Доставчикът е текстово поле, което човек пише на ръка и в което най-често
+  // влиза чужд знак или залепен невидим — затова е първото закачено.
+  const poleDostavchik = koren.querySelector<HTMLInputElement>('#razhod-dostavchik');
+  const kazvaDostavchik = koren.querySelector<HTMLElement>('#kazva-dostavchik');
+  if (poleDostavchik && kazvaDostavchik) {
+    zakachiPole(poleDostavchik, { azbuka: 'kirilitsa' }, kazvaDostavchik);
+  }
 
   // И95 · същата форма за дело работи и оттук — един механизъм, два екрана.
   zakachiFormataNaDelo(koren, k, prerisuvay);
@@ -937,6 +1217,8 @@ export function zakachiSmetki(
     const stavka = potokKlyuch === 'fakturi' ? Number(danni.get('stavka')) : 0;
 
     buton.disabled = true;
+    // Брои се ПРЕДИ записа: после речникът вече ги съдържа (ADR-040).
+    const novite = novoteVSpisatsite(koren, rechnitsite(RECHNIK_RAZHOD));
     try {
       await k.deystviya.zapishiRazhod(
         `R:${crypto.randomUUID()}`,
@@ -954,7 +1236,10 @@ export function zakachiSmetki(
         { opId: opIdRazhod },
       );
       opIdRazhod = crypto.randomUUID();
-      k.vest('dobre', 'Разходът е записан. Входящият ДДС влезе в акумулатора си.');
+      k.vest(
+        'dobre',
+        `Разходът е записан. Входящият ДДС влезе в акумулатора си.${sDumiZaNovite(novite)}`,
+      );
       await prerisuvay();
     } catch (err) {
       greshka.textContent = dumiZaGreshka(err);

@@ -1,0 +1,178 @@
+/**
+ * ТЕМИТЕ НА НАСТРОЙКИТЕ · трите списъка (И101 т.2 · ADR-045).
+ *
+ * Негови думи: „падащи редове с теми от Настройки, които са РАЗЛИЧНИ от
+ * стопанин и служителя с добавен и упълномощен служител."
+ *
+ * „Различни" е лесно да се напише и трудно да се удържи: първата нова тема,
+ * добавена без своя ред в описа, става видима за всички. Тук се пази точно
+ * това.
+ */
+
+import { describe, expect, it } from 'vitest';
+import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { operatsiya, SHA } from './pomoshtni.js';
+import { Deystviya } from '../src/domein/deystviya.js';
+import { fold } from '../src/ogledalo/ogledalo.js';
+import { OTKRIVASHTO_SABITIE } from '../src/domein/stopanin.js';
+import {
+  KOY_GLEDA,
+  koyGleda,
+  temaPoKlyuch,
+  TEMI,
+  temiZa,
+  vizhdaTemata,
+} from '../src/domein/temi-nastroyki.js';
+import { imaIkona } from '../app/ikoni.js';
+import { EKRANI } from '../app/ekranite.js';
+
+const GLAVEN = 'vintexstroy@gmail.com';
+
+async function knigata(sStopanin = true) {
+  const dnevnik = new DnevnikVPametta();
+  const vrata = new Vrata({
+    dnevnik,
+    pravata: new VsichkoRazresheno(),
+    sha: SHA,
+    ...(sStopanin ? { parvoto: OTKRIVASHTO_SABITIE } : {}),
+  });
+  const deystviya = new Deystviya({
+    vrata,
+    dnevnik,
+    naematel: 'vintexstroy',
+    actor: GLAVEN,
+    chasovnik: () => '2026-08-25T09:00:00.000Z',
+  });
+  if (sStopanin) {
+    await deystviya.zapishiStopanina(
+      { imeyl: GLAVEN, ime: 'Иво', dostavchik: 'google' },
+      { opId: 'op-0' },
+    );
+  } else {
+    await vrata.dobavi(operatsiya({ opId: 'op-1' }));
+  }
+  return { dnevnik, deystviya };
+}
+
+describe('описът · какво е една тема', () => {
+  it('всяка носи ключ, име, описание и ЖИВА икона', () => {
+    for (const t of TEMI) {
+      expect(t.klyuch.trim(), t.klyuch).not.toBe('');
+      expect(t.ime.trim(), t.klyuch).not.toBe('');
+      expect(t.opis.trim(), t.klyuch).not.toBe('');
+      expect(imaIkona(t.ikona), `${t.klyuch} · икона ${t.ikona}`).toBe(true);
+    }
+  });
+
+  it('ключовете са различни · два реда с един ключ водят на едно място', () => {
+    const klyuchove = TEMI.map((t) => t.klyuch);
+    expect(new Set(klyuchove).size).toBe(klyuchove.length);
+  });
+
+  /**
+   * ЕДНО МЯСТО, НЕ ДВЕ. Тема, която сочи екран, който го няма, води в нищото —
+   * и това не се вижда, докато някой не натисне точно нея.
+   */
+  it('всяка тема-секция сочи СЪЩЕСТВУВАЩ екран', () => {
+    const ekrani = new Set(Object.keys(EKRANI));
+    for (const t of TEMI) {
+      if (t.kade.vid !== 'sektsiya') continue;
+      expect(ekrani.has(t.kade.ekran), `${t.klyuch} → ${t.kade.ekran}`).toBe(true);
+      expect(t.kade.sektsiya.trim(), t.klyuch).not.toBe('');
+    }
+  });
+
+  it('всяка тема се вижда от ПОНЕ един човек', () => {
+    for (const t of TEMI) {
+      expect(t.za.length, t.klyuch).toBeGreaterThan(0);
+      for (const koy of t.za) expect(KOY_GLEDA).toContain(koy);
+    }
+  });
+});
+
+describe('трите списъка са РАЗЛИЧНИ · негова дума', () => {
+  it('и трите не са празни', () => {
+    for (const koy of KOY_GLEDA) expect(temiZa(koy).length, koy).toBeGreaterThan(0);
+  });
+
+  it('Стопанинът вижда най-много, упълномощеният — най-малко', () => {
+    const stopanin = temiZa('stopanin').length;
+    const sluzhitel = temiZa('sluzhitel').length;
+    const upalnomoshten = temiZa('upalnomoshten').length;
+    expect(stopanin).toBeGreaterThan(sluzhitel);
+    expect(sluzhitel).toBeGreaterThan(upalnomoshten);
+  });
+
+  /**
+   * СТЪЛБАТА НЕ СЕ ПРЕСИЧА. По-малкото право не бива да дава нещо, което
+   * по-голямото няма — иначе „по-малко" престава да значи по-малко и започва
+   * да значи „друго", а тогава никой не може да отговори кой какво вижда.
+   */
+  it('по-тясното е ПОДМНОЖЕСТВО на по-широкото', () => {
+    const kluchove = (koy: Parameters<typeof temiZa>[0]) =>
+      new Set(temiZa(koy).map((t) => t.klyuch));
+    const stopanin = kluchove('stopanin');
+    const sluzhitel = kluchove('sluzhitel');
+    const upalnomoshten = kluchove('upalnomoshten');
+    for (const k of sluzhitel) expect(stopanin.has(k), `служител → ${k}`).toBe(true);
+    for (const k of upalnomoshten) expect(sluzhitel.has(k), `упълномощен → ${k}`).toBe(true);
+  });
+
+  it('служителят НЕ вижда моделите, бутоните и правата', () => {
+    // Изброено поименно, за да падне на глас, ако утре някоя от трите се
+    // отвори мимоходом.
+    for (const k of ['modeli', 'butoni', 'pravata', 'hedari', 'zapasen', 'izgledi']) {
+      expect(vizhdaTemata('sluzhitel', k), k).toBe(false);
+      expect(vizhdaTemata('stopanin', k), k).toBe(true);
+    }
+  });
+
+  it('но вижда СВОИТЕ · езикът и личното са негови', () => {
+    for (const k of ['ezik', 'lichno', 'moeto', 'otmetki']) {
+      expect(vizhdaTemata('sluzhitel', k), k).toBe(true);
+      expect(vizhdaTemata('upalnomoshten', k), k).toBe(true);
+    }
+  });
+
+  it('непозната тема не се вижда от никого', () => {
+    expect(temaPoKlyuch('нямагоняма')).toBeUndefined();
+    for (const koy of KOY_GLEDA) expect(vizhdaTemata(koy, 'нямагоняма')).toBe(false);
+  });
+});
+
+describe('кой гледа · различава се от ЖУРНАЛА, не от екрана', () => {
+  it('Стопанинът е стопанин', async () => {
+    const { dnevnik } = await knigata();
+    const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
+    expect(koyGleda(GLAVEN, o)).toBe('stopanin');
+    expect(koyGleda('VintexStroy@Gmail.com', o)).toBe('stopanin');
+  });
+
+  it('вписаният служител е служител', async () => {
+    const { dnevnik, deystviya } = await knigata();
+    await deystviya.zapishiSluzhitel(
+      { imeyl: 'petar@example.bg', ime: 'Петър', rolya: 'redaktor' },
+      { opId: 'op-s' },
+    );
+    const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
+    expect(koyGleda('petar@example.bg', o)).toBe('sluzhitel');
+  });
+
+  /**
+   * ТРЕТИЯТ СЛУЧАЙ, не празнина. „Упълномощен" е онзи, който НЕ е служител на
+   * този наемател, но има даден достъп — И99: „да сподели на външен имейл
+   * личната си папка… например на жена си".
+   */
+  it('чуждият имейл е УПЪЛНОМОЩЕН, не служител', async () => {
+    const { dnevnik } = await knigata();
+    const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
+    expect(koyGleda('zhena@example.bg', o)).toBe('upalnomoshten');
+  });
+
+  it('Журнал БЕЗ стопанин не понижава никого', async () => {
+    const { dnevnik } = await knigata(false);
+    const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
+    expect(o.stopanin).toBe('');
+    expect(koyGleda('kojto-i-da-e@example.bg', o)).toBe('stopanin');
+  });
+});

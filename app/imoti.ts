@@ -16,12 +16,43 @@ import { otData } from '../src/yadro/data.js';
 import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
+import { poImot } from '../src/ogledalo/izgledi.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { butonSIkona } from './ikoni.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
-import type { Konteks } from './main.js';
+import {
+  menyuOtZhivi,
+  novoteVSpisatsite,
+  poleSIzbor,
+  poleSMenyu,
+  rechnitsite,
+  sDumiZaNovite,
+  zakachiMenyuta,
+  zapomniRechnitsite,
+} from './menyu.js';
+import type { Menyu } from '../src/domein/padashti-menyuta.js';
+import type { Konteks } from './ekranite.js';
 
-export interface SastoyanieNaEkrana {
+/** Ключът на речниците на този екран · формата на наема е една. */
+const RECHNIK_NAEM = 'naem';
+
+/**
+ * РЕЧНИКЪТ НА НАЕМАТЕЛИТЕ · изведен от живите наеми, без ново събитие.
+ *
+ * Прекратените наеми ВЛИЗАТ нарочно: същият наемател често се връща, а името
+ * му не престава да съществува, когато договорът свърши (правило 1, приложено
+ * към речника — старото не се трие).
+ */
+function menyutoNaNaemite(o: Ogledalo): Menyu {
+  return menyuOtZhivi(
+    'naemetel',
+    'Наемател',
+    [...o.naemi.values()].map((n) => n.naemetel),
+  );
+}
+
+interface SastoyanieNaEkrana {
   readonly ogledalo: Ogledalo;
   readonly sabitiya: number;
 }
@@ -105,6 +136,9 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const naemi = [...ogledalo.naemi.values()].sort(
     (a, b) => Number(a.prekraten) - Number(b.prekraten) || a.naemetel.localeCompare(b.naemetel),
   );
+  // Речникът се пълни при РИСУВАНЕ (тук е Огледалото) и се чете при ЗАКАЧАНЕ
+  // (там е DOM-ът) — двете не могат да се слеят (ADR-040).
+  zapomniRechnitsite(RECHNIK_NAEM, new Map([['naemetel', menyutoNaNaemite(ogledalo)]]));
   const naemiPoImot = new Map<string, Naem[]>();
   for (const naem of naemi) {
     const spisak = naemiPoImot.get(naem.imotId) ?? [];
@@ -225,11 +259,28 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
                 .join('')}
             </select>
           </div>
-          <div class="pole">
-            <label for="naem-naemetel">Наемател</label>
-            <input translate="no" id="naem-naemetel" name="naemetel" required placeholder="име или дружество" autocomplete="off"
-                   value="${popravyanNaem ? ekraniraj(popravyanNaem.naemetel) : ''}">
-          </div>
+          ${
+            /**
+             * НАЕМАТЕЛЯТ · живо меню от Журнала (ADR-042).
+             *
+             * Дотук беше голо текстово поле — тоест речник НЯМАШЕ, а човекът
+             * пишеше едно и също име по петдесет пъти. „Петров ЕООД" и
+             * „ПЕТРОВ еоод" ставаха двама наематели, които после не се събират
+             * в нито един изглед — и това не се вижда, докато някой не потърси.
+             *
+             * Менюто ОПИСВА (системата не смята върху името), значи расте
+             * свободно от полето: „нищо не спира човека".
+             */
+            poleSMenyu({
+              id: 'naem-naemetel',
+              ime: 'naemetel',
+              etiket: 'Наемател',
+              menyu: menyutoNaNaemite(ogledalo),
+              stoynost: popravyanNaem ? popravyanNaem.naemetel : '',
+              zadalzhitelno: true,
+              mestodarzhatel: 'име или дружество',
+            })
+          }
           <div class="pole">
             <label for="naem-telefon">Телефон (по избор)</label>
             <input translate="no" id="naem-telefon" name="telefon" placeholder="0888 123 456" autocomplete="off"
@@ -245,19 +296,21 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             <input translate="no" id="naem-suma" name="naem" required inputmode="decimal" placeholder="1150,00" autocomplete="off"
                    value="${popravyanNaem ? pishiVPole(popravyanNaem.naem_st) : ''}">
           </div>
-          <div class="pole">
-            <label for="naem-sektor">Сектор — определя ставката</label>
-            <select translate="no" id="naem-sektor" name="sektor" required>
-              ${sektoriNaNaem()
-                .map(
-                  (a) =>
-                    `<option value="${ekraniraj(a.klyuch)}"${
-                      popravyanNaem?.sektor === a.klyuch ? ' selected' : ''
-                    }>${ekraniraj(a.sektor)} · ${a.stavka}%</option>`,
-                )
-                .join('')}
-            </select>
-          </div>
+          ${poleSIzbor({
+            id: 'naem-sektor',
+            ime: 'sektor',
+            etiket: 'Сектор — определя ставката',
+            spisak: 'sektor',
+            zadalzhitelno: true,
+            opcii: sektoriNaNaem()
+              .map(
+                (a) =>
+                  `<option value="${ekraniraj(a.klyuch)}"${
+                    popravyanNaem?.sektor === a.klyuch ? ' selected' : ''
+                  }>${ekraniraj(a.sektor)} · ${a.stavka}%</option>`,
+              )
+              .join(''),
+          })}
           <div class="pole">
             <label for="naem-depozit">Депозит, € (по избор)</label>
             <input translate="no" id="naem-depozit" name="depozit" inputmode="decimal" placeholder="1150,00" autocomplete="off"
@@ -327,7 +380,67 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
     </section>`
     }
+    ${sektsiyaPoImot(ogledalo)}
   `;
+}
+
+/**
+ * ОЩЕ ЕДНО ОГЛЕДАЛО · „кой обект колко носи и колко яде" (възможност `ogledala`).
+ *
+ * `src/ogledalo/izgledi.ts` беше построен в резен 9 и оттогава го викаха само
+ * тестовете — възможността „Изгледи по имот и по контрагент" стоеше в Таблото
+ * с отметка, която не пипаше нищо. Отметка без последица е НАДПИС, а правило 15
+ * иска обратното: „изключено ≠ липсващо".
+ *
+ * Изгледът е ЧИСТА ФУНКЦИЯ върху Огледалото — нула ново състояние, нула нови
+ * събития. Истината е една (Журналът); ъглите към нея са колкото трябват.
+ */
+function sektsiyaPoImot(o: Ogledalo): string {
+  const redove = poImot(o);
+  if (redove.length === 0) return '';
+  const sbor = redove.reduce(
+    (s, r) => ({
+      nachisleno: s.nachisleno + r.nachisleno_st,
+      sabrano: s.sabrano + r.sabrano_st,
+      duljimo: s.duljimo + r.duljimo_st,
+    }),
+    { nachisleno: 0, sabrano: 0, duljimo: 0 },
+  );
+  return `
+    <section data-sektsiya="po-imot">
+      <div class="dyalglava">
+        <h2>По обект</h2>
+        <span>кой носи и кой дължи · смята се от Журнала, не се пази</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="po-imot">
+        <div class="glava po-imot">
+          <span>Обект</span><span>Живи наеми</span><span>Начислено</span><span>Събрано</span><span>Дължимо</span>
+        </div>
+        ${redove
+          .map(
+            (r) => `<div class="red po-imot${r.duljimo_st > 0 ? ' trevoga' : ''}" translate="no">
+              <span class="kletka"><b>${ekraniraj(r.adres)}</b>${
+                r.edinitsa ? ` <span class="drebno">${ekraniraj(r.edinitsa)}</span>` : ''
+              }</span>
+              <span class="chislo" translate="no">${r.zhiviNaemi}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.nachisleno_st))}</span>
+              <span class="chislo" translate="no">${ekraniraj(pishi(r.sabrano_st))}</span>
+              <span class="chislo" translate="no">${r.duljimo_st === 0 ? '—' : ekraniraj(pishi(r.duljimo_st))}</span>
+            </div>`,
+          )
+          .join('')}
+        <div class="red po-imot sbor" translate="no">
+          <span class="kletka"><b>Всичко</b></span>
+          <span class="chislo" translate="no">${redove.reduce((n, r) => n + r.zhiviNaemi, 0)}</span>
+          <span class="chislo" translate="no">${ekraniraj(pishi(sbor.nachisleno))}</span>
+          <span class="chislo" translate="no">${ekraniraj(pishi(sbor.sabrano))}</span>
+          <span class="chislo" translate="no">${sbor.duljimo === 0 ? '—' : ekraniraj(pishi(sbor.duljimo))}</span>
+        </div>
+      </div>
+      <p class="drebno"><b>Начислено</b> е онова, което е ПАДЕЖИРАЛО, не онова, което е влязло —
+      затова „Дължимо" е разликата, а не отделно число. Сборът долу затваря с колоните над него:
+      ако не затваряше, някой наем щеше да сочи изчезнал имот.</p>
+    </section>`;
 }
 
 function polePrichina(koe: string): string {
@@ -391,8 +504,8 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
             : '<span class="znachka tiha">свободен</span>'
       }</span>
       <span class="butoni">
-        <button type="button" class="vtorichen malak" data-popravi-imot="${ekraniraj(imot.id)}">Поправи</button>
-        <button type="button" class="vtorichen malak" data-storno-imot="${imot.seq}">Сторно</button>
+        ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
         ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;
@@ -415,9 +528,9 @@ function redNaem(naem: Naem, o: Ogledalo): string {
           : '<span class="znachka dobre">жив</span>'
       }</span>
       <span class="butoni">
-        ${naem.prekraten ? '' : `<button type="button" class="vtorichen malak" data-prekrati="${ekraniraj(naem.id)}">Прекрати</button>`}
-        <button type="button" class="vtorichen malak" data-popravi-naem="${ekraniraj(naem.id)}">Поправи</button>
-        <button type="button" class="vtorichen malak" data-storno-naem="${naem.seq}">Сторно</button>
+        ${naem.prekraten ? '' : butonSIkona({ ikona: 'mahni', tekst: 'Прекрати', danni: { prekrati: naem.id } })}
+        ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-naem': naem.id } })}
+        ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-naem': String(naem.seq) } })}
         ${butonIstoriya('naem', naem.id)}
       </span>
     </div>`;
@@ -428,6 +541,9 @@ function opisi(i: Imot): string {
 }
 
 export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
+  // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · наемателят е живо поле.
+  zakachiMenyuta(koren, rechnitsite(RECHNIK_NAEM));
+
   // ── имот: нов или поправен ───────────────────────────────────────────────
   const formaImot = koren.querySelector<HTMLFormElement>('#forma-imot');
   formaImot?.addEventListener('submit', async (sabitie) => {
@@ -503,6 +619,9 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     }
 
     buton.disabled = true;
+    // БРОИ СЕ ПРЕДИ ЗАПИСА: после речникът вече ги съдържа и отговорът би бил
+    // „нищо ново". Преди записа това би било въпрос; след него е следа (ADR-040).
+    const novite = novoteVSpisatsite(koren, rechnitsite(RECHNIK_NAEM));
     try {
       if (rezhim.kakvo === 'popravi-naem') {
         const star = (await k.deystviya.ogledalo()).naemi.get(rezhim.id)!;
@@ -517,7 +636,10 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         );
         opIdDeystvie = novOpId();
         rezhim = { kakvo: 'nov' };
-        k.vest('dobre', 'Поправката е записана. Новата сума важи за бъдещите начисления.');
+        k.vest(
+          'dobre',
+          `Поправката е записана. Новата сума важи за бъдещите начисления.${sDumiZaNovite(novite)}`,
+        );
       } else {
         await k.deystviya.dobaviNaem(
           `N:${crypto.randomUUID()}`,
@@ -530,7 +652,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         );
         opIdNaem = novOpId();
         formaNaem.reset();
-        k.vest('dobre', 'Наемът е записан в Журнала.');
+        k.vest('dobre', `Наемът е записан в Журнала.${sDumiZaNovite(novite)}`);
       }
       await prerisuvay();
     } catch (e) {

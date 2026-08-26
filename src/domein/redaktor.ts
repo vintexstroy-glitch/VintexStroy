@@ -62,7 +62,7 @@ export class GreshkaRedaktor extends Error {
 }
 
 /** Трите вида номенклатура на една колона — по И58, изброени поименно. */
-export type VidNomenklatura = 'svobodna' | 'opis' | 'vavezhdane';
+type VidNomenklatura = 'svobodna' | 'opis' | 'vavezhdane';
 
 export const IMENA_NA_NOMENKLATURITE: Readonly<Record<VidNomenklatura, string>> = Object.freeze({
   svobodna: 'без падащо меню',
@@ -544,7 +544,7 @@ export function semeystvo(
 }
 
 /** Един ред в Описа на Подредба — всичко именувано е ред (ред 1970). */
-export interface RedVOpisa {
+interface RedVOpisa {
   /** името, дословно */
   readonly ime: string;
   /** какво е именуваното */

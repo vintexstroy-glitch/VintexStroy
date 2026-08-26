@@ -22,6 +22,7 @@
  * ADR-011) са две решения с два дома и не се сливат (правило 15).
  */
 
+import { ekraniraj } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
 /**
@@ -124,7 +125,10 @@ export function prilozhiSkritite(koren: HTMLElement): void {
     }
     const red = stariyat ?? document.createElement('p');
     red.className = 'drebno skrito-koloni';
-    red.innerHTML = `Скрити колони: ${nomera.size} · <button type="button" class="vrazka" data-pokazhi-koloni="${klyuch}">покажи ги</button>`;
+    // ЕКРАНИРАНО, макар днес ключът да идва от `chistKlyuch` (само букви, цифри
+    // и тире). Одитът на И101 т.4 го намери: не е дупка, но виси на ЧУЖДО
+    // правило — разхлаби ли се чистенето утре, тук става вход за разметка.
+    red.innerHTML = `Скрити колони: ${nomera.size} · <button type="button" class="vrazka" data-pokazhi-koloni="${ekraniraj(klyuch)}">покажи ги</button>`;
     red.querySelector('button')!.addEventListener('click', () => {
       pokazhiKolonite(klyuch);
       prilozhiSkritite(koren);

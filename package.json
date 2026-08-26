@@ -13,7 +13,8 @@
     "typecheck": "tsc --noEmit",
     "proba": "npm run build && node proba/prohod.mjs",
     "merki": "vitest run proba/merki.test.ts",
-    "ikoni": "node stroezh/risuvai-ikoni.mjs"
+    "ikoni": "node stroezh/risuvai-ikoni.mjs",
+    "chistota": "node stroezh/chistota.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

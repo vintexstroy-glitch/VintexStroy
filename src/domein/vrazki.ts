@@ -58,7 +58,7 @@ export class GreshkaVrazka extends Error {
   }
 }
 
-export interface Vrazka {
+interface Vrazka {
   /** откъде тръгва сигналът */
   readonly ot: string;
   /** накъде отива */

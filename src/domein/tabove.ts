@@ -36,7 +36,7 @@ export class GreshkaTab extends Error {
 }
 
 /** Двата вида секция. Нов вид се добавя ТУК, където се вижда. */
-export const VIDOVE_SEKTSII = ['tablitsa', 'diagrama'] as const;
+const VIDOVE_SEKTSII = ['tablitsa', 'diagrama'] as const;
 
 export type VidSektsiya = (typeof VIDOVE_SEKTSII)[number];
 
@@ -242,9 +242,7 @@ export function premahniSektsiya(t: Tab, klyuch: string): Tab {
     sektsii: Object.freeze(
       t.sektsii
         .filter((s) => s.klyuch !== klyuch)
-        .map((s) =>
-          s.svarzanaS === klyuch ? Object.freeze({ ...s, svarzanaS: '', po: '' as const }) : s,
-        ),
+        .map((s) => (s.svarzanaS === klyuch ? razvarzana(s) : s)),
     ),
   });
 }
@@ -323,10 +321,19 @@ export function razvarzhiSektsiya(t: Tab, klyuch: string): Tab {
   }
   return Object.freeze({
     ...t,
-    sektsii: Object.freeze(
-      t.sektsii.map((s) => (s.klyuch === klyuch ? Object.freeze({ ...s, svarzanaS: '', po: '' as const }) : s)),
-    ),
+    sektsii: Object.freeze(t.sektsii.map((s) => (s.klyuch === klyuch ? razvarzana(s) : s))),
   });
+}
+
+/**
+ * СЕКЦИЯТА БЕЗ ВРЪЗКАТА СИ · един израз, две места го викат.
+ *
+ * Махането на секция развързва вързаните за нея, а развързването прави същото
+ * на самата нея. Написан два пъти, изразът се разминава при първото ново поле
+ * на връзката — и едното място ще го чисти, другото не.
+ */
+function razvarzana(s: Sektsiya): Sektsiya {
+  return Object.freeze({ ...s, svarzanaS: '', po: '' as const });
 }
 
 /**

@@ -24,7 +24,7 @@
 import { pishi } from '../yadro/pari.js';
 
 /** Какво трябва да се знае, за да се напише едно писмо. */
-export interface ZaPismo {
+interface ZaPismo {
   readonly naemetel: string;
   readonly imeyl: string;
   /** адресът на имота, както се чете от човек */
@@ -39,7 +39,7 @@ export interface ZaPismo {
   readonly ot?: string;
 }
 
-export interface Pismo {
+interface Pismo {
   readonly do: string;
   readonly tema: string;
   readonly tyalo: string;

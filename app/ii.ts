@@ -69,6 +69,7 @@ import {
   type Iskane,
   type ZaKakvo,
 } from '../src/domein/potvarzhdenie.js';
+import { kamTekst, mesetsatKatoTablitsa } from '../src/domein/mesetsat.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
@@ -76,7 +77,7 @@ import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import type { Konteks } from './main.js';
+import type { Konteks } from './ekranite.js';
 
 /** Кой агент е отворен · помни се като поглед, не като факт (ADR-022). */
 let izbranAgent = chetiEkranno('ii.agent', '');
@@ -300,10 +301,10 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
         <span>единственият дом на длъжностната · промптът се СГЛОБЯВА оттук</span>
       </div>
       <div class="tablitsa">
-        <div class="red opis"><span><b>Характеристика</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')} <span class="znachka tiha">умение · постоянно</span></span></div>
-        <div class="red opis"><span><b>Обхват · чете</b></span><span>${ekraniraj(a.obhvat.map((x) => IMENA_NA_OBHVATITE[x]).join(' · ') || 'нищо')}</span></div>
-        <div class="red opis"><span><b>Забрани</b></span><span>${ekraniraj(a.zabrani.join(' · '))}</span></div>
-        <div class="red opis"><span><b>Умения</b></span><span>${
+        <div class="red opis" translate="no"><span><b>Характеристика</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')} <span class="znachka tiha">умение · постоянно</span></span></div>
+        <div class="red opis" translate="no"><span><b>Обхват · чете</b></span><span>${ekraniraj(a.obhvat.map((x) => IMENA_NA_OBHVATITE[x]).join(' · ') || 'нищо')}</span></div>
+        <div class="red opis" translate="no"><span><b>Забрани</b></span><span>${ekraniraj(a.zabrani.join(' · '))}</span></div>
+        <div class="red opis" translate="no"><span><b>Умения</b></span><span>${
           a.umeniya.length === 1
             ? 'само характеристиката — добави умения отдолу'
             : ekraniraj(
@@ -313,8 +314,8 @@ function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
                   .join(' · '),
               )
         }</span></div>
-        <div class="red opis"><span><b>Отговорник</b></span><span>${ekraniraj(a.otgovornik)} · неговият имейл е <code>actor</code></span></div>
-        <div class="red opis"><span><b>Включен от</b></span><span>${ekraniraj(a.ot || '—')}</span></div>
+        <div class="red opis" translate="no"><span><b>Отговорник</b></span><span>${ekraniraj(a.otgovornik)} · неговият имейл е <code>actor</code></span></div>
+        <div class="red opis" translate="no"><span><b>Включен от</b></span><span>${ekraniraj(a.ot || '—')}</span></div>
       </div>
       <details class="drebno">
         <summary>Промптът, сглобен от този документ</summary>
@@ -475,20 +476,20 @@ function kartaSaglasie(a: Agent): string {
         <span>какво ще прави · какво НЯМА да прави · и какво може да се обърка</span>
       </div>
       <div class="tablitsa">
-        <div class="red opis"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
-        <div class="red opis"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
+        <div class="red opis" translate="no"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
+        <div class="red opis" translate="no"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
       </div>
       <div class="tablitsa">
         <div class="glava opis"><span>Рискът</span><span>какво значи</span></div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Подхвърлен текст</b></span>
           <span>Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той няма път към запис — но предложение, прието на доверие, пренася грешката. Затова всяко предложение носи сверка, и тя се гледа.</span>
         </div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Умора от съгласия</b></span>
           <span>Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" няма и няма да има — присъдата е ред по ред.</span>
         </div>
-        <div class="red opis">
+        <div class="red opis" translate="no">
           <span><b>Сгрешена сметка</b></span>
           <span>Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не го запишеш — и записът носи ТВОЯ имейл, не неговото име.</span>
         </div>
@@ -796,27 +797,27 @@ function redNaPredlozhenie(p: Predlozhenie): string {
  * гледа числата; за да прецени посоката, обобщението стига, а имената на
  * наематели и доставчици нямат работа на чужд сървър.
  */
-export function dannitezaAgenta(o: Ogledalo, a: Agent): string {
+function dannitezaAgenta(o: Ogledalo, a: Agent, dnes: string): string {
   const redove: string[] = [];
+
+  // МЕСЕЦЪТ КАТО ТАБЛИЦА · пилотът на ADR-005 (резен 15б).
+  //
+  // Сметки и Пари гледат ЕДИН И СЪЩ месец, затова таблицата излиза ВЕДНЪЖ:
+  // агент с двата обхвата получаваше преди два реда за едно и също и щеше да
+  // сметне два пъти същите пари.
+  //
+  // Дотук тук стояха сборове и бройки — „Приходи: 1 700,00 € (2 плащания)".
+  // От такова изречение агентът може да повтори числото и толкова: не може да
+  // сравни с миналия месец, не може да покаже КЪДЕ мърда нещо. Анализ върху
+  // обобщение е мнение; анализ върху таблица е сметка (И12).
+  if (a.obhvat.includes('smetki') || a.obhvat.includes('pari')) {
+    redove.push(kamTekst(mesetsatKatoTablitsa(o, dnes.slice(0, 7), new Date().toISOString())));
+  }
+
   for (const obhvat of a.obhvat) {
     switch (obhvat) {
       case 'imoti':
         redove.push(`Имоти: ${o.imoti.size} · договори за наем: ${o.naemi.size}`);
-        break;
-      case 'pari': {
-        const prihod = [...o.plashtaniya.values()].reduce((s, p) => s + p.suma_st, 0);
-        const razhod = [...o.razhodi.values()].reduce((s, r) => s + r.suma_st, 0);
-        redove.push(
-          `Приходи: ${pishi(prihod)} € (${o.plashtaniya.size} плащания) · ` +
-            `Разходи: ${pishi(razhod)} € (${o.razhodi.size} разхода)`,
-        );
-        break;
-      }
-      case 'smetki':
-        redove.push(
-          `Подадени ДДС-справки: ${o.spravki.size} · платени: ${o.platenoDDS.size} · ` +
-            `начислени вземания: ${o.vzemaniya.size}`,
-        );
         break;
       case 'stoynost':
         redove.push(`Таблици с модел: ${o.modeli.size} · записани сверки: ${o.sverki.length}`);
@@ -824,9 +825,14 @@ export function dannitezaAgenta(o: Ogledalo, a: Agent): string {
       case 'gant':
         redove.push(`Дела в Управление: ${o.dela.size}`);
         break;
+      // Сметки и Пари вече излязоха ГОРЕ, като таблица. Изброени са поименно,
+      // а не хванати с `default`: добавен утре обхват ще падне тук на глас.
+      case 'smetki':
+      case 'pari':
+        break;
     }
   }
-  return redove.length === 0 ? 'Обхватът му е празен — няма какво да прочете.' : redove.join('\n');
+  return redove.length === 0 ? 'Обхватът му е празен — няма какво да прочете.' : redove.join('\n\n');
 }
 
 export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
@@ -1184,7 +1190,7 @@ export function zakachiII(koren: HTMLElement, k: Konteks, prerisuvay: () => Prom
             const otgovor = await pusniSKlod({
               agent,
               zadacha: z.kakvo,
-              danni: dannitezaAgenta(o, agent),
+              danni: dannitezaAgenta(o, agent, new Date().toISOString().slice(0, 10)),
             });
             await k.deystviya.zapishiPredlozhenie(
               {

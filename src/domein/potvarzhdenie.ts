@@ -149,7 +149,7 @@ export function pismoto(i: Iskane, kod: string): { readonly zaglavie: string; re
 }
 
 /** Следата, която ВЛИЗА в Журнала · кодът в нея го няма. */
-export interface SledaOtPotvarzhdenie {
+interface SledaOtPotvarzhdenie {
   readonly zaKakvo: ZaKakvo;
   readonly kakvo: string;
   readonly doImeyl: string;

@@ -18,13 +18,25 @@
       frame-src   accounts.google.com — прозорчето, в което човек избира акаунт
 
     Тук НЕ пише „https:" и не пише звезда. Стена, отворена изобщо, е стена,
-    свалена — а единственото, което ни трябва навън, са три точни адреса.
+    свалена — а единственото, което ни трябва навън, са ЧЕТИРИ точни адреса,
+    изброени поименно:
+
+      · accounts.google.com   — скриптът и рамката на входа (само при натискане)
+      · www.googleapis.com    — публичните ключове, с които се проверява подписът
+      · lh3.googleusercontent — снимката на профила, ако доставчикът я даде
+      · api.anthropic.com     — „Пусни с Клод" (ADR-029)
+
+    ЧЕТВЪРТИЯТ ЛИПСВАШЕ и това го намери одитът на И101 т.4: `app/klod.ts`
+    праща `fetch` към api.anthropic.com, а стената го спираше — тоест бутонът
+    „Пусни с Клод" беше построен, минаваше тестовете (те не викат мрежа) и НЕ
+    работеше в истински браузър. Стена, която спира собствения ти изход, е
+    по-лоша от липсваща: тя изглежда като работеща защита.
   -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     img-src 'self' data: https://lh3.googleusercontent.com;
     script-src 'self' https://accounts.google.com;
-    connect-src 'self' ws://localhost:* ws://127.0.0.1:* https://accounts.google.com https://www.googleapis.com;
+    connect-src 'self' ws://localhost:* ws://127.0.0.1:* https://accounts.google.com https://www.googleapis.com https://api.anthropic.com;
     frame-src https://accounts.google.com;
     object-src 'none';
     base-uri 'none';

@@ -52,7 +52,7 @@ export type Deystvie =
 
 export type Posoka = 'chete' | 'pishe' | 'smyata';
 
-export interface OpisNaDeystvie {
+interface OpisNaDeystvie {
   readonly klyuch: Deystvie;
   readonly ime: string;
   readonly posoka: Posoka;

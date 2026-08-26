@@ -13,7 +13,7 @@ import {
   sabiri,
   stotinki,
 } from '../src/yadro/index.js';
-import { pishi, pishiVPole, zaPisane } from '../src/yadro/pari.js';
+import { deliZakragleno, pishi, pishiVPole, zaPisane } from '../src/yadro/pari.js';
 
 describe('цели стотинки', () => {
   it('33_33 + 66_67 = 100_00 точно', () => {
@@ -35,6 +35,48 @@ describe('цели стотинки', () => {
     // 0.1 + 0.2 !== 0.3 при float; при стотинки няма такъв въпрос.
     expect(sabiri(stotinki(10), stotinki(20))).toBe(30);
     expect(izvadi(stotinki(30), stotinki(20))).toBe(10);
+  });
+});
+
+/**
+ * ЕДИН ДОМ ЗА ДЕЛЕНЕТО (правило 17, платено с находка).
+ *
+ * `deliZakragleno` живееше на ДВЕ места — `dds.ts` и `koefitsienti.ts` — с
+ * еднакво име и еднакъв коментар, но с РАЗЛИЧНО поведение при отрицателно
+ * число. Преписаната функция се разминава по-тихо от преписаното число:
+ * и двете изглеждат прави, докато не подадеш минус.
+ */
+describe('целочислено делене · един дом', () => {
+  it('закръгля половинката НАГОРЕ, не към четното', () => {
+    expect(deliZakragleno(5, 2)).toBe(3); // 2,5 → 3
+    expect(deliZakragleno(7, 2)).toBe(4); // 3,5 → 4
+    expect(deliZakragleno(4, 2)).toBe(2); // точно
+    expect(deliZakragleno(1, 3)).toBe(0); // 0,33 → 0
+    expect(deliZakragleno(2, 3)).toBe(1); // 0,67 → 1
+  });
+
+  it('ЗНАКЪТ СЕ ПАЗИ · иначе сторното на ДДС не е минус самия ДДС', () => {
+    // Точно тук се разминаваха двете копия: версията „и двете положителни"
+    // праща -2,5 надолу до -3 през Math.floor, вместо симетрично на +2,5.
+    expect(deliZakragleno(-5, 2)).toBe(-3);
+    expect(deliZakragleno(5, -2)).toBe(-3);
+    expect(deliZakragleno(-5, -2)).toBe(3);
+    // и симетрията, изказана като закон:
+    for (const ch of [1, 5, 7, 33, 12_345, 999_999]) {
+      for (const zn of [2, 3, 7, 120_000]) {
+        expect(deliZakragleno(-ch, zn)).toBe(-deliZakragleno(ch, zn));
+      }
+    }
+  });
+
+  it('лихвата за месец е точно това делене · базисни пунктове / 120 000', () => {
+    // 3,45 % годишно = 345 базисни пункта; остатък 100 000,00 € = 10 000 000 ц.
+    // месечна лихва = 10 000 000 × 345 / 120 000 = 28 750 ц. = 287,50 €
+    expect(deliZakragleno(10_000_000 * 345, 120_000)).toBe(28_750);
+  });
+
+  it('делене на нула се КАЗВА, а не връща нула', () => {
+    expect(() => deliZakragleno(100, 0)).toThrow(GreshkaPari);
   });
 });
 

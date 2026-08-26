@@ -126,7 +126,7 @@ export const IMENA_NA_IZBORA: Readonly<Record<KoyaTsena, string>> = Object.freez
 });
 
 /** Двете колони, които се долепят отдясно при избор „и двете". */
-export const DOPALNITELNI_KOLONI: readonly string[] = Object.freeze([
+const DOPALNITELNI_KOLONI: readonly string[] = Object.freeze([
   'Стойност на Състояние',
   'Евро / кв.м. (състояние)',
 ]);

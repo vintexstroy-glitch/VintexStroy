@@ -12,7 +12,7 @@
  *      Вратата пази реда в един раздел, ключалката — между няколко.
  */
 
-export type Postoyanstvo = 'постоянно' | 'изтриваемо' | 'неизвестно';
+type Postoyanstvo = 'постоянно' | 'изтриваемо' | 'неизвестно';
 
 export interface SastoyanieNaHranilishteto {
   readonly postoyanstvo: Postoyanstvo;
