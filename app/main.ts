@@ -12,6 +12,7 @@ import {
   proveriVerigata,
   Vrata,
   LichnoESamoTvoe,
+  PoSvoyataVeriga,
 } from '../src/yadro/index.js';
 import {
   klyuchalkaMezhduRazdeli,
@@ -45,6 +46,7 @@ import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
+import { prochetiKnigata } from '../src/domein/knigata.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
@@ -66,7 +68,10 @@ import {
   KLYUCH_OT_ALFA,
   NASTAVKA_LICHEN,
   klyuchNaLichniya,
+  klyuchNaVerigata,
+  knigataNa,
   koyZhurnal,
+  pisachatNa,
   sDumiZaAkaunta,
   svediImeyl,
 } from '../src/domein/akaunt.js';
@@ -196,6 +201,18 @@ const zapishiBeleg = (beleg: BelegZaIznos) => zapishiBelegZaIznos(KLYUCH_IZNOS, 
 let akaunt = KLYUCH_OT_ALFA;
 
 /**
+ * МОЯТА ВЕРИГА в тази книга (ADR-055).
+ *
+ * Различава се от `akaunt` само когато книгата е ЧУЖДА: тогава пиша в
+ * `книга#pero:моят-имейл`, а чета цялата книга. При един писач двете съвпадат.
+ *
+ * Всичко, което брои, проверява или изнася ЗВЕНА, гледа веригата, не книгата:
+ * хеш-веригата тръгва от `seq 1` за всяка поотделно, а слят файл би имал по
+ * едно `seq 1` на верига — тоест нищо, което да се провери.
+ */
+let veriga = KLYUCH_OT_ALFA;
+
+/**
  * КОЙ Е ВЛЯЗЪЛ · вече истински.
  *
  * Дотук тук стоеше ЗАКОВАНА самоличност, която пазеше мястото на входа. Сега
@@ -280,11 +297,28 @@ async function trugvay(): Promise<void> {
    */
   let vizhdatLichnoto: ReadonlySet<string> = new Set();
   let pishatVLichnoto: ReadonlySet<string> = new Set();
-  const pravata = new LichnoESamoTvoe(
-    NASTAVKA_LICHEN,
+  /**
+   * И ВТОРАТА граница · всеки пише в СВОЯТА верига (ADR-055).
+   *
+   * Обвивка около личното, не втора политика: двете пазят различни неща —
+   * личното дели двата Журнала на ЕДИН човек, това дели ПИСАЧИТЕ в една книга.
+   *
+   * Стопанинът се пълни, щом се разбере коя книга се отваря (по-долу): дотогава
+   * е `undefined`, което значи „не знам, не възразявам" — и е вярно, защото
+   * дотогава не е писано нищо.
+   */
+  let stopaninatNaKnigata: string | undefined;
+  const pravata = new PoSvoyataVeriga(
+    new LichnoESamoTvoe(
+      NASTAVKA_LICHEN,
+      svediImeyl,
+      () => vizhdatLichnoto,
+      () => pishatVLichnoto,
+    ),
+    pisachatNa,
+    knigataNa,
+    (kniga) => (kniga === akaunt ? stopaninatNaKnigata : undefined),
     svediImeyl,
-    () => vizhdatLichnoto,
-    () => pishatVLichnoto,
   );
   const vrata = new Vrata({
     dnevnik,
@@ -322,10 +356,24 @@ async function trugvay(): Promise<void> {
   // вход тръгне: данните му стоят на диска, но под ключ, който никой не пита.
   akaunt = koyZhurnal(kojSam, (await dnevnik.chetiVsichki(KLYUCH_OT_ALFA)).length > 0, vrasten);
 
+  /**
+   * КОЯ ВЕРИГА ПИША · книгата е една, веригите са по писач (ADR-055).
+   *
+   * Стопанинът се извежда от ПЪРВОТО събитие на книгата (ADR-043), не се пита.
+   * Аз ли съм — пиша във веригата-нула, точно както досега, и нищо не се
+   * мигрира. Друг е — получавам своя верига в СЪЩАТА книга.
+   *
+   * Празна книга дава `undefined` и значи „аз съм първият": веригата-нула, а
+   * трите правила при Вратата решават дали това е законно.
+   */
+  stopaninatNaKnigata = (await dnevnik.parvo(akaunt))?.actor;
+  veriga = klyuchNaVerigata(akaunt, kojSam.imeyl, stopaninatNaKnigata);
+
   // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
-  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(akaunt);
+  // ПО ВЕРИГА, не по книга: тя брои МОИТЕ звена и чуждата верига не я мени.
+  const sabitiyaVNachaloto = await dnevnik.chetiVsichki(veriga);
   const proverka = proveriKotvata(
-    kotva.cheti(akaunt),
+    kotva.cheti(veriga),
     sabitiyaVNachaloto[sabitiyaVNachaloto.length - 1]?.seq ?? 0,
     (seq) => sabitiyaVNachaloto.find((s) => s.seq === seq)?.hash,
   );
@@ -338,12 +386,20 @@ async function trugvay(): Promise<void> {
         'Журналът не се пипа; вземи последния износ и го внеси.',
     };
   }
+  /**
+   * ТРЕТИЯТ КОНТЕКСТ · пиша в СВОЯТА верига, чета ЦЯЛАТА книга (ADR-055).
+   *
+   * Двете посоки са различни ключове и точно това е резенът. При един писач
+   * `veriga === akaunt` и всичко върви както досега — включително мерките,
+   * защото сгъването на ЕДНА верига е самата верига.
+   */
   const deystviya = new Deystviya({
     vrata,
     dnevnik,
-    naematel: akaunt,
+    naematel: veriga,
     actor: kojSam.imeyl,
     chasovnik: () => new Date().toISOString(),
+    kniga: akaunt,
   });
 
   const k: Konteks = {
@@ -558,7 +614,7 @@ async function trugvay(): Promise<void> {
   }
 
   async function prerisuvay(): Promise<void> {
-    const sabitiya = await dnevnik.chetiVsichki(akaunt);
+    const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
     // ЛИЧНОТО · чете се ОТДЕЛНО и никога не влиза в служебното Огледало.
@@ -875,7 +931,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   });
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
-    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
+    const sabitiya = await k.dnevnik.chetiVsichki(veriga);
     const rezultat = await proveriVerigata(sabitiya, sha256Web);
     sastoyanieNaVerigata = {
       tsyala: rezultat.tsyala,
@@ -904,11 +960,12 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
+    // ФАЙЛ НА ПИСАЧ · моята верига, проверима сама за себе си.
+    const sabitiya = await k.dnevnik.chetiVsichki(veriga);
     const fayl = new Blob([JSON.stringify(sabitiya, null, 2)], {
       type: 'application/json',
     });
-    svaliFayl(fayl, `zhurnal-${akaunt}-${dnesKato()}.json`);
+    svaliFayl(fayl, `zhurnal-${veriga}-${dnesKato()}.json`);
 
     const posledenHash = sabitiya[sabitiya.length - 1]?.hash ?? '';
     zapishiBeleg({
@@ -931,7 +988,9 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       await prerisuvay();
       return;
     }
-    const sabitiya = await k.dnevnik.chetiVsichki(akaunt);
+    // АРХИВЪТ Е ОТЧЕТ, не проверима верига: чете се ЦЯЛАТА книга, за да не
+    // излезе таблица, чието Огледало е по-широко от редовете под него.
+    const sabitiya = (await prochetiKnigata(k.dnevnik, akaunt, new Date().toISOString())).potok;
     const ogledalo = await k.deystviya.ogledalo();
     const bajtove = arhivZaEksel(sabitiya, ogledalo, new Date().toISOString());
     const fayl = new Blob([bajtove.slice().buffer], {
@@ -954,7 +1013,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     const izbran = fayl.files?.[0];
     if (!izbran) return;
 
-    const sega = (await k.dnevnik.chetiVsichki(akaunt)).length;
+    const sega = (await k.dnevnik.chetiVsichki(veriga)).length;
     const potvarzhdenie =
       sega === 0
         ? `Да внеса ли „${izbran.name}"?`

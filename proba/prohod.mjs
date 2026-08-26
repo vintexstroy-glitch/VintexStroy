@@ -4143,6 +4143,67 @@ async function main() {
         'всички');
     }
 
+    // ══ 67 · МНОГОТО ВЕРИГИ · вторият писач в ЕДНА книга (ADR-055) ══════════
+    //
+    // Тук се симулира онова, което резен 6 ще донесе от Драйва: файлът на ДРУГ
+    // писач ляга до моя, под свой ключ `книга#pero:имейл`. Проверява се, че:
+    //   · екранът показва СГЪНАТАТА книга, не само моята половина — това е
+    //     дупката, която не хвърля и затова е най-опасната;
+    //   · МОЯТА верига остава цяла — чуждата не участва в нейната проверка;
+    //   · Таблото КАЗВА в коя верига се пише.
+    razdel = '67 · многото вериги · чуждата верига се появява';
+    const chuzhdiyat = await p.evaluate(async () => {
+      const db = await new Promise((da, ne) => {
+        const z = indexedDB.open('masterbook');
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      const vsichki = await new Promise((da, ne) => {
+        const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+        z.onsuccess = () => da(z.result);
+        z.onerror = () => ne(z.error);
+      });
+      const kniga = vsichki.map((s) => s.naematel).find((n) => !n.includes('#'));
+      const veriga = `${kniga}#pero:kolega@example.bg`;
+      const sabitie = {
+        opId: 'kolega-imot-1',
+        ts: '2026-08-26T09:00:00.000Z',
+        naematel: veriga,
+        actor: 'kolega@example.bg',
+        seq: 1,
+        prevHash: '',
+        hash: 'chuzhd-hash-1',
+        type: 'ИмотДобавен',
+        sashtnost: { vid: 'imot', id: 'IMOT-NA-KOLEGATA' },
+        payload: { adres: 'ул. Колегата 7', edinitsa: 'ап. 1', ploshtad_kvsm: 55 },
+      };
+      await new Promise((da, ne) => {
+        const t = db.transaction('sabitiya', 'readwrite');
+        const z = t.objectStore('sabitiya').add(sabitie);
+        z.onsuccess = () => da();
+        z.onerror = () => ne(z.error);
+      });
+      return { kniga, veriga };
+    });
+
+    await p.reload();
+    await p.waitForSelector('.nav');
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('имотът на ДРУГИЯ писач се вижда · книгата е сгъната',
+      await p.$$eval('.red.imot', (r) => r.some((e) => e.textContent.includes('ул. Колегата 7'))),
+      true);
+
+    razdel = '67 · многото вериги · моята верига остава цяла';
+    await naEkran(p, 'tablo', '#proveri');
+    await p.click('#proveri');
+    await p.waitForFunction(() => document.body.innerText.includes('Веригата е цяла'));
+    proveri('чуждият хеш НЕ поваля моята проверка',
+      (await p.evaluate(() => document.body.innerText)).includes('Веригата е цяла'), true);
+
+    razdel = '67 · многото вериги · Таблото казва коя е моята';
+    proveri('книгата се вижда на екрана',
+      (await p.evaluate(() => document.body.innerText)).includes(chuzhdiyat.kniga), true);
+
     // ══ 48 · джобът НАКРАЯ · чужда азбука, довлечена от кой да е екран ═══════
     //
     // §16 гледа джоба РАНО — а знак от чужда азбука, сложен на екран, който се

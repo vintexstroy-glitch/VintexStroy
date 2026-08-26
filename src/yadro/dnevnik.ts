@@ -36,6 +36,24 @@ export interface Dnevnik {
 
   /** Събитията за една същност, подредени по seq — входът на Огледалото. */
   chetiZaSashtnost(naematel: string, sashtnost: Sashtnost): Promise<Sabitie[]>;
+
+  /**
+   * КОИ ВЕРИГИ ИМА ТУК · единственият нов метод на порта за ADR-055.
+   *
+   * ОБЯВЯВА СЕ, вместо да се вмъква тихо: досега всяко четене питаше за ЕДИН
+   * наемател, защото книгата имаше една верига. Станат ли писачите повече,
+   * приложението трябва да разбере кои вериги съществуват — а това НЕ може да
+   * бъде събитие. Събитието живее в верига; списък на веригите, живеещ в една
+   * от тях, би искал точно онзи общ курсор, който правило 6 забранява: писач,
+   * чиято верига не е вписана никъде, ще стане невидим за всички.
+   *
+   * Затова списъкът е свойство на НОСИТЕЛЯ — той знае какво държи.
+   *
+   * ДОГОВОРЪТ Е МЕХАНИЧЕН: „ключовете, започващи с този префикс", подредени.
+   * Ядрото не знае наставки и не отсява личния Журнал — това е дума на домейна
+   * (`knigata.ts`), точно както наставката на личния идва отвън.
+   */
+  verigi(prefiks: string): Promise<string[]>;
 }
 
 export class GreshkaDnevnik extends Error {
@@ -98,6 +116,10 @@ export class DnevnikVPametta implements Dnevnik {
     const klyuch = klyuchNaSashtnost(sashtnost);
     const redica = this.#poNaematel.get(naematel) ?? [];
     return redica.filter((s) => klyuchNaSashtnost(s.sashtnost) === klyuch);
+  }
+
+  async verigi(prefiks: string): Promise<string[]> {
+    return [...this.#poNaematel.keys()].filter((k) => k.startsWith(prefiks)).sort();
   }
 
   /** Само за тестове: колко наематели са пипани. */

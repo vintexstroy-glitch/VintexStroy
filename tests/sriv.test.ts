@@ -70,6 +70,9 @@ class DnevnikSasSpirashtTok implements Dnevnik {
   chetiZaSashtnost(n: string, s: never) {
     return this.istinski.chetiZaSashtnost(n, s);
   }
+  verigi(p: string) {
+    return this.istinski.verigi(p);
+  }
 
   async dobavi(s: Sabitie): Promise<void> {
     if (this.#ostavashti <= 0) {
