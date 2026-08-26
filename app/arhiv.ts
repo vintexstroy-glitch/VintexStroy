@@ -16,6 +16,7 @@ import { akumulator, ddsOtObshta, stavkaNaReda } from '../src/domein/dds.js';
 import { potok } from '../src/domein/smetki.js';
 import { smetki } from '../src/domein/smetki.js';
 import { platenoDDSZaPerioda, type Ogledalo } from '../src/ogledalo/ogledalo.js';
+import { klyuchNaZveno } from '../src/yadro/sabitie.js';
 import type { Sabitie } from '../src/yadro/index.js';
 
 /** Стотинки → евро като число за клетка на Excel. Само за този изглед. */
@@ -70,7 +71,7 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
       `${s.sashtnost.vid}:${s.sashtnost.id}`,
       opisOtPayload(s),
       sumaOtPayload(s),
-      o.pogaseni.has(s.seq) ? 'да' : '',
+      o.pogaseni.has(klyuchNaZveno(s)) ? 'да' : '',
       s.opId,
       s.hash.slice(0, 16),
     ]),

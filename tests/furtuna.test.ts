@@ -18,12 +18,14 @@ import {
   Vrata,
   VsichkoRazresheno,
   type Operatsiya,
+  type Sabitie,
 } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
 import { duljimo, fold } from '../src/ogledalo/ogledalo.js';
 import { glavnaKniga } from '../src/domein/glavna-kniga.js';
+import { sgani } from '../src/ogledalo/sgavane.js';
 import { seyalka, SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -355,5 +357,152 @@ describe('фъртуна 3 · главната книга не пада и за�
     // Бурята наистина е минала през двата пътя: и статии, и пропуснати.
     expect(statii).toBeGreaterThan(30);
     expect(propusnati).toBeGreaterThan(0);
+  });
+});
+
+/**
+ * ФЪРТУНА 4 · МНОГО ВЕРИГИ · четирима писача в една книга.
+ *
+ * Единичният тест пази СЛУЧАЯ; бурята пази ПРАВИЛОТО. Тук правилото е ново и
+ * най-крехко: щом писачите са няколко, всяка верига тръгва от `seq 1` и
+ * наредбата между тях идва от такта, не от брояча.
+ *
+ * ТРИ ИНВАРИАНТА, и трите се късат по различен начин, ако нещо се сбърка:
+ *
+ *   1. ВСЯКА ВЕРИГА ПООТДЕЛНО Е ЦЯЛА. Сгъването е ПОГЛЕД — то не бива да
+ *      докосва нито един хеш. Скъса ли се верига, значи сме писали, а не чели.
+ *   2. ПОТОКЪТ Е ЕДИН И СЪЩ ПРИ ВСЯКАКЪВ РЕД НА ПОДАВАНЕ. Носителят връща
+ *      файловете в какъвто ред му е удобно; зависи ли „кой е последен" от това,
+ *      два екрана показват различни пари.
+ *   3. ГЛАВНАТА КНИГА НЕ ХВЪРЛЯ И ЗАТВАРЯ. Дебит = кредит, до стотинка — при
+ *      каквито и да е данни от четирима души.
+ */
+describe('фъртуна 4 · четирима писача, една книга', () => {
+  const KNIGA = 'vintexstroy';
+  const PISACHI = [
+    KNIGA,
+    `${KNIGA}#pero:mira@example.bg`,
+    `${KNIGA}#pero:petar@example.bg`,
+    `${KNIGA}#pero:ana@example.bg`,
+  ] as const;
+
+  it('веригите са цели, потокът е един и същ, книгата затваря', async () => {
+    const dnevnik = new DnevnikVPametta();
+    const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
+    const sluchayno = seyalka(20260826);
+    const izbroy = (n: number) => Math.floor(sluchayno() * n);
+    const MESETSI = ['2026-01', '2026-02', '2026-03'];
+
+    /**
+     * ЧАСОВНИЦИТЕ СЕ СБЛЪСКВАТ НАРОЧНО, и това е същината на фъртуната.
+     *
+     * Първият вариант на този тест даваше на всеки писач свое отместване от по
+     * две секунди — и минаваше ДОРИ когато разчупването по верига се махнеше.
+     * Тоест твърдеше, че пази наредбата, а не я пазеше: при различни времена
+     * няма какво да се разчупва.
+     *
+     * Затова тук времето върви ОБЩО и БАВНО: една милисекунда на всеки пет
+     * записа. Четиримата пишат в едни и същи милисекунди, равенствата са
+     * стотици, и наредбата виси изцяло на разчупването по верига. Махне ли се
+     * то, пермутационната проверка пада.
+     */
+    let obshtTik = 0;
+    const chasovnik = () =>
+      new Date(Date.UTC(2026, 0, 1, 0, 0, 0, Math.floor(obshtTik++ / 5))).toISOString();
+
+    const deystviyata = PISACHI.map((veriga, i) =>
+      new Deystviya({
+        vrata,
+        dnevnik,
+        naematel: veriga,
+        actor: i === 0 ? 'vintexstroy@gmail.com' : veriga.split(':')[1]!,
+        chasovnik,
+      }),
+    );
+
+    // Всеки писач си държи свой имот и свой наем — иначе тестът щеше да мери
+    // сблъсъците, а те са работа на резен 4, не на този.
+    for (const [i, d] of deystviyata.entries()) {
+      await d.dobaviImot(`I-${i}`, { adres: `Малинова ${i}`, edinitsa: '№ 1', ploshtad_kvsm: 6000 }, { opId: `op-i-${i}` });
+      await d.dobaviNaem(
+        `N-${i}`,
+        { imotId: `I-${i}`, naemetel: `Наемател ${i}`, telefon: '', imeyl: '',
+          naem_st: 60000 + i * 7777, padezhDen: 5, ot: '2026-01-01', do: '2026-12-31',
+          depozit_st: 0, sektor: i % 2 === 0 ? 'naem-zhilishten' : 'naem-targovski' },
+        { opId: `op-n-${i}` },
+      );
+    }
+
+    let n = 0;
+    for (let krag = 0; krag < 200; krag += 1) {
+      const i = izbroy(PISACHI.length);
+      const d = deystviyata[i]!;
+      const mesets = MESETSI[izbroy(MESETSI.length)]!;
+      const zar = sluchayno();
+      n += 1;
+      try {
+        if (zar < 0.4) {
+          await d.nachisliVzemane(
+            `V-${i}-${n}`,
+            { naemId: `N-${i}`, period: mesets, osnovanie: 'наем',
+              suma_st: izbroy(300000) + 1, padezh: `${mesets}-05` },
+            { opId: `op-v-${i}-${n}` },
+          );
+        } else if (zar < 0.7) {
+          await d.zapishiRazhod(
+            `R-${i}-${n}`,
+            { potok: 'fakturi', dostavchik: `Доставчик ${izbroy(3)}`, opis: 'материали',
+              suma_st: izbroy(120000) + 1, sektor: 'pokupki-materiali',
+              nachin: 'банка', data: `${mesets}-12`, dokument: `Ф-${n}` },
+            { opId: `op-r-${i}-${n}` },
+          );
+        } else {
+          await d.dobaviImot(
+            `I-${i}-${n}`,
+            { adres: `ул. ${n}`, edinitsa: 'А', ploshtad_kvsm: izbroy(20000) },
+            { opId: `op-di-${i}-${n}` },
+          );
+        }
+      } catch {
+        // Отказ на действие е ВАЛИДЕН изход (замразен период, негодна сума).
+        // Фъртуната мери какво става с ЖУРНАЛА, не колко операции минават.
+      }
+    }
+
+    const verigi = await Promise.all(PISACHI.map((v) => dnevnik.chetiVsichki(v)));
+
+    // ── инвариант 1 · всяка верига поотделно е ЦЯЛА ──────────────────────
+    for (const [i, v] of verigi.entries()) {
+      expect(v.length, `верига ${i} е празна`).toBeGreaterThan(0);
+      const proverka = await proveriVerigata(v, SHA);
+      expect(proverka.tsyala, `верига ${i}: ${proverka.prichina ?? ''}`).toBe(true);
+    }
+
+    // ── инвариант 2 · редът на подаване не мени НИЩО ─────────────────────
+    const KOGATO = '2026-04-01T00:00:00.000Z';
+    const otpechatak = (r: readonly (readonly Sabitie[])[]) =>
+      sgani(r, KOGATO).potok.map((s) => s.hash).join('|');
+
+    const naopaki = [...verigi].reverse();
+    const razmesteni = [verigi[2]!, verigi[0]!, verigi[3]!, verigi[1]!];
+    expect(otpechatak(naopaki)).toBe(otpechatak(verigi));
+    expect(otpechatak(razmesteni)).toBe(otpechatak(verigi));
+
+    // и сверката затваря · правило 7
+    const sgunato = sgani(verigi, KOGATO);
+    expect(sgunato.sverka.nared).toBe(true);
+    expect(sgunato.verigi).toHaveLength(PISACHI.length);
+
+    // ── инвариант 3 · Главната книга не хвърля и ЗАТВАРЯ ─────────────────
+    const o = fold(sgunato.potok);
+    for (const period of MESETSI) {
+      const kniga = glavnaKniga(o, period, KOGATO);
+      expect(kniga.debit_st, `период ${period}`).toBe(kniga.kredit_st);
+      for (const statiya of kniga.statii) {
+        const debit = statiya.redove.reduce((s, r) => s + (r.strana === 'debit' ? r.suma_st : 0), 0);
+        const kredit = statiya.redove.reduce((s, r) => s + (r.strana === 'kredit' ? r.suma_st : 0), 0);
+        expect(debit, `статия ${statiya.id}`).toBe(kredit);
+      }
+    }
   });
 });

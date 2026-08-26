@@ -20,6 +20,7 @@ import {
 } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
+import { sgani } from '../src/ogledalo/sgavane.js';
 import { smetki } from '../src/domein/smetki.js';
 import { otvoriDnevnik } from '../src/nositel/dnevnik-indexeddb.js';
 import { stotinki } from '../src/yadro/pari.js';
@@ -31,6 +32,8 @@ const BROY = 10_000;
 /** Бюджетите. Едно място, за да се четат като договор. */
 const BYUDZHET = {
   fold_ms: 20,
+  sgavane_ms: 20,
+  fold_n_verigi_ms: 20,
   veriga_ms: 400,
   smetki_ms: 10,
   append_na_sekunda: 500,
@@ -101,6 +104,28 @@ describe(`мерките · ${BROY.toLocaleString('bg')} събития`, () => 
     t = performance.now();
     smetki(o, '2023-06', '2026-01-01T00:00:00.000Z');
     meri('smetki', performance.now() - t, BYUDZHET.smetki_ms);
+
+    /**
+     * СГЪВАНЕТО НА МНОГО ВЕРИГИ · мери се, не се твърди.
+     *
+     * Един Журнал не е пет вериги, затова тук същите 10 000 събития се РЯЗАТ
+     * на пет и се сгъват наново. Не е истинска книга с пет писача — но мери
+     * точно онова, което новият код прави: k-пътното сливане и сгъването на
+     * слетия поток. Бюджетът е СЪЩИЯТ като на `fold`: многото вериги не бива
+     * да струват порядък повече от една.
+     */
+    const naryazani: Sabitie[][] = [[], [], [], [], []];
+    sabitiya.forEach((sabitie, i) => naryazani[i % 5]!.push(sabitie));
+    sgani(naryazani, '2026-01-01T00:00:00.000Z'); // загрявка
+
+    t = performance.now();
+    const sgunato = sgani(naryazani, '2026-01-01T00:00:00.000Z');
+    meri('сгъване на 5 вериги', performance.now() - t, BYUDZHET.sgavane_ms);
+    expect(sgunato.sverka.nared).toBe(true);
+
+    t = performance.now();
+    fold(sgunato.potok);
+    meri('fold върху слетия поток', performance.now() - t, BYUDZHET.fold_n_verigi_ms);
 
     t = performance.now();
     const veriga = await proveriVerigata(sabitiya, SHA);

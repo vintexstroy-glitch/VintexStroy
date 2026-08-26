@@ -14,6 +14,7 @@
  */
 
 import type { Sabitie } from '../yadro/index.js';
+import { klyuchNaZveno } from '../yadro/sabitie.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 
 /**
@@ -45,7 +46,9 @@ export function mozheLiDaSeStornira(
   if (s.type === 'Сторно') {
     return ne('Сторно не се сторнира. Ако е сгрешено, впиши наново това, което трябва.');
   }
-  if (o.pogaseni.has(seq)) return ne('Това вече е сторнирано. Второ сторно не го връща.');
+  if (o.pogaseni.has(klyuchNaZveno(s))) {
+    return ne('Това вече е сторнирано. Второ сторно не го връща.');
+  }
 
   const id = s.sashtnost.id;
 

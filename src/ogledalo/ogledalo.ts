@@ -19,6 +19,7 @@ import {
   type VidProblem,
 } from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
+import { klyuchNaZveno } from '../yadro/sabitie.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
@@ -324,8 +325,13 @@ export interface Ogledalo {
   readonly sverki: readonly ZapisanaSverka[];
   /** колко събития са влезли в състоянието */
   readonly prilozheni: number;
-  /** seq-овете, които сторно е погасило (и самите сторна) */
-  readonly pogaseni: ReadonlySet<number>;
+  /**
+   * ЗВЕНАТА, които сторно е погасило (и самите сторна).
+   *
+   * Ключът е `верига#seq` (`klyuchNaZveno`), не голо `seq`: всяка верига тръгва
+   * от 1, тъй че число само по себе си сочи по едно събитие във всяка от тях.
+   */
+  readonly pogaseni: ReadonlySet<string>;
 }
 
 /**
@@ -361,12 +367,13 @@ function poletataNaNaema(p: PayloadNaemDobaven | PayloadNaemPopraven) {
 }
 
 export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
-  const pogaseni = new Set<number>();
+  const pogaseni = new Set<string>();
   for (const s of sabitiya) {
     if (s.type === 'Сторно') {
       const p = s.payload as unknown as PayloadStorno;
-      pogaseni.add(p.pogasyavaSeq);
-      pogaseni.add(s.seq);
+      // Пропусната верига значи СВОЯТА — виж `PayloadStorno.pogasyavaVeriga`.
+      pogaseni.add(klyuchNaZveno({ naematel: p.pogasyavaVeriga ?? s.naematel, seq: p.pogasyavaSeq }));
+      pogaseni.add(klyuchNaZveno(s));
     }
   }
 
@@ -386,15 +393,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
    * се брои — каквото и да пише след него.
    */
   const storniranite = (tip: TipSabitie): ReadonlySet<string> => {
-    const sazdadenoNaSeq = new Map<string, number>();
+    const sazdadenoNaZveno = new Map<string, string>();
     for (const s of sabitiya) {
-      if (s.type === tip && !sazdadenoNaSeq.has(s.sashtnost.id)) {
-        sazdadenoNaSeq.set(s.sashtnost.id, s.seq);
+      if (s.type === tip && !sazdadenoNaZveno.has(s.sashtnost.id)) {
+        sazdadenoNaZveno.set(s.sashtnost.id, klyuchNaZveno(s));
       }
     }
     const mrtvi = new Set<string>();
-    for (const [id, seq] of sazdadenoNaSeq) {
-      if (pogaseni.has(seq)) mrtvi.add(id);
+    for (const [id, zveno] of sazdadenoNaZveno) {
+      if (pogaseni.has(zveno)) mrtvi.add(id);
     }
     return mrtvi;
   };
@@ -447,7 +454,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let prilozheni = 0;
 
   for (const s of sabitiya) {
-    if (pogaseni.has(s.seq)) continue;
+    if (pogaseni.has(klyuchNaZveno(s))) continue;
     prilozheni += 1;
 
     switch (s.type) {
