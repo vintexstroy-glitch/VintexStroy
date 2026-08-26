@@ -2441,6 +2441,20 @@ async function main() {
     proveri('Описът казва формулата на колоната',
       (await redove(p, '.red.opis')).some((r) => r[3]?.includes('формула: разлика(')), true);
 
+    // ══ 40б · картата на връзките · БРОЕНА на екрана, не преписана ═══════════
+    razdel = '40б · картата на връзките';
+    await naEkran(p, 'nastroyki', '[data-sektsiya="karta"]');
+    const karta = await tekstNa(p, '[data-sektsiya="karta"] .dyalglava');
+    proveri('картата казва КОЛКО от колко са построени',
+      /построени\s+\d+\s+от\s+\d+/.test(karta.replace(/\s+/g, ' ')), true);
+    const vrazkiRedove = await redove(p, '[data-sektsiya="karta"] .red.deystvie');
+    proveri('всяка връзка стои поименно',
+      vrazkiRedove.length > 0, true);
+    proveri('обявената НЕ се крие — стои със значка',
+      vrazkiRedove.some((r) => r.some((k) => k.includes('обявена'))), true);
+    proveri('построената също си личи',
+      vrazkiRedove.some((r) => r.some((k) => k.includes('построена'))), true);
+
     // ══ 41 · ИИ-таблото (И92 т.10) ═══════════════════════════════════════════
     razdel = '41 · ИИ-таблото';
     await naEkran(p, 'ii', '#nov-agent');

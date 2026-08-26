@@ -27,12 +27,15 @@ import { otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
 import { otpechatak, type Izvor, type Snimka, type VidIzvor } from '../src/iztochnik/snimka.js';
 import { periodPoModel, pogadniPeriod, razchetiPoModel, razchetiRazhodi } from '../src/iztochnik/razchitane.js';
 import { bezPrazni, kletka, type Tablitsa } from '../src/iztochnik/tablitsa.js';
+import { sDumiFormula, smetniKolonite } from '../src/domein/formuli.js';
+import { IMENA_NA_VIDOVETE_STOYNOST } from '../src/domein/vid-stoynost.js';
 import {
   belegNaModel,
   GreshkaModel,
   IMENA_NA_ROLITE,
   nameriModel,
   napraviModel,
+  redoveSDanni,
   podskazhi,
   ZADALZHITELNI_ROLI,
   type ModelNaTablitsa,
@@ -284,6 +287,7 @@ export function narisuvayPlana(): string {
       </div>
 
       ${blokNaSborovete()}
+      ${blokNaFormulite()}
 
       ${
         nepoznati.length === 0
@@ -495,6 +499,79 @@ function blokNaSborovete(): string {
         <span class="drebno" translate="no">${ekraniraj(sDumiNaPartida(zaIzprashtane(sborove.model, sborove.tablitsa)))}</span>
       </div>
       <p class="drebno"><b>Колоната стои където я поставиш</b> — тук тя е в реда на хедъра. Отива <b>сборът ѝ</b>: при /+/ в Приходи, при /−/ в Разходи. Знакът се <b>смята</b> и не се записва; записва се само <b>махането</b>, защото то е решение и иска следа.</p>`;
+}
+
+/**
+ * ФОРМУЛНИТЕ КОЛОНИ · смятат се ПРИ ПОКАЗВАНЕ и се показват ТУК.
+ *
+ * ADR-025 построи формулата и Настройки я СЪЗДАВАТ — а `smetniKolonite`, онова,
+ * което я превръща в число, нямаше нито един викащ извън теста си. Тоест човек
+ * можеше да си направи колона „сбор(Наем · ДДС)" и да не я види никога. Точно
+ * това ADR-041 нарече обявена възможност без консуматор.
+ *
+ * СТОЙНОСТТА НЯМА СОБСТВЕН ДОМ (правило 17): записът е ФОРМУЛАТА в модела,
+ * числото е нейна производна. Затова блокът само ПОКАЗВА — не пише и не
+ * изпраща.
+ *
+ * И НЕ ВЛИЗА В ДВАТА СБОРА. Там стоят колоните с данни (правило 20); влезе ли
+ * и резултатът, една сума се брои два пъти — веднъж като операнд и веднъж
+ * като резултат.
+ *
+ * ЧИСТАТА ЧАСТ Е ОТДЕЛНА (`formulniteKoloni`), за да има тест: блок, който се
+ * сглобява само вътре в шаблонен низ, се проверява единствено от прохода, а
+ * проходът минава по един път — тестът минава по всички.
+ *
+ * СПЪНАЛИТЕ СЕ РЕДОВЕ СЕ КАЗВАТ. `smetniKolonite` ги брои поименно, вместо да
+ * обезсили колоната; тук се изписват с думи, защото ред, който мълчаливо не се
+ * смята, изглежда като нула.
+ */
+export function formulniteKoloni(
+  model: ModelNaTablitsa,
+  tablitsa: Tablitsa,
+): ReturnType<typeof smetniKolonite> {
+  return smetniKolonite(model, {
+    redove: redoveSDanni(model, tablitsa),
+    kletka: (red, kolona) => kletka(tablitsa, red, kolona),
+  });
+}
+
+function blokNaFormulite(): string {
+  if (!sborove) return '';
+  const { model, tablitsa } = sborove;
+  const koloni = formulniteKoloni(model, tablitsa);
+  if (koloni.length === 0) return '';
+
+  return `
+      <div class="dyalglava">
+        <h2 class="malko">Формулни колони</h2>
+        <span>смятат се при показване · записът е формулата, не числото</span>
+      </div>
+      <div class="tablitsa">
+        <div class="glava znak">
+          <span>Колона</span><span>Формула</span><span>Вид</span>
+          <span class="suma">Сбор</span><span></span>
+        </div>
+        ${koloni
+          .map((k) => {
+            const f = model.formuli[k.kolona];
+            return `
+        <div class="red znak" translate="no">
+          <span class="kletka"><b>${ekraniraj(k.ime)}</b></span>
+          <span class="kletka"><span>${ekraniraj(f ? sDumiFormula(model, f) : '—')}</span></span>
+          <span class="kletka"><span>${ekraniraj(IMENA_NA_VIDOVETE_STOYNOST[k.vid])}</span></span>
+          <span class="suma"${k.vid === 'evro' ? ` data-st="${k.sbor}"` : ''}>${ekraniraj(
+            k.vid === 'evro' ? pishi(k.sbor) : String(k.sbor),
+          )}</span>
+          <span class="kletka"><span>${
+            k.spanali.length === 0
+              ? `${k.redove.length} ${k.redove.length === 1 ? 'ред' : 'реда'}`
+              : `${k.spanali.length} ${k.spanali.length === 1 ? 'ред не се чете' : 'реда не се четат'}`
+          }</span></span>
+        </div>`;
+          })
+          .join('')}
+      </div>
+      <p class="drebno"><b>Формулната колона не влиза в двата сбора</b> — там стоят колоните с данни. Иначе една сума щеше да се брои два пъти: веднъж като операнд и веднъж като резултат.</p>`;
 }
 
 /** Име по подразбиране: файлът без наставка и без брояча „(3)". */
