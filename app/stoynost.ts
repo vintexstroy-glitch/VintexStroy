@@ -137,7 +137,9 @@ export function narisuvayStoynost(): string {
         <span class="chislo" translate="no">${smetnato ? pishi(smetnato.sastoyanie_st) : '—'}</span>
         <span class="pod">${
           smetnato
-            ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ`
+            ? `${vBT(smetnato.razlika_na_metodite_bt)} спрямо цената по площ · закръглено ${sZnak(
+                smetnato.razlika_sastoyanie_st,
+              )}`
             : 'оценката · годишен наем ÷ доходност'
         }</span>
       </div>

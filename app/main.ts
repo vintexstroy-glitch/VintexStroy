@@ -718,7 +718,7 @@ async function trugvay(): Promise<void> {
       zakachiIstoriya(koren, k);
       zakachiKontekstnoMenyu(koren, k);
       zakachiKlaviatura(koren, k, prerisuvay);
-      zakachiRedaktsiya(koren, k, prerisuvay);
+      zakachiRedaktsiya(koren, k, prerisuvay, rolyataNa(kojSam.imeyl, ogledalo));
     }
     zakachiChernovata(koren);
     // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).

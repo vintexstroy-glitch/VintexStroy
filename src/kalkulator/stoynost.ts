@@ -29,7 +29,7 @@
  * отделно: закръгленото никога не влиза в сбор (ADR-012).
  */
 
-import { tsenaNagore, zakragli } from '../yadro/valuta.js';
+import { razlikaOtZakraglyane, tsenaNagore, zakragli } from '../yadro/valuta.js';
 import {
   evroNaKvadrat_st,
   ochakvanNaem_st,
@@ -107,12 +107,21 @@ export interface StoynostNaSastoyanie {
   readonly obshto_tochno_st: number;
   /** А · същият сбор, закръглен веднъж към най-близката стотица — за екрана */
   readonly obshto_st: number;
-  /** колко „изяде" закръглянето — вижда се, не се преглъща (правило 7) */
+  /** А · колко „изяде" закръглянето — вижда се, не се преглъща (правило 7) */
   readonly razlika_st: number;
   /** Б · сборът от точните стойности по състояние */
   readonly sastoyanie_tochno_st: number;
   /** Б · същият, закръглен веднъж */
   readonly sastoyanie_st: number;
+  /**
+   * Б · КОЛКО ИЗЯДЕ ЗАКРЪГЛЯНЕТО и при него.
+   *
+   * Дотук го нямаше, а плочката на Б показваше закръглен сбор — точно както А,
+   * само че мълчешком. Двете плочки стоят една до друга и обещават едно и също;
+   * обещание, спазено от едната, е по-лошо от неспазено и от двете, защото
+   * човекът се научава да вярва на надписа.
+   */
+  readonly razlika_sastoyanie_st: number;
   /** Δ на двата сбора, в цели базисни точки */
   readonly razlika_na_metodite_bt: number;
   /** колко обекта влизат в стойността */
@@ -199,14 +208,22 @@ export function stoynostNaSastoyanie(
     });
   }
 
-  const obshto_st = zakragli(obshto_tochno_st, 'stotitsi');
+  /**
+   * ЕДНА ФУНКЦИЯ ЗА РАЗЛИКАТА, не изваждане на ръка.
+   *
+   * `razlika_st` дотук се смяташе тук като `obshto_st - obshto_tochno_st` —
+   * дословно онова, което `razlikaOtZakraglyane` прави. Втори израз за едно
+   * число (правило 17), при това вторият остави ИМЕНУВАНИЯ без нито един
+   * викащ извън теста му, а ADR-012 го обявява за построен.
+   */
   return {
     redove: Object.freeze(redove),
     obshto_tochno_st,
-    obshto_st,
-    razlika_st: obshto_st - obshto_tochno_st,
+    obshto_st: zakragli(obshto_tochno_st, 'stotitsi'),
+    razlika_st: razlikaOtZakraglyane(obshto_tochno_st, 'stotitsi'),
     sastoyanie_tochno_st,
     sastoyanie_st: zakragli(sastoyanie_tochno_st, 'stotitsi'),
+    razlika_sastoyanie_st: razlikaOtZakraglyane(sastoyanie_tochno_st, 'stotitsi'),
     razlika_na_metodite_bt: razlikaVBT(obshto_tochno_st, sastoyanie_tochno_st),
     broy: redove.length - prodadeni,
     prodadeni,

@@ -24,6 +24,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { razlikaOtZakraglyane } from '../src/yadro/valuta.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import {
   eListSPloshti,
@@ -218,6 +219,29 @@ describe('стойността на състоянието', () => {
     const s = stoynostNaSastoyanie(obekti, otLista());
     expect(s.obshto_st - s.obshto_tochno_st).toBe(s.razlika_st);
     expect(s.obshto_st % 10_000).toBe(0); // сборът е на цели стотици евро
+  });
+
+  /**
+   * И ЗА ДВЕТЕ КОЛОНИ · обещанието не е наполовина.
+   *
+   * Двете плочки стоят една до друга и показват сбор, закръглен по един и същи
+   * начин. Дотук А казваше „закръглено −33 €", а Б мълчеше за същото —
+   * обещание, спазено от едната, е по-лошо от неспазено и от двете, защото
+   * човекът се научава да вярва на надписа.
+   *
+   * И двете вече минават през ЕДНА функция (`razlikaOtZakraglyane`); дотук А
+   * я смяташе с ръчно изваждане, а именуваната нямаше нито един викащ извън
+   * теста си — макар ADR-012 да я обявява за построена.
+   */
+  it('и Б казва своето закръгляне · не само А', () => {
+    const { obekti } = prochetiPloshti(ploshti());
+    const s = stoynostNaSastoyanie(obekti, otLista());
+    expect(s.razlika_st).toBe(razlikaOtZakraglyane(s.obshto_tochno_st, 'stotitsi'));
+    expect(s.razlika_sastoyanie_st).toBe(
+      razlikaOtZakraglyane(s.sastoyanie_tochno_st, 'stotitsi'),
+    );
+    expect(s.sastoyanie_st - s.sastoyanie_tochno_st).toBe(s.razlika_sastoyanie_st);
+    expect(s.sastoyanie_st % 10_000).toBe(0);
   });
 
   it('СВЕРКА вход↔изход · N обекта влизат, N реда излизат', () => {

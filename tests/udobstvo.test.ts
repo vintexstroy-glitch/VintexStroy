@@ -28,7 +28,12 @@ import { klipbordniVkusove, smetniIzbora } from '../app/klaviatura.js';
 import { klyuchNaChernova, umryalaLi } from '../app/chernova.js';
 import { sDumiZaStornoto, vidOtAtribut } from '../app/storno.js';
 import { bezPatechka } from '../app/skriti-koloni.js';
-import { prichinaZaRedaktsiya, redaktorZa, sDumiZaGrupovoto } from '../app/redaktsiya.js';
+import {
+  mozheDaPopraviKletka,
+  prichinaZaRedaktsiya,
+  redaktorZa,
+  sDumiZaGrupovoto,
+} from '../app/redaktsiya.js';
 import { readdirSync, readFileSync } from 'node:fs';
 
 // ── сравнителят по вид ─────────────────────────────────────────────────────
@@ -193,6 +198,30 @@ describe('редакторите на клетки', () => {
 
   it('непознат редактор е null — клетка без белег не се отваря', () => {
     expect(redaktorZa('nyama-takav')).toBeNull();
+  });
+});
+
+/**
+ * КОЙ МОЖЕ ДА ПОПРАВИ КЛЕТКА · правило 23, сметнато на пътя към Вратата.
+ *
+ * Екран Имоти нарочно НЕ иска роля („падането по подразбиране"), а Вратата
+ * пуска всеки писач в служебния Журнал (политиката чака П3). Значи ако тук
+ * не се пита, наблюдателят пише — и то с неговия имейл за `actor`.
+ */
+describe('редакцията в клетката пита за ролята', () => {
+  it('наблюдателят получава ОТКАЗ С ДУМИ, не мълчалива клетка', () => {
+    const otgovor = mozheDaPopraviKletka('nablyudatel');
+    expect(otgovor.mozhe).toBe(false);
+    expect(otgovor.prichina).toContain('не мърда Журнала');
+  });
+
+  it('редакторът и стопанинът поправят', () => {
+    expect(mozheDaPopraviKletka('redaktor').mozhe).toBe(true);
+    expect(mozheDaPopraviKletka('sobstvenik').mozhe).toBe(true);
+  });
+
+  it('позволеното мълчи — причина има само отказът', () => {
+    expect(mozheDaPopraviKletka('sobstvenik').prichina).toBe('');
   });
 });
 
