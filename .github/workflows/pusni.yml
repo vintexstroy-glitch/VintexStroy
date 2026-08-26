@@ -1,0 +1,78 @@
+# ПУСКАНЕТО · приложението застава на публичен адрес
+#
+# ЗАЩО ОТДЕЛЕН ПОТОК, а не стъпка в CI: CI казва „вярно ли е", пускането казва
+# „видимо ли е". Слети, един счупен тест би свалил работещото приложение от
+# мрежата — а човек, който работи в него, няма вина за счупен тест.
+#
+# ЗАЩО GITHUB PAGES: приложението е СТАТИЧНО и местно-първо. Няма сървър, няма
+# база, няма какво да се изпълнява отсреща — значи няма и какво да се плаща.
+# Това е същото решение като правило 10, само на едно ниво по-нагоре: каквото
+# го няма, не се поддържа и не изтича.
+#
+# ЧАКА ЕДНА НЕГОВА НАСТРОЙКА, и тя не може да се направи оттук:
+#   1. В хранилището · Settings → Pages → Source: **GitHub Actions**
+#   2. В конзолата на Google · към клиентския номер се вписва адресът
+#      `https://vintexstroy-glitch.github.io` като **Authorized JavaScript
+#      origin**. Без него входът отказва — и това е правилно: какво се приема,
+#      решават АДРЕСИТЕ, не номерът (`app/vhod-google.ts`).
+name: Пускане
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Пускането ЧЕТЕ хранилището и ПИШЕ само на страницата.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Едно пускане наведнъж. Второ бутане ИЗЧАКВА първото, вместо да го отмени:
+# приложението не бива да остане наполовина качено.
+concurrency:
+  group: pusni
+  cancel-in-progress: false
+
+jobs:
+  pusni:
+    name: Построяване и качване
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.pusnato.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # ПОРТАТА ПРЕДИ ПУСКАНЕТО. Пълната проверка върви в CI; тук стоят трите,
+      # които са евтини и хващат счупен пакет: типове, тестове, чистота.
+      # Приложение, което не се компилира, не бива да стига до ничий браузър.
+      - name: Типове
+        run: npm run typecheck
+
+      - name: Инвариантни тестове
+        run: npm test
+
+      - name: Чистотата · деветте обхода
+        run: npm run chistota
+
+      # `npm run build` вече отпечатва и джоба (`stroezh/pechat-sw.mjs`) —
+      # черупката се чете ОТ построеното, не се изброява на ръка.
+      - name: Построяване
+        run: npm run build
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - id: pusnato
+        uses: actions/deploy-pages@v4

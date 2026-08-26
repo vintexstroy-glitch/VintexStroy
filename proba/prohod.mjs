@@ -2441,6 +2441,17 @@ async function main() {
     proveri('Описът казва формулата на колоната',
       (await redove(p, '.red.opis')).some((r) => r[3]?.includes('формула: разлика(')), true);
 
+    // ══ 39б · границата на книгата · казана, не премълчана ═══════════════════
+    razdel = '39б · границата на книгата';
+    await naEkran(p, 'tablo', '[data-pole="granitsa-na-knigata"]');
+    const granitsa = await tekstNa(p, '[data-pole="granitsa-na-knigata"]');
+    proveri('Таблото казва, че ключът идва от ТВОЯ имейл',
+      granitsa.includes('ТВОЯ имейл'), true);
+    proveri('и че книгата на работодателя е ДРУГА книга',
+      granitsa.includes('споделената папка'), true);
+    proveri('и че това още НЕ е построено — без премълчаване',
+      granitsa.includes('още не е построено'), true);
+
     // ══ 40б · картата на връзките · БРОЕНА на екрана, не преписана ═══════════
     razdel = '40б · картата на връзките';
     await naEkran(p, 'nastroyki', '[data-sektsiya="karta"]');
