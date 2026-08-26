@@ -32,6 +32,7 @@ import {
   type Statiya,
 } from '../src/domein/glavna-kniga.js';
 import { STAVKI } from '../src/domein/dds.js';
+import { safT } from '../src/iznos/saf-t.js';
 
 const GLAVEN = 'vintexstroy@gmail.com';
 const KOGATO = '2026-08-25T09:00:00.000Z';
@@ -56,12 +57,12 @@ async function knigata() {
     { opId: 'op-0' },
   );
   const ogledalo = async (): Promise<Ogledalo> => fold(await dnevnik.chetiVsichki('vintexstroy'));
-  return { dnevnik, deystviya, ogledalo };
+  return { dnevnik, vrata, deystviya, ogledalo };
 }
 
 /** Един месец с наем, плащане и разход — най-обикновеният случай. */
 async function mesets() {
-  const { deystviya, ogledalo } = await knigata();
+  const { vrata, deystviya, ogledalo } = await knigata();
   await deystviya.dobaviImot('imot-1', { adres: 'ул. Първа 1', edinitsa: 'А', ploshtad_kvsm: 60 }, { opId: 'op-i' });
   await deystviya.dobaviNaem(
     'naem-1',
@@ -103,7 +104,7 @@ async function mesets() {
     },
     { opId: 'op-r' },
   );
-  return { deystviya, ogledalo };
+  return { vrata, deystviya, ogledalo };
 }
 
 describe('сметкопланът · описът, който отива в НАП', () => {
@@ -361,5 +362,72 @@ describe('стотинката · всяка ставка, всяка неудо
     expect(k.statii.length).toBe(i);
     expect(k.debit_st).toBe(k.kredit_st);
     expect(k.nared).toBe(true);
+  });
+});
+
+/**
+ * СЪРЦЕТО · нула не мести пари, и екранът не пада заради нея.
+ *
+ * Намерено чрез сверител: `platiDDS` НЯМА пазач за нула (Вратата иска цели
+ * стотинки, а нулата е цяла). Записан нулев ДДС-превод правеше статия без
+ * нито един ред; `proveriStatiya` хвърляше, хвърлянето минаваше нагоре през
+ * `glavnaKniga` → `blokNaOditniyaFayl` → `narisuvaySmetki` — и ЦЕЛИЯТ екран
+ * Сметки оставаше празен заради един запис за нула.
+ *
+ * Проекцията не бива да пада от онова, което вече стои в Журнала: там влиза и
+ * прочетена таблица, и върнат архив, и стар запис. Затова тук се пази и двете —
+ * че не хвърля, И че пропуснатото се БРОИ, вместо да се премълчи.
+ */
+describe('нулата · източник без движение', () => {
+  /**
+   * НУЛАТА ВЛИЗА ПОКРАЙ ДЕЙСТВИЕТО · нарочно.
+   *
+   * `platiDDS` вече я отказва (`proveriDvizhi`) — но проекцията не бива да
+   * разчита на това. В Журнала влизат и прочетена таблица, и върнат архив, и
+   * запис отпреди пазача; Вратата ги пуска, защото правило 3 иска ЦЕЛИ
+   * стотинки, а нулата е цяла.
+   *
+   * Затова тук се пише направо през Вратата: така тестът пази ПРОЕКЦИЯТА, а не
+   * повтаря проверката на действието.
+   */
+  async function sNulevoDDS() {
+    const vsichko = await mesets();
+    await vsichko.vrata.dobavi({
+      opId: 'op-dp-nula',
+      ts: KOGATO,
+      naematel: 'vintexstroy',
+      actor: GLAVEN,
+      type: 'ДДСПлатено',
+      sashtnost: { vid: 'spravka', id: 'DP:2026-07:nula' },
+      payload: { period: '2026-07', suma_st: 0, data: '2026-07-20', nachin: 'банка' },
+    });
+    return vsichko;
+  }
+
+  it('нулево ДДС-плащане НЕ поваля книгата · брои се отделно', async () => {
+    const { ogledalo } = await sNulevoDDS();
+    const k = glavnaKniga(await ogledalo(), '2026-07', KOGATO);
+    expect(k.bezDvizhenie).toBe(1);
+    expect(k.nared, k.sverki.filter((s) => !s.nared).map((s) => s.kakvo).join(' · ')).toBe(true);
+    expect(k.debit_st).toBe(k.kredit_st);
+  });
+
+  it('и одитният файл го КАЗВА, вместо да го премълчи', async () => {
+    const { ogledalo } = await sNulevoDDS();
+    const r = safT(await ogledalo(), '2026-07', KOGATO);
+    expect(r.prechki.some((p) => p.includes('не мести пари'))).toBe(true);
+    expect(r.xml.length).toBeGreaterThan(100);
+  });
+
+  /** И пазачът на ДЕЙСТВИЕТО · за да не се разчита само на проекцията. */
+  it('но самото действие вече отказва нулата', async () => {
+    const { deystviya } = await mesets();
+    await expect(
+      deystviya.platiDDS(
+        'DP:2026-07:x',
+        { period: '2026-07', suma_st: 0, data: '2026-07-20', nachin: 'банка' },
+        { opId: 'op-x' },
+      ),
+    ).rejects.toThrow(/повече от нула/);
   });
 });

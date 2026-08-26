@@ -170,6 +170,28 @@ export const IMENA_NA_DNEVNITSITE: Readonly<Record<VidDnevnik, string>> = Object
   dds: 'ДДС · справки и внасяне',
 });
 
+/**
+ * ИЗТОЧНИК БЕЗ ДВИЖЕНИЕ НЕ РАЖДА СТАТИЯ · и това НЕ е дефект.
+ *
+ * Намерено чрез сверител: записано ДДС-плащане за НУЛА (`platiDDS` не пази от
+ * нула — Вратата иска цели стотинки, а нулата е цяла) правеше статия без нито
+ * един ред. `proveriStatiya` хвърляше „статията е ДВУстранна", хвърлянето
+ * минаваше нагоре през `glavnaKniga` и `blokNaOditniyaFayl` — и **целият екран
+ * Сметки оставаше празен** заради един запис за нула.
+ *
+ * Затова правилото е тук, на ЕДНО място, и е просто: движение няма → статия
+ * няма. Нула не мести пари; отрицателна сума в източник е повреда на данните,
+ * не счетоводна операция, и няма как да ѝ се измисли вярна страна.
+ *
+ * НО НЕ СЕ ПРЕМЪЛЧАВА. Пропуснатите се броят и се ВРЪЩАТ (`bezDvizhenie`) —
+ * тихо пропуснат източник е точно онова, срещу което е правило 7. Екранът ги
+ * показва; сверката „източници ↔ статии" ги изважда от очакваното, за да не
+ * дава лъжлива тревога (същата поука като при справка без ДДС).
+ */
+function dvizhi(suma_st: number): boolean {
+  return Number.isSafeInteger(suma_st) && suma_st > 0;
+}
+
 /** Редовете без сума не се пишат: нулев ред е шум във файл, който се валидира. */
 function red(smetka: string, strana: Strana, suma_st: number, opis: string): RedNaStatiya[] {
   return suma_st === 0 ? [] : [{ smetka, strana, suma_st, opis }];
@@ -212,7 +234,8 @@ export function proveriStatiya(s: Statiya): void {
  * ВАДИ, а не се смята отделно — иначе стотинката се губи и статията не
  * затваря.
  */
-function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya {
+function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya | undefined {
+  if (!dvizhi(v.nachisleno_st)) return undefined;
   const naem = o.naemi.get(v.naemId);
   const razbivka = ddsOtObshta(v.nachisleno_st, stavkaNaReda(naem?.sektor));
   const s: Statiya = {
@@ -232,7 +255,8 @@ function statiyaOtVzemane(v: Vzemane, o: Ogledalo): Statiya {
 }
 
 /** ПРИЕТО ПЛАЩАНЕ → Дт 501/503 / Кт 411. */
-function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya {
+function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya | undefined {
+  if (!dvizhi(p.suma_st)) return undefined;
   const vzemane = o.vzemaniya.get(p.vzemaneId);
   const naem = vzemane ? o.naemi.get(vzemane.naemId) : undefined;
   const s: Statiya = {
@@ -258,7 +282,8 @@ function statiyaOtPlashtane(p: Plashtane, o: Ogledalo): Statiya {
  * днес няма събитие — и измислена статия през 401 щеше да покаже пред НАП
  * дълг, който го няма.
  */
-function statiyaOtRazhod(r: Razhod): Statiya {
+function statiyaOtRazhod(r: Razhod): Statiya | undefined {
+  if (!dvizhi(r.suma_st)) return undefined;
   const stavka = stavkaNaReda(r.sektor, r.stavka);
   const razbivka = ddsOtObshta(r.suma_st, stavka);
   const s: Statiya = {
@@ -323,7 +348,8 @@ function statiyaOtPlateno(p: {
   readonly period: string;
   readonly suma_st: number;
   readonly nachin: string;
-}): Statiya {
+}): Statiya | undefined {
+  if (!dvizhi(p.suma_st)) return undefined;
   const s: Statiya = {
     id: p.id,
     data: p.data,
@@ -350,6 +376,11 @@ export interface GlavnaKniga {
   readonly nared: boolean;
   /** сметките без национален код · честна дума, не мълчание */
   readonly nemapnati: readonly Smetka[];
+  /**
+   * Колко източника НЕ раждат статия, защото не местят пари (нула или
+   * повредена сума). Нула е обичайното; всяко друго число иска поглед.
+   */
+  readonly bezDvizhenie: number;
 }
 
 function sumaNa(statii: readonly Statiya[], strana: Strana): number {
@@ -397,12 +428,24 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
   const razhodi = razhodiZaPerioda(o, period);
   const platenoDDS = [...o.platenoDDS.values()].filter((p) => p.data.slice(0, 7) === period);
 
+  /**
+   * ИЗТОЧНИЦИТЕ · всеки със сумата, по която се съди дали изобщо мести пари.
+   * Държат се заедно, за да се броят ВЕДНЪЖ и по едно правило (`dvizhi`).
+   */
+  const iztochnitsi: readonly number[] = [
+    ...vzemaniya.map((v) => v.nachisleno_st),
+    ...plashtaniya.map((p) => p.suma_st),
+    ...razhodi.map((r) => r.suma_st),
+    ...platenoDDS.map((p) => p.suma_st),
+  ];
+  const bezDvizhenie = iztochnitsi.filter((suma) => !dvizhi(suma)).length;
+
   const statii: Statiya[] = [
     ...vzemaniya.map((v) => statiyaOtVzemane(v, o)),
     ...plashtaniya.map((p) => statiyaOtPlashtane(p, o)),
     ...razhodi.map(statiyaOtRazhod),
     ...platenoDDS.map(statiyaOtPlateno),
-  ];
+  ].filter((s): s is Statiya => s !== undefined);
 
   /**
    * ПРИКЛЮЧВАЩАТА влиза САМО при подадена справка.
@@ -453,7 +496,7 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
   dnevnik.zapishi(
     sverka(
       `Главна книга ${period} · източници ↔ статии`,
-      vzemaniya.length + plashtaniya.length + razhodi.length + platenoDDS.length + priklyuchvashta,
+      iztochnitsi.length - bezDvizhenie + priklyuchvashta,
       statii.length,
       kogato,
       MERKA.broy,
@@ -468,5 +511,6 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
     sverki: dnevnik.vsichki,
     nared: dnevnik.nezatvoreni.length === 0,
     nemapnati: nemapnati(),
+    bezDvizhenie,
   };
 }

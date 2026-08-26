@@ -139,6 +139,7 @@ export class Deystviya {
     danni: PayloadVzemaneNachisleno,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Начислението');
     proveriZamrazen(await this.ogledalo(), danni.period, z.svereno);
     return this.#pusni('ВземанеНачислено', VID.vzemane, id, danni, z);
   }
@@ -148,6 +149,7 @@ export class Deystviya {
     danni: PayloadPlashtanePrieto,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Плащането');
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
   }
@@ -484,6 +486,7 @@ export class Deystviya {
     danni: PayloadRazhodZapisan,
     z: Zayavka,
   ): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Разходът');
     proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
     return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
   }
@@ -653,6 +656,7 @@ export class Deystviya {
 
   /** Внесеното ДДС, от платежното. Нарочно НЕ иска отключен период. */
   async platiDDS(id: string, danni: PayloadDDSPlateno, z: Zayavka): Promise<Rezultat> {
+    proveriDvizhi(danni.suma_st, 'Внесеното ДДС');
     return this.#pusni('ДДСПлатено', VID.spravka, id, danni, z);
   }
 
@@ -925,5 +929,45 @@ class GreshkaNaem extends Error {
 function proveriPadezhDen(den: number): void {
   if (!Number.isInteger(den) || den < 1 || den > 31) {
     throw new GreshkaNaem(`Падежът е ден от месеца, 1 до 31 — получено: ${den}.`);
+  }
+}
+
+/**
+ * СУМА, КОЯТО НАИСТИНА МЕСТИ ПАРИ · строго над нулата.
+ *
+ * ═══ ЗАЩО ПОИМЕННО, А НЕ ВЪРХУ ВСЯКО `_st` ═══
+ *
+ * Вратата пази, че всяко поле на `_st` е ЦЕЛИ стотинки (правило 3) — но нулата
+ * е цяло число и минава, а отрицателното също. За повечето суми това е ВЯРНО и
+ * общ пазач щеше да отхвърли точно верните случаи:
+ *
+ *   · **салдото** може да е отрицателно — овърдрафтът е дълг, не грешка;
+ *   · **сборът на колона** може да е отрицателен: знакът решава Приходи срещу
+ *     Разходи (правило 20);
+ *   · **декларираният ДДС** може да е нула (месец без обороти) и отрицателен
+ *     (данък за възстановяване);
+ *   · **разликата в сверка** е нула точно когато всичко е наред (правило 7);
+ *   · **депозитът** е нула при договор без депозит.
+ *
+ * Затова пазачът се вика ПОИМЕННО, там където нулата няма смисъл: плащане за
+ * нула не е плащане, начисление за нула не е задължение, разход за нула не е
+ * разход.
+ *
+ * ═══ ЗАЩО ТУК, А НЕ САМО ВЪВ ФОРМАТА ═══
+ *
+ * Формите вече отказват ≤ 0 (`SUMATA_NAD_NULA`), но формата е ЕДИН вход.
+ * Прочетена таблица, върнат архив и действие, писано утре, не минават през нея.
+ * Правило 2 казва, че Вратата е единственият вход — значи и проверката живее по
+ * пътя към нея, не пред екрана.
+ *
+ * Платено с находка: `platiDDS` нямаше нито пазач, нито форма, която да го
+ * пази — нулев ДДС-превод влизаше в Журнала и събаряше ЦЕЛИЯ екран Сметки,
+ * защото Главната книга не може да направи двустранна статия от нула.
+ */
+function proveriDvizhi(suma_st: number, koe: string): void {
+  if (!Number.isSafeInteger(suma_st) || suma_st <= 0) {
+    throw new GreshkaVhod(
+      `${koe}: ${SUMATA_NAD_NULA} Получено: ${String(suma_st)}.`,
+    );
   }
 }
