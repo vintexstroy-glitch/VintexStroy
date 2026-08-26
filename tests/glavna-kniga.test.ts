@@ -32,6 +32,7 @@ import {
   type Statiya,
 } from '../src/domein/glavna-kniga.js';
 import { STAVKI } from '../src/domein/dds.js';
+import { smetki } from '../src/domein/smetki.js';
 import { safT } from '../src/iznos/saf-t.js';
 
 const GLAVEN = 'vintexstroy@gmail.com';
@@ -429,5 +430,88 @@ describe('нулата · източник без движение', () => {
         { opId: 'op-x' },
       ),
     ).rejects.toThrow(/повече от нула/);
+  });
+});
+
+/**
+ * КНИГАТА И СМЕТКИ КАЗВАТ ЕДНО И СЪЩО ДДС · и защо това не се подразбираше.
+ *
+ * Двата екрана вадеха ДДС по РАЗЛИЧЕН начин: книгата — по документ, Сметки —
+ * от сбора на групата. Σ round(x) ≠ round(Σ x), затова се разминаваха с
+ * стотинки, а НИКОЯ сверка не ги пресичаше: книгата проверява дебит = кредит
+ * (вярно по построение), Сметки — приход = Σ(основа + ДДС) (също вярно по
+ * построение). Две тавтологии, без мост.
+ *
+ * Цената: полето „Деклариран ДДС" се прифилва от Сметки, а приключващата
+ * статия в SAF-T кредитира числото на КНИГАТА. Одитният файл противоречи на
+ * подадената справка, и нищо не светва.
+ *
+ * Кой се промени и защо: **Сметки**. ADR-012 §2 слага ДДС при точност
+ * `tochno` — „не пипа", — а §3 казва инварианта ПО ДОКУМЕНТ: „ДДС, изваден от
+ * обща цена, ражда центове, и без тях инвариантът „основа + ДДС == обща"
+ * пада". Групов сбор го спазва само за група, каквато документ няма.
+ *
+ * Числата тук са подбрани точно да разминат двата пътя: 350,02 € при 20 % дава
+ * 58,34 ст. ДДС по документ (×3 = 175,02), а от сбора 1050,06 — 175,01.
+ */
+describe('едно ДДС за двата екрана', () => {
+  async function triNaema() {
+    const { deystviya, ogledalo } = await knigata();
+    await deystviya.dobaviImot('imot-1', { adres: 'ул. Първа 1', edinitsa: 'А', ploshtad_kvsm: 60 }, { opId: 'op-i' });
+    for (let n = 1; n <= 3; n += 1) {
+      await deystviya.dobaviNaem(
+        `naem-${n}`,
+        {
+          imotId: 'imot-1',
+          naemetel: `ЕООД Наемател ${n}`,
+          telefon: '',
+          imeyl: '',
+          naem_st: 35002,
+          padezhDen: 5,
+          ot: '2026-01-01',
+          do: '2026-12-31',
+          depozit_st: 0,
+          sektor: 'naem-targovski',
+        },
+        { opId: `op-n${n}` },
+      );
+      await deystviya.nachisliVzemane(
+        `vz-${n}`,
+        { naemId: `naem-${n}`, period: '2026-07', osnovanie: 'наем', suma_st: 35002, padezh: '2026-07-05' },
+        { opId: `op-v${n}` },
+      );
+    }
+    return ogledalo();
+  }
+
+  it('книгата и Сметки дават ЕДНО число за изходния ДДС', async () => {
+    const o = await triNaema();
+    const kniga = oboroti(glavnaKniga(o, '2026-07', KOGATO));
+    const s = smetki(o, '2026-07', KOGATO);
+    const dds = kniga.find((r) => r.smetka.nomer === '4532');
+
+    expect(dds?.kredit_st).toBe(3 * 5834);
+    expect(s.dds_izhod_st).toBe(dds?.kredit_st);
+    expect(s.zaVnasyane_st).toBe(dds?.kredit_st);
+  });
+
+  it('и основата им също · сборът от закръглени, не закръгленият сбор', async () => {
+    const o = await triNaema();
+    const kniga = oboroti(glavnaKniga(o, '2026-07', KOGATO));
+    const s = smetki(o, '2026-07', KOGATO);
+    const prihod = kniga.find((r) => r.smetka.nomer === '703');
+
+    expect(prihod?.kredit_st).toBe(3 * (35002 - 5834));
+    const osnova = s.dds.reduce((sbor, r) => sbor + (r.strana === 'изход' ? r.osnova_st : 0), 0);
+    expect(osnova).toBe(prihod?.kredit_st);
+  });
+
+  it('инвариантът на групата ОСТАВА · основа + ДДС == обща', async () => {
+    const o = await triNaema();
+    const s = smetki(o, '2026-07', KOGATO);
+    for (const r of s.dds) {
+      expect(r.osnova_st + r.dds_st).toBe(r.obshta_st);
+    }
+    expect(s.nared).toBe(true);
   });
 });
