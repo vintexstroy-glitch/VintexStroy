@@ -94,20 +94,23 @@ describe('ключът на веригата', () => {
   });
 });
 
+/** Врата с ДВЕТЕ политики · обвивката около личното (ADR-055). */
+function vrataSPravo(stopanin: string | undefined) {
+  const dnevnik = new DnevnikVPametta();
+  const pravata: Pravata = new PoSvoyataVeriga(
+    new LichnoESamoTvoe(NASTAVKA_LICHEN, svediImeyl),
+    pisachatNa,
+    knigataNa,
+    // Стопанин има само СЛУЖЕБНАТА книга; личната е на своя човек по друг
+    // ред и обвивката нарочно няма дума за нея.
+    (kniga) => (kniga === KNIGA ? stopanin : undefined),
+    svediImeyl,
+  );
+  return { dnevnik, vrata: new Vrata({ dnevnik, pravata, sha: SHA }) };
+}
+
 describe('Вратата пуска само в СВОЯТА верига', () => {
-  function vrata(stopanin: string | undefined) {
-    const dnevnik = new DnevnikVPametta();
-    const pravata: Pravata = new PoSvoyataVeriga(
-      new LichnoESamoTvoe(NASTAVKA_LICHEN, svediImeyl),
-      pisachatNa,
-      knigataNa,
-      // Стопанин има само СЛУЖЕБНАТА книга; личната е на своя човек по друг
-      // ред и обвивката нарочно няма дума за нея.
-      (kniga) => (kniga === KNIGA ? stopanin : undefined),
-      svediImeyl,
-    );
-    return { dnevnik, vrata: new Vrata({ dnevnik, pravata, sha: SHA }) };
-  }
+  const vrata = vrataSPravo;
 
   const imot = (naematel: string, actor: string, n: number) => ({
     opId: `${naematel}-${n}`,
@@ -226,5 +229,56 @@ describe('сторно през граница', () => {
       { opId: 's3' },
     );
     expect(await dnevnik.chetiVsichki(MOYATA2)).toHaveLength(1);
+  });
+});
+
+/**
+ * ПОЛУЧЕНАТА ВЕРИГА · дърпането минава през ВРАТАТА (ADR-055 · резен 6).
+ *
+ * Изкушението е дръпнатият файл да се запише направо в носителя — по-бързо е и
+ * „нали вече е проверен". Отхвърлено: това е втори вход за запис, а правило 2
+ * казва, че вход е един. `vazstanovi` прави и повече — NFC, валидност на всяко
+ * звено, отказ на по-стар файл и на разделили се истории.
+ *
+ * `actor` е АВТОРЪТ НА ВЕРИГАТА, не дърпащият. Не се приема на доверие: той е
+ * в подписа (ADR-049), тъй че подменен автор къса веригата.
+ */
+describe('получената верига влиза през Вратата', () => {
+  async function chuzhdata(broy: number) {
+    const dnevnik = new DnevnikVPametta();
+    const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
+    for (let i = 0; i < broy; i += 1) {
+      await vrata.dobavi({
+        opId: `ch-${i}`,
+        ts: new Date(Date.UTC(2026, 7, 26, 9, 0, i)).toISOString(),
+        naematel: MOYATA,
+        actor: SLUZHITEL,
+        type: 'ИмотДобавен',
+        sashtnost: { vid: 'imot', id: `i-${i}` },
+        payload: { adres: `ул. ${i}`, edinitsa: 'А', ploshtad_kvsm: 60 },
+      });
+    }
+    return dnevnik.chetiVsichki(MOYATA);
+  }
+
+  it('приема се, защото `actor` е нейният автор', async () => {
+    const chuzhdi = await chuzhdata(3);
+    const { dnevnik, vrata: v } = vrataSPravo(STOPANIN);
+    const r = await v.vazstanovi(MOYATA, chuzhdi[0]!.actor, chuzhdi);
+    expect(r.vneseni).toBe(3);
+    expect(await dnevnik.chetiVsichki(MOYATA)).toHaveLength(3);
+  });
+
+  it('стопанинът НЕ може да я вкара от свое име · подписът е на друг', async () => {
+    const chuzhdi = await chuzhdata(3);
+    const { vrata: v } = vrataSPravo(STOPANIN);
+    await expect(v.vazstanovi(MOYATA, STOPANIN, chuzhdi)).rejects.toThrow(/право/);
+  });
+
+  it('подменен автор КЪСА веригата · доверие няма', async () => {
+    const chuzhdi = await chuzhdata(3);
+    const pipnati = chuzhdi.map((s, i) => (i === 1 ? { ...s, actor: 'ne-toy@example.bg' } : s));
+    const { vrata: v } = vrataSPravo(STOPANIN);
+    await expect(v.vazstanovi(MOYATA, SLUZHITEL, pipnati)).rejects.toThrow(/къса|seq 2/);
   });
 });

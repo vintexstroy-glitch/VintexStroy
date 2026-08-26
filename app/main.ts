@@ -48,6 +48,8 @@ import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnit
 import { arhivZaEksel } from './arhiv.js';
 import { prochetiKnigata } from '../src/domein/knigata.js';
 import { sveriVerigite } from '../src/domein/sverka-verigi.js';
+import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
+import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
@@ -977,6 +979,83 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
       );
     }
     await prerisuvay();
+  });
+
+  /**
+   * ПРЕНАСЯНЕТО · Драйвът, файл на писач (ADR-055 · резен 6).
+   *
+   * Двете посоки НЕ са огледални и това е целият смисъл: бутам СВОЯТА верига,
+   * дърпам ЧУЖДИТЕ. Бутане на чужд файл би значело да стана посредник, през
+   * когото минава чужд подпис.
+   *
+   * Дръпнатото влиза през ВРАТАТА (правило 2) — не се записва направо в
+   * носителя, колкото и да е по-бързо: файл, който заобикаля Вратата, е втори
+   * вход за запис, а такъв няма.
+   */
+  koren.querySelector<HTMLButtonElement>('#drapni-drayv')?.addEventListener('click', async () => {
+    const buton = koren.querySelector<HTMLButtonElement>('#drapni-drayv')!;
+    buton.disabled = true;
+    try {
+      const drayv = new DrayvNaGoogle(await vzemiZheton());
+      const drapnati = await drapniChuzhdite(drayv, akaunt, veriga, sha256Web);
+      let novi = 0;
+      const otkazani: string[] = [];
+      for (const d of drapnati) {
+        if (!d.tsyala) {
+          otkazani.push(`${d.veriga}: ${d.prichina}`);
+          continue;
+        }
+        try {
+          /**
+           * ВРАТАТА, не носителят (правило 2).
+           *
+           * `vazstanovi` е входът за ПОЛУЧЕНА верига и прави повече от запис:
+           * проверява NFC и валидността на всяко звено, отказва по-стар файл от
+           * наличното, отказва разделили се истории и мести котвата на чуждата
+           * верига. Директният запис в носителя щеше да е втори вход — а такъв
+           * няма.
+           *
+           * `actor` е АВТОРЪТ НА ВЕРИГАТА, не аз: питането е „този човек има ли
+           * право в тази верига", а за получено копие отговорът е да — и не
+           * се приема на доверие, защото `actor` е в подписа (ADR-049), тъй че
+           * подменен автор къса веригата и `proveriVerigata` го лови.
+           */
+          const r = await k.vrata.vazstanovi(d.veriga, d.sabitiya[0]!.actor, d.sabitiya);
+          novi += r.vneseni;
+        } catch (greshka) {
+          otkazani.push(`${d.veriga}: ${dumiZaGreshka(greshka)}`);
+        }
+      }
+      k.vest(
+        otkazani.length === 0 ? 'dobre' : 'zle',
+        `Дръпнати ${drapnati.length - otkazani.length} вериги · ${novi} нови звена.` +
+          (otkazani.length === 0 ? '' : ` ОТКАЗАНИ: ${otkazani.join(' · ')}`),
+      );
+    } catch (greshka) {
+      k.vest('zle', dumiZaGreshka(greshka));
+    } finally {
+      buton.disabled = false;
+      await prerisuvay();
+    }
+  });
+
+  koren.querySelector<HTMLButtonElement>('#butni-drayv')?.addEventListener('click', async () => {
+    const buton = koren.querySelector<HTMLButtonElement>('#butni-drayv')!;
+    buton.disabled = true;
+    try {
+      const drayv = new DrayvNaGoogle(await vzemiZheton());
+      const r = await butniSvoyata(drayv, veriga, await k.dnevnik.chetiVsichki(veriga));
+      k.vest(
+        'dobre',
+        `Бутнати ${r.broy} звена в ${r.novFayl ? 'нов файл' : 'своя файл'}. ` +
+          'Чуждите вериги не са пипани.',
+      );
+    } catch (greshka) {
+      k.vest('zle', dumiZaGreshka(greshka));
+    } finally {
+      buton.disabled = false;
+      await prerisuvay();
+    }
   });
 
   koren.querySelector<HTMLButtonElement>('#iznesi')?.addEventListener('click', async () => {

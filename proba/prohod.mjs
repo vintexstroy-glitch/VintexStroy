@@ -2451,10 +2451,23 @@ async function main() {
     const granitsa = await tekstNa(p, '[data-pole="granitsa-na-knigata"]');
     proveri('Таблото казва, че ключът идва от ТВОЯ имейл',
       granitsa.includes('ТВОЯ имейл'), true);
-    proveri('и че книгата на работодателя е ДРУГА книга',
-      granitsa.includes('споделената папка'), true);
-    proveri('и че това още НЕ е построено — без премълчаване',
-      granitsa.includes('още не е построено'), true);
+    // Дотук границата беше и ПРИЗНАНИЕ („това още не е построено"). ADR-055
+    // го построи, тъй че текстът вече казва КАК минава пренасянето — а
+    // проходът проверява именно новото, вместо да пази старото признание.
+    proveri('и че двете книги НЕ се сливат',
+      granitsa.includes('НЕ се сливат'), true);
+    proveri('и че пренасянето минава през Драйва',
+      granitsa.includes('Драйва'), true);
+    proveri('и че несъгласията са НАХОДКИ, не тихо решение',
+      granitsa.includes('не се решават сами'), true);
+
+    razdel = '39в · пренасянето има БУТОНИ, не само обещание';
+    proveri('дърпането стои на екрана',
+      await p.$$eval('#drapni-drayv', (e) => e.length), 1);
+    proveri('бутането също',
+      await p.$$eval('#butni-drayv', (e) => e.length), 1);
+    proveri('и екранът КАЗВА, че достъпът е второ съгласие',
+      (await tekstNa(p, '[data-sektsiya=prenasyane]')).includes('второ съгласие'), true);
 
     // ══ 40б · картата на връзките · БРОЕНА на екрана, не преписана ═══════════
     razdel = '40б · картата на връзките';
