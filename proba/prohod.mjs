@@ -507,8 +507,12 @@ async function main() {
     razdel = '9 · верига';
     await p.click('#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е'));
+    // Един бутон, ДВА отговора (ADR-055): „цяла ли е моята верига" и
+    // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
+    // че вторият е нулевата сверка — и нулата ПАК се казва (правило 7).
     proveri('веригата е цяла, 13 звена', await tekstNa(p, '.vest'),
-      `Веригата е цяла · ${12 + OTKRIVASHTOTO} от ${12 + OTKRIVASHTOTO} звена.`);
+      `Веригата е цяла · ${12 + OTKRIVASHTOTO} от ${12 + OTKRIVASHTOTO} звена. ` +
+      'Сверката на единствената верига: нула сблъсъка.');
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 10 · износ ═══════════════════════════════════════════════════════
@@ -4199,6 +4203,15 @@ async function main() {
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е цяла'));
     proveri('чуждият хеш НЕ поваля моята проверка',
       (await p.evaluate(() => document.body.innerText)).includes('Веригата е цяла'), true);
+
+    razdel = '67 · многото вериги · сверката КАЗВА сблъсъка';
+    // Колегата не е вписан като служител — шестият сблъсък. Сверката тръгва
+    // със същия бутон като проверката на веригата и излиза С ДУМИ.
+    const sledProverka = await p.evaluate(() => document.body.innerText);
+    proveri('сверката е тръгнала със същия бутон', sledProverka.includes('сверката'), true);
+    proveri('и назовава невписания писач', sledProverka.includes('kolega@example.bg'), true);
+    proveri('и казва, че НИЩО не е поправено',
+      sledProverka.includes('Нищо не е поправено'), true);
 
     razdel = '67 · многото вериги · Таблото казва коя е моята';
     proveri('книгата се вижда на екрана',

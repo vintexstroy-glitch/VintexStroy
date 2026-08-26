@@ -47,6 +47,7 @@ import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { prochetiKnigata } from '../src/domein/knigata.js';
+import { sveriVerigite } from '../src/domein/sverka-verigi.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
@@ -940,7 +941,32 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
     };
 
     if (rezultat.tsyala) {
-      k.vest('dobre', `Веригата е цяла · ${rezultat.proverni} от ${sabitiya.length} звена.`);
+      /**
+       * СЛЕД СВОЯТА ВЕРИГА · сверката МЕЖДУ веригите (ADR-055 · резен 4).
+       *
+       * Двете отговарят на различни въпроси и затова вървят заедно, а не едно
+       * вместо друго: „цяла ли е моята" пита за подписи, „съгласни ли са
+       * веригите" пита за стопански факти. Книга с шест цели вериги може да
+       * има двойно начислен месец — и обратното също.
+       *
+       * Тук нищо не се поправя: сблъсъкът е НАХОДКА за човек (правило 18).
+       */
+      const potok = (await prochetiKnigata(k.dnevnik, akaunt, new Date().toISOString())).potok;
+      const sverkata = sveriVerigite(potok, await k.deystviya.ogledalo(), new Date().toISOString());
+      if (sverkata.nared) {
+        k.vest(
+          'dobre',
+          `Веригата е цяла · ${rezultat.proverni} от ${sabitiya.length} звена. ` +
+            `Сверката на ${sverkata.broiVerigi === 1 ? 'единствената верига' : `${sverkata.broiVerigi} вериги`}: нула сблъсъка.`,
+        );
+      } else {
+        k.vest(
+          'zle',
+          `Веригата е цяла, но сверката намери ${sverkata.sblasatsi.length} сблъсъка: ` +
+            sverkata.sblasatsi.map((sb) => sb.kakvo).join(' · ') +
+            ' Нищо не е поправено — поправката е решение на човек и се записва като сторно.',
+        );
+      }
     } else {
       // При инцидент Журналът НЕ се пипа — дърпа се спирателният кран.
       k.vrata.zatvori(`скъсана верига на seq ${rezultat.parvoSchupeno}`);

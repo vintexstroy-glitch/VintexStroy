@@ -871,14 +871,34 @@ export class Deystviya {
     z: Zayavka,
     vid: Vid = VID.plashtane,
   ): Promise<Rezultat> {
-    // Сторно на събитие ОТ заключен период също е редакция на периода.
-    const zhertva = (await this.#dnevnik.chetiVsichki(this.#naematel)).find(
+    /**
+     * СТОРНО ПРЕЗ ГРАНИЦА · жертвата се търси в КНИГАТА, не само в моята
+     * верига (ADR-055 · резен 5).
+     *
+     * Двата пазача по-долу имат смисъл чак сега и се крепят на това четене:
+     *
+     *  1. ЖЕРТВАТА ТРЯБВА ДА Я ИМА. Дотук липсващата жертва просто не намираше
+     *     нищо и сторното минаваше — при един писач това беше почти невъзможно
+     *     (своя `seq` се знае), но погасяване на ЧУЖДА верига се пише по номер,
+     *     който човек може да сбърка. Сторно, което не гаси нищо, е запис,
+     *     изглеждащ като поправка, и после никой не намира какво е поправял.
+     *  2. ЗАМРАЗЕНИЯТ ПЕРИОД се пита срещу СГЪНАТОТО Огледало. Жертва в чужда
+     *     верига има свой период; четена само от моята, тя не се намираше и
+     *     проверката се прескачаше цяла — тоест сторно в заключен месец
+     *     минаваше, стига жертвата да е на другия.
+     */
+    const kade = danni.pogasyavaVeriga ?? this.#naematel;
+    const zhertva = (await this.#dnevnik.chetiVsichki(kade)).find(
       (s) => s.seq === danni.pogasyavaSeq,
     );
-    if (zhertva) {
-      const period = periodNaSabitie(zhertva);
-      if (period !== '') proveriZamrazen(await this.ogledalo(), period, z.svereno);
+    if (!zhertva) {
+      throw new GreshkaStorno(
+        `Сторното сочи звено „${kade}#${danni.pogasyavaSeq}", което го няма. ` +
+          'Погасяване без жертва не поправя нищо, а изглежда като поправка.',
+      );
     }
+    const period = periodNaSabitie(zhertva);
+    if (period !== '') proveriZamrazen(await this.ogledalo(), period, z.svereno);
     return this.#pusni('Сторно', vid, id, danni, z);
   }
 
@@ -949,6 +969,18 @@ export class Deystviya {
  * ги преглътне с Math.min/Math.max, раждайки падеж, който никой не е искал.
  * Границата е при записа, с думи — не при смятането, мълчешком.
  */
+/**
+ * СТОРНО БЕЗ ЖЕРТВА · своя грешка, за да се различи от отказа за замразен
+ * период. Двете идват от един и същ бутон и с общо име човек не би разбрал
+ * дали да отключи месеца, или да поправи номера.
+ */
+class GreshkaStorno extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaStorno';
+  }
+}
+
 class GreshkaNaem extends Error {
   constructor(message: string) {
     super(message);

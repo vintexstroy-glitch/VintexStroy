@@ -32,9 +32,11 @@ import {
   LichnoESamoTvoe,
   PoSvoyataVeriga,
   Vrata,
+  VsichkoRazresheno,
   type Pravata,
 } from '../src/yadro/index.js';
 import { NASTAVKA_LICHEN } from '../src/domein/akaunt.js';
+import { Deystviya } from '../src/domein/deystviya.js';
 import { SHA } from './pomoshtni.js';
 
 const STOPANIN = 'ivo@example.bg';
@@ -151,5 +153,78 @@ describe('Вратата пуска само в СВОЯТА верига', () =
     // Веригата няма наставка на писач и стопанинът съм аз — тоест обвивката
     // мълчи и думата остава на `LichnoESamoTvoe`, която отказва чуждия личен.
     await expect(v.dobavi(imot(lichen, SLUZHITEL, 1))).rejects.toThrow();
+  });
+});
+
+/**
+ * ДВАТА ПАЗАЧА, които имат смисъл чак сега (ADR-055 · резен 5).
+ *
+ * И двата се крепят на едно: жертвата на сторното се търси в КНИГАТА, не само
+ * в моята верига. Дотук това нямаше значение — своя `seq` се знае, а чужд
+ * нямаше откъде да дойде. Погасяването през граница (`pogasyavaVeriga`) го
+ * донесе, и с него две тихи дупки наведнъж.
+ */
+describe('сторно през граница', () => {
+  const KNIGA2 = 'kniga';
+  const MOYATA2 = `${KNIGA2}${NASTAVKA_PISACH}mira@x.bg`;
+
+  async function podredi() {
+    const dnevnik = new DnevnikVPametta();
+    const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
+    let tik = 0;
+    const napravi = (naematel: string) =>
+      new Deystviya({
+        vrata,
+        dnevnik,
+        naematel,
+        actor: 'mira@x.bg',
+        chasovnik: () => new Date(Date.UTC(2026, 7, 26, 9, 0, tik++)).toISOString(),
+        kniga: KNIGA2,
+      });
+    const nula = napravi(KNIGA2);
+    const moyata = napravi(MOYATA2);
+
+    // Веригата-нула: наем, начисление за март и справка, която ЗАМРАЗЯВА март.
+    await nula.dobaviImot('I-1', { adres: 'ул. Първа', edinitsa: 'А', ploshtad_kvsm: 60 }, { opId: 'o1' });
+    await nula.nachisliVzemane(
+      'V:N-1:2026-03',
+      { naemId: 'N-1', period: '2026-03', osnovanie: 'наем', suma_st: 50000, padezh: '2026-03-05' },
+      { opId: 'o2' },
+    );
+    return { dnevnik, nula, moyata };
+  }
+
+  it('сторно БЕЗ жертва се отказва С ДУМИ', async () => {
+    const { moyata } = await podredi();
+    await expect(
+      moyata.storniraj('I-1', { pogasyavaSeq: 99, pogasyavaVeriga: KNIGA2, prichina: 'сгрешен номер' }, { opId: 's1' }),
+    ).rejects.toThrow(/няма/);
+  });
+
+  it('сторно на ЧУЖДО звено в замразен период се отказва · правило 9 не се заобикаля', async () => {
+    const { nula, moyata } = await podredi();
+    await nula.podaySpravka(
+      { period: '2026-03', dds_deklarirano_st: 10000, data: '2026-04-10', belezhka: '' },
+      { opId: 'o3' },
+    );
+    // Жертвата (начислението за март) е в ЧУЖДАТА верига. Търсена само в
+    // моята, тя не се намираше и проверката за замразен период се прескачаше.
+    await expect(
+      moyata.storniraj(
+        'V:N-1:2026-03',
+        { pogasyavaSeq: 2, pogasyavaVeriga: KNIGA2, prichina: 'начислено два пъти' },
+        { opId: 's2' },
+      ),
+    ).rejects.toThrow(/замразен|заключен|подадена/i);
+  });
+
+  it('същото сторно ПРЕДИ справката минава', async () => {
+    const { dnevnik, moyata } = await podredi();
+    await moyata.storniraj(
+      'V:N-1:2026-03',
+      { pogasyavaSeq: 2, pogasyavaVeriga: KNIGA2, prichina: 'начислено два пъти' },
+      { opId: 's3' },
+    );
+    expect(await dnevnik.chetiVsichki(MOYATA2)).toHaveLength(1);
   });
 });
