@@ -301,15 +301,57 @@ for (const f of kod) {
 
 /** Стои ли този тип на ред, който ИЗНАСЯ нещо — тоест в лицето на модула. */
 function vPublichenPodpis(ime, f) {
-  return chist
-    .get(f)
-    .split('\n')
-    .some(
-      (red) =>
-        /^export\b/.test(red) &&
-        !new RegExp(`^export\\s+(?:async\\s+)?\\w+\\s+${ime}\\b`).test(red) &&
-        new RegExp(`\\b${ime}\\b`).test(red),
-    );
+  return publichniPodpisi(f).some(
+    (podpis) =>
+      !new RegExp(`^export\\s+(?:async\\s+)?\\w+\\s+${ime}\\b`).test(podpis) &&
+      new RegExp(`\\b${ime}\\b`).test(podpis),
+  );
+}
+
+/**
+ * ПУБЛИЧНИТЕ ПОДПИСИ на един файл, всеки СЛЕПЕН в един ред · седмата поправка.
+ *
+ * Дотук проверката гледаше ЕДИН ред. Подпис на няколко реда я излъга веднага:
+ *
+ *   export function sgani(
+ *     verigi: readonly (readonly Sabitie[])[],
+ *     kogato: string,
+ *   ): SgunatoOgledalo {
+ *
+ * Върнатият тип стои на ред, който НЕ почва с `export` — тъй че `SgunatoOgledalo`
+ * излезе „излишен export", макар да е самото лице на модула. Обход, който кара
+ * да се махне точно онова, което държи подписа, е по-скъп от липсващ.
+ *
+ * Затова редовете се слепват: от реда с `export` до онзи, който затваря
+ * подписа (`{` или `;`). Таванът от 20 реда е спирачка за файл без затваряне —
+ * обходът предпочита да пропусне, вместо да увисне.
+ */
+function publichniPodpisi(f) {
+  const redove = chist.get(f).split('\n');
+  const podpisi = [];
+  for (let i = 0; i < redove.length; i += 1) {
+    if (!/^export\b/.test(redove[i])) continue;
+    let podpis = redove[i];
+    for (let k = 1; k < 20 && !/[{;]\s*$/.test(podpis); k += 1) {
+      const sled = redove[i + k];
+      if (sled === undefined) break;
+      podpis += ` ${sled.trim()}`;
+    }
+    // ТЯЛОТО НА ИЗНЕСЕН ТИП СЪЩО Е ЛИЦЕ. `RezyumeNaVeriga` стои само вътре в
+    // полетата на изнесен `interface` — а онзи, който го получава, трябва да
+    // може да назове какво е получил. Затова при тип се чете до затварящата
+    // скоба, не до отварящата.
+    if (/^export\s+(?:declare\s+)?(interface|type|class|enum)\b/.test(redove[i])) {
+      for (let k = 1; k < 200; k += 1) {
+        const sled = redove[i + k];
+        if (sled === undefined) break;
+        podpis += ` ${sled.trim()}`;
+        if (/^\}/.test(sled)) break;
+      }
+    }
+    podpisi.push(podpis);
+  }
+  return podpisi;
 }
 
 /** Колко пъти името се среща В СВОЯ файл, без реда на декларацията си. */

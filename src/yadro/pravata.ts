@@ -102,6 +102,73 @@ export class LichnoESamoTvoe implements Pravata {
   }
 }
 
+/**
+ * ПО СВОЯТА ВЕРИГА (ADR-055) · всеки пише в СВОЯТА и в ничия друга.
+ *
+ * ОБВИВКА, не втора политика. `LichnoESamoTvoe` пази границата между личния и
+ * служебния Журнал на един човек; тази пази границата между писачите в ЕДНА
+ * книга. Двете са различни въпроси и преписването на едната в другата би
+ * оставило два дома на едно правило (правило 17). Затова тук се пита ПЪРВО за
+ * веригата, и чак ако тя не възразява, се пита обвитата.
+ *
+ * ТРИ СЛУЧАЯ, и третият е този, който досега липсваше:
+ *
+ *   1. Веригата носи наставката на писач → пише САМО той. Чужд писач се отказва
+ *      дори да е стопанинът: стопанинът има СВОЯ верига и няма нужда от
+ *      чуждата, а „собственикът може всичко" тук значи собственикът да добави
+ *      събитие в чужд подпис.
+ *   2. Веригата-нула на книга с ИЗВЕСТЕН стопанин → пише само стопанинът.
+ *      Дотук всеки, отворил книгата, пишеше в нея — а служителят вече отваря
+ *      ЧУЖДА книга (ADR-054), тоест дупката имаше път до нея.
+ *   3. Книга без известен стопанин (нова, празна) → минава. Първото събитие
+ *      ражда стопанина (ADR-043) и трите правила при Вратата решават дали
+ *      това е законно; тук няма какво да се пази.
+ *
+ * ЧЕТЕЦЪТ ИДВА ОТВЪН — стопанинът се извежда от Огледалото на книгата, а
+ * ядрото не сгъва Огледала. Същият ред на зависимостите като при
+ * `imaZhurnalOtAlfa` и при допуснатите до личния.
+ *
+ * ИЗНОСЪТ НЕ СЕ СТЯГА тук. Четенето на цялата книга е смисълът на сгънатото
+ * Огледало; ограничава го колонното право (правило 23), не веригата.
+ */
+export class PoSvoyataVeriga implements Pravata {
+  readonly #vatre: Pravata;
+  readonly #pisachat: (naematel: string) => string | undefined;
+  readonly #knigata: (naematel: string) => string;
+  readonly #stopaninat: (kniga: string) => string | undefined;
+  readonly #svedi: (imeyl: string) => string;
+
+  constructor(
+    vatre: Pravata,
+    pisachat: (naematel: string) => string | undefined,
+    knigata: (naematel: string) => string,
+    stopaninat: (kniga: string) => string | undefined,
+    svedi: (imeyl: string) => string,
+  ) {
+    this.#vatre = vatre;
+    this.#pisachat = pisachat;
+    this.#knigata = knigata;
+    this.#stopaninat = stopaninat;
+    this.#svedi = svedi;
+  }
+
+  async mozheDaPishe(actor: string, naematel: string, sashtnost: Sashtnost): Promise<boolean> {
+    const az = this.#svedi(actor);
+    const pisach = this.#pisachat(naematel);
+    if (pisach !== undefined) {
+      if (this.#svedi(pisach) !== az) return false;
+    } else {
+      const stopanin = this.#stopaninat(this.#knigata(naematel));
+      if (stopanin !== undefined && this.#svedi(stopanin) !== az) return false;
+    }
+    return this.#vatre.mozheDaPishe(actor, naematel, sashtnost);
+  }
+
+  async mozheDaIznasya(actor: string, naematel: string): Promise<boolean> {
+    return this.#vatre.mozheDaIznasya(actor, naematel);
+  }
+}
+
 /** Изрична карта actor → наематели. Ползва се в тестовете за изолация. */
 export class PoSpisak implements Pravata {
   readonly #karta: ReadonlyMap<string, ReadonlySet<string>>;

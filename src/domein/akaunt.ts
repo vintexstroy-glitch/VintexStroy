@@ -130,12 +130,82 @@ export function sluzhebniyatNa(lichenKlyuch: string): string {
 }
 
 /**
+ * ВЕРИГАТА НА ПИСАЧА · вторият писач в ЕДНА книга (ADR-055).
+ *
+ * Дотук книгата имаше точно една верига и ключът ѝ беше ключът на акаунта.
+ * Влезе ли служител със своя имейл, той трябва да пише в СЪЩАТА книга, но в
+ * СВОЯ append-only верига — нищо не се слива, нищо не се преномерира.
+ *
+ * НАСТАВКА, по калъпа на личния ключ, и по същата причина: „#" е позволен знак
+ * в ЛОКАЛНАТА част на имейл (RFC 5322), но не и в домейна, значи сведен имейл
+ * никога не съдържа „#pero:" и сблъсък между книга и верига е невъзможен по
+ * конструкция. И в носителя (keyPath по наемател) веригите на една книга лягат
+ * ЕДНА ДО ДРУГА, вместо да се пръснат по азбуката на имейлите.
+ *
+ * ДВОЕТОЧИЕТО е нарочно: без него `knigataNa` не различава наставката от
+ * начало на имейл, а с него краят на наставката е еднозначен.
+ */
+export const NASTAVKA_PISACH = '#pero:';
+
+/**
+ * ВЕРИГАТА-НУЛА не се мигрира (ADR-055).
+ *
+ * Стопанинът пише там, където книгата вече се пише — под голия ключ на
+ * книгата, без наставка. Всеки друг получава своя. Ако беше обратното (и
+ * стопанинът с наставка), всяко вече записано събитие щеше да смени веригата
+ * си, тоест `naematel` в хеша — правило 1 и правило 4 наведнъж.
+ *
+ * Кой е стопанинът НЕ се гадае тук: извежда се от първото събитие на книгата
+ * (ADR-043) и се подава отвън. Непознат стопанин (нова, още празна книга)
+ * значи „аз съм първият" — веригата-нула, а трите правила при Вратата решават
+ * дали това е вярно.
+ */
+export function klyuchNaVerigata(
+  kniga: string,
+  imeyl: string,
+  stopaninat: string | undefined,
+): string {
+  const moyat = svediImeyl(imeyl);
+  if (moyat === '') {
+    throw new GreshkaAkaunt('Без имейл няма верига — доставчикът не е върнал самоличност.');
+  }
+  if (eVerigaNaPisach(kniga)) {
+    throw new GreshkaAkaunt(`„${kniga}" вече е верига на писач — книга не се прави от верига.`);
+  }
+  if (stopaninat === undefined || svediImeyl(stopaninat) === moyat) return kniga;
+  if (eLichenKlyuch(kniga)) {
+    throw new GreshkaAkaunt('Личният Журнал няма втори писач — той е на един човек (И98).');
+  }
+  return `${kniga}${NASTAVKA_PISACH}${moyat}`;
+}
+
+export function eVerigaNaPisach(klyuch: string): boolean {
+  return klyuch.includes(NASTAVKA_PISACH);
+}
+
+/** Коя КНИГА е това · веригата на писача сочи книгата, в която стои. */
+export function knigataNa(klyuch: string): string {
+  const kray = klyuch.indexOf(NASTAVKA_PISACH);
+  return kray === -1 ? klyuch : klyuch.slice(0, kray);
+}
+
+/** Чия е веригата · `undefined` за веригата-нула, чийто писач е стопанинът. */
+export function pisachatNa(klyuch: string): string | undefined {
+  const kray = klyuch.indexOf(NASTAVKA_PISACH);
+  return kray === -1 ? undefined : klyuch.slice(kray + NASTAVKA_PISACH.length);
+}
+
+/**
  * Кратко за екрана: под кой ключ работи приложението в момента.
  *
  * Показва се в Таблото. Ключ, който не се вижда никъде, е точно онова, което
  * прави „къде ми отидоха данните" неотговорим въпрос.
  */
 export function sDumiZaAkaunta(klyuch: string): string {
+  const pisach = pisachatNa(klyuch);
+  if (pisach !== undefined) {
+    return `${knigataNa(klyuch)} · моята верига в тази книга (${pisach}) · чуждите се четат, не се пишат`;
+  }
   if (klyuch === KLYUCH_OT_ALFA) return `${klyuch} · първият Журнал, от Стартъп Алфа`;
   if (eLichenKlyuch(klyuch)) return `${klyuch} · ЛИЧНИЯТ Журнал · никога не се смесва със служебния`;
   return `${klyuch} · акаунт по имейл`;

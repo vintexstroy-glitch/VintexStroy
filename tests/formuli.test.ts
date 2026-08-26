@@ -28,6 +28,7 @@ import {
   premahniKolona,
   smeniFormula,
 } from '../src/domein/redaktor.js';
+import { formulniteKoloni } from '../app/iztochnitsi.js';
 
 const TABLITSA: Tablitsa = {
   ime: 'Наеми',
@@ -251,5 +252,45 @@ describe('смятането върху цялата таблица', () => {
     });
     const [k] = smetniKolonite(m, { redove: [1, 2], kletka: kletkaNa });
     expect(k!.redove.map((r) => r.stoynost)).toEqual([10000, 24000]);
+  });
+});
+
+/**
+ * ФОРМУЛНАТА КОЛОНА СТИГА ДО ЕКРАНА · и защо това не се подразбираше.
+ *
+ * ADR-025 построи формулата, Настройки я СЪЗДАВАТ — а `smetniKolonite`, онова,
+ * което я превръща в число за показване, нямаше нито един викащ извън теста
+ * си. Тоест човек можеше да си направи колона „сбор(Наем · Такса)" и да не я
+ * види никога. Тук се пази обратното: щом моделът носи формула, екранът на
+ * Източници има какво да покаже, и то с верните числа.
+ */
+describe('формулната колона стига до екрана', () => {
+  function sFormula(): ModelNaTablitsa {
+    return dobaviFormulnaKolona(model(), {
+      ime: 'Общо с такса',
+      formula: { deystvie: 'sbor', ot: [1, 2] },
+      rolya: 'sobstvenik',
+    });
+  }
+
+  it('екранът получава колоната, сбора ѝ и вида ѝ', () => {
+    const koloni = formulniteKoloni(sFormula(), TABLITSA);
+
+    expect(koloni).toHaveLength(1);
+    expect(koloni[0]!.ime).toBe('Общо с такса');
+    expect(koloni[0]!.vid).toBe('evro');
+    // 520,00 + 1 230,00 · третият ред е недописан (празен наем) и не влиза
+    expect(koloni[0]!.sbor).toBe(52000 + 123000);
+  });
+
+  it('недописаният ред не се смята и НЕ се брои за спънал се', () => {
+    const koloni = formulniteKoloni(sFormula(), TABLITSA);
+
+    expect(koloni[0]!.spanali).toEqual([]);
+    expect(koloni[0]!.redove.filter((r) => r.stoynost === null)).toHaveLength(1);
+  });
+
+  it('модел без формула не ражда блок', () => {
+    expect(formulniteKoloni(model(), TABLITSA)).toEqual([]);
   });
 });

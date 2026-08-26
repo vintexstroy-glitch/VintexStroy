@@ -237,29 +237,38 @@ function razbiy(
   redove: readonly { sektor: string | undefined; obshta_st: number; ot_reda?: number | undefined }[],
   strana: StranaDDS,
 ): RedDDS[] {
-  const po = new Map<string, { a: Akumulator; stavka: number; obshta_st: number; broi: number }>();
+  const po = new Map<
+    string,
+    { a: Akumulator; stavka: number; obshta_st: number; osnova_st: number; dds_st: number; broi: number }
+  >();
   for (const r of redove) {
     const a = akumulator(r.sektor);
     const stavka = stavkaNaReda(r.sektor, r.ot_reda);
     const klyuch = `${a.klyuch}|${stavka}`;
-    const veche = po.get(klyuch) ?? { a, stavka, obshta_st: 0, broi: 0 };
-    po.set(klyuch, { a, stavka, obshta_st: veche.obshta_st + r.obshta_st, broi: veche.broi + 1 });
+    const veche = po.get(klyuch) ?? { a, stavka, obshta_st: 0, osnova_st: 0, dds_st: 0, broi: 0 };
+    // ДДС се вади ПО ДОКУМЕНТ и се СБИРА · не се вади от сбора на групата.
+    const razbivka = ddsOtObshta(r.obshta_st, stavka);
+    po.set(klyuch, {
+      a,
+      stavka,
+      obshta_st: veche.obshta_st + r.obshta_st,
+      osnova_st: veche.osnova_st + razbivka.osnova_st,
+      dds_st: veche.dds_st + razbivka.dds_st,
+      broi: veche.broi + 1,
+    });
   }
 
   return [...po.values()]
     .sort((x, y) => x.a.klyuch.localeCompare(y.a.klyuch) || x.stavka - y.stavka)
-    .map(({ a, stavka, obshta_st, broi }) => {
-      const razbivka = ddsOtObshta(obshta_st, stavka);
-      return {
-        akumulator: a,
-        stavka,
-        strana,
-        obshta_st,
-        osnova_st: razbivka.osnova_st,
-        dds_st: razbivka.dds_st,
-        broi,
-      };
-    });
+    .map(({ a, stavka, obshta_st, osnova_st, dds_st, broi }) => ({
+      akumulator: a,
+      stavka,
+      strana,
+      obshta_st,
+      osnova_st,
+      dds_st,
+      broi,
+    }));
 }
 
 // ── ТРЕТОТО ЧИСЛО · фактури ↔ извлечения ↔ внесено ────────────────────────

@@ -71,6 +71,7 @@ import {
   type DeystvieNaFormula,
   type Formula,
 } from '../src/domein/formuli.js';
+import { dokade, IMENA_NA_FUNKTSIITE, obyaveni, VRAZKI } from '../src/domein/vrazki.js';
 import {
   ePari,
   IMENA_NA_VIDOVETE_STOYNOST,
@@ -171,7 +172,8 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izb
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
     ${sektsiyaZhurnalat(o, sabitiya)}
-    ${blokNaDeystviyata()}`;
+    ${blokNaDeystviyata()}
+    ${blokNaKartata()}`;
 }
 
 // ── бутоните ───────────────────────────────────────────────────────────────
@@ -1006,6 +1008,51 @@ function blokNaDeystviyata(): string {
         ).join('')}
       </div>
       <p class="drebno">Бутон с обявено, но непостроено действие се отказва при създаване — бутон, който мълчи при натискане, е по-лош от липсващ бутон.</p>
+    </section>`;
+}
+
+/**
+ * КАРТАТА НА ВРЪЗКИТЕ · същият честен опис като „Десетте пътя", но за сигналите
+ * МЕЖДУ прозорците.
+ *
+ * `src/domein/vrazki.ts` описва тринайсетте връзки поименно и има `dokade()`,
+ * който ги БРОИ. Дотук обаче целият този файл се внасяше само от собствения си
+ * тест: числото „седем от тринайсет" живееше ПРЕПИСАНО в `docs/09` §3, а
+ * преписаното число се разминава (правило 17 — платено вече три пъти).
+ *
+ * Оттук нататък се брои на екрана, от същия списък, който `proveriPosoka` пази.
+ * Обявената, но непостроена връзка не се крие: връзка, която мълчи при
+ * ползване, е по-лоша от липсваща — така го казва и самият модул.
+ */
+function blokNaKartata(): string {
+  const { postroeni, vsichki } = dokade();
+  const chakat = obyaveni();
+  return `
+    <section data-sektsiya="karta">
+      <div class="dyalglava">
+        <h2>Картата на връзките</h2>
+        <span>построени <b>${postroeni}</b> от <b>${vsichki}</b> · броени, не преписани${
+          chakat.length === 0
+            ? ''
+            : ` · чакат: ${ekraniraj(chakat.map((v) => `${v.ot} → ${v.kam}`).join(' · '))}`
+        }</span>
+      </div>
+      <div class="tablitsa">
+        <div class="glava deystvie">
+          <span>Откъде</span><span>Накъде</span><span>Място</span><span>Състояние</span>
+        </div>
+        ${VRAZKI.map(
+          (v) => `<div class="red deystvie" translate="no">
+          <span>${ekraniraj(v.ot)}</span>
+          <span>${ekraniraj(v.kam)}${v.ednoposochna ? '' : ' ⇄'}</span>
+          <span>${ekraniraj(v.myasto)} · ${ekraniraj(IMENA_NA_FUNKTSIITE[v.funktsiya])}</span>
+          <span><span class="znachka ${v.postroena ? 'dobre' : 'tiha'}">${
+            v.postroena ? 'построена' : 'обявена'
+          }</span></span>
+        </div>`,
+        ).join('')}
+      </div>
+      <p class="drebno">Стрелката <b>⇄</b> значи, че сигналът се връща по същия път. Обявената връзка стои в списъка нарочно — <b>връзка, която мълчи при ползване, е по-лоша от липсваща</b>.</p>
     </section>`;
 }
 

@@ -33,6 +33,7 @@ import {
   type VhodBezParola,
 } from '../src/yadro/index.js';
 import { svediImeyl } from '../src/domein/akaunt.js';
+import { osiguriSkriptaNaGoogle } from './gis-skript.js';
 
 /**
  * КЛИЕНТСКИЯТ НОМЕР · публичен по устройство.
@@ -76,36 +77,6 @@ interface GoogleNaProzoretsa {
 
 function google(): GoogleNaProzoretsa['accounts'] {
   return (window as unknown as { google?: GoogleNaProzoretsa }).google?.accounts;
-}
-
-/**
- * Тегли скрипта · САМО при натискане и САМО веднъж.
- *
- * Отказът е с думи: „няма обхват" не бива да изглежда като „входът е развален".
- */
-async function osiguriSkripta(): Promise<void> {
-  if (google()) return;
-  await new Promise<void>((gotovo, greshka) => {
-    const veche = document.querySelector<HTMLScriptElement>(`script[src="${ADRES_NA_SKRIPTA}"]`);
-    const skript = veche ?? document.createElement('script');
-    skript.addEventListener('load', () => gotovo());
-    skript.addEventListener('error', () =>
-      greshka(
-        new GreshkaVhod(
-          'Google не се обажда — няма обхват или мрежата го спира. ' +
-            'Ако вече си влизал на това устройство, продължи със запомнения вход.',
-        ),
-      ),
-    );
-    if (!veche) {
-      skript.src = ADRES_NA_SKRIPTA;
-      skript.async = true;
-      document.head.append(skript);
-    }
-  });
-  if (!google()) {
-    throw new GreshkaVhod('Скриптът на Google се зареди, но не се представи.');
-  }
 }
 
 /** Еднократна дума за това влизане · спира жетон, взет от другаде. */
@@ -159,7 +130,10 @@ export class VhodSGoogle implements VhodBezParola {
           'по една регистрация всеки (ADR-009 §6б).',
       );
     }
-    await osiguriSkripta();
+    await osiguriSkriptaNaGoogle(
+    () => Boolean(google()?.id),
+    (t) => new GreshkaVhod(t),
+  );
     const nonce = novNonce();
     const zheton = await this.#pochakayZheton(nonce);
 

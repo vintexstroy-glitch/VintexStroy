@@ -140,9 +140,50 @@ export class DnevnikVIndexedDB implements Dnevnik {
     return redove.sort((a, b) => a.seq - b.seq);
   }
 
+  /**
+   * КОИ ВЕРИГИ ИМА · прескачащ обход, не четене на всичко.
+   *
+   * Наивното „прочети всички събития и събери имената" би вдигнало целия Журнал
+   * в паметта, за да върне шепа низа — при 10 000 събития това е секунди на
+   * телефон. Затова курсорът стъпва на първото събитие на всяка верига и
+   * ПРЕСКАЧА до следващата с `continue([име, []])`: `[име, []]` е по-голямо от
+   * всяко `[име, число]`, тъй че скокът минава цялата верига наведнъж. Броят на
+   * стъпките е броят на ВЕРИГИТЕ, не на събитията.
+   */
+  async verigi(prefiks: string): Promise<string[]> {
+    const naideni: string[] = [];
+    const zayavka = this.#chete().openKeyCursor(obhvatNaPrefiks(prefiks));
+    await new Promise<void>((resolve, reject) => {
+      zayavka.onerror = () => reject(zayavka.error);
+      zayavka.onsuccess = () => {
+        const kursor = zayavka.result;
+        if (!kursor) {
+          resolve();
+          return;
+        }
+        const ime = (kursor.key as [string, number])[0];
+        naideni.push(ime);
+        kursor.continue([ime, []]);
+      };
+    });
+    return naideni.sort();
+  }
+
   #chete(): IDBObjectStore {
     return this.#db.transaction(HRANILISHTE, 'readonly').objectStore(HRANILISHTE);
   }
+}
+
+/**
+ * Всички вериги, чието име започва с префикса.
+ *
+ * Горната граница е `префикс + '\uffff'`: всеки низ, започващ с префикса, е
+ * по-малък от него, защото по-нататъшните знаци са от базовата равнина или са
+ * сурогати (`\ud800`–`\udfff`), а те са ПОД `\uffff`. Тоест границата държи и
+ * за емоджи в името, без да се разчита на „никой няма да сложи такова".
+ */
+function obhvatNaPrefiks(prefiks: string): IDBKeyRange {
+  return IDBKeyRange.bound([prefiks], [`${prefiks}\uffff`, []]);
 }
 
 /**

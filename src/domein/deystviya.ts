@@ -11,6 +11,7 @@
 
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
+import { prochetiKnigata } from './knigata.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
@@ -83,6 +84,18 @@ interface NastroykiDeystviya {
   readonly actor: string;
   /** ISO време — подава се отвън, за да са тестовете повторяеми */
   readonly chasovnik: () => string;
+  /**
+   * КНИГАТА, ако е по-широка от моята верига (ADR-055).
+   *
+   * Пропусната значи „книгата съм аз" — точно днешното поведение, тъй че всеки
+   * вече написан ред работи непроменен. Подадена значи ЧЕТА от всички вериги
+   * на тази книга, а ПИША пак само в `naematel`.
+   *
+   * Несиметрията е нарочна и е целият избор на ADR-055: сливане на писането би
+   * било презапис, преоблечен като синхрон, а свиване на четенето до своята
+   * верига би скрило половин книга — мълчаливо, защото нищо не хвърля.
+   */
+  readonly kniga?: string;
 }
 
 interface Zayavka {
@@ -102,6 +115,7 @@ export class Deystviya {
   readonly #naematel: string;
   readonly #actor: string;
   readonly #chasovnik: () => string;
+  readonly #kniga: string | undefined;
 
   constructor(n: NastroykiDeystviya) {
     this.#vrata = n.vrata;
@@ -109,6 +123,7 @@ export class Deystviya {
     this.#naematel = n.naematel;
     this.#actor = n.actor;
     this.#chasovnik = n.chasovnik;
+    this.#kniga = n.kniga;
   }
 
   async dobaviImot(id: string, danni: PayloadImotDobaven, z: Zayavka): Promise<Rezultat> {
@@ -856,23 +871,58 @@ export class Deystviya {
     z: Zayavka,
     vid: Vid = VID.plashtane,
   ): Promise<Rezultat> {
-    // Сторно на събитие ОТ заключен период също е редакция на периода.
-    const zhertva = (await this.#dnevnik.chetiVsichki(this.#naematel)).find(
+    /**
+     * СТОРНО ПРЕЗ ГРАНИЦА · жертвата се търси в КНИГАТА, не само в моята
+     * верига (ADR-055 · резен 5).
+     *
+     * Двата пазача по-долу имат смисъл чак сега и се крепят на това четене:
+     *
+     *  1. ЖЕРТВАТА ТРЯБВА ДА Я ИМА. Дотук липсващата жертва просто не намираше
+     *     нищо и сторното минаваше — при един писач това беше почти невъзможно
+     *     (своя `seq` се знае), но погасяване на ЧУЖДА верига се пише по номер,
+     *     който човек може да сбърка. Сторно, което не гаси нищо, е запис,
+     *     изглеждащ като поправка, и после никой не намира какво е поправял.
+     *  2. ЗАМРАЗЕНИЯТ ПЕРИОД се пита срещу СГЪНАТОТО Огледало. Жертва в чужда
+     *     верига има свой период; четена само от моята, тя не се намираше и
+     *     проверката се прескачаше цяла — тоест сторно в заключен месец
+     *     минаваше, стига жертвата да е на другия.
+     */
+    const kade = danni.pogasyavaVeriga ?? this.#naematel;
+    const zhertva = (await this.#dnevnik.chetiVsichki(kade)).find(
       (s) => s.seq === danni.pogasyavaSeq,
     );
-    if (zhertva) {
-      const period = periodNaSabitie(zhertva);
-      if (period !== '') proveriZamrazen(await this.ogledalo(), period, z.svereno);
+    if (!zhertva) {
+      throw new GreshkaStorno(
+        `Сторното сочи звено „${kade}#${danni.pogasyavaSeq}", което го няма. ` +
+          'Погасяване без жертва не поправя нищо, а изглежда като поправка.',
+      );
     }
+    const period = periodNaSabitie(zhertva);
+    if (period !== '') proveriZamrazen(await this.ogledalo(), period, z.svereno);
     return this.#pusni('Сторно', vid, id, danni, z);
   }
 
-  /** Огледалото: изчислява се от Журнала при всяко поискване, не се пази. */
+  /**
+   * Огледалото: изчислява се от Журнала при всяко поискване, не се пази.
+   *
+   * При книга с няколко вериги входът е СГЪНАТИЯТ поток — иначе замразеният
+   * период, салдата и правата биха се смятали само от своята половина.
+   */
   async ogledalo(): Promise<Ogledalo> {
-    return fold(await this.#dnevnik.chetiVsichki(this.#naematel));
+    if (this.#kniga === undefined) {
+      return fold(await this.#dnevnik.chetiVsichki(this.#naematel));
+    }
+    return fold((await prochetiKnigata(this.#dnevnik, this.#kniga, this.#chasovnik())).potok);
   }
 
-  /** Суровите събития на този наемател — за проверки, износ и вратаря на сторното. */
+  /**
+   * Суровите събития на ТАЗИ ВЕРИГА — за проверки, износ и вратаря на сторното.
+   *
+   * НЕ се разширява до книгата, дори когато тя има няколко вериги: хеш-веригата
+   * се проверява поотделно за всяка (`proveriVerigata` тръгва от `seq 1`), а
+   * износът е файл НА ПИСАЧ. Слят файл би имал `seq`, повтарящ се по веднъж на
+   * верига — тоест нищо, което да се провери.
+   */
   async sabitiya(): Promise<readonly Sabitie[]> {
     return this.#dnevnik.chetiVsichki(this.#naematel);
   }
@@ -919,6 +969,18 @@ export class Deystviya {
  * ги преглътне с Math.min/Math.max, раждайки падеж, който никой не е искал.
  * Границата е при записа, с думи — не при смятането, мълчешком.
  */
+/**
+ * СТОРНО БЕЗ ЖЕРТВА · своя грешка, за да се различи от отказа за замразен
+ * период. Двете идват от един и същ бутон и с общо име човек не би разбрал
+ * дали да отключи месеца, или да поправи номера.
+ */
+class GreshkaStorno extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaStorno';
+  }
+}
+
 class GreshkaNaem extends Error {
   constructor(message: string) {
     super(message);
