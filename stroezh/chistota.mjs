@@ -91,73 +91,189 @@ function nahodka(obhod, kade, red, kakvo) {
 }
 
 /**
- * Редовете БЕЗ коментари и без низове.
+ * Редовете БЕЗ коментари и без низове · ЕДИН четец на лексеми, в реда на файла.
  *
  * Без това всеки обход лови собствените си обяснения: коментар, който описва
- * празен `catch`, се брои за празен `catch`. Изчистването е грубо нарочно —
- * то маха повече, отколкото трябва, а обходът предпочита да пропусне, вместо
- * да излъже.
+ * празен `catch`, се брои за празен `catch`.
+ *
+ * ═══ ЗАЩО ЕДИН ЧЕТЕЦ, А НЕ ЧЕТИРИ ЗАМЕНИ ═══
+ *
+ * Дотук изчистването бяха четири последователни регулярни замени (блоков
+ * коментар · ред-коментар · \'…\' · "…") и чак НАКРАЯ шаблонните низове. Всяка
+ * от тях гледаше файла така, сякаш другите три не съществуват — и точно там се
+ * къса:
+ *
+ *   const red = `<td class="suma">${pishi(x)}</td>`;
+ *
+ * Заменáта за "…" изяжда `class="suma"` ЗАЕДНО с обкръжаващия текст, шаблонният
+ * брояч след нея вече не вижда своята отваряща обратна апострофа — и от този ред
+ * НАДОЛУ целият файл минава за „вътре в шаблон", тоест се изтрива.
+ *
+ * **Измерено, не предположено.** `smetniIzbora` се вика на ред 354 в
+ * `app/klaviatura.ts`; обходът виждаше там празен ред и я обявяваше за
+ * „непостроена възможност с тест". Същото важеше в различна степен за всеки
+ * екранен файл — тоест обходът за чистота беше ПОЛУСЛЯП точно за `app/`, където
+ * живеят шаблонните низове.
+ *
+ * Затова тук има ЕДИН четец с едно състояние, който минава файла отляво надясно
+ * и не може да се разсинхронизира: всяка лексема се разпознава от онова
+ * състояние, в което наистина се намираме.
+ *
+ * ═══ КАКВО ОСТАВА И КАКВО ПАДА ═══
+ *
+ *   · коментари · падат изцяло (иначе обходът чете обясненията си);
+ *   · \'…\' и "…" · падат (име в низ не е повикване);
+ *   · шаблонен низ · ТЕКСТЪТ пада, `${…}` ОСТАВА. Тук екраните се строят от
+ *     шаблони и всяко повикване в тях живее в `${…}`; изтрит целият низ, обходът
+ *     обяви `lihvaSDumi` за мъртва в същия ход, в който я закачихме на екрана.
+ *     Оставен целият, разметката `class="red smetka"` щеше да мине за повиквания;
+ *   · регулярен израз · пада. Разпознава се по предхождащия го знак — иначе
+ *     наклонена черта и звездичка ВЪТРЕ в него отварят блоков коментар и пак се
+ *     разсинхронизираме.
+ *
+ * Редовете и стълбовете се пазят: всичко скрито става ИНТЕРВАЛ, не изчезва.
  */
-function golKod(tekst) {
-  return prazniShablonite(
-    tekst
-      .replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' '))
-      .replace(/(^|[^:])\/\/[^\n]*/g, (m) => m.replace(/[^\n]/g, ' '))
-      .replace(/'(?:[^'\\\n]|\\.)*'/g, (m) => m.replace(/[^\n]/g, ' '))
-      .replace(/"(?:[^"\\\n]|\\.)*"/g, (m) => m.replace(/[^\n]/g, ' ')),
-  );
-}
 
-/**
- * ШАБЛОННИЯТ НИЗ · текстът пада, `${…}` ОСТАВА · петата поправка на обхода.
- *
- * Тук екраните се строят от шаблонни низове, и всяко повикване в тях живее в
- * `${…}`. Изтрит целият низ, обходът не вижда нито едно от тези повиквания —
- * и обяви `lihvaSDumi` за мъртва в същия ход, в който я закачихме на екрана.
- *
- * Обратното — да се остави низът цял — е също толкова лошо: разметката вътре
- * носи думи като `class="red smetka"`, и всяко такова име щеше да мине за
- * повикване. Затова се пази точно онова, което Е код.
- */
-function prazniShablonite(tekst) {
+/** След тези знаци „/" започва регулярен израз, не деление. */
+const PRED_REGULYAREN = new Set(['(', ',', '=', ':', '[', '!', '&', '|', '?', '{', '}', ';', '\n', '+', '-', '*', '%', '<', '>', '~', '^']);
+
+function golKod(tekst, paziNizove = false) {
   let izhod = '';
+  let sastoyanie = 'kod';
+  /** дълбочината на `${…}` за всеки отворен шаблон · празен стек = не сме в шаблон */
+  const shabloni = [];
+  let posleden = '';
   let i = 0;
-  let vShablon = 0;
-  let vIzraz = 0;
+
+  const skriy = (n = 1) => {
+    for (let k = 0; k < n; k++) izhod += tekst[i + k] === '\n' ? '\n' : ' ';
+    i += n;
+  };
+  const pazi = () => {
+    izhod += tekst[i];
+    if (!/\s/.test(tekst[i])) posleden = tekst[i];
+    i += 1;
+  };
+
   while (i < tekst.length) {
     const z = tekst[i];
     const sled = tekst[i + 1];
-    if (z === '\\' && vShablon > 0) {
-      izhod += tekst[i + 1] === '\n' ? '\n ' : '  ';
-      i += 2;
+
+    if (sastoyanie === 'red-koment') {
+      if (z === '\n') sastoyanie = 'kod';
+      skriy();
+      continue;
+    }
+    if (sastoyanie === 'blok-koment') {
+      if (z === '*' && sled === '/') {
+        sastoyanie = 'kod';
+        skriy(2);
+        continue;
+      }
+      skriy();
+      continue;
+    }
+    if (sastoyanie === 'edinichen' || sastoyanie === 'dvoen' || sastoyanie === 'regulyaren') {
+      const kray = sastoyanie === 'edinichen' ? "'" : sastoyanie === 'dvoen' ? '"' : '/';
+      if (z === '\\') {
+        if (paziNizove) { pazi(); pazi(); } else skriy(2);
+        continue;
+      }
+      // Незатворен низ до края на реда е синтактична грешка, не наша грижа —
+      // но да НЕ се излиза от състоянието би заслепило остатъка от файла.
+      if (z === kray || z === '\n') {
+        sastoyanie = 'kod';
+        posleden = kray;
+      }
+      if (paziNizove) pazi(); else skriy();
+      continue;
+    }
+    if (sastoyanie === 'shablon') {
+      if (z === '\\') {
+        if (paziNizove) { pazi(); pazi(); } else skriy(2);
+        continue;
+      }
+      if (z === '`') {
+        shabloni.pop();
+        sastoyanie = 'kod';
+        posleden = '`';
+        skriy();
+        continue;
+      }
+      if (z === '$' && sled === '{') {
+        shabloni[shabloni.length - 1] += 1;
+        sastoyanie = 'kod';
+        posleden = '{';
+        skriy(2);
+        continue;
+      }
+      if (paziNizove) pazi(); else skriy();
+      continue;
+    }
+
+    // ── състояние „код" ──
+    if (z === '/' && sled === '/') {
+      sastoyanie = 'red-koment';
+      skriy(2);
+      continue;
+    }
+    if (z === '/' && sled === '*') {
+      sastoyanie = 'blok-koment';
+      skriy(2);
+      continue;
+    }
+    if (z === '/' && (posleden === '' || PRED_REGULYAREN.has(posleden))) {
+      sastoyanie = 'regulyaren';
+      skriy();
+      continue;
+    }
+    if (z === "'") {
+      sastoyanie = 'edinichen';
+      skriy();
+      continue;
+    }
+    if (z === '"') {
+      sastoyanie = 'dvoen';
+      skriy();
       continue;
     }
     if (z === '`') {
-      vShablon += vShablon > 0 && vIzraz === 0 ? -1 : 1;
-      izhod += ' ';
-      i += 1;
+      shabloni.push(0);
+      sastoyanie = 'shablon';
+      skriy();
       continue;
     }
-    if (vShablon > 0 && vIzraz === 0 && z === '$' && sled === '{') {
-      vIzraz = 1;
-      izhod += '  ';
-      i += 2;
-      continue;
+    // Затварящата скоба на `${…}` ни връща в текста на шаблона.
+    if (z === '}' && shabloni.length > 0) {
+      shabloni[shabloni.length - 1] -= 1;
+      if (shabloni[shabloni.length - 1] === 0) {
+        sastoyanie = 'shablon';
+        skriy();
+        continue;
+      }
     }
-    if (vShablon > 0 && vIzraz > 0) {
-      if (z === '{') vIzraz += 1;
-      else if (z === '}') vIzraz -= 1;
-      izhod += vIzraz === 0 ? ' ' : z;
-      i += 1;
-      continue;
-    }
-    izhod += vShablon > 0 && z !== '\n' ? ' ' : z;
-    i += 1;
+    if (z === '{' && shabloni.length > 0) shabloni[shabloni.length - 1] += 1;
+    pazi();
   }
   return izhod;
 }
 
 const chist = new Map([...tekstat].map(([f, t]) => [f, golKod(t)]));
+
+/**
+ * СЪЩИЯТ ФАЙЛ, НО С НИЗОВЕТЕ · само за обхода за дублирано.
+ *
+ * Останалите обходи търсят ИМЕНА, затова низовете им пречат: „сума" в текст на
+ * бутон не е повикване. Дублирането обаче е точно обратното — двата блока са
+ * един и същ КОД само ако и съобщенията им съвпадат.
+ *
+ * Измерено: `app/imoti.ts:580` и `:690` изглеждаха дословно еднакви, а са
+ * различни решения — единият казва „Поправката е записана", другият „Наемът е
+ * прекратен". Изтрити, двете изречения станаха еднакви празни редове и обходът
+ * поиска да ги слеем. Обход, който кара да се слее РАЗЛИЧНО, е по-скъп от
+ * липсващ.
+ */
+const sNizove = new Map([...tekstat].map(([f, t]) => [f, golKod(t, true)]));
 
 // ── 1 и 2 · МЪРТВО и САМО ТЕСТ ────────────────────────────────────────────
 
@@ -181,6 +297,19 @@ for (const f of kod) {
   for (const [, kakvo, ime] of chist.get(f).matchAll(IZNESENI)) {
     imenata.set(ime, { kade: f, tip: TIPOVE.has(kakvo), vKod: 0, vTest: 0 });
   }
+}
+
+/** Стои ли този тип на ред, който ИЗНАСЯ нещо — тоест в лицето на модула. */
+function vPublichenPodpis(ime, f) {
+  return chist
+    .get(f)
+    .split('\n')
+    .some(
+      (red) =>
+        /^export\b/.test(red) &&
+        !new RegExp(`^export\\s+(?:async\\s+)?\\w+\\s+${ime}\\b`).test(red) &&
+        new RegExp(`\\b${ime}\\b`).test(red),
+    );
 }
 
 /** Колко пъти името се среща В СВОЯ файл, без реда на декларацията си. */
@@ -241,6 +370,13 @@ for (const [ime, z] of imenata) {
   if (z.vTest === 0 && vatre === 0) {
     nahodka('1 · мъртво', z.kade, 0, `„${ime}" · не се среща НИКЪДЕ освен в декларацията си`);
   } else if (z.vTest === 0) {
+    // ТИП В ПУБЛИЧЕН ПОДПИС НЕ Е ИЗЛИШЕН · шестата поправка на обхода.
+    // Шапката го обявяваше отдавна, а кодът го прилагаше само за обход 3.
+    // Затова `Tochnost` — типът на втория довод на изнесената `zakragli` —
+    // излезе като „излишен export" в мига, в който четецът на лексеми
+    // прогледна за `app/`. Тип, който стои на ред с `export`, Е част от лицето
+    // на модула: без него викащият няма как да назове онова, което подава.
+    if (z.tip && vPublichenPodpis(ime, z.kade)) continue;
     nahodka('2 · излишен export', z.kade, 0, `„${ime}" · ползва се само ВЪТРЕ в своя файл`);
   } else if (!z.tip) {
     if (vatre > 0) {
@@ -410,7 +546,7 @@ const DEYSTVIE = /(?:\breturn\b|\bif\s*\(|=>|[\w$)\]]\s*\(|[^=!<>]=[^=])/;
 const BLOK = 5;
 const blokove = new Map();
 for (const f of kod) {
-  const redove = chist
+  const redove = sNizove
     .get(f)
     .split('\n')
     .map((r, i) => ({ tekst: r.trim(), red: i + 1 }))

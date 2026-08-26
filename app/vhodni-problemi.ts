@@ -69,7 +69,7 @@ export function legendata(otvorena = false): string {
  * Не пипа DOM сам: екраните го викат и слагат каквото им трябва. Така една
  * логика обслужва форма, клетка в таблица и внесен ред от файл.
  */
-export interface Svetnalo {
+interface Svetnalo {
   /** класът за полето · празен, когато няма находки */
   readonly klas: string;
   /** съобщението под полето */

@@ -40,6 +40,7 @@ import {
   predlozhiVnoska,
   razhodnaChast,
   sborovePoTemi,
+  type LichnaTema,
   type LichenKredit,
   type LichnoDvizhenie,
   type VidKredit,
@@ -92,6 +93,33 @@ let greshka = '';
 let prichinaZaIzklyuchvane = '';
 /** Кой ред коя тема получава · човекът пипа плана, преди да го запише. */
 const temiNaPlana = new Map<string, string>();
+
+/**
+ * ПАДАЩОТО МЕНЮ НА ТЕМИТЕ · един дом за четирите му места (правило 17).
+ *
+ * Строеше се дословно четири пъти в този файл — два пъти във форма и два пъти
+ * в таблица. Разликата беше САМО дали има вече избрана тема; тя става довод.
+ *
+ * Обходът за дублирано го намери чак когато прогледна за `app/`: дотук
+ * изчистването на низовете сливаше и различни блокове, и обходът беше
+ * полусляп точно за екранните файлове (ADR-051).
+ */
+function menyuNaTemite(
+  atribut: string,
+  temi: readonly LichnaTema[],
+  izbrana = '',
+): string {
+  const redove = temi
+    .map(
+      (t) =>
+        `<option value="${ekraniraj(t.temaId)}"${t.temaId === izbrana ? ' selected' : ''}>${ekraniraj(t.ime)}</option>`,
+    )
+    .join('');
+  return `<select translate="no" ${atribut}>
+            <option value="">— без тема —</option>
+            ${redove}
+          </select>`;
+}
 
 export function zabraviPlana(): void {
   planat = null;
@@ -170,15 +198,7 @@ function tablitsataNaRedovete(o: Ogledalo, skriti: boolean): string {
             <span>${
               d.izklyuchen
                 ? `<span class="znachka tiha">изключен · ${ekraniraj(d.prichina)}</span>`
-                : `<select translate="no" data-smeni-tema="${ekraniraj(d.dvizhenieId)}">
-                     <option value="">— без тема —</option>
-                     ${temi
-                       .map(
-                         (t) =>
-                           `<option value="${ekraniraj(t.temaId)}"${t.temaId === d.temaId ? ' selected' : ''}>${ekraniraj(t.ime)}</option>`,
-                       )
-                       .join('')}
-                   </select>`
+                : menyuNaTemite(`data-smeni-tema="${ekraniraj(d.dvizhenieId)}"`, temi, d.temaId)
             }</span>
             <span>${
               d.izklyuchen
@@ -233,10 +253,7 @@ function formaRed(o: Ogledalo, dnes: string): string {
           })
         }
         <label class="pole"><span>Тема</span>
-          <select translate="no" id="${PREDSTAVKA_PARI}r-tema">
-            <option value="">— без тема —</option>
-            ${temi.map((t) => `<option value="${ekraniraj(t.temaId)}">${ekraniraj(t.ime)}</option>`).join('')}
-          </select></label>
+          ${menyuNaTemite(`id="${PREDSTAVKA_PARI}r-tema"`, temi)}</label>
       </div>
       <div class="deystviya">
         <button type="button" class="glaven" id="${PREDSTAVKA_PARI}r-zapishi">Добави реда</button>
@@ -423,10 +440,7 @@ function formaKredit(o: Ogledalo, dnes: string): string {
         <label class="pole"><span>Ден от месеца</span>
           <input translate="no" type="number" min="1" max="31" step="1" id="${PREDSTAVKA_PARI}k-den" value="5"></label>
         <label class="pole"><span>Тема на лихвата</span>
-          <select translate="no" id="${PREDSTAVKA_PARI}k-tema">
-            <option value="">— без тема —</option>
-            ${temi.map((t) => `<option value="${ekraniraj(t.temaId)}">${ekraniraj(t.ime)}</option>`).join('')}
-          </select></label>
+          ${menyuNaTemite(`id="${PREDSTAVKA_PARI}k-tema"`, temi)}</label>
       </div>
       <div class="deystviya">
         <button type="button" class="glaven" id="${PREDSTAVKA_PARI}k-zapishi">Впиши кредита</button>
@@ -503,15 +517,7 @@ function planatNaEkrana(p: PlanZaVnos, o: Ogledalo, skriti: boolean): string {
             }${chislo(d?.suma_st ?? r.star?.suma_st ?? 0)}</span>
             <span>${
               r.kakvo === 'nov' || r.kakvo === 'promenen'
-                ? `<select translate="no" data-tema-za="${ekraniraj(r.klyuch)}">
-                     <option value="">— без тема —</option>
-                     ${temi
-                       .map(
-                         (t) =>
-                           `<option value="${ekraniraj(t.temaId)}"${t.temaId === izbrana ? ' selected' : ''}>${ekraniraj(t.ime)}</option>`,
-                       )
-                       .join('')}
-                   </select>${r.otKade === 'от паметта' ? '<span class="drebno"> ← от паметта</span>' : ''}`
+                ? `${menyuNaTemite(`data-tema-za="${ekraniraj(r.klyuch)}"`, temi, izbrana)}${r.otKade === 'от паметта' ? '<span class="drebno"> ← от паметта</span>' : ''}`
                 : ekraniraj(o.lichniTemi.get(r.temaId)?.ime ?? '—')
             }</span>
           </div>`;
@@ -927,6 +933,6 @@ function paraOtPole(tekst: string): number {
 }
 
 /** Лихвата, изписана за човек · 345 б.п. → „3,45 %". */
-export function lihvaSDumi(lihva_bp: number): string {
+function lihvaSDumi(lihva_bp: number): string {
   return `${(lihva_bp / 100).toFixed(2).replace('.', ',')} %`;
 }
