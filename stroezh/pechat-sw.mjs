@@ -13,6 +13,10 @@
 import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync, writeFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+// ЗАЩО `.mjs` внася `.ts` без строеж: от Node 22.18 обелването на типове е
+// включено по подразбиране. Условието не е дребно — под 22.18 `npm run build`
+// пада на този ред, — затова е вписано МАШИННО ЧЕТИМО в `package.json`
+// (`engines.node`), а не само с думи тук. И двата потока карат Node 22.
 import { PAKETI } from '../src/domein/azbuki.ts';
 
 const DIST = new URL('../dist/', import.meta.url).pathname;
