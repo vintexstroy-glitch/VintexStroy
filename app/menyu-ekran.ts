@@ -36,11 +36,19 @@
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { ekraniraj } from './obshto.js';
+import { zapishiRedaNaSektsiite } from './podredba.js';
+import {
+  broySemeystva,
+  otpechatakNaEkrannaGlava,
+  podrediPoSemeystvo,
+} from './semeystva.js';
 
 /** Една секция, както се показва в реда. */
 interface Sektsiya {
   readonly klyuch: string;
   readonly ime: string;
+  /** отпечатъкът на главата ѝ · празен, когато секцията няма таблица (резен 11) */
+  readonly otpechatak?: string;
 }
 
 /**
@@ -64,6 +72,13 @@ function sektsiiteNa(koren: ParentNode): Sektsiya[] {
     .map((e) => ({
       klyuch: e.dataset['sektsiya'] ?? '',
       ime: e.querySelector('.dyalglava h2, .dyalglava h3')?.textContent?.trim() ?? '',
+      // ОТПЕЧАТЪКЪТ НА ГЛАВАТА · за подреждането по семейство (резен 11).
+      // Чете се от НАРИСУВАНАТА глава, със същото свеждане като в домейна.
+      otpechatak: otpechatakNaEkrannaGlava(
+        [...(e.querySelector('.tablitsa .glava')?.children ?? [])].map(
+          (k) => k.textContent?.trim() ?? '',
+        ),
+      ),
     }))
     .filter((s) => s.klyuch !== '' && s.ime !== '');
 }
@@ -149,6 +164,21 @@ export function zakachiMenyutataNaEkranite(
     red.setAttribute('role', 'menu');
     red.setAttribute('aria-label', `Секции на ${vhod.textContent!.trim()}`);
     red.hidden = otvoreniyat !== koy;
+    /**
+     * ПОДРЕЖДАНЕТО ПО СЕМЕЙСТВО · само на екрана, на който СТОИШ.
+     *
+     * Негово: таблиците с еднакви хедъри се подреждат една до друга — „като
+     * СОРТИРАНЕ", тоест човек го натиска. Затова е бутон, не правило.
+     *
+     * Показва се само когато има какво да събере (правило 15: бутон, който не
+     * прави нищо, изглежда счупен). И само за ТЕКУЩИЯ екран: отпечатъците на
+     * чужд екран идват от паметта и може да са от вчера, а подредба по стари
+     * глави е по-лоша от липсваща.
+     */
+    // Един превод към формата на семействата · ползван и от броенето, и от
+    // подреждането: два превода се разминават при първата смяна на полето.
+    const sGlavi = sektsii.map((x) => ({ klyuch: x.klyuch, otpechatak: x.otpechatak ?? '' }));
+    const semeystva = koy === ekran ? broySemeystva(sGlavi) : 0;
     red.innerHTML =
       `<p class="drebno za-kogo">Секциите на този екран</p>` +
       sektsii
@@ -158,7 +188,14 @@ export function zakachiMenyutataNaEkranite(
               s.klyuch,
             )}"><span class="dvete"><b>${ekraniraj(s.ime)}</b></span></button>`,
         )
-        .join('');
+        .join('') +
+      (semeystva > 0
+        ? `<button type="button" class="tema podredi-semeystva" role="menuitem"
+             data-podredi-semeystva="${ekraniraj(koy)}"><span class="dvete"><b>Подреди
+             еднаквите хедъри заедно</b><span class="drebno">${semeystva} ${
+               semeystva === 1 ? 'семейство' : 'семейства'
+             } с еднаква глава</span></span></button>`
+        : '');
     obvivka.append(red);
 
     vhod.addEventListener('click', () => {
@@ -178,6 +215,16 @@ export function zakachiMenyutataNaEkranite(
         await zavediDoSektsiyata(koy, b.dataset['kamSektsiya'] ?? '', otvoriEkran, prerisuvay);
       });
     }
+
+    // Сортирането пише в СЪЩАТА памет като стрелките ▲▼ — един дом за реда.
+    red.querySelector<HTMLButtonElement>('[data-podredi-semeystva]')?.addEventListener(
+      'click',
+      async () => {
+        zatvoriVsichki();
+        zapishiRedaNaSektsiite(koy, podrediPoSemeystvo(sGlavi));
+        await prerisuvay();
+      },
+    );
   }
 
   zakachiEscape();

@@ -833,6 +833,60 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollTop = 0;
     });
 
+    razdel = '77 · Семействата хедъри · еднаквите застават една до друга';
+    // Негово, 27.08: таблиците с еднакви хедъри се подреждат една до друга —
+    // „като СОРТИРАНЕ". И от 08.08 (р70·[32]): „хедърите от еднаквите таблици…
+    // някой хедъри имат индивидуални колони за себе си."
+    //
+    // Сметки има ЧЕТИРИНАЙСЕТ секции и е екранът, на който това има смисъл.
+    await naEkran(p, 'smetki', '#forma-razhod');
+    const otpechatatsi = async (): Promise<string[]> =>
+      p.$$eval('[data-sektsiya]', (se) =>
+        se.map((e) => {
+          const g = e.querySelector('.tablitsa .glava');
+          return g === null
+            ? ''
+            : [...g.children].map((k) => (k.textContent ?? '').trim().toLowerCase()).join('|');
+        }),
+      );
+    // Колко ДВОЙКИ съседи с еднаква глава има ПРЕДИ подреждането.
+    const sasedi = (o: readonly string[]): number =>
+      o.filter((x, i) => x !== '' && i > 0 && o[i - 1] === x).length;
+    const predi = await otpechatatsi();
+    const semeystvaPredi = new Set(predi.filter((x) => x !== '')).size;
+    proveri('екранът има повече от една таблица, за да има какво да се подрежда',
+      predi.filter((x) => x !== '').length > 1, true);
+
+    // Лостът е в падащия ред на екрана и се показва САМО когато има какво да събере.
+    //
+    // ПУНКТЪТ Е И ПАДАЩИЯТ БУТОН: `naEkran` натиска него, значи редът вече може
+    // да е ОТВОРЕН. Втори клик би го ЗАТВОРИЛ — и чакането щеше да виси до край
+    // върху скрит възел. Затова се отваря само когато е затворен.
+    const otvoriReda = async (): Promise<void> => {
+      if (await p.$('#ekran-red-smetki:not([hidden])')) return;
+      await p.click('.padasht-menyu > [data-ekran=smetki]');
+      await p.waitForSelector('#ekran-red-smetki:not([hidden])');
+    };
+    await otvoriReda();
+    await p.waitForSelector('[data-podredi-semeystva]');
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi-semeystva]'));
+
+    const sled = await otpechatatsi();
+    console.log(`\n  СЕМЕЙСТВА ХЕДЪРИ: съседни двойки ${sasedi(predi)} → ${sasedi(sled)}\n`);
+    proveri('еднаквите глави застават една до друга · съседството РАСТЕ',
+      sasedi(sled) >= sasedi(predi), true);
+    // НИЩО НЕ СЕ ГУБИ · подредбата мести, не трие.
+    proveri('нито една секция не изчезва при подреждането', sled.length, predi.length);
+    proveri('и семействата са същите на брой',
+      new Set(sled.filter((x) => x !== '')).size, semeystvaPredi);
+
+    razdel = '77 · Семействата · ВТОРОТО натискане не мърда нищо';
+    // Устойчиво: човек, който вече е наредил своето, не бива да го губи.
+    await otvoriReda();
+    await deystvieSPrerisuvane(p, () => p.click('[data-podredi-semeystva]'));
+    proveri('повторното подреждане дава СЪЩИЯ ред', (await otpechatatsi()).join('¦'), sled.join('¦'));
+    await naEkran(p, 'imoti', '#forma-imot');
+
     razdel = '76 · Размерът на текста · лост, видим по всяко време';
     // Негово: „Бутоните за размера на текста да е видим по ВСЯКО ВРЕМЕ горе в
     // дясно, НА ВСЕКИ ПРОЗОРЕЦ."

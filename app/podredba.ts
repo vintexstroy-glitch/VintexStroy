@@ -47,6 +47,18 @@ function zapomneniyatRed(ekran: string): readonly string[] {
  *   · новите → накрая, в реда, в който екранът ги е нарисувал;
  *   · изчезналите (запомнени, но вече ги няма) → просто отпадат.
  */
+/**
+ * ЗАПИСВА реда на секциите · ЕДИНСТВЕНИЯТ вход към тази памет.
+ *
+ * Отваря се, защото подреждането по семейство (`semeystva.ts`) стига до същия
+ * въпрос от друга страна: „какъв е редът на секциите на този екран". Втора
+ * памет за него би значела, че стрелките ▲▼ и бутонът за семействата казват
+ * различни неща за едно и също (правило 17).
+ */
+export function zapishiRedaNaSektsiite(ekran: string, red: readonly string[]): void {
+  zapomniEkranno(klyuchat(ekran), [...red]);
+}
+
 export function podredi(
   imena: readonly string[],
   zapomneni: readonly string[],
