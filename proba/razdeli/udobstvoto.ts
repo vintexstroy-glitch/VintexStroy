@@ -833,6 +833,46 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollTop = 0;
     });
 
+    razdel = '75 · Височината на реда · ЕДНА за цялата таблица';
+    // Негово: „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ
+    // РЕДОВЕ височината, ЗА КОЛОНИТЕ НЕ ВАЖИ." Двете половини се мерят поотделно.
+    const koloniPredi = await p.$eval('.glava.imot', (e) =>
+      getComputedStyle(e).gridTemplateColumns);
+    const visochiniPredi = await p.$$eval('.red.imot', (r) =>
+      r.map((x) => Math.round(x.getBoundingClientRect().height)));
+    proveri('таблицата има повече от един ред, за да има какво да се мери',
+      visochiniPredi.length > 1, true);
+
+    // ТРИТЕ ГЪСТОТИ · лостът стои в главата на секцията, до стрелките.
+    proveri('лостът за височина е в главата на секцията',
+      await p.$$eval('[data-sektsiya="imoti-spisak"] .gastotata button', (b) => b.length), 3);
+    await p.click('[data-sektsiya="imoti-spisak"] .gastotata button[data-gastota="shiroko"]');
+    await p.waitForTimeout(150);
+    const shiroki = await p.$$eval('.red.imot', (r) =>
+      r.map((x) => Math.round(x.getBoundingClientRect().height)));
+    console.log(`\n  ВИСОЧИНА НА РЕД: сбито/средно/широко → ${visochiniPredi[0]} → ${shiroki[0]}px\n`);
+    proveri('широкото вдига реда', shiroki[0]! > visochiniPredi[0]!, true);
+    // ВСИЧКИ, не един — това е сърцевината на неговото изречение.
+    proveri('и вдига ВСИЧКИ редове, не един', new Set(shiroki).size, 1);
+    proveri('отбелязана е точно ЕДНА гъстота',
+      await p.$$eval('[data-sektsiya="imoti-spisak"] .gastotata button[aria-pressed="true"]',
+        (b) => b.length), 1);
+
+    // ЗА КОЛОНИТЕ НЕ ВАЖИ · неговата втора половина, премерена
+    proveri('колоните НЕ се менят от височината на реда',
+      await p.$eval('.glava.imot', (e) => getComputedStyle(e).gridTemplateColumns), koloniPredi);
+
+    razdel = '75 · Височината · изборът преживява смяна на екран';
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('широкото си стои след два екрана',
+      await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)), shiroki[0]);
+    await p.click('[data-sektsiya="imoti-spisak"] .gastotata button[data-gastota="sredno"]');
+    await p.waitForTimeout(150);
+    proveri('и се връща на средното',
+      await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)),
+      visochiniPredi[0]);
+
     razdel = '75 · Зебрата · ивицата се сменя при СМЯНА НА ГРУПАТА';
     // Негово: „сиво и бяло с добър контраст за окото и СЕ РЕДУВАТ КОГАТО СЕ
     // СМЕНЯТ задачи от, в моя случай, Имот."

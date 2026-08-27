@@ -556,6 +556,44 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   line-height: 1.35;
   min-width: 720px;
 }
+/* ЕДНА ВИСОЧИНА ЗА ЦЯЛАТА ТАБЛИЦА (резен 9б · негова дума, 27.08):
+   „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ РЕДОВЕ
+   височината, ЗА КОЛОНИТЕ НЕ ВАЖИ."
+
+   Числото стои на ТАБЛИЦАТА, не на реда: така „една за всички" е свойство на
+   едно място, а не обещание, което трябва да се повтори за всеки нов ред.
+   `min-height`, не `height` — ред с повече текст расте, вместо да го отреже;
+   правило от резен 8 („височината я дава ТЕКСТЪТ") остава долната граница.
+
+   КОЛОНИТЕ НЕ СЕ ПИПАТ. Тук няма нито един `grid-template-columns` — всяка
+   таблица си остава със своите ширини (ADR-013: видът и ширината живеят в
+   колоната). */
+.tablitsa { --red-visochina: 48px; }
+.tablitsa .red { min-height: var(--red-visochina); }
+/* ДРЪЖКАТА · долните шест пиксела на реда.
+   Тя е `::after`, а не свой възел: воал-елемент върху всеки ред би застанал
+   между пръста и клетката, а клетката се редактира с двойно натискане (резен
+   „Удобството"). Псевдоелементът получава СВОЙ курсор и се вижда с очи, преди
+   да се натисне — курсорът казва „тук се дърпа", вместо човек да го открива. */
+.tablitsa .red { position: relative; }
+.tablitsa .red::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  cursor: row-resize;
+}
+
+/* ТРИТЕ ГЪСТОТИ · в главата на секцията, до стрелките за подредба. */
+.gastotata { display: inline-flex; gap: 2px; margin-left: 6px; }
+.gastotata button {
+  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
+  border-radius: 4px; padding: 1px 6px; font-size: 0.786rem; line-height: 1.4;
+  cursor: pointer;
+}
+.gastotata button:hover { background: var(--panel); color: var(--mastilo); }
+/* Отбелязаната гъстота е ЕДНА и се смята от числото (`gastotaNa`), не се пази
+   втори път — две памети за едно нещо се разминават при първото влачене. */
+.gastotata button[aria-pressed='true'] {
+  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
+}
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;
