@@ -462,6 +462,25 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('Escape го затваря · клавиатурата не остава в капан',
       Boolean(await p.$('.istoriya-karta')), false);
 
+    /**
+     * 63б · ПРИБРАНОТО СЕ ПРИБИРА НАИСТИНА (ADR-057г).
+     *
+     * Дотук тук се четеше само `hidden` — и той казваше истината за
+     * РАЗМЕТКАТА, докато на екрана редът си стоеше отворен: авторското
+     * `display: flex` бие `[hidden]` от таблицата на браузъра. Реалният екран
+     * се е разминавал с проверката от ADR-045 насам, без нито един червен тест.
+     *
+     * Състоянието се ЧЕТЕ, не се предполага: по-ранните раздели минават през
+     * този пункт и Escape също го прибира.
+     */
+    razdel = '63б · Настройките · прибраното се прибира НАИСТИНА';
+    if (await p.$eval('#nastroyki-red', (e) => !(e as any).hidden)) {
+      await p.click('#nastroyki-vhod');
+      await p.waitForFunction(() => (document.querySelector('#nastroyki-red') as any)?.hidden === true);
+    }
+    proveri('прибраният ред НЕ се вижда на екрана',
+      await p.$eval('#nastroyki-red', (e) => (e as HTMLElement).checkVisibility()), false);
+
     // ══ 70 · ПЕТТЕ ГРУПИ В ПАДАЩИЯ РЕД (негов избор, 27.08 · ADR-057б) ══════
     //
     // Шестнайсет теми в един стълб се четат като списък с покупки. Заглавието

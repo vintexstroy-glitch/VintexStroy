@@ -660,13 +660,13 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     // го хвана, проходът — не. Оттук нататък го хваща и той.
     proveri('вижда се ЕДНО от тях',
       await p.$$eval(`${grupata} button:not(.strelkichka)`,
-        (e) => e.filter((x) => (x as HTMLElement).offsetParent !== null).length), 1);
+        (e) => e.filter((x) => (x as HTMLElement).checkVisibility()).length), 1);
     proveri('и това е първото · редът, в който екранът ги е нарисувал',
       await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), false);
     proveri('другото стои в DOM-а, само скрито · слушателят му не е пипан',
       await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), true);
     proveri('и наистина не се вижда · не само по атрибут',
-      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).offsetParent === null), true);
+      await p.$eval('#butni-drayv', (e) => !(e as HTMLElement).checkVisibility()), true);
     proveri('стрелкичката КАЗВА, че носи меню',
       await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-haspopup')), 'menu');
     proveri('и че е прибрана',

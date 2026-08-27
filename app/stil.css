@@ -549,16 +549,28 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   .desno-gore button.sIkona .duma { display: none; }
   .butoni button.sIkona, .desno-gore button.sIkona { padding: 6px 9px; gap: 0; }
 }
-/* ── ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045) ────────────────── */
-.menyu-nastroyki { display: flex; flex-direction: column; gap: 2px; }
-.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 0.786rem; color: var(--mastilo2); }
-.menyu-nastroyki.otvoreno .strelka-dolu { transform: rotate(180deg); }
-.nastroyki-red {
+/* ── ПАДАЩИТЕ РЕДОВЕ В ЛЕНТАТА (И101 т.2 · ADR-045 · ADR-057в) ─────────
+   ЕДИН вид за двата реда: темите на Настройки и секциите на всеки екран.
+   Копие би се разминало при първата смяна на палитрата — обходът за чистота
+   брои точно такива копия. */
+.menyu-nastroyki, .padasht-menyu { display: flex; flex-direction: column; gap: 2px; }
+.menyu-nastroyki .strelka-dolu,
+.padasht-menyu .strelka-dolu { margin-left: auto; font-size: 0.786rem; color: var(--mastilo2); }
+.menyu-nastroyki.otvoreno .strelka-dolu,
+.padasht-menyu > [aria-expanded="true"] .strelka-dolu { transform: rotate(180deg); }
+.nastroyki-red, .padasht-red {
   display: flex; flex-direction: column; gap: 1px;
   margin: 2px 0 6px 8px; padding-left: 8px;
   border-left: 2px solid var(--liniya);
 }
-.nastroyki-red .za-kogo { margin: 2px 0 4px; }
+/* ПРИБРАНОТО СЕ ПРИБИРА НАИСТИНА.
+   `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а авторското
+   `display: flex` отгоре я бие — независимо от тежестта на селектора. Значи
+   редът СЕ Е ПРАВИЛ на прибран: атрибутът казваше „скрит", а на екрана си
+   стоеше. Това е било вярно за реда на Настройки от ADR-045 насам и не се е
+   виждало, защото и тестът, и проходът четяха АТРИБУТА, не екрана. */
+.nastroyki-red[hidden], .padasht-red[hidden] { display: none; }
+.nastroyki-red .za-kogo, .padasht-red .za-kogo { margin: 2px 0 4px; }
 /* ГРУПАТА · заглавие и темите под него (ADR-057б).
    Обвивката е `role="group"` и затова трябва СВОЙ flex: инак темите ѝ спират
    да наследяват колоната на реда и застават една до друга. */
@@ -572,15 +584,16 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   color: var(--mastilo2);
 }
 .nastroyki-red > [role="group"]:first-of-type .grupa-zaglavie { margin-top: 2px; }
-.nastroyki-red .tema {
+.nastroyki-red .tema, .padasht-red .tema {
   display: flex; align-items: flex-start; gap: 8px; text-align: left;
   background: none; border: none; border-radius: 4px; padding: 6px 8px;
   color: var(--mastilo); font-family: inherit; font-size: 0.893rem;
 }
-.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible { background: var(--panel); }
+.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible,
+.padasht-red .tema:hover, .padasht-red .tema:focus-visible { background: var(--panel); }
 .nastroyki-red .tema .ikona { margin-top: 2px; color: var(--mastilo2); }
-.nastroyki-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.nastroyki-red .dvete b { font-weight: 600; }
+.nastroyki-red .dvete, .padasht-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nastroyki-red .dvete b, .padasht-red .dvete b { font-weight: 600; }
 
 /* Темата, до която редът те е завел · подчертава се за миг, за да се види
    къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */

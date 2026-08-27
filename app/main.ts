@@ -39,6 +39,7 @@ import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
+import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -135,6 +136,20 @@ let hranilishte: SastoyanieNaHranilishteto = {
   zaeto: -1,
   pozvoleno: -1,
 };
+/**
+ * ОТВАРЯ ЕКРАН · един дом, два викащи.
+ *
+ * Падащите редове (темите на Настройки и секциите на всеки екран) не знаят кой
+ * екран е отворен и не бива да научават: те казват КЪДЕ да се отиде, а пътят
+ * дотам е един. Дотук този път беше вписан вътре в закачането на Настройки и
+ * вторият викащ щеше да си направи копие. Живее ТУК, до самото `ekran` —
+ * единственото място, което го мени.
+ */
+async function otvoriEkran(koy: string): Promise<void> {
+  ekran = koy as KoyEkran;
+  zapomniEkranno('ekran', ekran);
+}
+
 let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
 let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
 
@@ -789,6 +804,10 @@ async function trugvay(): Promise<void> {
     // пипа бутоните вътре в тях — обратният ред би свивал възли, които после
     // се местят.
     zakachiGrupite(koren, ekran);
+    // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с повече от три
+    // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
+    // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
+    zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }
@@ -934,10 +953,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   // ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045). Отварянето на екран е
   // подадено, а не вградено: компонентът не знае кой екран е отворен и не бива
   // да научава — той води до ТЕМА, а къде живее тя, казва домейнът.
-  zakachiMenyutoNaNastroykite(koren, prerisuvay, async (koy) => {
-    ekran = koy as KoyEkran;
-    zapomniEkranno('ekran', ekran);
-  });
+  zakachiMenyutoNaNastroykite(koren, prerisuvay, otvoriEkran);
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
     const sabitiya = await k.dnevnik.chetiVsichki(veriga);

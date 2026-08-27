@@ -114,6 +114,10 @@ async function main(): Promise<void> {
     await infrastruktura.blok4(ctx);
     await mnogotoVerigi.blok2(ctx);
     await infrastruktura.blok5(ctx);
+    // §71 стои НАКРАЯ нарочно: обхожда лентата, отваря редове и мени екрана,
+    // а дотогава всеки друг блок вече си е взел своето. Блок, който мести
+    // състояние под следващия, е по-скъп от липсващ.
+    await menyuta.blok4(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

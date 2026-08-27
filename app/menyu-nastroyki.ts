@@ -25,6 +25,7 @@
 
 import { ekraniraj } from './obshto.js';
 import { otvoriProzorets } from './prozorets.js';
+import { zavediDoSektsiyata } from './menyu-ekran.js';
 import { ikona } from './ikoni.js';
 import {
   IMENA_NA_GLEDASHTITE,
@@ -175,18 +176,9 @@ export function zakachiMenyutoNaNastroykite(
         vhod.setAttribute('aria-expanded', 'false');
         return;
       }
-      await otvoriEkran(tema.kade.ekran);
-      await prerisuvay();
-      // СЛЕД прерисуването: старият възел вече го няма, а новият още не е
-      // намерен. Търси се в живия документ, не в стария корен.
-      const tsel = document.querySelector<HTMLElement>(
-        `[data-sektsiya="${CSS.escape(tema.kade.sektsiya)}"]`,
-      );
-      if (tsel) {
-        tsel.scrollIntoView({ block: 'start' });
-        tsel.classList.add('podchertana');
-        setTimeout(() => tsel.classList.remove('podchertana'), 1600);
-      }
+      // ЕДИН дом на похвата „заведи и подчертай за миг" (`menyu-ekran.ts`):
+      // редът на секциите прави същото и копие тук би се разминало.
+      await zavediDoSektsiyata(tema.kade.ekran, tema.kade.sektsiya, otvoriEkran, prerisuvay);
     });
   }
 }

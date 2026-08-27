@@ -274,3 +274,86 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // ЕКРАНА, че пречките се четат с думи и че вписаните данни МАХАТ своята
     // пречка — тоест че екранът и домейнът гледат едно и също число.
 }
+
+/**
+ * 71 · Падащият ред на екрана · секциите в лентата (ADR-057в)
+ *
+ * Негови думи: „Отляво където са изредени табовете искам **когато има секции
+ * вътре да ги подредиш в падащо меню**."
+ *
+ * Проверява се и ГРАНИЦАТА, и ЦЕНАТА: екран с три секции няма ред (три реда в
+ * меню са повече работа от превъртането), а списъкът се чете от ЕКРАНА, значи
+ * работи от другаде чак след като екранът е бил отварян веднъж.
+ */
+export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '71 · Падащият ред на екрана · кой пункт го получава';
+
+    // Сметки е най-натовареният екран · дотук е бил отварян много пъти, значи
+    // паметта му е пълна и редът работи ОТ ДРУГАДЕ.
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('Сметки носи падащ ред, макар да стоим на Имоти',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=smetki]')), true);
+    proveri('и Имоти също · пет секции е повече от три',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=imoti]')), true);
+    // ГРАНИЦАТА: три реда в меню са повече работа от превъртането.
+    proveri('Гант НЯМА · три секции не правят меню',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=gant]')), false);
+    proveri('Настройки пази СВОЯ ред · теми, не секции',
+      Boolean(await p.$('.menyu-nastroyki #nastroyki-red')), true);
+
+    razdel = '71 · Падащият ред на екрана · какво изрежда';
+    const vhodSmetki = '.padasht-menyu > [data-ekran=smetki]';
+    proveri('пунктът КАЗВА, че носи ред', await p.$eval(vhodSmetki, (e) => e.getAttribute('aria-expanded')), 'false');
+    await p.click(vhodSmetki);
+    await p.waitForSelector('#ekran-red-smetki:not([hidden])');
+    proveri('и се отваря', await p.$eval(vhodSmetki, (e) => e.getAttribute('aria-expanded')), 'true');
+    const redove = await p.$$eval('#ekran-red-smetki [data-kam-sektsiya]', (e) => e.length);
+    proveri('изрежда секциите на Сметки · повече от десет', redove > 10, true);
+    proveri('и всяка носи ИМЕТО си, не ключа',
+      await p.$eval('#ekran-red-smetki [data-kam-sektsiya="smetki-dds"] b', (e) => e.textContent!.trim()),
+      'ДДС');
+
+    razdel = '71 · Падащият ред на екрана · води до секцията';
+    // Подчертаването живее 1,6 секунди и си отива само — чака се да се появи,
+    // вместо да се чете след прерисуването.
+    await p.click('#ekran-red-smetki [data-kam-sektsiya="smetki-dds"]');
+    // ПЪРВО се чака СМЯНАТА на екрана, чак после белегът. Сметки е най-тежкият
+    // екран и рисуването му изяжда кадрите; чакането направо за белега тръгва
+    // да брои, докато екранът още се строи, и изпуска мига, в който белегът
+    // стои (той живее 1,6 секунди и си отива сам).
+    // Чака се СЪС СВОЙ такт (50 ms), не по кадри: Сметки е най-тежкият екран и
+    // рисуването му изяжда кадрите, а белегът живее 1,6 секунди и си отива сам.
+    // Чакане по кадри тук изпуска точно мига, в който белегът стои.
+    await p.waitForSelector('[data-sektsiya=smetki-dds]');
+    await p.waitForFunction(
+      () => document.querySelector('[data-sektsiya=smetki-dds]')?.classList.contains('podchertana'),
+      undefined,
+      { polling: 50 },
+    );
+    proveri('заведе на Сметки', await p.$eval('.navred.tuk', (e) => e.getAttribute('data-ekran')), 'smetki');
+    proveri('и ПОДЧЕРТА секцията, за да се види къде е стигнало окото', true, true);
+    // МЕРИ СЕ ЕКРАНЪТ, не атрибутът · виж §63 и ADR-057г.
+    proveri('а редът се прибра след избора · и наистина не се вижда',
+      await p.$eval('#ekran-red-smetki', (e) => !(e as HTMLElement).checkVisibility()), true);
+    proveri('и НИКОЙ друг ред не е останал отворен',
+      await p.$$eval('.ekran-red', (e) => e.filter((x) => (x as HTMLElement).checkVisibility()).length), 0);
+
+    razdel = '71 · Падащият ред на екрана · Escape не оставя капан';
+    // Натискането на пункт върши ДВЕ неща: завежда И отваря реда. Изчаква се
+    // прерисуването, преди да се натисне Escape — инак проходът натиска, докато
+    // старата лента още се сменя, и фокусът пада на `body` не заради грешка, а
+    // защото възелът под пръста вече го няма. Човек не пише толкова бързо.
+    await deystvieSPrerisuvane(p, () => p.click('.padasht-menyu > [data-ekran=imoti]'));
+    await p.waitForSelector('#ekran-red-imoti:not([hidden])');
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => (document.querySelector('#ekran-red-imoti') as HTMLElement).hidden);
+    proveri('Escape затваря реда · мери се екранът, не атрибутът',
+      await p.$eval('#ekran-red-imoti', (e) => !(e as HTMLElement).checkVisibility()), true);
+    proveri('и фокусът се връща на пункта',
+      await p.evaluate(() => document.activeElement?.getAttribute('data-ekran')), 'imoti');
+    await naEkran(p, 'imoti', '#forma-imot');
+}
