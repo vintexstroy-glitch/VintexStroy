@@ -60,6 +60,7 @@ import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { zakachiKlaviatura } from './klaviatura.js';
 import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
+import { zakachiZebrata } from './zebra.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
@@ -812,6 +813,10 @@ async function trugvay(): Promise<void> {
     // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
     zakachiSvivachaNaLentata(koren, prerisuvay);
     prilozhiSkritite(koren);
+    // ЗЕБРАТА е ПОСЛЕДНА: тя брои РЕДОВЕТЕ, а скритите колони и подредбата
+    // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
+    // на редове, които после се местят.
+    zakachiZebrata(koren);
     zakachiGlavnite(k, prerisuvay);
   }
 

@@ -273,6 +273,19 @@
   --mastilo: #2A2521;
   --mastilo2: #6E645B;
   --liniya: #E3DACE;
+  /* ЗЕБРАТА И ПОСОЧЕНИЯТ РЕД · измерени, не подбрани на око (резен 9в).
+     Негово: „сиво и бяло с ДОБЪР КОНТРАСТ за окото".
+
+       зебра ↔ бяло          1,136 : 1   ивицата се вижда
+       посочен ↔ бяло        1,274 : 1   (беше 1,03 — практически невидим)
+       посочен ↔ зебра       1,122 : 1   личи и върху ивица
+       мастило2 върху зебра  5,08  : 1   AA
+       мастило2 върху посочен 4,53 : 1   AA
+
+     ЗЕБРАТА НЕ Е `--panel`. Панелът вече значи „това е глава, сбор или шапка
+     на група"; ивица със същия тон би откраднала точно това. */
+  --zebra: #F4F0E9;
+  --posochen: #EAE3D8;
   --aktsent: #B25E38;
   --aktsent-tumen: #8E4526;
   --zeleno: #2E7D5E;
@@ -283,6 +296,12 @@
      2 дниу свети в червено." Тези четири не са палитра — те са правило. */
   --srok-normalno: #7A9E8E;
   --srok-zhalto: #C99A2E;
+  /* ЖЪЛТОТО ИМА ДВЕ ЛИЦА, защото има две задачи (резен 9в).
+     `--srok-zhalto` пълни ЛЕНТАТА и си остава негово. Като ТЕКСТ върху бяло
+     обаче то дава 2,58 : 1 — пада и AA (4,5), и дори 3 : 1. Затова текстът
+     получава свой, по-тъмен тон: 5,33 : 1 върху бяло, 4,65 върху панела.
+     Прагът не е избран — той е записан и се ПЕЧАТА от прохода. */
+  --srok-zhalto-tekst: #8C6408;
   --srok-cherveno: #C0442A;
   --srok-prosrocheno: #8E2A16;
   /* „всички проекти с един цвят тъмно графитено" (р52·[221]) */
@@ -521,7 +540,6 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .glava > :first-child, .red > :first-child { position: sticky; left: 0; z-index: 1; }
 .glava > :first-child { background: var(--panel); }
 .red > :first-child { background: #FFFFFF; }
-.red:hover > :first-child { background: #FDFBF7; }
 .glava, .red {
   display: grid;
   /* `justify-content: start` е ЗАДЪЛЖИТЕЛЕН след капването на fr → px:
@@ -545,7 +563,11 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .red { border-bottom: 1px solid #EFE8DD; }
 .red:last-child { border-bottom: none; }
-.red:hover { background: #FDFBF7; }
+/* ЗЕБРАТА стои ПРЕДИ посочването и преди `.red.sbor` НАРОЧНО: така смисловият
+   цвят я надвива сам, по ред на правилата, без нито един `!important`.
+   Ивица, която гаси предупреждение, е по-лоша от липсваща. */
+.red.zebra, .red.zebra > :first-child { background: var(--zebra); }
+.red:hover, .red:hover > :first-child { background: var(--posochen); }
 /* ТЯСНАТА КОЛОНА ПРЕНАСЯ НА НОВ РЕД, не реже с многоточие (негова дума):
    „ако колоната е тясна минава на следваш ред". Многоточието СКРИВА текст и
    не казва колко — а в счетоводна книга отрязаното име на доставчик изглежда
@@ -1313,13 +1335,18 @@ table.razbivka .drebno { font-size: 0.75rem; }
   height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
   border-bottom: 1px solid var(--liniya); font-size: 0.893rem;
 }
-/* „задачите с редуващи се цветове, бял и светло сив, за да се открояват" */
-.gant-delo:nth-of-type(even) { background: var(--panel); }
+/* „задачите с редуващи се цветове, бял и светло сив, за да се открояват"
+   *(р52·[221] · 08.08)*, а ивицата се сменя при СМЯНА НА МЯСТОТО *(27.08)*.
+   Дотук тук стоеше `:nth-of-type(even)` — и беше счупена: `nth-of-type` брои
+   по ТИП елемент, а в лентата с имената децата са смесени (глава, шапки на
+   Места, дела), значи паритетът се местеше и редуването излизаше с произволна
+   фаза. Кой ред носи ивица, решава `app/zebra.ts`. */
+.gant-delo.zebra { background: var(--zebra); }
 .gant-delo.poddelo { padding-left: 34px; font-size: 0.857rem; }
 .gant-delo b { font-weight: 500; }
 .gant-delo .drebno { margin-left: auto; white-space: nowrap; }
 /* „С Удебелен Проекта и Задачите с по налък шрифт и не удебеллени" (р48·[99]) */
-.gant-delo.zhalto b { color: var(--srok-zhalto); }
+.gant-delo.zhalto b { color: var(--srok-zhalto-tekst); }
 .gant-delo.cherveno b { color: var(--srok-cherveno); }
 .gant-delo.prosrocheno b { color: var(--srok-prosrocheno); font-weight: 600; }
 .sgavach {

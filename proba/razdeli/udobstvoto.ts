@@ -833,6 +833,79 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollTop = 0;
     });
 
+    razdel = '75 · Зебрата · ивицата се сменя при СМЯНА НА ГРУПАТА';
+    // Негово: „сиво и бяло с добър контраст за окото и СЕ РЕДУВАТ КОГАТО СЕ
+    // СМЕНЯТ задачи от, в моя случай, Имот."
+    //
+    // КОНТРАСТЪТ СЕ МЕРИ В БРАУЗЪРА, не се преписва от CSS: правилото може да
+    // е вярно и пак да не стига до реда (`[hidden]` вече ни го показа два
+    // пъти — ADR-057). Затова числата се смятат от НАРИСУВАНИТЕ цветове.
+    const kontrast = await p.evaluate(() => {
+      const svetlina = (tsvyat: string): number => {
+        const [r, g, b] = tsvyat.match(/\d+/g)!.slice(0, 3).map((n) => Number(n) / 255);
+        const p2 = (x: number): number => (x <= 0.03928 ? x / 12.92 : ((x + 0.055) / 1.055) ** 2.4);
+        return 0.2126 * p2(r!) + 0.7152 * p2(g!) + 0.0722 * p2(b!);
+      };
+      const k = (a: string, b: string): number => {
+        const [x, y] = [svetlina(a), svetlina(b)];
+        return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+      };
+      const st = getComputedStyle(document.documentElement);
+      const zebra = st.getPropertyValue('--zebra').trim();
+      const kam = (c: string): string => {
+        const d = document.createElement('div');
+        d.style.color = c;
+        document.body.append(d);
+        const v = getComputedStyle(d).color;
+        d.remove();
+        return v;
+      };
+      return {
+        zebraKamByalo: Math.round(k(kam(zebra), 'rgb(255,255,255)') * 1000) / 1000,
+        mastiloVarhuZebra: Math.round(k(kam(st.getPropertyValue('--mastilo2').trim()), kam(zebra)) * 100) / 100,
+        zhaltoVarhuByalo:
+          Math.round(k(kam(st.getPropertyValue('--srok-zhalto-tekst').trim()), 'rgb(255,255,255)') * 100) / 100,
+      };
+    });
+    console.log(
+      `\n  КОНТРАСТ: зебра↔бяло ${kontrast.zebraKamByalo} · мастило2 върху зебра ` +
+        `${kontrast.mastiloVarhuZebra} (праг 4,5) · жълт текст ${kontrast.zhaltoVarhuByalo} (праг 4,5)\n`,
+    );
+    proveri('ивицата се вижда · зебрата не е бяло', kontrast.zebraKamByalo > 1.08, true);
+    proveri('текстът върху ивицата минава AA', kontrast.mastiloVarhuZebra >= 4.5, true);
+    // Жълтото като ТЕКСТ падаше на 2,58 — под AA и под 3:1. Лентата си остава
+    // с неговия цвят; текстът получи свой, по-тъмен тон.
+    proveri('жълтият ТЕКСТ на светофара минава AA', kontrast.zhaltoVarhuByalo >= 4.5, true);
+
+    // ИВИЦАТА СЛЕДВА ГРУПАТА · в Управление редовете са групирани по Място.
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const ivitsi = await p.$eval('.gant-imena', (t) => {
+      const out: { grupa: string; zebra: boolean }[] = [];
+      let grupa = '';
+      for (const e of t.children) {
+        if (e.classList.contains('gant-myasto')) { grupa = e.textContent!.trim(); continue; }
+        if (!e.classList.contains('gant-delo')) continue;
+        out.push({ grupa, zebra: e.classList.contains('zebra') });
+      }
+      return out;
+    });
+    // Вътре в едно Място ивицата е ЕДНА И СЪЩА — тъкмо разликата от `nth-child`.
+    const poGrupi = new Map<string, Set<boolean>>();
+    for (const r of ivitsi) {
+      if (!poGrupi.has(r.grupa)) poGrupi.set(r.grupa, new Set());
+      poGrupi.get(r.grupa)!.add(r.zebra);
+    }
+    proveri('вътре в едно Място ивицата НЕ се мени',
+      [...poGrupi.values()].every((v) => v.size === 1), true);
+    proveri('и има поне две Места, за да има какво да се редува',
+      poGrupi.size >= 2, true);
+    // Съседните места носят РАЗЛИЧНИ ивици.
+    const redNaGrupite = [...new Set(ivitsi.map((r) => r.grupa))];
+    proveri('съседните Места носят различни ивици',
+      redNaGrupite.every((g, i) =>
+        i === 0 || [...poGrupi.get(g)!][0] !== [...poGrupi.get(redNaGrupite[i - 1]!)!][0]), true);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     razdel = '74 · Плочките · числото и думата на ЕДИН ред';
     // Негови думи: „полетата където дават цифри… с текста НЕ над и под цифрата
     // а да е ДО… и да не закриват важността на информацията долу."
