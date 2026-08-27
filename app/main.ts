@@ -63,6 +63,7 @@ import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiZebrata } from './zebra.js';
 import { zakachiVisochinata } from './visochina.js';
 import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
+import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
@@ -824,6 +825,7 @@ async function trugvay(): Promise<void> {
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
     // на редове, които после се местят.
     zakachiGoleminata(koren);
+    zakachiIzgledaNaGanta(koren);
     zakachiVisochinata(koren);
     zakachiZebrata(koren);
     zakachiGlavnite(k, prerisuvay);

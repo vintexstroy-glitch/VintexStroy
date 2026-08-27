@@ -563,7 +563,10 @@ export function formaDelo(
 export function slozhiShirinite(koren: HTMLElement): void {
   for (const gant of koren.querySelectorAll<HTMLElement>('.gant')) {
     const broy = Number(gant.dataset.koloni ?? 0);
-    gant.style.setProperty('--vreme', `repeat(${broy}, minmax(34px, 1fr))`);
+    // СТАНДАРТНА ширина, не разтеглива (резен 12): `1fr` разпъваше колоните да
+    // напълнят мястото и оставяше хоризонталния скрол без какво да скролва.
+    // Числото идва от `--kolona`, което `gant-izgled.ts` мени с влачене.
+    gant.style.setProperty('--vreme', `repeat(${broy}, var(--kolona, 34px))`);
   }
   for (const l of koren.querySelectorAll<HTMLElement>('.gant-lenta')) {
     l.style.setProperty('--ot', String(l.dataset.ot ?? 1));

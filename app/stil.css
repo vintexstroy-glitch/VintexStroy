@@ -1145,18 +1145,46 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 0.857rem; }
 
 /* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
+/* ПОДВИЖНАТА ГРАНИЦА между таблицата и диаграмата (резен 12 · негова дума,
+   27.08): „Диаграмата се вижда 2 ТРЕТИ от екрана, и също границата между
+   таблицата и диаграмата до нея СЕ МЕСТИ С МИШКАТА."
+
+   `--dyal` е колко от ширината взима ДИАГРАМАТА. Подразбраното е 2/3 — по-късна
+   дума от „при старт е разделено на 2" (ADR-018 §4 · правило 28). */
 .gant-dvete {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  --dyal: 0.667;
+  grid-template-columns: minmax(0, calc((100% - 20px) * (1 - var(--dyal)))) 6px minmax(0, 1fr);
+  gap: 7px;
   align-items: start;
 }
 .gant-dvete.bez-diagrama { grid-template-columns: minmax(0, 1fr); }
+.gant-dvete.bez-diagrama .gant-granitsa { display: none; }
+/* Дръжката е СВОЙ възел, защото стои МЕЖДУ двете половини, в процепа — няма чий
+   ръб да заеме. При реда беше обратното (резен 9б): там воал върху реда би
+   застанал между пръста и клетката. */
+.gant-granitsa {
+  align-self: stretch; min-height: 120px; border-radius: 3px;
+  background: var(--liniya); cursor: col-resize;
+}
+.gant-granitsa:hover, .gant-granitsa:focus-visible {
+  background: var(--aktsent); outline: none;
+}
 .gant-tablitsata, .gant-diagramata { min-width: 0; }
-/* На тесен екран двете една до друга не се четат — падат една под друга,
-   таблицата първа, защото тя носи числата. */
+/* НА ТЕСЕН ЕКРАН · неговите ДВА режима, не един (27.08): „на телефона
+   диаграмата може да я пускаш в този режим на 1/3 ИЛИ ДА Я СКРИЕШ".
+
+   Затова тук двете НЕ падат една под друга: диаграмата стои до таблицата на
+   една трета, а другият режим е бутонът „Скрий диаграмата", който вече го има.
+   Дръжката се прибира — на тесен екран съотношението е заковано на неговото
+   число, а не се влачи с пръст върху шест пиксела. */
 @media (max-width: 1100px) {
-  .gant-dvete { grid-template-columns: minmax(0, 1fr); }
+  .gant-dvete {
+    --dyal: 0.333;
+    grid-template-columns: minmax(0, calc((100% - 7px) * (1 - var(--dyal)))) minmax(0, 1fr);
+    gap: 7px;
+  }
+  .gant-granitsa { display: none; }
 }
 
 /* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
@@ -1387,7 +1415,24 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mastilo2);
 }
+/* КОЛОНАТА Е СТАНДАРТНА, не разтеглива (резен 12 · негова дума, 27.08): „да
+   запази ЕДНА СТАНДАРТНА КОЛОНА като ширина в диаграмата, и там ако местиш
+   една колона местиш ширината на ВСИЧКИ колони".
+
+   Дотук беше `repeat(N, minmax(34px, 1fr))`. `1fr` значи РАЗТЯГАНЕ: при такт
+   „година" дванайсетте колони се разпъват да напълнят мястото, и хоризонтален
+   скрол НЯМА КАКВО да скролва. Тоест „стандартна колона" и „скрол за периода"
+   се чупеха от една и съща дума.
+
+   „Местиш една, местиш всички" излиза ДАРОМ: числото е ЕДНО, на решетката. */
+.gant { --kolona: 34px; }
 .gant-glava-vreme { display: grid; grid-template-columns: var(--vreme); padding: 0; }
+/* Десните шест пиксела на всяка глава са дръжка · курсорът го КАЗВА. */
+.gant-glava-vreme span { position: relative; }
+.gant-glava-vreme span::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 6px;
+  cursor: col-resize;
+}
 .gant-glava-vreme span {
   display: flex; align-items: center; justify-content: center;
   font-size: 0.75rem; border-left: 1px solid var(--liniya); white-space: nowrap;

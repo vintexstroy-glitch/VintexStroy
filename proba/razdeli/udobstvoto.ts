@@ -833,6 +833,61 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollTop = 0;
     });
 
+    razdel = '78 · Гантът · подвижната граница и стандартната колона';
+    // Негово, 27.08: „Диаграмата се вижда 2 ТРЕТИ от екрана и също границата
+    // между таблицата и диаграмата до нея СЕ МЕСТИ С МИШКАТА." И: „да запази
+    // ЕДНА СТАНДАРТНА КОЛОНА като ширина… ако местиш една колона местиш
+    // ширината на ВСИЧКИ колони."
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('границата е СВОЙ възел, с роля за четеца',
+      await p.$eval('.gant-granitsa', (e) => e.getAttribute('role')), 'separator');
+
+    const dyalat = async (): Promise<number> => {
+      const [tabl, diag] = await p.$eval('.gant-dvete', (e) => {
+        const d = [...e.children].filter((x) => !x.classList.contains('gant-granitsa'));
+        return [d[0]!.getBoundingClientRect().width, d[1]!.getBoundingClientRect().width];
+      });
+      return Math.round((diag! / (tabl! + diag!)) * 100) / 100;
+    };
+    const dyalPredi = await dyalat();
+    console.log(`\n  ДЯЛ НА ДИАГРАМАТА: ${dyalPredi} · неговото число е 0,67\n`);
+    proveri('диаграмата е около ДВЕ ТРЕТИ', Math.abs(dyalPredi - 0.667) < 0.06, true);
+
+    // ГРАНИЦАТА СЕ МЕСТИ · клавиатурата е достатъчна и е по-устойчива от влачене.
+    //
+    // БЕЗ `deystvieSPrerisuvane`: стрелката мени САМО променлива на стила и не
+    // прерисува екрана — чакане за прерисуване тук виси до край. Лост, който не
+    // пипа Журнала, няма защо да прерисува (ADR-022: погледът не е факт).
+    await p.focus('.gant-granitsa');
+    await p.keyboard.press('ArrowLeft');
+    await p.waitForTimeout(150);
+    const dyalSled = await dyalat();
+    proveri('стрелка наляво прави диаграмата ПО-ГОЛЯМА', dyalSled > dyalPredi, true);
+    // ПРЕЖИВЯВА ЛИ · сега наистина се сменя екран и се връща.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('и съотношението преживява смяна на екран',
+      Math.abs((await dyalat()) - dyalSled) < 0.02, true);
+
+    razdel = '78 · Гантът · колоната е СТАНДАРТНА, не разтеглива';
+    // `1fr` разпъваше колоните да напълнят мястото — и хоризонталният скрол
+    // нямаше какво да скролва. Мери се, че всички колони са ЕДНАКВИ и че
+    // ширината идва от ЕДНО число.
+    const koloni = await p.$$eval('.gant-glava-vreme span', (se) =>
+      se.map((e) => Math.round(e.getBoundingClientRect().width)));
+    proveri('времевата ос има колони', koloni.length > 1, true);
+    proveri('и ВСИЧКИ са с една и съща ширина · едно число за всички',
+      new Set(koloni).size, 1);
+    proveri('ширината идва от ЕДНА променлива на решетката',
+      (await p.$eval('.gant', (e) => getComputedStyle(e).getPropertyValue('--kolona'))).trim(),
+      '34px');
+    // И ХОРИЗОНТАЛНИЯТ СКРОЛ · негово „скрол за хоризонталния период".
+    proveri('времевата ос скролва хоризонтално',
+      await p.$eval('.gant-vreme', (e) => getComputedStyle(e).overflowX), 'auto');
+    proveri('а имената НЕ скролват с нея · остават на място',
+      await p.$eval('.gant-imena', (e) => getComputedStyle(e).overflowX), 'hidden');
+    await naEkran(p, 'imoti', '#forma-imot');
+
     razdel = '77 · Семействата хедъри · еднаквите застават една до друга';
     // Негово, 27.08: таблиците с еднакви хедъри се подреждат една до друга —
     // „като СОРТИРАНЕ". И от 08.08 (р70·[32]): „хедърите от еднаквите таблици…
