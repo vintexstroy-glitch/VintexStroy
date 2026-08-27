@@ -435,15 +435,45 @@ button { font-family: inherit; cursor: pointer; }
 a.kato-buton { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* ── плочки ──────────────────────────────────────────────────────── */
-.plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+/* ── ОБОБЩЕНИТЕ ЧИСЛА · числото и думата на ЕДИН ред (ADR-058 §Б) ──────────
+   Негови думи: „полетата където дават цифри… да са по ниски, с текста НЕ над и
+   под цифрата, А ДА Е ДО. Тогава няма да има празни пространства… да се събират
+   повече на ред… и да НЕ ЗАКРИВАТ важността на информацията долу."
+
+   Плочката е капната на 240px и редът НЕ се разтяга (`justify-content: start`)
+   — същият урок като при таблиците в резен 3: `1fr` разтяга пътеките и прави
+   от четири плочки четири широки петна вместо шест събрани. */
+.plochki {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+  justify-content: start; gap: 10px;
+}
+/* Числото ВЛЯВО, етикетът и подтекстът вдясно един под друг · три реда стават
+   един. Разметката на 68-те плочки не се пипа: и трите деца си стоят както са,
+   само мястото им се сменя. */
 .plochka {
   background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px;
-  padding: var(--space-sm) var(--space-md) var(--space-sm); display: flex; flex-direction: column; gap: 6px;
+  padding: 6px 10px;
+  display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  grid-template-areas: "chislo etiket" "chislo pod";
+  align-items: center; column-gap: 10px; row-gap: 0;
+}
+.plochka > .etiket { grid-area: etiket; }
+.plochka > .chislo { grid-area: chislo; }
+.plochka > .pod { grid-area: pod; }
+/* ДУМА, НЕ ЧИСЛО · плочките на Таблото носят име, имейл и роля в мястото на
+   числото (`.chislo.malak`). Дума до дума не се чете — там трите реда си
+   остават един под друг. Той каза „полетата където дават ЦИФРИ", и това е
+   точно границата, не изключение от нея. */
+.plochka:has(> .chislo.malak) {
+  display: flex; flex-direction: column; gap: 2px;
 }
 .etiket { font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+/* Числото слиза от 1,929rem: то е ОБОБЩЕНИЕ, а важното стои в таблицата отдолу
+   (негова дума). Мащабът си остава `rem`-базиран (резен 1), значи следва
+   настройката на устройството — числото расте с текста, не отделно от него. */
 .chislo {
-  font-family: Literata, Georgia, serif; font-size: 1.929rem; font-weight: 600;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05;
+  font-family: Literata, Georgia, serif; font-size: 1.5rem; font-weight: 600;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1;
 }
 .pod { font-size: 0.857rem; color: var(--mastilo2); }
 

@@ -789,4 +789,30 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и се връща разтворена',
       await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
     await naEkran(p, 'imoti', '#forma-imot');
+
+    razdel = '74 · Плочките · числото и думата на ЕДИН ред';
+    // Негови думи: „полетата където дават цифри… с текста НЕ над и под цифрата
+    // а да е ДО… и да не закриват важността на информацията долу."
+    // Прагът е 72, не 60: височината зависи от СЪДЪРЖАНИЕТО — дълъг подтекст
+    // („начислено · €" под „МЕСЕЧЕН НАЕМ") се пренася на втори ред в капнатите
+    // 240px и плочката става 66 вместо 49. Това не е разхлабване: беше над 90,
+    // а истинският сигнал е ПЕЧАТАНОТО число, не прагът.
+    const plochka = await p.$eval('.plochka', (e) => Math.round(e.getBoundingClientRect().height));
+    console.log(`\n  ВИСОЧИНА НА ПЛОЧКА: ${plochka}px · праг 72\n`);
+    proveri('плочката е ниска · под прага си', plochka <= 72, true);
+    // ЧИСЛОТО И ЕТИКЕТЪТ СА ЕДИН ДО ДРУГ, не един под друг: мери се дали
+    // етикетът почва ВДЯСНО от числото, не под него.
+    proveri('етикетът стои ВДЯСНО от числото, не под него',
+      await p.$eval('.plochka', (e) => {
+        const ch = e.querySelector('.chislo')!.getBoundingClientRect();
+        const et = e.querySelector('.etiket')!.getBoundingClientRect();
+        return et.left >= ch.right - 1;
+      }), true);
+    // ДА НЕ ЗАКРИВАТ ВАЖНОТО ОТДОЛУ · мярка, не усещане: под една трета екран.
+    const lentata = await p.$eval('.plochki', (e) => e.getBoundingClientRect().height);
+    proveri('редът плочки заема под една трета от екрана',
+      lentata < (await p.evaluate(() => innerHeight)) / 3, true);
+    proveri('и не се разтяга · плочката е капната',
+      await p.$eval('.plochka', (e) => Math.round(e.getBoundingClientRect().width) <= 240), true);
+
 }
