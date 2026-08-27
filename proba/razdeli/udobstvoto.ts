@@ -790,6 +790,49 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
     await naEkran(p, 'imoti', '#forma-imot');
 
+    razdel = '75 · Хедърът се ЗАДЪРЖА · една скролираща кутия на екран';
+    // Негово: „Хедърите също при скрол трябваше да се задържат."
+    //
+    // МЕРИ СЕ СТАБИЛНОСТ, не абсолютна позиция. Главата се лепи на върха на
+    // СЪДЪРЖАНИЕТО на тялото (след подложката му), значи числото ѝ не е върхът
+    // на тялото — но е ЕДНО И СЪЩО при два различни скрола. Проверка по
+    // абсолютна позиция би паднала при първата смяна на подложката.
+    proveri('таблицата НЯМА свой скрол · кутията е една',
+      await p.$eval('.tablitsa', (e) => {
+        const st = getComputedStyle(e);
+        return `${st.overflowX}/${st.overflowY}`;
+      }), 'visible/visible');
+    proveri('скролиращата кутия е ТЯЛОТО',
+      await p.$eval('.telo', (e) => getComputedStyle(e).overflowY), 'auto');
+    // Страницата НЕ скролва — инак главата пак си отива с нея. Лентата има
+    // свой скрол точно затова: при десет пункта тя надхвърля екрана и БУТАШЕ
+    // страницата (премерено 1003px при видими 900).
+    proveri('страницата НЕ скролва · нищо не бута тялото',
+      await p.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), true);
+
+    const glavataPri = async (kolko: number): Promise<number> => {
+      await p.$eval('.telo', (e, s2) => { (e as HTMLElement).scrollTop = s2 as number; }, kolko);
+      await p.waitForTimeout(120);
+      return p.$eval('.tablitsa .glava', (e) => Math.round(e.getBoundingClientRect().top));
+    };
+    const glavaA = await glavataPri(900);
+    const glavaB = await glavataPri(1300);
+    console.log(`\n  ГЛАВАТА при скрол 900 → ${glavaA}px · при 1300 → ${glavaB}px\n`);
+    proveri('главата стои на едно и също място при два различни скрола', glavaA, glavaB);
+
+    const parvataPri = async (kolko: number): Promise<number> => {
+      await p.$eval('.telo', (e, s2) => { (e as HTMLElement).scrollLeft = s2 as number; }, kolko);
+      await p.waitForTimeout(120);
+      return p.$eval('.red', (r) => Math.round(r.firstElementChild!.getBoundingClientRect().left));
+    };
+    const parvaA = await parvataPri(200);
+    const parvaB = await parvataPri(600);
+    proveri('и първата колона остава замразена настрани', parvaA, parvaB);
+    await p.$eval('.telo', (e) => {
+      (e as HTMLElement).scrollLeft = 0;
+      (e as HTMLElement).scrollTop = 0;
+    });
+
     razdel = '74 · Плочките · числото и думата на ЕДИН ред';
     // Негови думи: „полетата където дават цифри… с текста НЕ над и под цифрата
     // а да е ДО… и да не закриват важността на информацията долу."

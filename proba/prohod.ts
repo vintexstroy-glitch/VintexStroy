@@ -138,6 +138,26 @@ async function main(): Promise<void> {
       .evaluate(() => document.getElementById('ekran')?.innerText?.slice(0, 300) ?? 'няма екран')
       .catch(() => 'екранът не се чете');
     console.log(`\n  НА ЕКРАНА В МИГА НА СПЪВАНЕТО:\n  ${naEkrana.replace(/\n/g, '\n  ')}\n`);
+
+    // НАСЛОЕНОТО · менютата и прозорците висят на `body`, ИЗВЪН `#ekran`.
+    // Дъмпът горе не ги вижда, и точно затова „менюто го няма" изглеждаше
+    // еднакво с „менюто е там, но е празно". Платено с един пуск на прохода.
+    const nasloeno = await p
+      .evaluate(() =>
+        [...document.body.children]
+          .filter((e) => e.id !== 'ekran')
+          .map((e) => {
+            const r = e.getBoundingClientRect();
+            return `${e.tagName.toLowerCase()}.${e.className || '—'} · ${Math.round(r.width)}×${Math.round(
+              r.height,
+            )} на ${Math.round(r.left)},${Math.round(r.top)} · ${(e as HTMLElement).innerText
+              ?.replace(/\s+/g, ' ')
+              .slice(0, 120)}`;
+          })
+          .join('\n') || 'нищо не виси на body извън екрана',
+      )
+      .catch(() => 'наслоеното не се чете');
+    console.log(`\n  НАСЛОЕНО ВЪРХУ BODY:\n  ${nasloeno.replace(/\n/g, '\n  ')}\n`);
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
   }
 
