@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, tekstNa } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -832,6 +832,149 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollLeft = 0;
       (e as HTMLElement).scrollTop = 0;
     });
+
+    razdel = '79 · Дървото под имота · много степени, не две';
+    // Негово, 27.08: „Да има РАЗРАСТВАНЕ НА ПЛАНА ПОД ИМОТ за задачи, дела,
+    // проекти, цели С МНОГО СТЪПКИ като строителство на сграда в Гант. Да може
+    // когато вкараш нова степен от главното дърво да се прибира при всяка
+    // степен с ЕДНА КОЛОНА."
+    //
+    // ПЪРВО СЕ ЗАТВАРЯ падащият ред. Пунктът в лентата Е и падащият бутон
+    // (ADR-057в), значи предишната навигация до Имоти го е ОТВОРИЛА — а отворен
+    // ред покрива пунктовете под себе си и следващият клик не стига до тях.
+    // Същият урок като в §77, платен втори път.
+    await p.keyboard.press('Escape');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    // Четири степени · „строителство на сграда" с много стъпки. Сроковете на
+    // детето излизат ИЗВЪН тези на родителя нарочно: обобщената лента се СМЯТА
+    // от децата, а не се преписва от родителя.
+    const napraviDelo = async (ime: string, nad: string, ot: string, do_: string): Promise<void> => {
+      await zapishiDelo(p, {
+        myasto: 'Строеж', obekt: '', ime, otgovornik: 'Иван',
+        ot, do: do_, otsenka: 'важно-неспешно', ...(nad === '' ? {} : { nad }),
+      });
+    };
+    await napraviDelo('Сграда А', '', '2026-08-01', '2026-08-31');
+    await napraviDelo('Груб строеж', 'Сграда А', '2026-08-05', '2026-09-30');
+    await napraviDelo('Кофраж', 'Груб строеж', '2026-08-10', '2026-08-20');
+    await napraviDelo('Кофраж етаж 1', 'Кофраж', '2026-08-12', '2026-08-15');
+
+    interface RedNaDarvo {
+      readonly stepen: number;
+      readonly otstap: number;
+      readonly nomer: string;
+    }
+    const stepeni: RedNaDarvo[] = await p.$$eval('.gant-delo[data-stepen]', (se) =>
+      se.map((e) => ({
+        stepen: Number((e as HTMLElement).dataset['stepen']),
+        otstap: Math.round(parseFloat(getComputedStyle(e).paddingLeft)),
+        nomer: e.querySelector('.nomer-stepen')?.textContent?.trim() ?? '',
+      })));
+    const nayDalboko = Math.max(...stepeni.map((x) => x.stepen));
+    console.log(`\n  ДЪРВОТО: най-дълбока степен ${nayDalboko} · отстъпи ${
+      [...new Set(stepeni.map((x) => x.otstap))].sort((a, b) => a - b).join(' · ')}px\n`);
+    proveri('дървото стига до ТРЕТА степен и по-надълбоко', nayDalboko >= 3, true);
+    // ОТСТЪПЪТ РАСТЕ · дотук подподделото се рисуваше ТОЧНО като подделото.
+    const poStepen = new Map<number, number>();
+    for (const x of stepeni) poStepen.set(x.stepen, x.otstap);
+    const naredeni = [...poStepen.entries()].sort((a, b) => a[0] - b[0]).map(([, o]) => o);
+    proveri('всяка степен е с ПО-ГОЛЯМ отстъп от предната',
+      naredeni.every((o, i) => i === 0 || o > naredeni[i - 1]!), true);
+    // НОМЕРАТА 1 · 1.1 · 1.2.3 · смятат се, не се записват.
+    proveri('най-дълбокото носи номер с три точки',
+      (stepeni.find((x) => x.stepen === nayDalboko)?.nomer.match(/\./g) ?? []).length,
+      nayDalboko);
+
+    razdel = '79 · Дървото · обобщената лента на родителя';
+    // Взето от MS Project: „обобщена лента на родителя — инак родителят е
+    // празен ред." Тук тя се РАЗПЪВА, никога не се свива: `ot` и `do` са
+    // записан факт, а не изведено число.
+    const lentataNa = async (ime: string): Promise<{ ot: number; broy: number }> =>
+      p.$eval(`.gant-red:has(.gant-lenta b:text-is("${ime}")) .gant-lenta`, (e) => ({
+        ot: Number((e as HTMLElement).dataset['ot']),
+        broy: Number((e as HTMLElement).dataset['broy']),
+      }));
+    const roditel = await lentataNa('Сграда А');
+    const dete = await lentataNa('Груб строеж');
+    proveri('лентата на родителя ЗАПОЧВА не по-късно от детето си',
+      roditel.ot <= dete.ot, true);
+    proveri('и СВЪРШВА не по-рано от него',
+      roditel.ot + roditel.broy >= dete.ot + dete.broy, true);
+    proveri('обобщената лента се различава по ФОРМА, не само по цвят',
+      await p.$eval('.gant-red:has(.gant-lenta b:text-is("Сграда А")) .gant-lenta',
+        (e) => e.classList.contains('obobshtena')), true);
+    proveri('делото БЕЗ деца НЕ носи обобщена лента',
+      await p.$eval('.gant-red:has(.gant-lenta b:text-is("Кофраж етаж 1")) .gant-lenta',
+        (e) => e.classList.contains('obobshtena')), false);
+
+    razdel = '79 · Дървото · навътре и навън · „вкараш нова степен"';
+    // Негово, 27.08: „Да може когато ВКАРАШ НОВА СТЕПЕН от главното дърво да се
+    // прибира при всяка степен с една колона." Двете посоки са ЕДНО действие:
+    // менят само родителя, значи са ПОПРАВКА на същото дело — същият `id`.
+    const stepenNaReda = async (ime: string): Promise<number> =>
+      p.$eval(`.gant-delo:has(b:text-is("${ime}"))`,
+        (e) => Number((e as HTMLElement).dataset['stepen']));
+    const stepenPredi = await stepenNaReda('Кофраж');
+    const chakayStepen = async (ime: string, n: number): Promise<void> => {
+      await p.waitForFunction(
+        ([i, k]) => Number(([...document.querySelectorAll('.gant-delo')]
+          .find((e) => e.querySelector('b')?.textContent === i) as HTMLElement | undefined)
+          ?.dataset['stepen'] ?? -1) === k,
+        [ime, n] as [string, number],
+      );
+    };
+    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Кофраж")) [data-navan]'));
+    await chakayStepen('Кофраж', stepenPredi - 1);
+    proveri('НАВЪН вдига делото с ЕДНА степен',
+      await stepenNaReda('Кофраж'), stepenPredi - 1);
+    proveri('и детето му го следва · дървото не се къса',
+      await stepenNaReda('Кофраж етаж 1'), stepenPredi);
+
+    // НАВЪТРЕ · под реда НАД себе си на своето ниво. Не се проверява като
+    // „връща предишното обратно": редът вътре в едно ниво днес се СМЯТА
+    // (спешност → срок → име), а ръчният ред — неговата колона „поредност" —
+    // още не е построен. Затова се мери каквото е обещано: делото влиза под
+    // реда, който стои над него.
+    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Груб строеж")) [data-navatre]'));
+    await chakayStepen('Груб строеж', stepenPredi);
+    proveri('НАВЪТРЕ влиза под реда над себе си · с една степен надолу',
+      await stepenNaReda('Груб строеж'), stepenPredi);
+
+    razdel = '79 · Дървото · „няма къде" се КАЗВА, не се мълчи';
+    const bezPromyana = await broySabitiya(p);
+    await p.click('.gant-delo:has(b:text-is("Сграда А")) [data-navan]');
+    await p.waitForFunction(() =>
+      (document.querySelector('.vest')?.textContent ?? '').includes('корена'));
+    proveri('дело в корена казва защо не мърда',
+      (await tekstNa(p, '.vest')).includes('Вече е в корена'), true);
+    proveri('и НИТО едно събитие не влиза в Журнала',
+      await broySabitiya(p), bezPromyana);
+
+    razdel = '79 · Дървото · сгъването крие ВСИЧКИТЕ потомци';
+    // Сгъвачът се търси ПО ИМЕТО НА РЕДА, не като „първия на екрана": на
+    // Управление стоят и осемдесетте дела от предишните раздели, и първият
+    // сгъвач е чужд — крие едно дете и мярката „внуците също" губи смисъл.
+    const sgavachatNa = (ime: string): string => `.gant-delo:has(b:text-is("${ime}")) .sgavach`;
+    // ЧАКА СЕ БРОЯТ НА ДЕЛАТА, не прерисуването на черупката. Сгъването е
+    // ПОГЛЕД (ADR-022) и не ражда събитие — значи шапката не се пипа и белегът
+    // ѝ стои завинаги. `deystvieSPrerisuvane` тук виси 30 секунди и лъже, че
+    // сгъването не работи.
+    const delaPredi = await p.$$eval('.gant-delo', (e) => e.length);
+    const chakayDela = async (kolko: number): Promise<void> => {
+      await p.waitForFunction((n) => document.querySelectorAll('.gant-delo').length === n, kolko);
+    };
+    await p.click(sgavachatNa('Сграда А'));
+    await chakayDela(delaPredi - 3);
+    proveri('сгъването крие ТРИТЕ потомъка · не само детето',
+      await p.$$eval('.gant-delo', (e) => e.length), delaPredi - 3);
+    // И ОБРАТНО · свитото дело ПАК носи сгъвача си. Дотук той изчезваше:
+    // броено от видимото, свитото няма деца — значи сгъването беше еднопосочно
+    // и единственият изход беше бутонът „СЕГА".
+    await p.click(sgavachatNa('Сграда А'));
+    await chakayDela(delaPredi);
+    proveri('и разгъването ги връща всичките · сгъвачът не изчезва',
+      await p.$$eval('.gant-delo', (e) => e.length), delaPredi);
+    await naEkran(p, 'imoti', '#forma-imot');
 
     razdel = '78 · Гантът · подвижната граница и стандартната колона';
     // Негово, 27.08: „Диаграмата се вижда 2 ТРЕТИ от екрана и също границата

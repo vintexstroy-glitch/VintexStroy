@@ -49,6 +49,7 @@ import {
   type Delo,
 } from '../src/domein/dela.js';
 import type { Reshetka } from '../src/domein/gant.js';
+import { stepenNa } from '../src/domein/dela.js';
 import { ekraniraj } from './obshto.js';
 
 /** Височина на един ред · подделото е по-тънко и това се вижда. */
@@ -82,8 +83,14 @@ export function narisuvayDiagrama(
   let y = GLAVA;
   const redove = dela
     .map((d) => {
-      const visok = d.nadDelo ? REDLO : RED;
-      const red = redNaDiagramata(d, y, visok, x, dnes);
+      // СТЕПЕНТА, не булев тест (резен 12б): дотук подподделото се рисуваше
+      // ТОЧНО като подделото. Смята се ВЕДНЪЖ тук и се подава — инак всеки ред
+      // би обикалял веригата на родителите си повторно.
+      const stepen = stepenNa(dela, d.id);
+      // Височината пада само ВЕДНЪЖ: по-тънко от най-тънкото не се чете.
+      // Отстъпът обаче расте с всяка степен — той носи дървото.
+      const visok = stepen > 0 ? REDLO : RED;
+      const red = redNaDiagramata(d, y, visok, x, dnes, stepen);
       y += visok;
       return red;
     })
@@ -141,9 +148,10 @@ function redNaDiagramata(
   visok: number,
   x: (data: string) => number,
   dnes: string,
+  stepen: number,
 ): string {
   const svet = svetofar(d, dnes);
-  const otstap = d.nadDelo ? OTSTAP : 0;
+  const otstap = stepen * OTSTAP;
   const x1 = x(d.ot);
   // Еднодневното дело няма дължина по времевата ос — дава му се минимална,
   // иначе изчезва напълно и „днес имам задача" изглежда като „нямам".
@@ -163,9 +171,9 @@ function redNaDiagramata(
         )}" height="${visokaLenta}" rx="3"></rect>`
       : '';
 
-  return `<g class="diagrama-red ${svet}${d.nadDelo ? ' poddelo' : ''}" data-delo="${ekraniraj(d.id)}">
+  return `<g class="diagrama-red ${svet}${stepen > 0 ? ' poddelo' : ''}" data-delo="${ekraniraj(d.id)}">
     <text class="diagrama-ime" x="${8 + otstap}" y="${y + visok / 2 + 4}">${ekraniraj(
-      skasi(d.ime, d.nadDelo ? 24 : 26),
+      skasi(d.ime, stepen > 0 ? 24 : 26),
     )}</text>
     <rect class="diagrama-lenta" x="${x1.toFixed(1)}" y="${yl}" width="${(kray - x1).toFixed(
       1,

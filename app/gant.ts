@@ -31,11 +31,15 @@ import { pishi } from '../src/yadro/pari.js';
 import {
   IMENA_NA_OTSENKITE,
   OTSENKI,
-  podredi,
+  nomeraPoDarvo,
+  podredeniPoDarvo,
+  stepenNa,
   SASTOYANIYA,
   svetofar,
   vidimi,
-  imaPoddela,
+  noviyatRoditel,
+  roditeliSDetsa,
+  sObobshteniSrokove,
   eEdnodnevno,
   type Delo,
   type Otsenka,
@@ -181,15 +185,25 @@ export function narisuvayGant(
   const p = pogled(klyuch);
   const { takt, sgunati, diagrama, filtarMyasto, filtarObekt, filtarOtsenka } = p;
   const vsichki = [...o.dela.values()];
-  const podredeni = podredi(vsichki, dnes);
+  // ПОДРЕДБАТА Е ДЪРВОВИДНА (резен 12б): детето винаги СЛЕД родителя си, а
+  // вътре в едно ниво важи неговата подредба (спешност → Оценка → завършените
+  // долу). Правилото му не се мени — прилага се на всяко ниво поотделно.
+  const podredeni = podredeniPoDarvo(vsichki, dnes);
   const filtrirani = podredeni.filter(
     (d) =>
       (!filtarMyasto || d.myasto === filtarMyasto) &&
       (!filtarObekt || d.obekt === filtarObekt) &&
       (!filtarOtsenka || d.otsenka === filtarOtsenka),
   );
+  // СГЪВАЧИТЕ се броят ПРЕДИ сгъването и веднъж за целия екран. Сметнати от
+  // видимото, свитото дело оставаше без бутон — сгъването беше еднопосочно.
+  const sgavaemi = roditeliSDetsa(filtrirani);
   const naEkrana = vidimi(filtrirani, sgunati);
-  const r = reshetka(naEkrana, takt, dnes);
+  // ОБОБЩЕНАТА ЛЕНТА · родителят се разпъва до децата си, за да не е празен ред
+  // (резен 12б). РИСУВА се с разпънатите, БРОИ се с записаните: плочките горе
+  // отчитат факти от Журнала, а не изведена дата.
+  const zaRisuvane = sObobshteniSrokove(naEkrana, filtrirani);
+  const r = reshetka(zaRisuvane, takt, dnes);
   // Сумите покриват ЦЕЛИЯ обхват на решетката — от първата до последната
   // колона — не един месец: колона извън месеца показваше нула, която
   // изглеждаше като „няма движение".
@@ -287,8 +301,8 @@ export function narisuvayGant(
           // на ЕДНА секция, а не две секции. Различен ключ тук би значел, че
           // подредбата на човека се губи в мига, в който първото дело влезе.
           `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
-            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes, true, true, sgunati, nadpisi)}</div>
-            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(naEkrana, r, dnes)}</div>` : ''}
+            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi)}</div>
+            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes)}</div>` : ''}
           </div>`
     }
 
@@ -349,6 +363,14 @@ export function tablitsataSOcveteniPoleta(
   /** сгънатите на ТОЗИ поглед · празно при копието в Сметки */
   sgunati: ReadonlySet<string> = new Set<string>(),
   nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
+  /**
+   * КОИ дела имат деца · смятано от списъка ПРЕДИ сгъването (резен 12б).
+   *
+   * Идва отвън нарочно: тук се вижда само видимото, а свито дело няма видими
+   * деца — значи сметнато оттук, то би загубило сгъвача си и нямаше да може да
+   * се разгъне. Празно при копието в Сметки, където сгъвачи не се рисуват.
+   */
+  sgavaemi: ReadonlySet<string> = new Set<string>(),
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -357,6 +379,10 @@ export function tablitsataSOcveteniPoleta(
     poMyasto.set(d.myasto, spisak);
   }
   const lenta = new Map(r.lenti.map((l) => [l.deloId, l]));
+  // НОМЕРАТА 1 · 1.1 · 1.2.3 се СМЯТАТ от реда, не се записват (резен 12б):
+  // записан, номерът щеше да се разминава при всяко разместване, а всяко
+  // разместване щеше да е ново събитие за нещо, което е просто позиция.
+  const nomera = nomeraPoDarvo(dela);
 
   return `
     <section data-sektsiya="gant-delata">
@@ -371,7 +397,7 @@ export function tablitsataSOcveteniPoleta(
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi)).join('')}`,
             )
             .join('')}
           ${sasTsifrite ? '<div class="gant-sbor">Приход · Разход</div>' : ''}
@@ -398,7 +424,7 @@ export function tablitsataSOcveteniPoleta(
                     l
                       ? `<span class="gant-lenta ${svetofar(d, dnes)}${
                           eEdnodnevno(d) ? ' ednodnevno' : ''
-                        }" data-ot="${l.ot + 1}" data-broy="${l.broy}"
+                        }${sgavaemi.has(d.id) ? ' obobshtena' : ''}" data-ot="${l.ot + 1}" data-broy="${l.broy}"
                         title="${ekraniraj(d.ime)} · ${d.ot} → ${d.do}">${
                           l.izlizaNalyavo ? '‹' : ''
                         }<b>${ekraniraj(d.ime)}</b>${l.izlizaNadyasno ? '›' : ''}</span>`
@@ -445,10 +471,23 @@ function imeNaDeloto(
   dnes: string,
   sasSgavachi: boolean,
   sgunati: ReadonlySet<string>,
+  nomer: string,
+  sgavaemi: ReadonlySet<string>,
 ): string {
   // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
-  const sgavaemo = sasSgavachi && imaPoddela(vsichki, d.id);
-  return `<div class="gant-delo ${svetofar(d, dnes)}${d.nadDelo ? ' poddelo' : ''}" data-ime="${ekraniraj(d.id)}">
+  const sgavaemo = sasSgavachi && sgavaemi.has(d.id);
+  // СТЕПЕНТА, не булев тест (резен 12б). Дотук тук стоеше `d.nadDelo ? … : …`
+  // и затова подподделото се рисуваше ТОЧНО като подделото — трета степен
+  // нямаше как да се различи. Негово *(р52·[231])*: „името на всеки проект в
+  // първа колона, а на задачите следващите редове да започват от втора колона."
+  const stepen = stepenNa(vsichki, d.id);
+  // СТЕПЕНТА идва като `data-`, НЕ като вграден `style`: CSP-то на приложението
+  // е `default-src 'self'` без `unsafe-inline`, значи браузърът ОТКАЗВА вградени
+  // стилови атрибути и отстъпът просто нямаше да се приложи. Числото се слага
+  // през CSSOM в `gant-izgled.ts` — там, където живеят и другите променливи на
+  // решетката. Проходът го хвана през конзолата.
+  return `<div class="gant-delo ${svetofar(d, dnes)}${stepen > 0 ? ' poddelo' : ''}"
+    data-stepen="${stepen}" data-ime="${ekraniraj(d.id)}">
     ${
       sgavaemo
         ? `<button type="button" class="sgavach" data-sgavi="${ekraniraj(d.id)}" aria-label="сгъни">${
@@ -456,7 +495,18 @@ function imeNaDeloto(
           }</button>`
         : '<span class="sgavach prazen"></span>'
     }
+    <span class="nomer-stepen" translate="no">${ekraniraj(nomer)}</span>
     <b>${ekraniraj(d.ime)}</b>
+    ${
+      sasSgavachi
+        ? `<span class="stepenki">
+            <button type="button" data-navan="${ekraniraj(d.id)}" title="Навън · едно ниво нагоре"
+              aria-label="Навън · едно ниво нагоре">◄</button>
+            <button type="button" data-navatre="${ekraniraj(d.id)}" title="Навътре · под реда над него"
+              aria-label="Навътре · под реда над него">►</button>
+          </span>`
+        : ''
+    }
     <span class="drebno">${ekraniraj(d.obekt || '—')} · ${ekraniraj(d.otgovornik)}</span>
   </div>`;
 }
@@ -625,6 +675,54 @@ export function zakachiGant(
       block: 'nearest',
     });
   });
+
+  /**
+   * НАВЪТРЕ · НАВЪН · „вкараш нова степен от главното дърво" (резен 12б).
+   *
+   * Редът идва от ЕКРАНА, не от Огледалото: „навътре" значи „под реда над мен",
+   * а редът на екрана е онова, което човекът вижда. Оттам нататък решава чиста
+   * функция, а записът е ПОПРАВКА на същото дело — същият `id`, същото събитие.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-navatre], [data-navan]')) {
+    b.addEventListener('click', async () => {
+      const posoka = b.dataset.navatre === undefined ? 'navan' : 'navatre';
+      const id = b.dataset.navatre ?? b.dataset.navan!;
+      const o = await k.deystviya.ogledalo();
+      const redat = [...koren.querySelectorAll<HTMLElement>('.gant-delo')]
+        .map((e) => o.dela.get(e.dataset.ime ?? ''))
+        .filter((d): d is Delo => d !== undefined);
+      const nov = noviyatRoditel(redat, id, posoka);
+      if (nov === null) {
+        // ВЕСТТА се вижда чак след прерисуване (`k.vest` само я запомня).
+        // „Няма къде" се КАЗВА, не се мълчи — правило 15.
+        k.vest('zle', posoka === 'navatre'
+          ? 'Няма ред над него на същото ниво — няма под какво да влезе.'
+          : 'Вече е в корена — по-навън няма.');
+        await prerisuvay();
+        return;
+      }
+      const delo = o.dela.get(id);
+      if (!delo) return;
+      b.disabled = true;
+      try {
+        await k.deystviya.zapishiDelo(
+          id,
+          {
+            myasto: delo.myasto, obekt: delo.obekt, ime: delo.ime,
+            otgovornik: delo.otgovornik, ot: delo.ot, do: delo.do,
+            otsenka: delo.otsenka, sastoyanie: delo.sastoyanie,
+            nadDelo: nov, dokument: delo.dokument,
+          },
+          { opId: crypto.randomUUID() },
+        );
+        await prerisuvay();
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      } finally {
+        b.disabled = false;
+      }
+    });
+  }
 
   koren.querySelector<HTMLButtonElement>('#kam-diagrama')?.addEventListener('click', async () => {
     p.diagrama = !p.diagrama;

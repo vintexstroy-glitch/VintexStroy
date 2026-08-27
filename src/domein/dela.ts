@@ -168,17 +168,310 @@ export function imaPoddela(dela: readonly Delo[], id: string): boolean {
 }
 
 /**
+ * КОИ дела имат деца · ЕДНО минаване за целия екран (резен 12б).
+ *
+ * `imaPoddela` отговаря за ЕДНО дело и обикаля целия списък — извикана вътре в
+ * цикъла за всеки ред, тя прави рисуването O(n²). При дърво от много степени
+ * това е първото, което се усеща.
+ *
+ * И по-важното: множеството се смята от списъка ПРЕДИ сгъването. Иначе свито
+ * дело губи собствения си сгъвач — децата му ги няма във видимия списък, значи
+ * „има ли деца" отговаря НЕ, бутонът изчезва и свитото не може да се разгъне.
+ * Точно това стоеше в кода: сгъването беше еднопосочно.
+ */
+export function roditeliSDetsa(dela: readonly Delo[]): ReadonlySet<string> {
+  const s = new Set<string>();
+  for (const d of dela) if (d.nadDelo !== '') s.add(d.nadDelo);
+  return s;
+}
+
+/**
  * Кои дела се ВИЖДАТ при дадено множество сгънати.
  *
  * Сгънато дело крие подделата си. Подделото на скрито дело също е скрито —
  * иначе сгъването би оставило сираци на екрана.
  */
 export function vidimi(dela: readonly Delo[], sgunati: ReadonlySet<string>): Delo[] {
-  const skrit = new Set<string>();
-  // Делата идват подредени; едно минаване стига, защото поддело сочи НАЗАД
-  // към вече видяно дело. Ако не сочи, то се вижда — сирак не се крие мълчешком.
-  for (const d of dela) {
-    if (d.nadDelo && (sgunati.has(d.nadDelo) || skrit.has(d.nadDelo))) skrit.add(d.id);
-  }
-  return dela.filter((d) => !skrit.has(d.id));
+  const po = kartaNaDelata(dela);
+  return dela.filter((d) => !podSgunato(po, d, sgunati));
 }
+
+/**
+ * ПОПРАВЕН ДЕФЕКТ · сгъването оставяше СИРАЦИ.
+ *
+ * Дотук тук стоеше едно минаване напред, с коментар: „делата идват подредени;
+ * поддело сочи НАЗАД към вече видяно дело". **`podredi()` не дава такава
+ * гаранция** — тя сортира по тежест на оценката → гори ли → срок → име, и
+ * никъде не групира децата под родителя им.
+ *
+ * СЦЕНАРИЯТ, който чупеше: дядо с оценка „нито-едно" (тежест 3) и внук със
+ * „спешно-важно" (тежест 0). Сортировката слага внука ПРЕДИ дядото; при сгънат
+ * дядо минаването стига до внука пръв, купчината „скрити" още не съдържа
+ * бащата, и внукът ОСТАВА на екрана под скрит родител. Точно сиракът, който
+ * функцията обещава да няма.
+ *
+ * Тестът не го ловеше, защото подаваше РЪЧНО подреден масив и така изпълняваше
+ * предположението, вместо да го провери.
+ *
+ * Сега се върви по ВЕРИГАТА на родителите — редът престава да има значение.
+ * `NAY_DALBOKO` е предпазител срещу цикъл: дърво, което сочи само себе си, инак
+ * върти безкрайно (Вратата го отказва, но Огледалото чете и стар Журнал).
+ */
+function podSgunato(
+  po: ReadonlyMap<string, Delo>,
+  d: Delo,
+  sgunati: ReadonlySet<string>,
+): boolean {
+  let roditel = d.nadDelo;
+  for (let i = 0; roditel !== '' && i < NAY_DALBOKO; i += 1) {
+    if (sgunati.has(roditel)) return true;
+    roditel = po.get(roditel)?.nadDelo ?? '';
+  }
+  return false;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   ДЪРВОТО ПОД ИМОТА · много степени, не две (резен 12б)
+   ═══════════════════════════════════════════════════════════════════════════
+
+   Негови думи, 27.08:
+
+     „Да има **разрастване на плана под имот** за задачи, дела, проекти, цели
+      **с много стъпки като строителство на сграда** в Гант. Да може когато
+      **вкараш нова степен от главното дърво да се прибира при всяка степен с
+      една колона**. Виж диаграма на Гант в МС Проджект."
+
+   И същото, негово, отпреди деветнайсет дни *(р52·[231] · 08.08)*:
+
+     „**Направи името на всеки проект в първа колона, а на задачите следващите
+      редове да започват от втора колона.**"
+
+   ═══ РЕЧНИКЪТ Е НЕГОВ, И ТОЙ ГО Е ЗАКОВАЛ САМ ═══
+
+   *(р52·[269] · 08.08)*: „**Навсякъде заменяш Проект с Място, за Задача
+   навсякъде заменяй с Дело.**" Затова възелът си остава `Delo`, а новото е
+   СТЕПЕН. Втори тип „Проект" би бил близнак на делото с друго име — грешката,
+   платена вече с ръчния близнак на второстепенния бутон (ADR-058).
+
+   ═══ ДАННИТЕ ВЕЧЕ ГО МОЖЕХА · ЕКРАНЪТ НЕ ═══
+
+   `nadDelo` няма ограничител на дълбочината и тестът за сгъване вече пазеше ТРИ
+   нива. Екранът обаче решаваше с БУЛЕВ тест (`d.nadDelo ? … : …`) на три места —
+   значи подподделото се рисуваше ТОЧНО като подделото. */
+
+/**
+ * НАЙ-ГОЛЯМАТА ДЪЛБОЧИНА, която се смята.
+ *
+ * Не е ограничение на дървото — то е предпазител срещу ЦИКЪЛ. Вратата отказва
+ * цикъл (`praviTsikal`), но Огледалото чете и стар Журнал, писан преди тази
+ * проверка; безкраен цикъл там заключва рисуването завинаги.
+ */
+export const NAY_DALBOKO = 64;
+
+/** Картата id → дело · един превод, ползван от всички обиколки на дървото. */
+function kartaNaDelata(dela: readonly Delo[]): Map<string, Delo> {
+  return new Map(dela.map((d) => [d.id, d]));
+}
+
+/**
+ * СТЕПЕНТА на едно дело · 0 за самостоятелно, 1 за поддело, 2 за подподдело…
+ *
+ * Сирак (`nadDelo` сочи несъществуващо дело) е степен 0, не грешка: `vidimi`
+ * вече го показва, вместо да го крие мълчешком, и двете решения трябва да
+ * казват едно и също.
+ */
+export function stepenNa(dela: readonly Delo[], id: string): number {
+  const po = kartaNaDelata(dela);
+  let roditel = po.get(id)?.nadDelo ?? '';
+  let stepen = 0;
+  while (roditel !== '' && stepen < NAY_DALBOKO) {
+    const gore = po.get(roditel);
+    if (!gore) break;
+    stepen += 1;
+    roditel = gore.nadDelo;
+  }
+  return stepen;
+}
+
+/**
+ * ПОДРЕЖДА ПО ДЪРВО · детето ВИНАГИ след родителя си.
+ *
+ * Вътре в едно ниво важи неговата подредба (`podredi`: спешност → Оценка →
+ * завършените долу). Тоест правилото му не се мени — то се прилага на всяко
+ * ниво поотделно, вместо върху разбъркана купчина.
+ *
+ * Сираците вървят като самостоятелни, накрая на своя ред: дело, чийто родител
+ * го няма, не бива да изчезне от екрана заради счупена връзка.
+ */
+export function podredeniPoDarvo(dela: readonly Delo[], dnes: string): Delo[] {
+  const po = kartaNaDelata(dela);
+  const deca = new Map<string, Delo[]>();
+  for (const d of dela) {
+    // Родител, който го няма, се брои за „няма родител" — инак сиракът пада
+    // в кофа, която никой не обхожда, и изчезва от екрана.
+    const kluch = d.nadDelo !== '' && po.has(d.nadDelo) ? d.nadDelo : '';
+    deca.set(kluch, [...(deca.get(kluch) ?? []), d]);
+  }
+  const izlezli = new Set<string>();
+  const red: Delo[] = [];
+  const slez = (roditel: string, dalbochina: number): void => {
+    if (dalbochina > NAY_DALBOKO) return;
+    for (const d of podredi(deca.get(roditel) ?? [], dnes)) {
+      if (izlezli.has(d.id)) continue; // предпазител срещу цикъл
+      izlezli.add(d.id);
+      red.push(d);
+      slez(d.id, dalbochina + 1);
+    }
+  };
+  slez('', 0);
+  return red;
+}
+
+/**
+ * НОМЕРАТА на степените · 1 · 1.1 · 1.2.3, като в MS Project.
+ *
+ * СМЯТАТ СЕ, не се записват. Записан, номерът щеше да се разминава при всяко
+ * разместване — и всяко разместване щеше да е ново събитие в Журнала за нещо,
+ * което е просто позиция (правило 17 · ADR-022).
+ *
+ * Приема ВЕЧЕ подредените по дърво: номерът е свойство на реда, не на делото.
+ */
+export function nomeraPoDarvo(podredeni: readonly Delo[]): Map<string, string> {
+  const po = kartaNaDelata(podredeni);
+  const nomera = new Map<string, string>();
+  const broyachi = new Map<string, number>();
+  for (const d of podredeni) {
+    const roditel = d.nadDelo !== '' && po.has(d.nadDelo) ? d.nadDelo : '';
+    const n = (broyachi.get(roditel) ?? 0) + 1;
+    broyachi.set(roditel, n);
+    const gore = roditel === '' ? '' : nomera.get(roditel);
+    nomera.set(d.id, gore === undefined || gore === '' ? String(n) : `${gore}.${n}`);
+  }
+  return nomera;
+}
+
+/**
+ * ОБХВАТЪТ НА РОДИТЕЛЯ · от най-ранното до най-късното дете (обобщена лента).
+ *
+ * СМЯТА СЕ, не се записва. Записан, той щеше да се разминава с децата при всяка
+ * промяна на срок — и щеше да има две числа за едно и също (правило 17).
+ *
+ * Дело без деца връща `null`: то си има СВОИ срокове и обобщена лента не му
+ * трябва. Разликата между „няма деца" и „децата покриват нула дни" е важна и не
+ * се слива в един празен обхват.
+ */
+export function obhvatNaDetsata(
+  dela: readonly Delo[],
+  id: string,
+): { readonly ot: string; readonly do: string } | null {
+  const po = kartaNaDelata(dela);
+  let ot = '';
+  let doo = '';
+  const slez = (roditel: string, dalbochina: number): void => {
+    if (dalbochina > NAY_DALBOKO) return;
+    for (const d of dela) {
+      if (d.nadDelo !== roditel || d.id === roditel) continue;
+      if (ot === '' || d.ot < ot) ot = d.ot;
+      if (doo === '' || d.do > doo) doo = d.do;
+      slez(d.id, dalbochina + 1);
+    }
+  };
+  if (!po.has(id)) return null;
+  slez(id, 0);
+  return ot === '' ? null : { ot, do: doo };
+}
+
+/**
+ * ОБОБЩЕНАТА ЛЕНТА · срокът на родителя, разпънат до децата (резен 12б).
+ *
+ * Взето от MS Project и записано в плана: „обобщена лента на родителя — ДА,
+ * инак родителят е празен ред." Тук обаче има разлика, която не бива да се
+ * пропусне: там сроковете на обобщената задача СА изведени и не се въвеждат, а
+ * тук `ot` и `do` са ЗАПИСАН ФАКТ в Журнала.
+ *
+ * Затова лентата се РАЗПЪВА, никога не се свива: покрива и записания срок на
+ * родителя, и целия обхват на потомците му. Свиване до децата би скрило
+ * записано число зад изведено — точно обратното на правило 1.
+ *
+ * Връща НОВ списък; нищо не се записва (правило 17: обобщеният срок има един
+ * дом — децата — и не се преписва като втори факт).
+ *
+ * `vsichki` е списъкът ПРЕДИ сгъването: свит родител пак показва докъде стигат
+ * скритите му деца — това е целият смисъл на обобщената лента.
+ */
+export function sObobshteniSrokove(
+  redove: readonly Delo[],
+  vsichki: readonly Delo[] = redove,
+): Delo[] {
+  const roditeli = roditeliSDetsa(vsichki);
+  return redove.map((d) => {
+    if (!roditeli.has(d.id)) return d;
+    const obhvat = obhvatNaDetsata(vsichki, d.id);
+    if (!obhvat) return d;
+    const ot = obhvat.ot < d.ot ? obhvat.ot : d.ot;
+    const doo = obhvat.do > d.do ? obhvat.do : d.do;
+    return ot === d.ot && doo === d.do ? d : { ...d, ot, do: doo };
+  });
+}
+
+/**
+ * НАВЪТРЕ · НАВЪН · „вкараш нова степен от главното дърво" (резен 12б).
+ *
+ * Взето от MS Project и в плана поименно. Двете са ЕДНО действие с посока, а не
+ * две: и двете менят САМО `nadDelo`, значи и двете са ПОПРАВКА на същото дело —
+ * същият `id`, същото събитие. Ново събитие за „преместване" не се строи.
+ *
+ * `podredeni` идва в РЕДА НА ЕКРАНА нарочно. „Навътре" значи „под реда НАД мен
+ * на моето ниво" — това е нещо, което човек вижда, а не изчислява. Функцията
+ * остава чиста: редът се подава, не се гадае.
+ *
+ * Връща `null` за „няма къде" (най-горното на нивото си · вече в корена) и
+ * ПРАЗЕН НИЗ за „в корена". Двете не се сливат: празният низ е валиден родител.
+ */
+export function noviyatRoditel(
+  podredeni: readonly Delo[],
+  id: string,
+  posoka: 'navatre' | 'navan',
+): string | null {
+  const po = kartaNaDelata(podredeni);
+  const d = po.get(id);
+  if (!d) return null;
+  if (posoka === 'navan') {
+    const roditel = d.nadDelo === '' ? undefined : po.get(d.nadDelo);
+    return roditel ? roditel.nadDelo : null;
+  }
+  let predishno: string | null = null;
+  for (const x of podredeni) {
+    if (x.id === id) break;
+    if (x.nadDelo === d.nadDelo) predishno = x.id;
+  }
+  return predishno;
+}
+
+/**
+ * ЩЕ НАПРАВИ ЛИ ЦИКЪЛ · проверката, която Вратата пита ПРЕДИ да запише.
+ *
+ * Дело, направено свой прародител, заключва рисуването завинаги: всяка обиколка
+ * на дървото тръгва и не се връща. Дотук такъв пазач НЯМАШЕ — не се стигаше до
+ * цикъл само защото формата винаги раждаше нов `id`. С бутони „навътре · навън"
+ * се стига веднага.
+ *
+ * Проверява се и `id === novRoditel`: дело, само на себе си родител, е цикъл с
+ * дължина едно и е най-лесният начин да се сгреши.
+ */
+export function praviTsikal(
+  dela: readonly Delo[],
+  id: string,
+  novRoditel: string,
+): boolean {
+  if (novRoditel === '') return false;
+  if (novRoditel === id) return true;
+  const po = kartaNaDelata(dela);
+  let gore = novRoditel;
+  for (let i = 0; gore !== '' && i < NAY_DALBOKO; i += 1) {
+    if (gore === id) return true;
+    gore = po.get(gore)?.nadDelo ?? '';
+  }
+  return false;
+}
+

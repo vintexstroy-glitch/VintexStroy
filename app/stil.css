@@ -1461,7 +1461,20 @@ table.razbivka .drebno { font-size: 0.75rem; }
    Места, дела), значи паритетът се местеше и редуването излизаше с произволна
    фаза. Кой ред носи ивица, решава `app/zebra.ts`. */
 .gant-delo.zebra { background: var(--zebra); }
-.gant-delo.poddelo { padding-left: 34px; font-size: 0.857rem; }
+/* ОТСТЪПЪТ РАСТЕ СЪС СТЕПЕНТА (резен 12б · негова дума, р52·[231] · 08.08):
+   „Направи името на всеки проект в първа колона, а на задачите следващите
+   редове да започват от ВТОРА КОЛОНА." И от 27.08: „да се прибира при всяка
+   степен с ЕДНА КОЛОНА."
+
+   Стъпката е ВЪТРЕ в колоната с имената, не нова колона на екрана: дърво от
+   шест нива инак изяжда шест колони и на телефон не остава нищо. */
+.gant-delo { padding-left: calc(18px + var(--stepen, 0) * 16px); }
+.gant-delo.poddelo { font-size: 0.857rem; }
+/* Номерът на степента · 1 · 1.1 · 1.2.3. Смята се от реда, не се записва. */
+.gant-delo .nomer-stepen {
+  color: var(--mastilo2); font-size: 0.75rem; font-variant-numeric: tabular-nums;
+  min-width: 34px; flex-shrink: 0;
+}
 .gant-delo b { font-weight: 500; }
 .gant-delo .drebno { margin-left: auto; white-space: nowrap; }
 /* „С Удебелен Проекта и Задачите с по налък шрифт и не удебеллени" (р48·[99]) */
@@ -1473,6 +1486,21 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 0.714rem;
 }
 .sgavach.prazen { cursor: default; }
+/* СТЕПЕНКИТЕ · навътре и навън (резен 12б · „вкараш нова степен от главното
+   дърво"). Стоят СВИТИ, докато редът не се посочи: два бутона на всеки ред са
+   шум, а редът, върху който е ръката, е точно онзи, който се мести. */
+.stepenki {
+  display: inline-flex; gap: 2px; margin-left: 6px;
+  opacity: 0; transition: opacity 0.12s;
+}
+.gant-delo:hover .stepenki,
+.stepenki:focus-within { opacity: 1; }
+.stepenki button {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1;
+  background: none; border: none; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.643rem;
+}
+.stepenki button:hover { color: var(--aktsent); }
 .gant-sbor, .gant-red.sumi {
   height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
 }
@@ -1504,6 +1532,14 @@ table.razbivka .drebno { font-size: 0.75rem; }
    ТЕКСТА И САМАТА ДАТА" — затова еднодневното носи и рамка, не само запълване. */
 .gant-lenta.ednodnevno { box-shadow: inset 0 0 0 2px rgba(251, 248, 243, 0.55); }
 .gant-lenta b { font-weight: 500; }
+/* ОБОБЩЕНАТА ЛЕНТА · родителят (резен 12б · MS Project).
+   По-тънка и с ръбове надолу, като скоба: тя не е СВОЙ срок, а обхватът на
+   децата. Различава се по ФОРМА, не само по цвят — цветът тук вече значи срок
+   (ADR-032 §1: състояние никога само с цвят). */
+.gant-lenta.obobshtena {
+  box-shadow: inset 0 -5px 0 rgba(38, 34, 30, 0.45);
+  border-radius: 3px 3px 0 0;
+}
 
 .gant-suma {
   display: flex; flex-direction: column; align-items: center; justify-content: center;

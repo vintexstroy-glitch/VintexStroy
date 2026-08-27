@@ -102,10 +102,27 @@ const RAB = 6;
  * отвсякъде, а проверка „има ли го" е по-евтина от условие при викащия.
  */
 export function zakachiIzgledaNaGanta(koren: HTMLElement): void {
+  postaviStepenite(koren);
   postaviKolonata(koren);
   const dvete = koren.querySelector<HTMLElement>('.gant-dvete');
   if (dvete && !dvete.classList.contains('bez-diagrama')) granitsata(dvete);
   vlacheneNaKolonata(koren);
+}
+
+/**
+ * СТЕПЕНТА на всеки ред · през CSSOM, не с вграден `style` (резен 12б).
+ *
+ * CSP-то на приложението е `default-src 'self'` без `unsafe-inline`: браузърът
+ * ОТКАЗВА вградени стилови атрибути и отстъпът нямаше да се приложи изобщо.
+ * Разметката носи `data-stepen`; числото стига до стила оттук.
+ *
+ * Поуката, платена от прохода: правило може да е вярно И да не стига до екрана.
+ * Тук пазачът не беше проверка на разметка, а КОНЗОЛАТА.
+ */
+function postaviStepenite(koren: HTMLElement): void {
+  for (const red of koren.querySelectorAll<HTMLElement>('.gant-delo[data-stepen]')) {
+    red.style.setProperty('--stepen', red.dataset['stepen'] ?? '0');
+  }
 }
 
 /** Слага ширината на колоната · на самата решетка. */

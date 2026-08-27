@@ -12,6 +12,7 @@
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
+import { praviTsikal } from './dela.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
@@ -219,6 +220,22 @@ export class Deystviya {
         `Това дело е ПРЕХВЪРЛЕНО към „${prehvarleno.kam}" (пренос ${prehvarleno.prenosId.slice(0, 8)}…). ` +
           'Върни го с обратен пренос, не със запис наново.',
       );
+    }
+    // ЦИКЪЛ · дело, направено свой прародител, ЗАКЛЮЧВА рисуването завинаги:
+    // всяка обиколка на дървото тръгва и не се връща. Дотук такъв пазач НЯМАШЕ
+    // и не се стигаше до цикъл само защото формата винаги ражда нов `id`. С
+    // бутони „навътре · навън" (резен 12б) се стига веднага.
+    //
+    // Проверката е ТУК, не при Вратата: Вратата не чете Огледалото — дословният
+    // прецедент на `vpishiZapasen` по-долу. Дървото се знае само от Огледалото.
+    if (danni.nadDelo !== '') {
+      const zhivi = [...(await this.ogledalo()).dela.values()];
+      if (praviTsikal(zhivi, id, danni.nadDelo)) {
+        throw new GreshkaTablitsa(
+          'Това дело не може да е под самото себе си или под свой потомък — ' +
+            'дървото щеше да се затвори в кръг и екранът нямаше да се нарисува.',
+        );
+      }
     }
     return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
   }
