@@ -29,6 +29,14 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
+  CHASOVE_NA_DENYA,
+  edinitsataNaSvoya,
+  IMENA_NA_TAKTOVETE,
+  TAKTOVE,
+  type SvoyPeriod,
+  type Takt,
+} from '../src/domein/vreme.js';
+import {
   IMENA_NA_OTSENKITE,
   OTSENKI,
   nomeraPoDarvo,
@@ -45,11 +53,8 @@ import {
   type Otsenka,
 } from '../src/domein/dela.js';
 import {
-  IMENA_NA_TAKTOVETE,
   obobshtenRed,
   reshetka,
-  TAKTOVE,
-  type Takt,
 } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
@@ -82,6 +87,8 @@ import type { Konteks } from './ekranite.js';
 interface PogledNaGanta {
   readonly klyuch: string;
   takt: Takt;
+  /** СВОЯТ такт · негов период от дата до дата (И104) */
+  svoy: SvoyPeriod;
   readonly sgunati: Set<string>;
   diagrama: boolean;
   filtarMyasto: string;
@@ -117,6 +124,28 @@ function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<s
   ]);
 }
 
+/**
+ * КАКВО КАЗВА ТАКТЪТ · един ред, който не лъже.
+ *
+ * Числото на колоните се БРОИ от решетката, а не се предполага: при „месец"
+ * февруари дава 28, а не 31, и точно това беше неговото възражение. При „свой"
+ * се казва и коя е колоната — денят или месецът — защото това е решение, взето
+ * вместо него, и мълчаливото решение е по-лошото.
+ */
+function opisNaTakta(p: PogledNaGanta, deystvitelen: Takt, broyKoloni: number): string {
+  if (p.takt === 'svoy' && deystvitelen !== 'svoy') {
+    return 'свой · избери ОТ и ДО · дотогава се показва месец';
+  }
+  if (p.takt === 'svoy') {
+    const edinitsa = edinitsataNaSvoya(p.svoy) === 'den' ? 'ДЕН' : 'МЕСЕЦ';
+    return `свой · ${p.svoy.ot} → ${p.svoy.do} · колоната е ${edinitsa} · ${broyKoloni} колони`;
+  }
+  if (deystvitelen === 'den') {
+    return `ден · ${CHASOVE_NA_DENYA.length} часа между 08:00 и 17:00 · обедът не се рисува`;
+  }
+  return `${IMENA_NA_TAKTOVETE[deystvitelen].toLowerCase()} · ${broyKoloni} колони`;
+}
+
 const POGLEDI = new Map<string, PogledNaGanta>();
 
 function pogled(klyuch = 'gant'): PogledNaGanta {
@@ -125,6 +154,7 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
   const nov: PogledNaGanta = {
     klyuch,
     takt: chetiEkranno<Takt>(`${klyuch}.takt`, 'mesets'),
+    svoy: chetiEkranno<SvoyPeriod>(`${klyuch}.svoy`, { ot: '', do: '' }),
     sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
@@ -140,6 +170,7 @@ let greshkaDelo = '';
 
 function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.takt`, p.takt);
+  zapomniEkranno(`${p.klyuch}.svoy`, p.svoy);
   zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
@@ -183,7 +214,11 @@ export function narisuvayGant(
   predstavka = 'd-',
 ): string {
   const p = pogled(klyuch);
-  const { takt, sgunati, diagrama, filtarMyasto, filtarObekt, filtarOtsenka } = p;
+  const { sgunati, diagrama, filtarMyasto, filtarObekt, filtarOtsenka } = p;
+  // СВОЯТ ТАКТ без период е такт без решетка. Вместо празен екран се пада на
+  // месец и полетата стоят отворени — правило 15: изключеното се КАЗВА.
+  const svoyGotov = p.svoy.ot !== '' && p.svoy.do !== '' && p.svoy.do >= p.svoy.ot;
+  const takt = p.takt === 'svoy' && !svoyGotov ? 'mesets' : p.takt;
   const vsichki = [...o.dela.values()];
   // ПОДРЕДБАТА Е ДЪРВОВИДНА (резен 12б): детето винаги СЛЕД родителя си, а
   // вътре в едно ниво важи неговата подредба (спешност → Оценка → завършените
@@ -203,7 +238,7 @@ export function narisuvayGant(
   // (резен 12б). РИСУВА се с разпънатите, БРОИ се с записаните: плочките горе
   // отчитат факти от Журнала, а не изведена дата.
   const zaRisuvane = sObobshteniSrokove(naEkrana, filtrirani);
-  const r = reshetka(zaRisuvane, takt, dnes);
+  const r = reshetka(zaRisuvane, takt, dnes, p.svoy);
   // Сумите покриват ЦЕЛИЯ обхват на решетката — от първата до последната
   // колона — не един месец: колона извън месеца показваше нула, която
   // изглеждаше като „няма движение".
@@ -241,17 +276,31 @@ export function narisuvayGant(
     <section data-sektsiya="gant-izgled" class="karta">
       <div class="dyalglava">
         <h2>Изглед</h2>
-        <span>тактът мени решетката · ${IMENA_NA_TAKTOVETE[takt].toLowerCase()}</span>
+        <span>тактът мени решетката · ${ekraniraj(opisNaTakta(p, takt, r.koloni.length))}</span>
       </div>
       <div class="lentata">
         <div class="takt" role="group" aria-label="Такт">
           ${TAKTOVE.map(
             (t) =>
-              `<button type="button" data-takt="${t}" class="${t === takt ? 'izbran' : ''}">${
+              `<button type="button" data-takt="${t}" class="${t === p.takt ? 'izbran' : ''}">${
                 IMENA_NA_TAKTOVETE[t]
               }</button>`,
           ).join('')}
         </div>
+        ${
+          p.takt === 'svoy'
+            ? `<div class="svoy-period poleta tesni">
+                <div class="pole">
+                  <label for="svoy-ot">От</label>
+                  <input type="date" id="svoy-ot" value="${ekraniraj(p.svoy.ot)}">
+                </div>
+                <div class="pole">
+                  <label for="svoy-do">До</label>
+                  <input type="date" id="svoy-do" value="${ekraniraj(p.svoy.do)}">
+                </div>
+              </div>`
+            : ''
+        }
         <button type="button" id="sega" class="vtorichen">СЕГА</button>
         <button type="button" id="kam-diagrama" class="vtorichen">${
           diagrama ? 'Скрий диаграмата' : 'Покажи диаграмата'
@@ -355,7 +404,7 @@ function opciiOtsenki(izbrano: string): string {
 export function tablitsataSOcveteniPoleta(
   dela: readonly Delo[],
   r: ReturnType<typeof reshetka>,
-  sumi: readonly { prihod_st: number; razhod_st: number }[],
+  sumi: readonly { prihod_st: number; razhod_st: number; obhvat: number }[],
   dnes: string,
   sasSgavachi = true,
   /** И95: Приходите и Разходите носят ключ — скрити ПАК се смятат (пр. 23) */
@@ -407,7 +456,11 @@ export function tablitsataSOcveteniPoleta(
             ${r.koloni
               .map(
                 (k) =>
-                  `<span class="${k.dnes ? 'dnes' : ''}" data-den="${k.ot}">${ekraniraj(k.nadpis)}</span>`,
+                  // ОПИСЪТ носи цялото · тясната глава реже („чт 27", „09"),
+                  // но нищо не се губи: денят и часът стоят в `title`.
+                  `<span class="${k.dnes ? 'dnes' : ''}" data-den="${k.ot}" title="${ekraniraj(
+                    k.opis,
+                  )}">${ekraniraj(k.nadpis)}</span>`,
               )
               .join('')}
           </div>
@@ -437,13 +490,14 @@ export function tablitsataSOcveteniPoleta(
             .join('')}
           ${sasTsifrite ? `<div class="gant-red sumi">
             ${sumi
-              .map(
-                (s, i) =>
-                  `<span class="gant-suma${r.koloni[i]!.dnes ? ' dnes' : ''}">${
-                    s.prihod_st || s.razhod_st
-                      ? `<b translate="no">${pishi(s.prihod_st)}</b><i translate="no">${pishi(s.razhod_st)}</i>`
-                      : ''
-                  }</span>`,
+              .map((s, i) =>
+                s.obhvat === 0
+                  ? ''
+                  : `<span class="gant-suma${r.koloni[i]!.dnes ? ' dnes' : ''}" data-obhvat="${s.obhvat}">${
+                      s.prihod_st || s.razhod_st
+                        ? `<b translate="no">${pishi(s.prihod_st)}</b><i translate="no">${pishi(s.razhod_st)}</i>`
+                        : ''
+                    }</span>`,
               )
               .join('')}
           </div>` : ''}
@@ -622,6 +676,11 @@ export function slozhiShirinite(koren: HTMLElement): void {
     l.style.setProperty('--ot', String(l.dataset.ot ?? 1));
     l.style.setProperty('--broy', String(l.dataset.broy ?? 1));
   }
+  // КЛЕТКАТА НА СУМИТЕ се разпъва над часовете на своя ден (резен 13а).
+  // Парите нямат час: сумата на деня стои ВЕДНЪЖ, не осем пъти.
+  for (const s of koren.querySelectorAll<HTMLElement>('.gant-suma[data-obhvat]')) {
+    s.style.setProperty('--obhvat', String(s.dataset.obhvat ?? 1));
+  }
 }
 
 export function zakachiGant(
@@ -721,6 +780,21 @@ export function zakachiGant(
       } finally {
         b.disabled = false;
       }
+    });
+  }
+
+  /**
+   * СВОЯТ ПЕРИОД · двете дати (И104 · „такъв който сам да избереш").
+   *
+   * Пише се при СМЯНА, не при всеки натиснат клавиш: полето за дата ражда
+   * `change` чак когато датата е цяла, значи прерисуване с половин дата няма.
+   */
+  for (const id of ['#svoy-ot', '#svoy-do']) {
+    koren.querySelector<HTMLInputElement>(id)?.addEventListener('change', async (e) => {
+      const v = (e.target as HTMLInputElement).value;
+      p.svoy = id === '#svoy-ot' ? { ...p.svoy, ot: v } : { ...p.svoy, do: v };
+      zapomniPogleda(p);
+      await prerisuvay();
     });
   }
 

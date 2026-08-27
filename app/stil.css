@@ -1545,6 +1545,9 @@ table.razbivka .drebno { font-size: 0.75rem; }
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border-left: 1px solid var(--liniya); font-size: 0.679rem; line-height: 1.25;
   font-variant-numeric: tabular-nums;
+  /* ОБХВАТЪТ · при такт „ден" осемте часа са ЕДИН ден, а парите нямат час:
+     сумата се разпъва над тях вместо да се повтори осем пъти (резен 13а). */
+  grid-column: span var(--obhvat, 1);
 }
 .gant-suma.dnes { background: var(--toplo); }
 .gant-suma b { color: var(--zeleno); font-weight: 500; }

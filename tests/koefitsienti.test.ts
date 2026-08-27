@@ -10,6 +10,7 @@
  *   · месечните се появяват САМО при стъпка месец.
  */
 
+import { IMENA_NA_TAKTOVETE } from '../src/domein/vreme.js';
 import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
@@ -26,7 +27,6 @@ import {
   sDumiStoynost,
   smetniKoefitsient,
   zaStapka,
-  IMENA_NA_STAPKITE,
   STAPKI,
   razbiyNaStapki,
   type DanniZaPerioda,
@@ -292,7 +292,10 @@ describe('делител нула дава ЛИПСА, не нула', () => {
 describe('стъпките · режат периода без да лъжат', () => {
   it('петте са изброени поименно и всяка има име', () => {
     expect([...STAPKI]).toEqual(['den', 'sedmitsa', 'mesets', 'trimesechie', 'godina']);
-    for (const st of STAPKI) expect(IMENA_NA_STAPKITE[st], st).not.toBe('');
+    for (const st of STAPKI) expect(IMENA_NA_TAKTOVETE[st], st).not.toBe('');
+    // ЕДИН РЕЧНИК (резен 13а): стъпката на Калкулатора Е тактът на Ганта, без
+    // „свой" — там периодът вече е избран отвън и няма какво да реже.
+    expect(STAPKI.includes('trimesechie' as never)).toBe(true);
   });
 
   it('месец по месец · всеки етикет е самият месец', () => {

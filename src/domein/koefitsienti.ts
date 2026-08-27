@@ -46,6 +46,7 @@ import { razhodiZaPerioda, smetki } from './smetki.js';
 import { saldoNa, sumiZaObhvat } from './otcheti.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
+import { TAKTOVE_ZA_REZHENE, type Takt } from './vreme.js';
 
 export class GreshkaKoefitsient extends Error {
   constructor(message: string) {
@@ -245,17 +246,17 @@ export function zaStapka(stapka: 'mesets' | 'drug'): readonly Koefitsient[] {
  * украса на диаграмата — тя решава КОИ коефициенти изобщо се показват: онези
  * на месечна база се появяват само при месец (т.6).
  */
-export const STAPKI = ['den', 'sedmitsa', 'mesets', 'trimesechie', 'godina'] as const;
+/**
+ * РЕЧНИКЪТ Е ЕДИН · идва от `vreme.ts` (резен 13а · правило 17).
+ *
+ * Дотук тук стоеше СВОЙ списък от пет думи, а Гантът имаше свой от четири:
+ * два дома за един факт, и те не съвпадаха — тримесечието го имаше само тук.
+ * Сега стъпката Е тактът, без „свой": периодът тук вече е избран отвън, значи
+ * няма какво да реже.
+ */
+export const STAPKI = TAKTOVE_ZA_REZHENE;
 
-export type Stapka = (typeof STAPKI)[number];
-
-export const IMENA_NA_STAPKITE: Readonly<Record<Stapka, string>> = Object.freeze({
-  den: 'ден',
-  sedmitsa: 'седмица',
-  mesets: 'месец',
-  trimesechie: 'тримесечие',
-  godina: 'година',
-});
+export type Stapka = Exclude<Takt, 'svoy'>;
 
 /** Едно парче от периода · със свой етикет за оста. */
 interface Parche {

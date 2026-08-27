@@ -19,8 +19,8 @@
  * учи човека, че приложението знае по-добре; казана причина го учи защо.
  */
 
+import { IMENA_NA_TAKTOVETE } from '../src/domein/vreme.js';
 import {
-  IMENA_NA_STAPKITE,
   IMENA_NA_VIDOVETE,
   KOEFITSIENTI,
   PRIRAVNYAVANETO,
@@ -134,7 +134,7 @@ function lentata(
           <select translate="no" id="koef-stapka">
             ${STAPKI.map(
               (s) =>
-                `<option value="${s}"${s === stapka ? ' selected' : ''}>${IMENA_NA_STAPKITE[s]}</option>`,
+                `<option value="${s}"${s === stapka ? ' selected' : ''}>${IMENA_NA_TAKTOVETE[s]}</option>`,
             ).join('')}
           </select>
         </div>
@@ -162,7 +162,7 @@ function lentata(
       ${
         stapka === 'mesets'
           ? '<p class="drebno">Стъпка МЕСЕЦ · показани са и месечните коефициенти (събираемост, ДДС) — начисленото и ДДС-то са месечни понятия, не наш избор.</p>'
-          : `<p class="drebno">При стъпка „${ekraniraj(IMENA_NA_STAPKITE[stapka])}" месечните коефициенти ги НЯМА — те нямат смисъл извън месец.</p>`
+          : `<p class="drebno">При стъпка „${ekraniraj(IMENA_NA_TAKTOVETE[stapka])}" месечните коефициенти ги НЯМА — те нямат смисъл извън месец.</p>`
       }
       ${lazhe ? `<p class="drebno trevozhno" id="kade-lazhe">⚠ ${ekraniraj(lazhe)}</p>` : ''}
       <label class="vazm">

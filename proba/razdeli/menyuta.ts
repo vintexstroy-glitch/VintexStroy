@@ -83,9 +83,19 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('подразбраният такт е месец',
       await p.$eval('[data-takt="mesets"]', (e) => e.classList.contains('izbran')), true);
     const koloniMesets = await p.$$eval('.gant-glava-vreme span', (e) => e.length);
+    const parvataMesets = await p.$eval('.gant-glava-vreme span',
+      (e) => e.getAttribute('data-den') ?? '');
     await deystvieSPrerisuvane(p, () => p.click('[data-takt="sedmitsa"]'));
     const koloniSedmitsa = await p.$$eval('.gant-glava-vreme span', (e) => e.length);
-    proveri('месецът дава 31×5 + 31 колони', koloniMesets, 31 * 5 + 31);
+    // МЕСЕЦЪТ Е КАЛЕНДАРЕН (резен 13а · И104: „Месец с дните от календара за
+    // месеца"). Дотук всеки месец получаваше по 31 колони и февруари показваше
+    // три празни; сега шестте месеца дават толкова, колкото имат.
+    // Числото се МЕРИ по свойство, не се заковава: шест последователни месеца
+    // дават между 181 и 184 дни според това кои са. Заковано число тук би
+    // паднало през февруари — точно грешката, която тази промяна поправя.
+    proveri('месецът дава КАЛЕНДАРНИТЕ дни на шест месеца, не 6×31',
+      koloniMesets >= 181 && koloniMesets <= 184, true);
+    proveri('и почва от ПЪРВИЯ ден на месец', parvataMesets.slice(8), '01');
     proveri('седмицата дава 7×5 + 7', koloniSedmitsa, 7 * 5 + 7);
     await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
 

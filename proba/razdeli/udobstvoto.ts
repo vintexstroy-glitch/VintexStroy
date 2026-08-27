@@ -1274,4 +1274,73 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и не се разтяга · плочката е капната',
       await p.$eval('.plochka', (e) => Math.round(e.getBoundingClientRect().width) <= 240), true);
 
+    razdel = '80 · Тактът · ЕДИН речник с ШЕСТ стойности';
+    // Негови думи, 27.08 (И104): „Нека са като НАП 5 вида… за деня е от 08:00
+    // до 17:00… Искам в такта да има и такъв който сам да избереш. ДЕН с 8
+    // часа. Месец с дните от календара за месеца. Тримесечие пак така. Година
+    // с 12 месеца."
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('шест такта, не четири',
+      await p.$$eval('[data-takt]', (e) => e.length), 6);
+    proveri('и тримесечието вече го има на екрана',
+      await p.$$eval('[data-takt="trimesechie"]', (e) => e.length), 1);
+
+    const koloniteSa = async (): Promise<number> =>
+      p.$$eval('.gant-glava-vreme span', (e) => e.length);
+
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="den"]'));
+    const kolonivDen = await koloniteSa();
+    console.log(`\n  ТАКТЪТ „ДЕН": ${kolonivDen} колони · осем часа по шест дни\n`);
+    proveri('денят е РАБОТЕН ДЕН · колоните са кратни на осем',
+      kolonivDen % 8, 0);
+    const glaviteNaDenya = await p.$$eval('.gant-glava-vreme span', (e) =>
+      e.slice(0, 3).map((x) => x.textContent));
+    proveri('първата колона на деня носи ДЕНЯ, не часа',
+      /^[а-я]{2} \d+$/.test(glaviteNaDenya[0] ?? ''), true);
+    proveri('а следващите носят ЧАС', glaviteNaDenya[1], '09');
+    proveri('обедът НЕ се рисува · от 11 се минава на 13',
+      (await p.$$eval('.gant-glava-vreme span', (e) => e.map((x) => x.textContent)))
+        .includes('12'), false);
+    // Цялото стои в описа · тясната глава реже, но нищо не се губи.
+    proveri('описът носи часа И деня',
+      await p.$eval('.gant-glava-vreme span:nth-child(2)',
+        (e) => (e.getAttribute('title') ?? '').includes('09:00–10:00')), true);
+
+    // ПАРИТЕ НЯМАТ ЧАС · сумата на деня стои ВЕДНЪЖ, разпъната над осемте.
+    const sumiteNaDen = await p.$$eval('.gant-suma', (e) => e.length);
+    proveri('сумата на деня е ЕДНА клетка, не осем',
+      sumiteNaDen * 8, kolonivDen);
+    proveri('и се разпъва над осемте си часа',
+      await p.$eval('.gant-suma', (e) => (e as HTMLElement).dataset['obhvat']), '8');
+
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="trimesechie"]'));
+    proveri('тримесечието почва от ПЪРВИЯ ден на тримесечие',
+      await p.$eval('.gant-glava-vreme span', (e) => {
+        const d = e.getAttribute('data-den') ?? '';
+        return `${d.slice(5, 7)}-${d.slice(8)}`;
+      }).then((x) => ['01-01', '04-01', '07-01', '10-01'].includes(x)), true);
+
+    razdel = '80 · Тактът · СВОЯТ период · „такъв който сам да избереш"';
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="svoy"]'));
+    proveri('появяват се двете дати', await p.$$eval('#svoy-ot, #svoy-do', (e) => e.length), 2);
+    // Без период не се показва празен екран · пада на месец и го КАЗВА.
+    proveri('без период се казва какво липсва',
+      (await tekstNa(p, '[data-sektsiya="gant-izgled"] .dyalglava span')).includes('избери ОТ и ДО'),
+      true);
+    await deystvieSPrerisuvane(p, () => p.fill('#svoy-ot', '2026-08-01'));
+    await deystvieSPrerisuvane(p, () => p.fill('#svoy-do', '2026-08-10'));
+    proveri('своят период дава ТОЧНО толкова колони', await koloniteSa(), 10);
+    proveri('и КАЗВА коя е колоната',
+      (await tekstNa(p, '[data-sektsiya="gant-izgled"] .dyalglava span')).includes('колоната е ДЕН'),
+      true);
+    // Дълъг период · колоната става МЕСЕЦ, и това пак се казва.
+    await deystvieSPrerisuvane(p, () => p.fill('#svoy-do', '2026-12-31'));
+    proveri('дълъг период дава МЕСЕЧНИ колони', await koloniteSa(), 5);
+    proveri('и това се КАЗВА, не се гадае',
+      (await tekstNa(p, '[data-sektsiya="gant-izgled"] .dyalglava span')).includes('колоната е МЕСЕЦ'),
+      true);
+    // Тактът се връща на месец · състоянието не се разсипва под следващите.
+    await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
+    await naEkran(p, 'imoti', '#forma-imot');
+
 }
