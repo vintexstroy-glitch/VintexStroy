@@ -22,6 +22,7 @@
  */
 
 import { ekraniraj } from './obshto.js';
+import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
 
 interface Prozorets {
   /** заглавието вътре · и достъпното име на прозореца */
@@ -47,6 +48,13 @@ export function otvoriProzorets(p: Prozorets): () => void {
   fon.className = 'istoriya-fon';
   fon.innerHTML = `
     <div class="istoriya-karta" role="dialog" aria-modal="true" aria-label="${ekraniraj(p.zaglavie)}">
+      ${
+        /* ЛОСТЪТ ЗА РАЗМЕРА И ТУК · негово: „на всеки прозорец" (резен 10).
+           Прозорецът ПОКРИВА шапката, значи лостът горе остава зад воала — а
+           точно тук се чете най-дребният текст. Разметката идва от ЕДНА
+           функция; двете места не са две истини. */
+        lostatNaGoleminata()
+      }
       <h3>${ekraniraj(p.zaglavie)}</h3>
       ${p.pod ? `<p class="pod">${ekraniraj(p.pod)}</p>` : ''}
       ${p.tyalo}
@@ -72,6 +80,7 @@ export function otvoriProzorets(p: Prozorets): () => void {
   document.body.append(fon);
 
   // Фокусът влиза В прозореца, за да е следващият Tab вътре в него.
+  zakachiGoleminata(fon);
   fon.querySelector<HTMLButtonElement>('.istoriya-zatvori')!.focus();
   return zatvori;
 }

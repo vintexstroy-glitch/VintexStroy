@@ -62,6 +62,7 @@ import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiZebrata } from './zebra.js';
 import { zakachiVisochinata } from './visochina.js';
+import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
@@ -680,6 +681,11 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
+            ${/* РАЗМЕРЪТ НА ТЕКСТА · ПЪРВИ отляво в групата и затова видим на
+                  всеки екран, дори когато петте служебни пътя ги няма (личния).
+                  Рисува се в ЧЕРУПКАТА, не в екраните: инак единайсетият екран
+                  ще се роди без него, точно както се роди без `data-sektsiya`. */
+              lostatNaGoleminata()}
             ${
               /**
                * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
@@ -817,6 +823,7 @@ async function trugvay(): Promise<void> {
     // ЗЕБРАТА е ПОСЛЕДНА: тя брои РЕДОВЕТЕ, а скритите колони и подредбата
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
     // на редове, които после се местят.
+    zakachiGoleminata(koren);
     zakachiVisochinata(koren);
     zakachiZebrata(koren);
     zakachiGlavnite(k, prerisuvay);

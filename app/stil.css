@@ -319,7 +319,19 @@
      „по-голям текст" на системата) и расте леко на широк екран (vw
      компонентът). Числата пазят ТОЧНИЯ стар пропорционален мащаб (базата си
      остава 14px = 1rem) — само единицата стана адаптивна. */
-  --text-base: clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem);
+  /* РАЗМЕРЪТ НА ТЕКСТА · лост, видим по всяко време (резен 10 · негова дума,
+     27.08: „Бутоните за размера на текста да е видим по всяко време горе в
+     дясно, на всеки прозорец").
+
+     Числото е МНОЖИТЕЛ, не нова скала: `clamp(…rem…)` следва настройката на
+     устройството (резен 1) и остава. Човек със слабо зрение, който си е вдигнал
+     шрифта в браузъра, инак би загубил своето при първото натискане.
+
+     Стои на КОРЕНА нарочно: изскачащият прозорец виси на `body`, значи
+     наследява същото число. Сложено на `.telo`, то щеше да спре точно на
+     границата на прозореца. */
+  --golemina: 1;
+  --text-base: calc(clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem) * var(--golemina));
   --text-xs: calc(var(--text-base) * 0.79);
   --text-sm: calc(var(--text-base) * 0.89);
   --text-md: var(--text-base);
@@ -456,6 +468,30 @@ a:hover { color: var(--aktsent-tumen); }
 .shapka h1 { font-family: Literata, Georgia, serif; font-size: 1.857rem; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
 .shapka p { margin: 0; font-size: 0.929rem; color: var(--mastilo2); }
 .desno-gore { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+/* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
+   показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
+   шапката, а лост зад воала е лост, който го няма. */
+.goleminata { display: inline-flex; align-items: baseline; gap: 2px; }
+.goleminata button {
+  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
+  border-radius: 4px; padding: 2px 8px; line-height: 1.2; cursor: pointer;
+  font-family: inherit;
+}
+.goleminata button:hover { background: var(--panel); color: var(--mastilo); }
+.goleminata button[aria-pressed='true'] {
+  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
+}
+/* Размерите са ЗАКОВАНИ в px, а не в rem: това е ЛЕГЕНДАТА на лоста, а не текст
+   от приложението. Расте ли и тя с избора, трите „A" остават еднакви помежду
+   си и лостът престава да казва кое какво е. */
+.goleminata .golemina-drebno { font-size: 11px; }
+.goleminata .golemina-normalno { font-size: 14px; }
+.goleminata .golemina-edro { font-size: 18px; }
+
+/* В ПРОЗОРЕЦА · горе вдясно, до заглавието. */
+.istoriya-karta { position: relative; }
+.istoriya-karta > .goleminata { position: absolute; top: 14px; right: 14px; }
 
 .telo {
   flex-grow: 1; min-width: 0; padding: var(--space-lg);

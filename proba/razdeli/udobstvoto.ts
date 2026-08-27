@@ -833,6 +833,57 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (e as HTMLElement).scrollTop = 0;
     });
 
+    razdel = '76 · Размерът на текста · лост, видим по всяко време';
+    // Негово: „Бутоните за размера на текста да е видим по ВСЯКО ВРЕМЕ горе в
+    // дясно, НА ВСЕКИ ПРОЗОРЕЦ."
+    //
+    // Мери се ПРЕМЕРЕНИЯТ размер, не атрибутът: правило може да е вярно и пак
+    // да не стига до текста (`[hidden]` вече ни го показа два пъти, ADR-057).
+    proveri('лостът стои ГОРЕ ВДЯСНО, в шапката',
+      await p.$$eval('.shapka .desno-gore .goleminata button', (b) => b.length), 3);
+    const tekstPredi = await p.$eval('body', (e) =>
+      Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100);
+    await p.click('.shapka .goleminata [data-golemina="edro"]');
+    await p.waitForTimeout(150);
+    const tekstEdro = await p.$eval('body', (e) =>
+      Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100);
+    console.log(`\n  РАЗМЕР НА ТЕКСТА: нормално ${tekstPredi}px → едро ${tekstEdro}px\n`);
+    proveri('едрото наистина уголемява ТЕКСТА', tekstEdro > tekstPredi, true);
+    proveri('и е отбелязано точно ЕДНО стъпало',
+      await p.$$eval('.shapka .goleminata button[aria-pressed="true"]', (b) => b.length), 1);
+
+    // СКАЛАТА ОСТАВА `rem`-БАЗИРАНА · лостът мени БАЗАТА, не заменя механизма.
+    // Инак човек, вдигнал шрифта в браузъра, губи своето при първото натискане.
+    proveri('скалата остава rem-базирана · множител, не нова скала',
+      await p.evaluate(() =>
+        getComputedStyle(document.documentElement).getPropertyValue('--text-base').includes('rem')),
+      true);
+
+    razdel = '76 · Размерът · и В ПРОЗОРЕЦА, където текстът е най-дребен';
+    // Прозорецът ПОКРИВА шапката — лост зад воала е лост, който го няма.
+    await natisniVGrupata(p, '[data-istoriya]');
+    await p.waitForSelector('.istoriya-karta');
+    proveri('лостът е и в прозореца',
+      await p.$$eval('.istoriya-karta .goleminata button', (b) => b.length), 3);
+    proveri('и показва СЪЩОТО стъпало като шапката',
+      await p.$eval('.istoriya-karta .goleminata button[aria-pressed="true"]',
+        (e) => (e as HTMLElement).dataset['golemina']), 'edro');
+    await p.keyboard.press('Escape');
+
+    razdel = '76 · Размерът · изборът преживява смяна на екран';
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('лостът го има и на втория екран',
+      await p.$$eval('.shapka .goleminata button', (b) => b.length), 3);
+    proveri('и текстът е още едър',
+      await p.$eval('body', (e) =>
+        Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100), tekstEdro);
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.click('.shapka .goleminata [data-golemina="normalno"]');
+    await p.waitForTimeout(150);
+    proveri('и се връща на нормалното',
+      await p.$eval('body', (e) =>
+        Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100), tekstPredi);
+
     razdel = '75 · Височината на реда · ЕДНА за цялата таблица';
     // Негово: „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ
     // РЕДОВЕ височината, ЗА КОЛОНИТЕ НЕ ВАЖИ." Двете половини се мерят поотделно.
