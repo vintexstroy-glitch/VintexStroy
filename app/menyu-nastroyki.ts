@@ -64,7 +64,7 @@ export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
         sEkran ? ' data-ekran="nastroyki"' : ''
       }
               aria-expanded="${otvoren ? 'true' : 'false'}" aria-controls="nastroyki-red">
-        ${ikona('nastroyki', 'ikona navikona')}Настройки
+        ${ikona('nastroyki', 'ikona navikona')}<span class="navime">Настройки</span>
         <span class="strelka-dolu" aria-hidden="true">▾</span>
       </button>
       <div class="nastroyki-red" id="nastroyki-red" role="menu"

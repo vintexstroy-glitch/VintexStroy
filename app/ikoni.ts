@@ -97,6 +97,8 @@ export const IKONI: Readonly<Record<string, string>> = Object.freeze({
   'ekran-tabove': '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
   'ekran-tablo': '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
 
+  /** кабарче · застопорява лентата разтворена (негова дума: „да може да се застопори") */
+  zastopori: '<path d="M9.5 3.5h5l-.7 5.2 3.2 3.3H7l3.2-3.3z"></path><path d="M12 12v8"></path>',
   sigurnost: '<path d="M12 3.5 19.5 6.5v6c0 4.4-3.1 7.6-7.5 9-4.4-1.4-7.5-4.6-7.5-9v-6z"></path><path d="M9 12.2l2.2 2.2 4-4.3"></path>',
 
   // ── счетоводството пред държавата (И96 т.11) ───────────────────────────

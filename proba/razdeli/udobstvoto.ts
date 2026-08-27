@@ -719,3 +719,74 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       await p.keyboard.press('Escape');
     }
 }
+
+/**
+ * 73 · Плътността на реда и свитата лента (ADR-058)
+ *
+ * Негови думи (27.08): „**В менюто да се скрива като при клод и да може да се
+ * застопори.** Редовете в таблиците да приличат повече на **Проджект Мениджър
+ * и ексел** и да не са толкова високи. Да можеш да видиш максимално **без
+ * празни пространства колкото е текста** и **ако колоната е тясна минава на
+ * следваш ред**, компактно и подредено."
+ *
+ * Плътността се МЕРИ, не се оценява: числото тук е праг, който пада при първия
+ * върнат назад отстъп. Дотук такъв пазач нямаше — трите резена за плътност
+ * (1–3) се провериха с око и скрийншот, а окото не помни колко е било.
+ */
+export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '73 · Плътността · редът е висок колкото текста си';
+
+    await naEkran(p, 'imoti', '#forma-imot');
+    const podlozhkata = await p.$eval('.red', (e) => {
+      const st = getComputedStyle(e);
+      return `${parseInt(st.paddingTop, 10)}/${parseInt(st.paddingBottom, 10)}`;
+    });
+    proveri('подложката на реда е дребна · беше 13px', podlozhkata, '4/4');
+    // Редът на Имоти носи две реда текст (място и единица) — значи ~48px.
+    // Прагът е 56: над него значи, че нещо пак е почнало да вдига реда.
+    const visochina = await p.$eval('.red', (e) => Math.round(e.getBoundingClientRect().height));
+    console.log(`\n  ВИСОЧИНА НА РЕД: ${visochina}px · праг 56\n`);
+    proveri('редът стои под прага си', visochina <= 56, true);
+
+    razdel = '73 · Плътността · тясната колона ПРЕНАСЯ, не реже';
+    // Многоточието СКРИВА текст и не казва колко — отрязано име на доставчик
+    // изглежда точно като цяло.
+    proveri('клетката пренася на нов ред',
+      await p.$eval('.kletka b', (e) => getComputedStyle(e).overflowWrap), 'anywhere');
+    proveri('и НЕ реже с многоточие',
+      await p.$eval('.kletka span', (e) => getComputedStyle(e).textOverflow), 'clip');
+
+    razdel = '73 · Плътността · редовите действия са ЕДИН лост';
+    // „История" беше ръчен близнак на второстепенния бутон и затова оставаше
+    // ИЗВЪН групата: редът носеше два лоста, те не се побираха и се пренасяха.
+    // ЕДИН ред, не всички · `$$eval` събира цялата таблица и числото престава
+    // да значи „колко лоста има РЕДЪТ".
+    proveri('в реда стои една група, не два лоста',
+      await p.$eval('.red', (e) =>
+        [...e.querySelectorAll('.butoni > *')].filter((x) => (x as HTMLElement).checkVisibility()).length), 1);
+
+    razdel = '73 · Лентата · свива се и се застопорява';
+    proveri('копчето казва, че лентата е ЗАСТОПОРЕНА',
+      await p.$eval('#svii-lentata', (e) => e.getAttribute('aria-pressed')), 'true');
+    const shirokaBeshe = await p.$eval('.strana', (e) => Math.round(e.getBoundingClientRect().width));
+    await deystvieSPrerisuvane(p, () => p.click('#svii-lentata'));
+    const svita = await p.$eval('.strana', (e) => Math.round(e.getBoundingClientRect().width));
+    proveri('свитата лента е много по-тясна', svita < shirokaBeshe / 3, true);
+    proveri('и името на пункта НЕ се вижда · остава знакът',
+      await p.$eval('.navred .navime', (e) => (e as HTMLElement).checkVisibility()), false);
+    proveri('но го носи цяло за четеца на екран',
+      (await p.$eval('.navred .navime', (e) => e.textContent!.trim())).length > 0, true);
+
+    razdel = '73 · Лентата · застопоряването се помни';
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('свитото преживява смяна на екран',
+      await p.$eval('.strana', (e) => e.classList.contains('svita')), true);
+    await deystvieSPrerisuvane(p, () => p.click('#svii-lentata'));
+    proveri('и се връща разтворена',
+      await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
+    await naEkran(p, 'imoti', '#forma-imot');
+}

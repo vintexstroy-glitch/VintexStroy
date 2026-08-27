@@ -331,9 +331,11 @@ body {
 a { color: var(--aktsent); text-decoration: none; }
 a:hover { color: var(--aktsent-tumen); }
 
-.ekran { display: flex; min-height: 100vh; }
+.ekran { display: flex; min-height: 100vh; position: relative; }
 
-/* ── страничната лента ───────────────────────────────────────────── */
+/* ── страничната лента · свива се и се застопорява (ADR-058) ────────
+   Разтворената при минаване с мишка ЛЯГА върху екрана, не бута таблицата:
+   местен ред под курсора значи натиснато друго, не което човек е гледал. */
 .strana {
   width: 232px;
   flex-shrink: 0;
@@ -343,6 +345,46 @@ a:hover { color: var(--aktsent-tumen); }
   flex-direction: column;
 }
 .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+/* СВИТАТА ЛЕНТА · остават само знаците. */
+.strana.svita { width: 52px; }
+.strana.svita .marka { padding: 18px 8px 12px; align-items: center; }
+.strana.svita .marka b { font-size: 1rem; }
+.strana.svita { overflow: hidden; }
+.strana.svita .marka span,
+.strana.svita .navime,
+.strana.svita .broyach,
+.strana.svita .strelka-dolu,
+.strana.svita .nastroyki-red,
+.strana.svita .ekran-red,
+.strana.svita .veriga { display: none; }
+/* Марката се свива до първата буква · цялото име не се побира в 52px и
+   стърчащият му остатък изглежда като счупен екран, не като свита лента. */
+.strana.svita .marka b { font-size: 0; }
+.strana.svita .marka b::first-letter { font-size: 1.214rem; }
+.strana.svita .navred { justify-content: center; padding: 9px 0; }
+/* Разтваря се при минаване с мишка и при фокус ВЪТРЕ — иначе клавиатурата
+   стига до пункт, чието име не се вижда. */
+.strana.svita:hover, .strana.svita:focus-within {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 40;
+  width: 232px; box-shadow: 6px 0 20px rgba(42, 37, 33, 0.12);
+}
+.strana.svita:hover .marka, .strana.svita:focus-within .marka { padding: 24px 20px 20px; align-items: stretch; }
+.strana.svita:hover, .strana.svita:focus-within { overflow: visible; }
+.strana.svita:hover .marka b, .strana.svita:focus-within .marka b { font-size: 1.214rem; }
+.strana.svita:hover .marka span, .strana.svita:focus-within .marka span,
+.strana.svita:hover .navime, .strana.svita:focus-within .navime,
+.strana.svita:hover .broyach, .strana.svita:focus-within .broyach,
+.strana.svita:hover .strelka-dolu, .strana.svita:focus-within .strelka-dolu,
+.strana.svita:hover .veriga, .strana.svita:focus-within .veriga { display: revert; }
+.strana.svita:hover .navred, .strana.svita:focus-within .navred { justify-content: flex-start; padding: 9px 10px; }
+/* Копчето · дребно, в шапката на лентата. */
+.svivach {
+  background: none; border: none; border-radius: 4px; padding: 4px;
+  color: var(--mastilo2); align-self: flex-end; margin-top: -4px;
+}
+.svivach:hover, .svivach:focus-visible { background: #EAE2D6; }
+.svivach[aria-pressed="false"] svg { opacity: 0.5; }
+.strana.svita .svivach { align-self: center; }
 .marka b { font-family: Literata, Georgia, serif; font-size: 1.214rem; font-weight: 600; letter-spacing: -0.01em; }
 .marka span { font-size: 0.786rem; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
 
@@ -427,27 +469,37 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
      е без ефект, и празнината просто се мести от колоната в опашката. */
   justify-content: start;
   grid-template-columns: minmax(0, 440px) minmax(0, 320px) 130px 120px 120px;
-  align-items: center; gap: 16px; padding: 13px 18px;
+  /* ПЛЪТНОСТТА НА РЕДА · като в Проджект и Ексел (негова дума, 27.08):
+     „да не са толкова високи… максимално без празни пространства колкото е
+     текста". Височината на реда я дава ТЕКСТЪТ, а подложката само го отлепя
+     от линията. Затова 4px отгоре-отдолу, не 13, и по-стегнат интерлиниаж. */
+  align-items: center; gap: 10px; padding: 4px 10px;
+  line-height: 1.35;
   min-width: 720px;
 }
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px;
+  color: var(--mastilo2); padding-top: 5px; padding-bottom: 5px;
 }
 .red { border-bottom: 1px solid #EFE8DD; }
 .red:last-child { border-bottom: none; }
 .red:hover { background: #FDFBF7; }
-.kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.kletka b { font-weight: 500; font-size: 0.964rem; }
-.kletka span { font-size: 0.857rem; color: var(--mastilo2); overflow: hidden; text-overflow: ellipsis; }
+/* ТЯСНАТА КОЛОНА ПРЕНАСЯ НА НОВ РЕД, не реже с многоточие (негова дума):
+   „ако колоната е тясна минава на следваш ред". Многоточието СКРИВА текст и
+   не казва колко — а в счетоводна книга отрязаното име на доставчик изглежда
+   точно като цяло. `anywhere` реже и вътре в дума, когато думата сама по себе
+   си не се побира (дълъг ЕИК, адрес без интервали). */
+.kletka { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.kletka b { font-weight: 500; font-size: 0.964rem; overflow-wrap: anywhere; }
+.kletka span { font-size: 0.857rem; color: var(--mastilo2); overflow-wrap: anywhere; }
 .suma { font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; text-align: right; }
 
 .znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 0.821rem; font-weight: 500; white-space: nowrap; }
 .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
 .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
 
-.prazno { padding: 34px 18px; text-align: center; color: var(--mastilo2); font-size: 0.964rem; line-height: 1.6; }
+.prazno { padding: 18px; text-align: center; color: var(--mastilo2); font-size: 0.964rem; line-height: 1.6; }
 
 /* ── форми ───────────────────────────────────────────────────────── */
 .karta {
@@ -519,6 +571,11 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .suma.duljimo { color: var(--aktsent); }
 .suma.plateno { color: var(--zeleno); }
 .vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 0.893rem; }
+/* В РЕД НА ТАБЛИЦА бутонът не бива да вдига реда · иначе редът с бутон е с
+   една трета по-висок от реда без, и таблицата „подскача". Цената е казана:
+   по-малка мишена от препоръчаните 44px — приета за ГЪСТА таблица на десктоп,
+   каквато той поиска („като Проджект и Ексел"); на тесен екран важи медията. */
+.red .vtorichen.malak, .red .strelkichka { min-height: 24px; padding: 2px 8px; }
 
 /* ── ТЕМАТИЧНИТЕ ИКОНИ · знак до всяко управление (И101 т.2 · ADR-045) ───
    Един стил за всички: само контур, цветът идва от текста до тях. Икона със
@@ -1356,12 +1413,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .istoriya-sabitie .koga { grid-column: 2; font-size: 0.857rem; color: var(--mastilo2); }
 .istoriya-sabitie .opis { grid-column: 2; font-size: 0.893rem; }
 .istoriya-zatvori { margin-top: 14px; }
-.butoncheto-istoriya {
-  background: none; border: 1px solid var(--liniya); border-radius: 4px;
-  cursor: pointer; font-size: 0.857rem; color: var(--mastilo2);
-  padding: 4px 8px; min-height: 28px;
-}
-.butoncheto-istoriya:hover { background: var(--panel); color: var(--mastilo); }
+/* „История" вече е второстепенен бутон като всички (`vtorichen malak`) и не
+   носи свой вид: ръчният близнак се разминаваше при всяка смяна на палитрата
+   и — по-лошо — държеше бутона ИЗВЪН групата действия. Класът остава само
+   като закачалка за прохода. */
 
 /* ── избраната клетка · клавиатурната карта (ADR-022 · вълна 2) ─────────── */
 .kletka-izbrana {

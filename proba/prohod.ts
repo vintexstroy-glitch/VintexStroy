@@ -118,6 +118,7 @@ async function main(): Promise<void> {
     // а дотогава всеки друг блок вече си е взел своето. Блок, който мести
     // състояние под следващия, е по-скъп от липсващ.
     await menyuta.blok4(ctx);
+    await udobstvoto.blok5(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

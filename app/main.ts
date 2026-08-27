@@ -40,6 +40,7 @@ import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
 import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
+import { kopchetoNaLentata, lentataESvita, zakachiSvivachaNaLentata } from './lenta.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -808,6 +809,8 @@ async function trugvay(): Promise<void> {
     // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
     // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
+    // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
+    zakachiSvivachaNaLentata(koren, prerisuvay);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }
@@ -850,6 +853,9 @@ function strana(
       : 'Веригата е СКЪСАНА';
   const zakasneli = prosrocheni(o, dnes).length;
 
+  // СВИТА ЛИ Е · поглед, не факт: чете се от паметта на екрана (ADR-058).
+  const svita = lentataESvita();
+
   const punktove = (Object.keys(EKRANI) as KoyEkran[])
     .filter((koy) => {
       // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
@@ -881,15 +887,19 @@ function strana(
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';
+      // ИМЕТО В СВОЙ ВЪЗЕЛ · гол текстов възел не се скрива с CSS, а свитата
+      // лента трябва да остави само знака (ADR-058). `textContent` не се мени,
+      // значи проходът и контекстното меню четат същото.
       return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
-        ${ikona(e.ikona, 'ikona navikona')}${e.ime}${znachka}
+        ${ikona(e.ikona, 'ikona navikona')}<span class="navime">${e.ime}</span>${znachka}
       </button>`;
     })
     .join('');
 
   return `
-    <aside class="strana">
+    <aside class="strana${svita ? ' svita' : ''}">
       <div class="marka">
+        ${kopchetoNaLentata(svita)}
         <b>VintexStroy</b>
         <span>MasterBook · ${SEGA.ime}</span>
       </div>
