@@ -99,6 +99,7 @@ async function main(): Promise<void> {
     await stoynost.blok3(ctx);
     await nastroyki.blok4(ctx);
     const lichniyat = await lichno.blok1(ctx);
+    await udobstvoto.blok3(ctx);
     await menyuta.blok2(ctx);
     await lichno.blok2(ctx, lichniyat);
     await menyuta.blok3(ctx);

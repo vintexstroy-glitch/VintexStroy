@@ -228,7 +228,7 @@ function redNaButon(b: Buton): string {
 function formaNaButon(modeli: readonly ModelNaTablitsa[]): string {
   const postroeni = DEYSTVIYA.filter((d) => d.postroeno);
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="nastroyki-nov-buton" class="karta izbrana">
       <div class="dyalglava"><h2>Нов бутон</h2><span>име · папка · действие · позволени модели</span></div>
       <form id="forma-buton">
         <div class="poleta">
@@ -546,7 +546,7 @@ function formaNaFormulata(m: ModelNaTablitsa, kolona: number, sega?: Formula): s
 function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
   const rodnini = semeystvo(modeli, m);
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="nastroyki-nova-kolona" class="karta izbrana">
       <div class="dyalglava"><h2>Нова колона</h2><span>ражда се с вида и номенклатурата си</span></div>
       <form id="forma-kolona">
         <div class="poleta">

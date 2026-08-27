@@ -218,7 +218,7 @@ function kartaOtmetki(izbor: Izbor): string {
   const izklyucheni = RED.filter((v) => eIzklyuchena(izbor, v)).length;
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tablo-vazmozhnosti" class="karta">
       <div class="dyalglava">
         <h2>Възможности</h2>
         <span>${
@@ -275,7 +275,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
   }).join('');
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tablo-planovete" class="karta">
       <div class="dyalglava">
         <h2>Плановете</h2>
         <span>нагоре расте КАПАЦИТЕТЪТ, не функциите</span>

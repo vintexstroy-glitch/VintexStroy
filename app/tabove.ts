@@ -164,7 +164,7 @@ export function narisuvayTabove(o: Ogledalo, dnes: string): string {
       : undefined);
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tabove-tabovete" class="karta">
       <div class="dyalglava">
         <h2>Табовете</h2>
         <span>стационарни — допълваш екраните с още секции · добавени — изцяло твои</span>
@@ -221,7 +221,7 @@ function blokAdresnaKniga(o: Ogledalo): string {
   const sledvasht = sledvashtNomer(kniga);
 
   return `
-    <section>
+    <section data-sektsiya="tabove-adresna-kniga">
       <div class="dyalglava">
         <h2>Адресната книга</h2>
         <span>връзката е ПО НОМЕР, като в Ексел · сходни номера = свързани колони</span>
@@ -306,7 +306,7 @@ function formaNovTab(): string {
 
 function blokTab(o: Ogledalo, t: Tab, dnes: string): string {
   return `
-    <section>
+    <section data-sektsiya="tabove-izbraniyat">
       <div class="dyalglava">
         <h2>${ekraniraj(t.ime)}</h2>
         <span>${t.sektsii.length} ${t.sektsii.length === 1 ? 'секция' : 'секции'}${t.statsionaren ? ' · допълва екрана' : ''}</span>

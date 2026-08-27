@@ -204,7 +204,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${formaSalda(o)}
 
-    <section class="karta">
+    <section data-sektsiya="smetki-period" class="karta">
       <div class="dyalglava"><h2>Период</h2><span>сметките се смятат наново за всеки месец</span></div>
       <form id="forma-period">
         <div class="poleta tesni">
@@ -220,7 +220,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       </form>
     </section>
 
-    <section>
+    <section data-sektsiya="smetki-smetki">
       <div class="dyalglava">
         <h2>Сметки</h2><span>${ekraniraj(mesets)}</span>
       </div>
@@ -233,7 +233,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       </div>
     </section>
 
-    <section>
+    <section data-sektsiya="smetki-dds">
       <div class="dyalglava">
         <h2>ДДС</h2>
         <span>отделни акумулатори по държава и сектор — не един общ</span>
@@ -269,7 +269,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${blokNaOditniyaFayl(o, mesets)}
 
-    <section>
+    <section data-sektsiya="smetki-sverka">
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
         ${GLAVA_NA_SVERKATA}
@@ -298,7 +298,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     ${
       razhodi.length === 0
         ? ''
-        : `<section>
+        : `<section data-sektsiya="smetki-razhodi">
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
       ${poleZaTarsene('razhodi')}
       <div class="tablitsa" data-tablitsa="razhodi">
@@ -423,7 +423,7 @@ function formaSalda(o: Ogledalo): string {
   const trezor_st = saldoNa(o, 'trezor');
   const lipsvat = !o.salda.has('banka') || !o.salda.has('trezor');
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-salda" class="karta">
       <div class="dyalglava">
         <h2>Салда</h2>
         <span>ръчно начало · движенията идват от Журнала</span>
@@ -480,7 +480,7 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
     stoynost_st === undefined ? {} : { stoynostNaSastoyanie_st: stoynost_st },
   );
   return `
-    <section>
+    <section data-sektsiya="smetki-otcheti">
       <div class="dyalglava">
         <h2>Отчети</h2>
         <span>${ekraniraj(mesets)} · всяко число с формулата си</span>
@@ -533,7 +533,7 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
 function blokMesetsatZaAgenta(o: Ogledalo, mesets: string): string {
   const t = mesetsatKatoTablitsa(o, mesets, new Date().toISOString());
   return `
-    <section>
+    <section data-sektsiya="smetki-mesetsat">
       <div class="dyalglava">
         <h2>Месецът за агента</h2>
         <span>това — и нищо друго — напуска устройството</span>
@@ -590,7 +590,7 @@ function blokDelata(o: Ogledalo, dnes: string): string {
   // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
   // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `
-    <section>
+    <section data-sektsiya="smetki-dela">
       <div class="dyalglava">
         <h2>Делата · копието от Управление</h2>
         <span>същата таблица · със същата форма за ново дело (И95)</span>
@@ -643,7 +643,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
     ]),
   );
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-nov-razhod" class="karta">
       <div class="dyalglava"><h2>Нов разход</h2><span>сумата е обща цена с ДДС — както при наема</span></div>
       <form id="forma-razhod">
         <div class="poleta">
@@ -783,7 +783,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
   const razlikaPlateno = spravka ? plateno_st - spravka.deklarirano_st : 0;
 
   return `
-    <section class="karta${zakluchen ? ' izbrana' : ''}">
+    <section data-sektsiya="smetki-spravka" class="karta${zakluchen ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>Справка и внасяне</h2>
         <span>${
@@ -897,7 +897,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
     r.dds_ot_fakturi_st === 0 && r.dds_ot_izvlecheniya_st === 0 && r.nesvarsheni.length === 0;
 
   return `
-    <section class="karta${r.svereno || bezDvizheniya ? '' : ' izbrana'}">
+    <section data-sektsiya="smetki-sverka-dds" class="karta${r.svereno || bezDvizheniya ? '' : ' izbrana'}">
       <div class="dyalglava">
         <h2>Сверка на ДДС</h2>
         <span>фактури ↔ извлечения ↔ внесено</span>
@@ -1000,7 +1000,7 @@ function kalkulator(): string {
   const sborObshta = redove.reduce((s, r) => s + r.razbivka.obshta_st, 0);
 
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-kalkulator" class="karta">
       <div class="dyalglava"><h2>Калкулатор</h2><span>обща цена → основа и ДДС</span></div>
       <form id="forma-smyatane">
         <div class="poleta">

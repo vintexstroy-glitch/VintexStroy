@@ -191,7 +191,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
 
     ${prekratyavan ? formaPrekratyavane(prekratyavan) : ''}
 
-    <section class="karta${popravyanImot ? ' izbrana' : ''}">
+    <section data-sektsiya="imoti-nov" class="karta${popravyanImot ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>${popravyanImot ? 'Поправи имота' : 'Нов имот'}</h2>
         <span>${
@@ -232,7 +232,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       </form>
     </section>
 
-    <section class="karta${popravyanNaem ? ' izbrana' : ''}">
+    <section data-sektsiya="imoti-naem-nov" class="karta${popravyanNaem ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>${popravyanNaem ? 'Поправи наема' : 'Нов наем'}</h2>
         <span>${
@@ -338,7 +338,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       }
     </section>
 
-    <section>
+    <section data-sektsiya="imoti-spisak">
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
       ${imoti.length ? poleZaTarsene('imoti') : ''}
       <div class="tablitsa" data-tablitsa="imoti">
@@ -359,7 +359,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     ${
       naemi.length === 0
         ? ''
-        : `<section>
+        : `<section data-sektsiya="imoti-naemi">
       <div class="dyalglava">
         <h2>Наеми</h2>
         <span>${zhivi.length} ${zhivi.length === 1 ? 'жив' : 'живи'}${
@@ -453,7 +453,7 @@ function polePrichina(koe: string): string {
 
 function formaPrekratyavane(naem: Naem): string {
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="imoti-prekrati" class="karta izbrana">
       <div class="dyalglava">
         <h2>Прекрати наема</h2>
         <span>${ekraniraj(naem.naemetel)} · вече начисленото остава дължимо</span>

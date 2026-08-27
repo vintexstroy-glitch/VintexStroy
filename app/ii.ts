@@ -155,7 +155,7 @@ export function narisuvayII(o: Ogledalo, kontrol: TroyniyatKontrol, dnes: string
 function kartaPotvarzhdenie(): string {
   if (!iskane) return '';
   return `
-    <section class="karta izbrana" id="potvarzhdenieto">
+    <section data-sektsiya="ii-potvarzhdenie" class="karta izbrana" id="potvarzhdenieto">
       <div class="dyalglava">
         <h2>Потвърждение с имейл</h2>
         <span>${IMENA_ZA_KAKVO[iskane.zaKakvo]} · „${ekraniraj(iskane.kakvo)}"</span>
@@ -214,7 +214,7 @@ function kartaKontrol(k: TroyniyatKontrol, izbran: Agent | undefined): string {
 
 function kartaAgentite(agenti: readonly Agent[], izbran: Agent | undefined): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-agentite" class="karta">
       <div class="dyalglava">
         <h2>Агентите</h2>
         <span>един агент, един ред · всеки с ЧОВЕК-отговорник</span>
@@ -249,7 +249,7 @@ function kartaAgentite(agenti: readonly Agent[], izbran: Agent | undefined): str
 
 function formaNaAgent(): string {
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="ii-nov-agent" class="karta izbrana">
       <div class="dyalglava"><h2>Нов агент</h2><span>карта · длъжностна характеристика · забрани · три умения</span></div>
       <form id="forma-agent">
         <div class="poleta">
@@ -295,7 +295,7 @@ function formaNaAgent(): string {
 /** ПРОТОКОЛЪТ · четимият документ, от който се сглобява и промптът. */
 function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-protokolat" class="karta">
       <div class="dyalglava">
         <h2>Протоколът на „${ekraniraj(a.ime)}"</h2>
         <span>единственият дом на длъжностната · промптът се СГЛОБЯВА оттук</span>
@@ -368,7 +368,7 @@ function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
   const broi = broeviNaKartata(karta);
 
   return `
-    <section>
+    <section data-sektsiya="ii-dostapat">
       <div class="dyalglava">
         <h2>Къде вижда · къде редактира</h2>
         <span>чете се през правата на ${ekraniraj(a.otgovornik)} — агентът не вижда повече от отговорника си</span>
@@ -415,7 +415,7 @@ function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
  */
 function kartaUmeniya(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-umeniyata" class="karta">
       <div class="dyalglava">
         <h2>Уменията на „${ekraniraj(a.ime)}"</h2>
         <span>характеристиката е умение, активирано ПОСТОЯННО · другите се добавят и махат</span>
@@ -470,7 +470,7 @@ function kartaUmeniya(a: Agent): string {
  */
 function kartaSaglasie(a: Agent): string {
   return `
-    <section class="karta izbrana" id="saglasieto">
+    <section data-sektsiya="ii-vklyuchvane" class="karta izbrana" id="saglasieto">
       <div class="dyalglava">
         <h2>Включване на „${ekraniraj(a.ime)}"</h2>
         <span>какво ще прави · какво НЯМА да прави · и какво може да се обърка</span>
@@ -508,7 +508,7 @@ function kartaSaglasie(a: Agent): string {
 /** ПОЛЕТО СЪС ЗАКОНИТЕ · изброени поименно, всеки със своя дом. */
 function kartaZakonite(): string {
   return `
-    <section>
+    <section data-sektsiya="ii-zakonite">
       <div class="dyalglava">
         <h2>Законите</h2>
         <span>редът на оценка е забрана → питане → позволение · подразбраното е ЗАБРАНА</span>
@@ -562,7 +562,7 @@ function kartaZadachi(a: Agent, zadachi: readonly Zadacha[], dnes: string): stri
   const p = pokazateliNaZadachite(zadachi, dnes);
   const podredeni = [...zadachi].sort((x, y) => y.kogato.localeCompare(x.kogato));
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-zadachite" class="karta">
       <div class="dyalglava">
         <h2>Задачите на „${ekraniraj(a.ime)}"</h2>
         <span>възлагането е мое действие · нищо не тръгва без потвърждение по имейл</span>
@@ -661,7 +661,7 @@ function redNaZadacha(z: Zadacha, dnes: string): string {
  */
 function kartaKlod(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-klod" class="karta">
       <div class="dyalglava">
         <h2>Свързването с Клод</h2>
         <span>свързваща част · офлайн изданието изобщо няма този файл</span>
@@ -698,7 +698,7 @@ function kartaKlod(a: Agent): string {
  */
 function kartaRachnoPredlozhenie(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-rachno" class="karta">
       <div class="dyalglava">
         <h2>Ръчно предложение</h2>
         <span>пътят без мрежа · вписвам заключението сам</span>
@@ -740,7 +740,7 @@ function kartaZhurnal(predlozheniya: readonly Predlozhenie[]): string {
   const p = pokazateli(predlozheniya);
   const podredeni = [...predlozheniya].sort((a, b) => b.kogato.localeCompare(a.kogato));
   return `
-    <section>
+    <section data-sektsiya="ii-zhurnal">
       <div class="dyalglava">
         <h2>Журнал на предложенията</h2>
         <span>всяко е събитие в Журнала · това тук е Огледало, не втори лог</span>

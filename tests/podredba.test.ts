@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { podredi, premesti } from '../app/podredba.js';
+import { podredi, premesti, prevediZapomnenoto } from '../app/podredba.js';
 
 describe('подредбата · нищо не изчезва', () => {
   it('запомненият ред важи', () => {
@@ -57,5 +57,53 @@ describe('местенето · една стъпка, без изненади',
     const red = ['а', 'б'];
     premesti(red, 'а', 'dolu');
     expect(red).toEqual(['а', 'б']);
+  });
+});
+
+/**
+ * ПРЕВОДЪТ НА СТАРИТЕ КЛЮЧОВЕ · платен при слагането на маркерите.
+ *
+ * Без него подредбата на онзи, който вече е местил секции, нямаше да се нулира
+ * — щеше да се РАЗБЪРКА: съвпадащите ключове остават по местата си, другите
+ * падат накрая. Затова тестът пази не „не гърми", а „стои където го е оставил".
+ */
+describe('преводът на ключовете · без разбъркване', () => {
+  it('старият ключ пази мястото си под новото си име', () => {
+    const karta = new Map([['zaglavie:Нов имот', 'imoti-nov']]);
+    expect(prevediZapomnenoto(['zaglavie:Нов имот', 'imoti-spisak'], karta)).toEqual([
+      'imoti-nov',
+      'imoti-spisak',
+    ]);
+  });
+
+  it('вече преведен ред не се мени · вторият проход е без работа', () => {
+    const karta = new Map([['zaglavie:Нов имот', 'imoti-nov']]);
+    const predenPat = prevediZapomnenoto(['zaglavie:Нов имот', 'imoti-spisak'], karta);
+    expect(prevediZapomnenoto(predenPat, karta)).toEqual(predenPat);
+  });
+
+  it('празна карта връща същия ред · нищо за превеждане', () => {
+    expect(prevediZapomnenoto(['а', 'б'], new Map())).toEqual(['а', 'б']);
+  });
+
+  it('непреведеното си остава · `podredi` после го отсява', () => {
+    const karta = new Map([['zaglavie:Нов имот', 'imoti-nov']]);
+    expect(prevediZapomnenoto(['zaglavie:Няма такава'], karta)).toEqual(['zaglavie:Няма такава']);
+  });
+
+  /**
+   * ДВА СТАРИ КЛЮЧА В ЕДИН НОВ · секция, местена и преди, и след преименуване.
+   * Пази се ПЪРВИЯТ — той е по-скорошното решение; удвоеният ключ би дал възел,
+   * прибавен два пъти.
+   */
+  it('удвояване не се допуска · пази се първият', () => {
+    const karta = new Map([
+      ['zaglavie:Старо име', 'imoti-nov'],
+      ['zaglavie:Ново име', 'imoti-nov'],
+    ]);
+    expect(prevediZapomnenoto(['zaglavie:Старо име', 'x', 'zaglavie:Ново име'], karta)).toEqual([
+      'imoti-nov',
+      'x',
+    ]);
   });
 });

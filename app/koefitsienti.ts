@@ -115,7 +115,7 @@ function lentata(
 ): string {
   const lazhe = kadeLazhe(vidD, k.merka);
   return `
-    <section class="karta">
+    <section class="karta" data-sektsiya="koef-izbor">
       <div class="dyalglava">
         <h2>Коефициентите</h2>
         <span>чиста диаграма · без нито един ред таблица</span>
@@ -282,7 +282,7 @@ function podDiagramata(
   kraj: string,
 ): string {
   return `
-    <section class="karta">
+    <section class="karta" data-sektsiya="koef-izbraniyat">
       <div class="dyalglava">
         <h2>${ekraniraj(k.ime)}</h2>
         <span>${ekraniraj(IMENA_NA_VIDOVETE[k.vid])}</span>
@@ -317,7 +317,7 @@ function vsichkite(
 ): string {
   const d = danniZaPerioda(o, nachalo, kraj);
   return `
-    <section>
+    <section data-sektsiya="koef-vsichki">
       <div class="dyalglava">
         <h2>Всички коефициенти за периода</h2>
         <span>формулата на един ред · и числото до нея</span>

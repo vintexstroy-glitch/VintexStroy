@@ -213,7 +213,7 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
   const koloni = koloniNaObektite();
   const f = filtriray('stoynost', s.redove, koloni, dnes);
   return `
-    <section>
+    <section data-sektsiya="stoynost-obektite">
       <div class="dyalglava">
         <h2>Обектите</h2>
         <span>${s.redove.length} реда · сборът отгоре е стойността на състоянието</span>

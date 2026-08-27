@@ -224,7 +224,7 @@ export function narisuvayGant(
       </div>
     </div>
 
-    <section class="karta">
+    <section data-sektsiya="gant-izgled" class="karta">
       <div class="dyalglava">
         <h2>Изглед</h2>
         <span>тактът мени решетката · ${IMENA_NA_TAKTOVETE[takt].toLowerCase()}</span>
@@ -265,7 +265,7 @@ export function narisuvayGant(
         ? // ПРАЗНОТО ПАК СЕ ПРЕДСТАВЯ. Платено с находка в прохода: празният
           // личен екран не казваше дори че е личен — заглавието на дяла се
           // рисуваше само ВЪТРЕ в таблицата, а при нула дела таблица нямаше.
-          `<section>
+          `<section data-sektsiya="gant-delata">
             <div class="dyalglava">
               <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
               <span>нито едно дело · първата колона е ДНЕС</span>
@@ -283,7 +283,10 @@ export function narisuvayGant(
           // Бутонът остава, но вече СКРИВА диаграмата, вместо да я разменя —
           // на тесен екран двете една до друга не се побират, а скриването
           // пипа само екрана (правило 23).
-          `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}">
+          // Ключът е СЪЩИЯТ като на празния случай отгоре: това са две лица
+          // на ЕДНА секция, а не две секции. Различен ключ тук би значел, че
+          // подредбата на човека се губи в мига, в който първото дело влезе.
+          `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
             <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(naEkrana, r, sumi, dnes, true, true, sgunati, nadpisi)}</div>
             ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(naEkrana, r, dnes)}</div>` : ''}
           </div>`
@@ -356,7 +359,7 @@ export function tablitsataSOcveteniPoleta(
   const lenta = new Map(r.lenti.map((l) => [l.deloId, l]));
 
   return `
-    <section>
+    <section data-sektsiya="gant-delata">
       <div class="dyalglava">
         <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
         <span>${dela.length} дела · първата колона е ДНЕС</span>
@@ -472,7 +475,7 @@ export function formaDelo(
   const menyutata = menyutataNaFormata(o, nadpisi);
   zapomniRechnitsite(predstavka, menyutata);
   return `
-    <section class="karta">
+    <section data-sektsiya="gant-forma" class="karta">
       <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
       <form id="${id('forma-delo')}">
         <div class="poleta">

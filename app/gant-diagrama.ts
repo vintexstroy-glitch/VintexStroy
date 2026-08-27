@@ -90,7 +90,7 @@ export function narisuvayDiagrama(
     .join('');
 
   return `
-    <section>
+    <section data-sektsiya="gant-diagrama">
       <div class="dyalglava">
         <h2>Диаграма на Ганта</h2>
         <span>${parva.ot} → ${posledna.do} · лентата е ВРЕМЕ, не клетки</span>
