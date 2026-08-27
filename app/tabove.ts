@@ -55,7 +55,7 @@ import {
   type RedVKnigata,
 } from '../src/domein/adresna-kniga.js';
 import { dayNomer } from '../src/domein/redaktor.js';
-import { reshetka, obobshtenRed } from '../src/domein/gant.js';
+import { reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import { pishi } from '../src/yadro/pari.js';

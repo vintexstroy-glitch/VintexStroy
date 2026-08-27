@@ -1504,7 +1504,15 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .gant-sbor, .gant-red.sumi {
   height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
 }
-.gant-sbor { display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2); }
+.gant-sbor {
+  display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2);
+  /* Дългото име на контрагент реже с многоточие ТУК и само тук: цялото стои в
+     `title`. Пренасяне би вдигнало реда и щеше да разчете двете колони. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* РАЗБИВКАТА (резен 13б) · само ПЪРВИЯТ ред носи дебелата черта отгоре, инак
+   всеки контрагент изглежда като нов сбор. */
+.gant-sbor ~ .gant-sbor, .gant-red.sumi ~ .gant-red.sumi { border-top: 1px solid var(--liniya); }
 
 .gant-red {
   position: relative; height: 26px; display: grid; grid-template-columns: var(--vreme);

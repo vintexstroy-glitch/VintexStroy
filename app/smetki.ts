@@ -41,7 +41,7 @@ import {
 import { sboratZaKapitala } from './stoynost.js';
 import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 import { podredi } from '../src/domein/dela.js';
-import { obobshtenRed, reshetka } from '../src/domein/gant.js';
+import { obobshteniRedove, reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import {
@@ -586,7 +586,9 @@ function blokDelata(o: Ogledalo, dnes: string): string {
   const r = reshetka(dela, 'mesets', dnes);
   const parvata = r.koloni[0]!;
   const poslednata = r.koloni[r.koloni.length - 1]!;
-  const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  // КОПИЕТО в Сметки чете БЕЗ разбивка: разрезът е лост на Управление, а тук
+  // таблицата е за сверка (И92 т.4). Един ред влиза, един ред излиза.
+  const sumi = obobshteniRedove(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
   // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
   // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `

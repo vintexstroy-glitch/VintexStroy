@@ -336,7 +336,14 @@ describe('цифрите за календара · числото е готов
     const dni = sumiZaDen(await deystviya.ogledalo(), PERIOD);
     expect(dni.length).toBe(1);
     // ден с 500 приход и 500 разход НЕ е празен ден — неттото би го скрило
-    expect(dni[0]).toEqual({ data: '2026-08-10', prihod_st: 500_00, razhod_st: 500_00 });
+    expect(dni[0]).toEqual({
+      data: '2026-08-10',
+      prihod_st: 500_00,
+      razhod_st: 500_00,
+      // БЕЗ разрез · празният ключ значи „целият свят в една кофа" (резен 13б)
+      razrez: '',
+      nadpis: '',
+    });
   });
 
   it('подрежда дните по дата и не пуска чужд месец', async () => {

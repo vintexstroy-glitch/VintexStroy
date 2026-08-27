@@ -53,10 +53,16 @@ import {
   type Otsenka,
 } from '../src/domein/dela.js';
 import {
-  obobshtenRed,
+  obobshteniRedove,
   reshetka,
+  type RedNaRazrez,
 } from '../src/domein/gant.js';
-import { sumiZaObhvat } from '../src/domein/otcheti.js';
+import {
+  IMENA_NA_RAZREZITE,
+  RAZREZI,
+  sumiZaObhvat,
+  type Razrez,
+} from '../src/domein/otcheti.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
@@ -89,6 +95,8 @@ interface PogledNaGanta {
   takt: Takt;
   /** СВОЯТ такт · негов период от дата до дата (И104) */
   svoy: SvoyPeriod;
+  /** ПО КАКВО се реже сборът · И102 · поглед, не факт (ADR-022) */
+  razrez: Razrez;
   readonly sgunati: Set<string>;
   diagrama: boolean;
   filtarMyasto: string;
@@ -155,6 +163,7 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     klyuch,
     takt: chetiEkranno<Takt>(`${klyuch}.takt`, 'mesets'),
     svoy: chetiEkranno<SvoyPeriod>(`${klyuch}.svoy`, { ot: '', do: '' }),
+    razrez: chetiEkranno<Razrez>(`${klyuch}.razrez`, 'bez'),
     sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
@@ -171,6 +180,7 @@ let greshkaDelo = '';
 function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.takt`, p.takt);
   zapomniEkranno(`${p.klyuch}.svoy`, p.svoy);
+  zapomniEkranno(`${p.klyuch}.razrez`, p.razrez);
   zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
@@ -244,7 +254,10 @@ export function narisuvayGant(
   // изглеждаше като „няма движение".
   const parvata = r.koloni[0]!;
   const poslednata = r.koloni[r.koloni.length - 1]!;
-  const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  const sumi = obobshteniRedove(
+    r.koloni,
+    sumiZaObhvat(o, parvata.ot, poslednata.do, p.razrez),
+  );
 
   const mesta = [...new Set(vsichki.map((d) => d.myasto))].sort();
   const obekti = [...new Set(vsichki.map((d) => d.obekt).filter(Boolean))].sort();
@@ -319,8 +332,17 @@ export function narisuvayGant(
           <label for="f-otsenka">Оценка</label>
           <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
         </div>
+        <div class="pole">
+          <label for="f-razrez">Разбий по</label>
+          <select translate="no" id="f-razrez">${RAZREZI.map(
+            (x) =>
+              `<option value="${x}"${x === p.razrez ? ' selected' : ''}>${IMENA_NA_RAZREZITE[x]}</option>`,
+          ).join('')}</select>
+        </div>
       </div>
-      <p class="drebno">Три колони с филтри, не три нива — филтрира се по която и да е, независимо от другите.</p>
+      <p class="drebno">Три колони с филтри, не три нива — филтрира се по която и да е, независимо от другите.
+      „Разбий по" е ЧЕТВЪРТО нещо и не е филтър: то не маха редове, а реже СБОРА на части —
+      ${ekraniraj(String(sumi.length))} ${sumi.length === 1 ? 'ред' : 'реда'} под решетката, чийто сбор е същият.</p>
     </section>
 
     ${
@@ -404,7 +426,12 @@ function opciiOtsenki(izbrano: string): string {
 export function tablitsataSOcveteniPoleta(
   dela: readonly Delo[],
   r: ReturnType<typeof reshetka>,
-  sumi: readonly { prihod_st: number; razhod_st: number; obhvat: number }[],
+  /**
+   * РЕДОВЕТЕ НА РАЗБИВКАТА (резен 13б) · един при „без разбивка", по един на
+   * контрагент · начин · сектор · поток иначе. Списък, не единичен ред, защото
+   * това е СЪЩАТА сметка, само нарязана — два входа щяха да се разминат.
+   */
+  sumi: readonly RedNaRazrez[],
   dnes: string,
   sasSgavachi = true,
   /** И95: Приходите и Разходите носят ключ — скрити ПАК се смятат (пр. 23) */
@@ -449,7 +476,18 @@ export function tablitsataSOcveteniPoleta(
             ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi)).join('')}`,
             )
             .join('')}
-          ${sasTsifrite ? '<div class="gant-sbor">Приход · Разход</div>' : ''}
+          ${
+            sasTsifrite
+              ? sumi
+                  .map(
+                    (red) =>
+                      `<div class="gant-sbor" title="${ekraniraj(
+                        red.nadpis === '' ? 'Приход · Разход' : red.nadpis,
+                      )}">${red.nadpis === '' ? 'Приход · Разход' : ekraniraj(red.nadpis)}</div>`,
+                  )
+                  .join('')
+              : ''
+          }
         </div>
         <div class="gant-vreme" id="gant-vreme">
           <div class="gant-glava-vreme">
@@ -488,8 +526,12 @@ export function tablitsataSOcveteniPoleta(
               .join('')}`,
             )
             .join('')}
-          ${sasTsifrite ? `<div class="gant-red sumi">
-            ${sumi
+          ${
+            sasTsifrite
+              ? sumi
+                  .map(
+                    (red) => `<div class="gant-red sumi" data-razrez="${ekraniraj(red.klyuch)}">
+            ${red.kletki
               .map((s, i) =>
                 s.obhvat === 0
                   ? ''
@@ -500,7 +542,11 @@ export function tablitsataSOcveteniPoleta(
                     }</span>`,
               )
               .join('')}
-          </div>` : ''}
+          </div>`,
+                  )
+                  .join('')
+              : ''
+          }
         </div>
       </div>
       <p class="drebno">Лентите НЕ се влачат — срокът се мени от полето за срок, за да остане следа в Журнала.
@@ -782,6 +828,17 @@ export function zakachiGant(
       }
     });
   }
+
+  /**
+   * РАЗБИЙ ПО · разрезът е ПОГЛЕД, не факт (ADR-022 · правило 23): мени какво
+   * се показва, не какво е записано. Затова в паметта на екрана, никога в
+   * Журнала — и затова НЕ добавя нито едно събитие.
+   */
+  koren.querySelector<HTMLSelectElement>('#f-razrez')?.addEventListener('change', async (e) => {
+    p.razrez = (e.target as HTMLSelectElement).value as Razrez;
+    zapomniPogleda(p);
+    await prerisuvay();
+  });
 
   /**
    * СВОЯТ ПЕРИОД · двете дати (И104 · „такъв който сам да избереш").

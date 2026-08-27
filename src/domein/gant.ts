@@ -21,6 +21,7 @@
  */
 
 import type { Delo } from './dela.js';
+import { BEZ_STOYNOST } from './otcheti.js';
 import {
   koloniNaTakta,
   kolkoSeVizhdat,
@@ -140,9 +141,19 @@ interface SumaVKolona {
   readonly obhvat: number;
 }
 
-export function obobshtenRed(
+/** Един ред с пари · дневната сума, вече отнесена към своя разрез. */
+interface DenevnaSuma {
+  readonly data: string;
+  readonly prihod_st: number;
+  readonly razhod_st: number;
+  readonly razrez?: string;
+  readonly nadpis?: string;
+}
+
+/** Клетките на един ред · ЕДИН дом за логиката, два входа към нея. */
+function kletkiNaKolonite(
   k: readonly KolonaNaTakta[],
-  poDni: readonly { data: string; prihod_st: number; razhod_st: number }[],
+  redove: readonly DenevnaSuma[],
 ): SumaVKolona[] {
   return k.map((kol, i) => {
     // Колона, която дели деня си с предишната (часовете на такт „ден"), не носи
@@ -157,7 +168,7 @@ export function obobshtenRed(
     }
     let prihod_st = 0;
     let razhod_st = 0;
-    for (const d of poDni) {
+    for (const d of redove) {
       if (d.data >= kol.ot && d.data <= kol.do) {
         prihod_st += d.prihod_st;
         razhod_st += d.razhod_st;
@@ -165,4 +176,60 @@ export function obobshtenRed(
     }
     return { prihod_st, razhod_st, obhvat };
   });
+}
+
+export function obobshtenRed(
+  k: readonly KolonaNaTakta[],
+  poDni: readonly DenevnaSuma[],
+): SumaVKolona[] {
+  return kletkiNaKolonite(k, poDni);
+}
+
+/** Един ред от разбивката · своя ключ, свой надпис, свои клетки. */
+export interface RedNaRazrez {
+  readonly klyuch: string;
+  readonly nadpis: string;
+  readonly kletki: readonly SumaVKolona[];
+}
+
+/**
+ * РАЗБИВКАТА · по ред на разрез (резен 13б · И102).
+ *
+ * Негов въпрос, 27.08: „…разбивки по контрагенти от банковите извлечения и да
+ * се покажат в таблицата **сумирано за такта на диаграмата**."
+ *
+ * Тук е втората половина на отговора. Първата е в `otcheti.ts`: там всеки ред
+ * получава КЛЮЧ по избрания разрез. Тук ключовете стават РЕДОВЕ върху същата
+ * решетка — значи разбивката и общият сбор се смятат от едно и също място и не
+ * могат да се разминат.
+ *
+ * СВЕРКАТА ВХОД↔ИЗХОД (правило 7) излиза даром и се пази с тест: всеки ред пада
+ * в ТОЧНО една кофа, значи сборът на разрезите Е неразбитият сбор. Ако някой ден
+ * не е — това е дефект, не закръгление.
+ *
+ * Подредбата: по надпис, а кофата „(няма)" пада НАКРАЯ — тя е остатъкът, не
+ * контрагент.
+ */
+export function obobshteniRedove(
+  k: readonly KolonaNaTakta[],
+  poDni: readonly DenevnaSuma[],
+): RedNaRazrez[] {
+  const po = new Map<string, { nadpis: string; redove: DenevnaSuma[] }>();
+  for (const d of poDni) {
+    const klyuch = d.razrez ?? '';
+    let v = po.get(klyuch);
+    if (!v) {
+      v = { nadpis: d.nadpis ?? '', redove: [] };
+      po.set(klyuch, v);
+    }
+    v.redove.push(d);
+  }
+  return [...po.entries()]
+    .map(([klyuch, v]) => ({ klyuch, nadpis: v.nadpis, kletki: kletkiNaKolonite(k, v.redove) }))
+    .sort((a, b) => tezhest(a.nadpis) - tezhest(b.nadpis) || a.nadpis.localeCompare(b.nadpis, 'bg'));
+}
+
+/** Остатъчната кофа върви последна · тя не е контрагент, а „нищо от това". */
+function tezhest(nadpis: string): number {
+  return nadpis === BEZ_STOYNOST ? 1 : 0;
 }

@@ -27,11 +27,12 @@
  * Всичко е цели стотинки (правило 3). Нула float, нула `toFixed`.
  */
 
-import type { Ogledalo } from '../ogledalo/ogledalo.js';
+import type { Ogledalo, Plashtane, Razhod } from '../ogledalo/ogledalo.js';
 import { duljimo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 import { smetki } from './smetki.js';
-import { prihodnaChast, razhodnaChast } from './lichni-pari.js';
+import { prihodnaChast, razhodnaChast, type LichnoDvizhenie } from './lichni-pari.js';
+import { klyuchNaKontragent } from './kontragenti.js';
 
 /** Двата джоба, назовани от него: „Банка — салдо, Трезор — салдо". */
 type Dzhob = 'banka' | 'trezor';
@@ -297,7 +298,48 @@ interface DenSPari {
   readonly data: string;
   readonly prihod_st: number;
   readonly razhod_st: number;
+  /**
+   * КЛЮЧЪТ НА РАЗРЕЗА · празен при „без разбивка".
+   *
+   * Ключът е СВЕДЕН (контрагентът минава през `klyuchNaKontragent`), а `nadpis`
+   * носи онова, което човек чете. Двете не се сливат: сливането им беше точно
+   * дефектът, заради който „Стройпласт␣␣ЕООД" ставаше втори контрагент.
+   */
+  readonly razrez: string;
+  readonly nadpis: string;
 }
+
+/**
+ * ПО КАКВО СЕ РЕЖЕ СБОРЪТ · вторият му въпрос от 27.08 (И102).
+ *
+ *   „…разбивки по контрагенти от банковите извлечения и да се покажат в
+ *    таблицата сумирано за такта на диаграмата… и съответно извлеченията
+ *    БАНКОВИТЕ ИЛИ КЕШОВИТЕ… Както и по други избрани критерии."
+ *
+ * „Дори измислен с измислена колона" ОТПАДА по негова дума (И107, 27.08) —
+ * разбивка по собствена колона иска РЕДОВЕТЕ на моделната таблица, а те не
+ * живеят в приложението (ADR-027 §2). Затова разрезите са ПЕТ и всеки от тях
+ * се чете от поле, което Журналът вече носи.
+ */
+export const RAZREZI = ['bez', 'kontragent', 'nachin', 'sektor', 'potok'] as const;
+export type Razrez = (typeof RAZREZI)[number];
+
+export const IMENA_NA_RAZREZITE: Readonly<Record<Razrez, string>> = Object.freeze({
+  bez: 'Без разбивка',
+  kontragent: 'По контрагент',
+  nachin: 'Банка или в брой',
+  sektor: 'По сектор',
+  potok: 'По поток',
+});
+
+/**
+ * КОФАТА С ИМЕ · за ред, който няма стойност по този разрез.
+ *
+ * НЕ празен низ: празният значи „без разбивка" и двете щяха да се слеят.
+ * Личното движение няма начин на плащане (полето го НЯМА в събитието), а
+ * плащането няма поток — това се ВИЖДА, вместо да изчезне в общия сбор.
+ */
+export const BEZ_STOYNOST = '(няма)';
 
 /**
  * КОЛКО ВЛИЗА И КОЛКО ИЗЛИЗА ВЪВ ВСЕКИ ДЕН НА ЕДИН МЕСЕЦ.
@@ -318,8 +360,8 @@ interface DenSPari {
  * Приходът тук е СЪБРАНОТО (пари, влезли на този ден), не начисленото:
  * календарът е за дни, а начислението няма ден — то има падеж.
  */
-export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
-  return poDni(o, (data) => data.slice(0, 7) === period);
+export function sumiZaDen(o: Ogledalo, period: Period, razrez: Razrez = 'bez'): readonly DenSPari[] {
+  return poDni(o, (data) => data.slice(0, 7) === period, razrez);
 }
 
 /**
@@ -331,50 +373,119 @@ export function sumiZaDen(o: Ogledalo, period: Period): readonly DenSPari[] {
  * календар щеше да казва едно, а решетката на Ганта — друго, за едни и същи
  * пари. Затова сметката е ЕДНА, а разликата е предикат.
  */
-function poDni(o: Ogledalo, vlizaLi: (data: string) => boolean): readonly DenSPari[] {
-  const po = new Map<string, { prihod_st: number; razhod_st: number }>();
-  const vzemi = (data: string) => {
-    let v = po.get(data);
+/**
+ * КЛЮЧЪТ НА ЕДИН РЕД по избрания разрез · чисти функции, по една на вид ред.
+ *
+ * Трите вида пари носят различни полета и това НЕ се замазва: плащането няма
+ * поток, личното движение няма начин на плащане. Липсата отива в кофа с ИМЕ
+ * (`BEZ_STOYNOST`), не в общия сбор — иначе „банка или в брой" щеше да отчете
+ * личните разходи като банкови.
+ */
+interface KlyuchISNadpis {
+  readonly klyuch: string;
+  readonly nadpis: string;
+}
+
+const NYAMA: KlyuchISNadpis = { klyuch: BEZ_STOYNOST, nadpis: BEZ_STOYNOST };
+const BEZ_RAZREZ: KlyuchISNadpis = { klyuch: '', nadpis: '' };
+
+/** Име на контрагент → сведен ключ + четим надпис (правило 12 · правило 17). */
+function poIme(ime: string): KlyuchISNadpis {
+  const chisto = ime.normalize('NFC').trim().replace(/\s+/g, ' ');
+  return chisto === '' ? NYAMA : { klyuch: klyuchNaKontragent(ime), nadpis: chisto };
+}
+
+/** Стойност, която е ДУМА в Журнала (начин · сектор · поток) — ключът Е думата. */
+function poDuma(v: string): KlyuchISNadpis {
+  const chisto = v.normalize('NFC').trim();
+  return chisto === '' ? NYAMA : { klyuch: chisto, nadpis: chisto };
+}
+
+function klyuchNaPlashtane(o: Ogledalo, p: Plashtane, razrez: Razrez): KlyuchISNadpis {
+  if (razrez === 'bez') return BEZ_RAZREZ;
+  if (razrez === 'nachin') return poDuma(p.nachin);
+  // Плащането няма СВОЙ контрагент и сектор — те висят на наема зад вземането.
+  const v = o.vzemaniya.get(p.vzemaneId);
+  const naem = v ? o.naemi.get(v.naemId) : undefined;
+  if (!naem) return NYAMA;
+  if (razrez === 'kontragent') return poIme(naem.naemetel);
+  if (razrez === 'sektor') return poDuma(naem.sektor);
+  return NYAMA; // поток · приходът от наем няма поток
+}
+
+function klyuchNaRazhod(r: Razhod, razrez: Razrez): KlyuchISNadpis {
+  switch (razrez) {
+    case 'bez': return BEZ_RAZREZ;
+    case 'kontragent': return poIme(r.dostavchik);
+    case 'nachin': return poDuma(r.nachin);
+    case 'sektor': return poDuma(r.sektor);
+    case 'potok': return poDuma(r.potok);
+  }
+}
+
+function klyuchNaLichno(d: LichnoDvizhenie, razrez: Razrez): KlyuchISNadpis {
+  switch (razrez) {
+    case 'bez': return BEZ_RAZREZ;
+    // „Кой" е търговецът от извлечението — той е контрагентът на личния ред.
+    case 'kontragent': return poIme(d.koy);
+    // НАЧИН НЯМА · `PayloadLichnoDvizhenieZapisano` не носи такова поле и това
+    // се КАЗВА, вместо да се замаже с „банка" (находка на разузнаването).
+    case 'nachin': return NYAMA;
+    case 'sektor': return NYAMA;
+    case 'potok': return NYAMA;
+  }
+}
+
+function poDni(
+  o: Ogledalo,
+  vlizaLi: (data: string) => boolean,
+  razrez: Razrez = 'bez',
+): readonly DenSPari[] {
+  const po = new Map<string, { data: string; razrez: string; nadpis: string; prihod_st: number; razhod_st: number }>();
+  const vzemi = (data: string, k: KlyuchISNadpis) => {
+    // Датата и ключът се слепват с знак, който не може да е в нито едно от
+    // двете: име с двоеточие инак би се слял с чужд ден.
+    const id = `${data}\u0000${k.klyuch}`;
+    let v = po.get(id);
     if (!v) {
-      v = { prihod_st: 0, razhod_st: 0 };
-      po.set(data, v);
+      v = { data, razrez: k.klyuch, nadpis: k.nadpis, prihod_st: 0, razhod_st: 0 };
+      po.set(id, v);
     }
     return v;
   };
 
   for (const p of o.plashtaniya.values()) {
-    if (vlizaLi(p.data)) vzemi(p.data).prihod_st += p.suma_st;
+    if (vlizaLi(p.data)) vzemi(p.data, klyuchNaPlashtane(o, p, razrez)).prihod_st += p.suma_st;
   }
   for (const r of o.razhodi.values()) {
-    if (vlizaLi(r.data)) vzemi(r.data).razhod_st += r.suma_st;
+    if (vlizaLi(r.data)) vzemi(r.data, klyuchNaRazhod(r, razrez)).razhod_st += r.suma_st;
   }
   /**
    * ТРЕТИЯТ ЦИКЪЛ · ЛИЧНИТЕ ПАРИ (И96 т.10).
    *
-   * Тук, а не в близнак `poDniLichno`. Файлът го забранява с думи четири реда
-   * по-горе, и има втора цена: решетката на Ганта вика `sumiZaObhvat`, тоест
-   * ТАЗИ функция. Близнак в `lichni-pari.ts` никога нямаше да бъде извикан от
-   * нея и обобщеният ред под ЛИЧНАТА таблица щеше да остане вечна нула — а
-   * нула на екран за пари изглежда като „няма движение", не като „не е питано".
+   * Тук, а не в близнак `poDniLichno`. Файлът го забранява с думи по-горе, и
+   * има втора цена: решетката на Ганта вика `sumiZaObhvat`, тоест ТАЗИ функция.
+   * Близнак в `lichni-pari.ts` никога нямаше да бъде извикан от нея и обобщеният
+   * ред под ЛИЧНАТА таблица щеше да остане вечна нула — а нула на екран за пари
+   * изглежда като „няма движение", не като „не е питано".
    *
    * БЕЗОПАСНО И В ДВЕТЕ ПОСОКИ: служебното Огледало няма `lichniDvizheniya`,
    * личното няма `plashtaniya` и `razhodi`. Всеки цикъл върти празна карта в
    * чуждия Журнал.
    *
-   * Разходната част минава през `razhodnaChast`, значи вноската по кредит
-   * влиза с ЛИХВАТА си, не с цялата вноска: главницата е движение между
-   * джобове, не разход.
+   * Разходната част минава през `razhodnaChast`, значи вноската по кредит влиза
+   * с ЛИХВАТА си, не с цялата вноска: главницата е движение между джобове.
    */
   for (const d of o.lichniDvizheniya.values()) {
     if (d.izklyuchen || !vlizaLi(d.data)) continue;
-    const v = vzemi(d.data);
+    const v = vzemi(d.data, klyuchNaLichno(d, razrez));
     v.prihod_st += prihodnaChast(d);
     v.razhod_st += razhodnaChast(d);
   }
 
-  return [...po.entries()]
-    .map(([data, v]) => ({ data, ...v }))
-    .sort((a, b) => a.data.localeCompare(b.data));
+  return [...po.values()].sort(
+    (a, b) => a.data.localeCompare(b.data) || a.razrez.localeCompare(b.razrez),
+  );
 }
 
 /**
@@ -387,8 +498,13 @@ function poDni(o: Ogledalo, vlizaLi: (data: string) => boolean): readonly DenSPa
  *
  * Границите са включителни, ISO текст — както говорят колоните на решетката.
  */
-export function sumiZaObhvat(o: Ogledalo, ot: string, doo: string): readonly DenSPari[] {
-  return poDni(o, (data) => data >= ot && data <= doo);
+export function sumiZaObhvat(
+  o: Ogledalo,
+  ot: string,
+  doo: string,
+  razrez: Razrez = 'bez',
+): readonly DenSPari[] {
+  return poDni(o, (data) => data >= ot && data <= doo, razrez);
 }
 
 /** Сборът на съставките. Знакът е в самата съставка, не в сбирача. */

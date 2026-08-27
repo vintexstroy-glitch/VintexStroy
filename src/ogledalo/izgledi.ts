@@ -14,6 +14,7 @@
 
 import type { Ogledalo } from './ogledalo.js';
 import { dniMezhdu } from './ogledalo.js';
+import { klyuchNaKontragent } from '../domein/kontragenti.js';
 
 /** Единият обект: какво носи, какво дължат по него, какво е ял. */
 interface PoImot {
@@ -73,9 +74,18 @@ interface PoKontragent {
 
 /**
  * Кой ми дължи и кой плаща навреме; на кого колко съм платил.
- * Имената се сравняват без глас и без разстояния — „Стройпласт ЕООД" и
- * „стройпласт еоод " са един контрагент, докато Контактите (М10) не дойдат
- * като истинска същност.
+ *
+ * ═══ ПОПРАВЕН ДЕФЕКТ · едно име се броеше за ДВЕ ═══
+ *
+ * Тук стоеше СВОЯ нормализация: `${rolya}:${ime.trim().toLowerCase()}` — без
+ * NFC и без свиване на вътрешните разстояния. Коментарът обещаваше „без глас и
+ * без разстояния", а вътрешните разстояния оставаха.
+ *
+ * Последицата беше точна и проверима: „Стройпласт␣␣ЕООД" с ДВЕ разстояния е
+ * ЕДИН контрагент в Настройки и в SAF-T, и ДВА реда тук. Нарушение и на правило
+ * 17 (един факт, един дом), и на правило 12 (всичко в NFC).
+ *
+ * Домът на този ключ е `klyuchNaKontragent` и той прави и трите неща.
  */
 export function poKontragent(o: Ogledalo): PoKontragent[] {
   const izhod = new Map<string, {
@@ -87,7 +97,7 @@ export function poKontragent(o: Ogledalo): PoKontragent[] {
     sledi: number;
   }>();
 
-  const klyuchNa = (ime: string, rolya: string) => `${rolya}:${ime.trim().toLowerCase()}`;
+  const klyuchNa = (ime: string, rolya: string) => `${rolya}:${klyuchNaKontragent(ime)}`;
   const vzemi = (ime: string, rolya: 'наемател' | 'доставчик') => {
     const k = klyuchNa(ime, rolya);
     const veche = izhod.get(k);

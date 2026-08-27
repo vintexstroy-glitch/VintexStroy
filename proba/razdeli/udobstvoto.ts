@@ -1343,4 +1343,51 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
     await naEkran(p, 'imoti', '#forma-imot');
 
+    razdel = '81 · Разбивката · „разбий по…" и сверката вход↔изход';
+    // Негов въпрос, 27.08 (И102): „…разбивки по контрагенти от банковите
+    // извлечения и да се покажат в таблицата СУМИРАНО ЗА ТАКТА на диаграмата…
+    // и съответно извлеченията БАНКОВИТЕ ИЛИ КЕШОВИТЕ."
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('лостът „Разбий по" е на екрана', await p.$$eval('#f-razrez', (e) => e.length), 1);
+    proveri('и предлага ПЕТ разреза · без „измислената колона" (И107)',
+      await p.$$eval('#f-razrez option', (e) => e.length), 5);
+    proveri('подразбраното е БЕЗ разбивка · един ред сборове',
+      await p.$$eval('.gant-red.sumi', (e) => e.length), 1);
+
+    /** Сборът на всички числа в редовете със сборове · в стотинки, от текста. */
+    const sborNaEkrana = async (): Promise<number> =>
+      p.$$eval('.gant-red.sumi .gant-suma', (kletki) =>
+        kletki.reduce((s, k) => {
+          const chisla = [...k.querySelectorAll('b, i')].map((x) =>
+            Math.round(parseFloat((x.textContent ?? '0').replace(/[^\d,.-]/g, '').replace(/\./g, '').replace(',', '.')) * 100));
+          return s + chisla.reduce((a, b) => a + (Number.isFinite(b) ? b : 0), 0);
+        }, 0));
+
+    const bezRazbivka = await sborNaEkrana();
+    const sabitiyaPredi = await broySabitiya(p);
+
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'kontragent'));
+    const redoveKontragent = await p.$$eval('.gant-red.sumi', (e) => e.length);
+    console.log(`\n  РАЗБИВКАТА: без разбивка 1 ред → по контрагент ${redoveKontragent} реда\n`);
+    proveri('по контрагент дава ПОВЕЧЕ от един ред', redoveKontragent > 1, true);
+    proveri('всеки ред носи ИМЕТО си вляво',
+      await p.$eval('.gant-sbor', (e) => (e.textContent ?? '').trim().length > 0), true);
+    // СВЕРКАТА ВХОД↔ИЗХОД (правило 7) · премерена на ЕКРАНА, не в паметта.
+    proveri('и сборът на разрезите Е неразбитият сбор', await sborNaEkrana(), bezRazbivka);
+
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'nachin'));
+    proveri('банка или в брой · сборът пак се събира', await sborNaEkrana(), bezRazbivka);
+    proveri('разрезите са толкова, колкото начина има движение',
+      (await p.$$eval('.gant-red.sumi', (e) => e.length)) >= 1, true);
+
+    // РАЗРЕЗЪТ Е ПОГЛЕД · нито едно събитие не влиза в Журнала (ADR-022).
+    proveri('смяната на разреза НЕ пише в Журнала', await broySabitiya(p), sabitiyaPredi);
+    // И преживява смяна на екран · инак изборът скача обратно при всяко влизане.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('изборът преживява смяна на екран',
+      await p.$eval('#f-razrez', (e) => (e as HTMLSelectElement).value), 'nachin');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'bez'));
+    await naEkran(p, 'imoti', '#forma-imot');
+
 }
