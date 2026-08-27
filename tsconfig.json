@@ -10,9 +10,10 @@
     "noImplicitOverride": true,
     "exactOptionalPropertyTypes": true,
     "noEmit": true,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true
   },
-  "include": ["src", "tests", "app", "proba/merki.test.ts", "vite.config.ts"]
+  "include": ["src", "tests", "app", "proba", "vite.config.ts"]
 }

@@ -14,7 +14,7 @@
     "test": "vitest run --exclude proba/merki.test.ts",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "proba": "npm run build && node proba/prohod.mjs",
+    "proba": "npm run build && node proba/prohod.ts",
     "merki": "vitest run proba/merki.test.ts",
     "ikoni": "node stroezh/risuvai-ikoni.mjs",
     "chistota": "node stroezh/chistota.mjs"
