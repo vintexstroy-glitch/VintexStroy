@@ -421,7 +421,12 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .red:hover > :first-child { background: #FDFBF7; }
 .glava, .red {
   display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) 130px 120px 120px;
+  /* `justify-content: start` е ЗАДЪЛЖИТЕЛЕН след капването на fr → px:
+     grid по подразбиране РАЗТЯГА пътеките без `fr`, за да запълни свободното
+     място (justify-content: normal ⇒ stretch за grid) — капнатият max иначе
+     е без ефект, и празнината просто се мести от колоната в опашката. */
+  justify-content: start;
+  grid-template-columns: minmax(0, 440px) minmax(0, 320px) 130px 120px 120px;
   align-items: center; gap: 16px; padding: 13px 18px;
   min-width: 720px;
 }
@@ -507,7 +512,7 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 
 /* ── редове за вземания и плащания ──────────────────────────────────── */
 .glava.plashtane, .red.plashtane {
-  grid-template-columns: 130px minmax(0, 2fr) minmax(0, 110px) 120px 100px;
+  grid-template-columns: 130px minmax(0, 400px) minmax(0, 110px) 120px 100px;
   min-width: 700px;
 }
 .zakasnenie { color: var(--aktsent); font-size: 0.821rem; }
@@ -570,7 +575,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · осемте параметъра (И96 т.1 · ADR-046) ──── */
 .glava.parametar, .red.parametar {
-  grid-template-columns: minmax(0, 1.4fr) 84px 150px minmax(0, 2fr) 120px;
+  grid-template-columns: minmax(0, 280px) 84px 150px minmax(0, 400px) 120px;
   min-width: 760px;
 }
 .red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
@@ -596,16 +601,16 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── редове с действия ───────────────────────────────────────────────── */
 .glava.imot, .red.imot {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) 96px 120px 108px 168px;
+  grid-template-columns: minmax(0, 400px) minmax(0, 320px) 96px 120px 108px 168px;
   min-width: 860px;
 }
 .glava.naem, .red.naem {
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.5fr) minmax(0, 1.2fr) 120px 136px 292px;
+  grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;
   min-width: 1040px;
 }
 .butoni { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .glava.vzemane, .red.vzemane {
-  grid-template-columns: minmax(0, 2fr) 92px minmax(0, 130px) 120px 216px;
+  grid-template-columns: minmax(0, 400px) 92px minmax(0, 130px) 120px 216px;
   min-width: 800px;
 }
 
@@ -617,24 +622,24 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── сметки, ДДС, сверка, калкулатор ────────────────────────────────── */
 .glava.smetka, .red.smetka {
-  grid-template-columns: minmax(0, 2.2fr) 110px 90px 140px;
+  grid-template-columns: minmax(0, 440px) 110px 90px 140px;
   min-width: 640px;
 }
 .glava.dds, .red.dds {
-  grid-template-columns: 92px minmax(0, 2fr) 90px minmax(150px, 190px) 130px;
+  grid-template-columns: 92px minmax(0, 400px) 90px minmax(150px, 190px) 130px;
   min-width: 760px;
 }
 .glava.razhod, .red.razhod {
-  grid-template-columns: minmax(0, 2.2fr) 110px minmax(0, 1.4fr) 130px 110px 108px;
+  grid-template-columns: minmax(0, 440px) 110px minmax(0, 280px) 130px 110px 108px;
   min-width: 900px;
 }
 .glava.sverka, .red.sverka {
-  grid-template-columns: minmax(0, 2.4fr) 100px 100px 100px 128px;
+  grid-template-columns: minmax(0, 480px) 100px 100px 100px 128px;
   min-width: 700px;
 }
 /* Одитният файл (И96 т.11) · оборотната ведомост под секцията SAF-T. */
 .glava.saft, .red.saft {
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) 130px 130px;
+  grid-template-columns: minmax(0, 440px) minmax(0, 240px) 130px 130px;
   min-width: 680px;
 }
 /* ПРЕЧКИТЕ · какво още спира подаването. Изречения, не флагове — затова
@@ -651,11 +656,11 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 }
 .prechki li + li { margin-top: 5px; }
 .glava.kontragent, .red.kontragent {
-  grid-template-columns: minmax(0, 2.2fr) 120px 130px 140px minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 440px) 120px 130px 140px minmax(0, 280px);
   min-width: 820px;
 }
 .glava.smyatane, .red.smyatane {
-  grid-template-columns: minmax(0, 2fr) 90px 120px 120px 120px;
+  grid-template-columns: minmax(0, 400px) 90px 120px 120px 120px;
   min-width: 640px;
 }
 .red.sbor {
@@ -697,79 +702,79 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 .filtar { display: flex; gap: 6px; flex-wrap: wrap; }
 .vtorichen.malak.tuk { background: var(--mastilo); color: var(--hartiya); border-color: var(--mastilo); }
 .glava.razlika, .red.razlika {
-  grid-template-columns: 104px minmax(0, 2.2fr) 108px 116px 116px;
+  grid-template-columns: 104px minmax(0, 440px) 108px 116px 116px;
   min-width: 720px;
 }
 .glava.propusnat, .red.propusnat {
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 200px);
   min-width: 360px;
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 0.893rem; }
 
 /* ── Настройки · бутоните са модели на пътища ────────────────────────── */
 .glava.buton, .red.buton {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 96px minmax(0, 1.8fr) 168px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 96px minmax(0, 360px) 168px;
   min-width: 760px;
 }
 .glava.model, .red.model {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) 130px minmax(0, 1.6fr);
+  grid-template-columns: minmax(0, 280px) minmax(0, 360px) 130px minmax(0, 320px);
   min-width: 700px;
 }
 /* Стойност на Състояние · Калкулаторът */
 .glava.stoynost, .red.stoynost {
-  grid-template-columns: minmax(0, 1.6fr) 130px 84px 84px 96px 118px 128px 128px 78px;
+  grid-template-columns: minmax(0, 320px) 130px 84px 84px 96px 118px 128px 128px 78px;
   min-width: 1040px;
 }
 
 /* ── Личният таб · преносът и достъпите (И98 · И99) ─────────────────── */
 .glava.prenos, .red.prenos {
-  grid-template-columns: 44px minmax(0, 1.8fr) minmax(0, 1.4fr) 190px;
+  grid-template-columns: 44px minmax(0, 360px) minmax(0, 280px) 190px;
   min-width: 640px;
 }
 .glava.dostap, .red.dostap {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr) 130px minmax(0, 1.4fr) 110px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 320px) 130px minmax(0, 280px) 110px;
   min-width: 780px;
 }
 
 /* ── Личните ПАРИ · теми, редове, кредити, план, партиди (И96 т.10) ─── */
 .glava.tema, .red.tema {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 130px 130px 90px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 130px 130px 90px;
   min-width: 700px;
 }
 .glava.tema-opis, .red.tema-opis {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 190px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 190px;
   min-width: 560px;
 }
 .glava.dvizhenie, .red.dvizhenie {
-  grid-template-columns: 110px minmax(0, 1.8fr) 190px minmax(0, 1.4fr) 110px;
+  grid-template-columns: 110px minmax(0, 360px) 190px minmax(0, 280px) 110px;
   min-width: 820px;
 }
 .glava.kredit, .red.kredit {
-  grid-template-columns: minmax(0, 1.6fr) 130px 90px 130px 140px 140px;
+  grid-template-columns: minmax(0, 320px) 130px 90px 130px 140px 140px;
   min-width: 820px;
 }
 .glava.plan, .red.plan {
-  grid-template-columns: 150px 110px minmax(0, 1.6fr) 150px minmax(0, 1.4fr);
+  grid-template-columns: 150px 110px minmax(0, 320px) 150px minmax(0, 280px);
   min-width: 820px;
 }
 .glava.partida, .red.partida {
-  grid-template-columns: minmax(0, 1.6fr) 90px 90px 130px 130px 130px;
+  grid-template-columns: minmax(0, 320px) 90px 90px 130px 130px 130px;
   min-width: 780px;
 }
 
 /* ── Журналът от таблица · промените и свръзките (И96 т.8) ──────────── */
 .glava.zhurnal-promyana, .red.zhurnal-promyana {
-  grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+  grid-template-columns: 70px minmax(0, 200px) minmax(0, 280px) minmax(0, 280px);
   min-width: 560px;
 }
 .glava.svrazka, .red.svrazka {
-  grid-template-columns: 120px minmax(0, 1.4fr) 130px 120px minmax(0, 1.8fr) 90px;
+  grid-template-columns: 120px minmax(0, 280px) 130px 120px minmax(0, 360px) 90px;
   min-width: 860px;
 }
 
 /* ── секция „Калкулатор" · входът, легендата и разбивката (И96 т.2) ──── */
 .glava.kalk-koef, .red.kalk-koef {
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 100px 140px 110px;
+  grid-template-columns: minmax(0, 240px) minmax(0, 320px) 100px 140px 110px;
   min-width: 700px;
 }
 .red.kalk-koef select {
@@ -812,7 +817,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
   /* Колона · Вид · СТОЙНОСТ · Номенклатура · Готово меню · бутони.
      „Стойност" е новата: тя казва дали сборът на колоната отива в Приходи и
      Разходи (ADR-014), а дотук се задаваше само с гадаене при внасяне. */
-  grid-template-columns: minmax(0, 1.5fr) 118px 150px minmax(0, 1.2fr) minmax(0, 1.4fr) 260px;
+  grid-template-columns: minmax(0, 300px) 118px 150px minmax(0, 240px) minmax(0, 280px) 260px;
   min-width: 980px;
 }
 .red.redaktor input {
@@ -830,15 +835,15 @@ table.razbivka .drebno { font-size: 0.75rem; }
    „евро" и „число" изглеждат като разлика в надпис, а не в поведение. */
 .red.redaktor .kletka > span { font-size: 0.75rem; color: var(--mastilo2); }
 .glava.opis, .red.opis {
-  grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 1.4fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(0, 320px) 120px minmax(0, 280px) minmax(0, 320px);
   min-width: 700px;
 }
 .glava.zapisanasverka, .red.zapisanasverka {
-  grid-template-columns: minmax(0, 2fr) 116px 116px 116px 128px;
+  grid-template-columns: minmax(0, 400px) 116px 116px 116px 128px;
   min-width: 640px;
 }
 .glava.deystvie, .red.deystvie {
-  grid-template-columns: 40px minmax(0, 2fr) 96px 120px;
+  grid-template-columns: 40px minmax(0, 400px) 96px 120px;
   min-width: 440px;
 }
 
@@ -869,7 +874,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .legenda-vhod { margin: 10px 0; }
 .legenda-vhod summary { cursor: pointer; font-size: 0.929rem; color: var(--mastilo2); }
 .glava.legenda, .red.legenda {
-  grid-template-columns: 56px minmax(0, 1.2fr) 150px minmax(0, 2.4fr);
+  grid-template-columns: 56px minmax(0, 240px) 150px minmax(0, 480px);
   min-width: 720px;
 }
 
@@ -889,12 +894,12 @@ table.razbivka .drebno { font-size: 0.75rem; }
 }
 .trevozhno { color: var(--aktsent); }
 .glava.koef-parametar, .red.koef-parametar {
-  grid-template-columns: minmax(0, 1fr) 160px;
+  grid-template-columns: minmax(0, 200px) 160px;
   min-width: 380px;
 }
 .red.koef-rezultat { background: var(--panel); }
 .glava.koef-red, .red.koef-red {
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr) 140px 130px;
+  grid-template-columns: minmax(0, 300px) minmax(0, 400px) 140px 130px;
   min-width: 820px;
 }
 .red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 0.857rem; }
@@ -916,20 +921,20 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
 .glava.mesetsat, .red.mesetsat {
-  grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;
+  grid-template-columns: 116px minmax(0, 400px) 124px 124px 148px 64px;
   min-width: 860px;
 }
 .red.mesetsat .suma .drebno { font-size: 0.75rem; }
 
 /* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
 .glava.zadacha, .red.zadacha {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 124px 72px 232px;
+  grid-template-columns: minmax(0, 400px) minmax(0, 280px) 124px 72px 232px;
   min-width: 900px;
 }
 
 /* ── двата задължителни сбора · Приход /+/ и Разход /−/ ──────────────── */
 .glava.znak, .red.znak {
-  grid-template-columns: 64px minmax(0, 2fr) minmax(0, 1.2fr) 130px 132px;
+  grid-template-columns: 64px minmax(0, 400px) minmax(0, 240px) 130px 132px;
   min-width: 640px;
 }
 .red.znak.mahnata { opacity: 0.55; }
@@ -938,7 +943,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── сверката на ДДС · КЪДЕ е разликата, не само колко ───────────────── */
 .glava.nesvarshen, .red.nesvarshen {
-  grid-template-columns: 132px minmax(0, 2.4fr) 108px 120px;
+  grid-template-columns: 132px minmax(0, 480px) 108px 120px;
   min-width: 600px;
 }
 .karta.izbrana .tablitsa { background: #FFFFFF; }
@@ -1055,7 +1060,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .vazm.nyama:hover { background: transparent; border-color: transparent; }
 
 .glava.planred, .red.planred {
-  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 480px) minmax(0, 240px) minmax(0, 280px) minmax(0, 180px);
 }
 .red.planred.tuk { background: var(--toplo); }
 
@@ -1351,11 +1356,11 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── Още огледала · по обект и по контрагент (ADR-041) ────────────────── */
 .glava.po-imot, .red.po-imot {
-  grid-template-columns: minmax(0, 2fr) 110px 140px 140px 140px;
+  grid-template-columns: minmax(0, 400px) 110px 140px 140px 140px;
   min-width: 760px;
 }
 .glava.po-kontragent, .red.po-kontragent {
-  grid-template-columns: minmax(0, 1.8fr) 120px 140px 140px 140px 120px;
+  grid-template-columns: minmax(0, 360px) 120px 140px 140px 140px 120px;
   min-width: 840px;
 }
 .red.po-imot.sbor { font-weight: 600; border-top: 2px solid var(--liniya); }
