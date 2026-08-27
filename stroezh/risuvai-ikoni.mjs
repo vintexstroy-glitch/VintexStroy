@@ -7,13 +7,12 @@
  *
  *   node stroezh/risuvai-ikoni.mjs
  */
-import { chromium } from 'playwright';
 import { readFileSync, writeFileSync } from 'node:fs';
+import { chromium, nameriHroma } from './hrom.mjs';
 
-const HROM = process.env['HROM'] ?? '/opt/pw-browsers/chromium-1194/chrome-linux/chrome';
 const svg = readFileSync(new URL('./ikona.svg', import.meta.url), 'utf8');
 
-const brauzar = await chromium.launch({ executablePath: HROM });
+const brauzar = await chromium.launch({ executablePath: nameriHroma() });
 for (const r of [192, 512]) {
   const stranitsa = await brauzar.newPage({ viewport: { width: r, height: r } });
   await stranitsa.setContent(

@@ -7,47 +7,16 @@
  * Пуска се с `npm run proba`. Пада с ненулев код и изброява всяко разминаване.
  */
 
-import { chromium } from 'playwright-core';
+import { chromium, nameriHroma } from '../stroezh/hrom.mjs';
 import { webcrypto } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { setTimeout as pochakay } from 'node:timers/promises';
 import { readFile, writeFile } from 'node:fs/promises';
-import { existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-/**
- * Пътят до Chromium · ТЪРСИ СЕ, не се заковава.
- *
- * Дотук пътят беше един закован ред и `npm run proba` работеше САМО на тази
- * машина — а командата е обявена в README като част от пълната проверка.
- *
- * Всеки кандидат се ПРОВЕРЯВА, че съществува. Това не е излишно: тук
- * `chromium.executablePath()` сочи `chromium-1234`, а на диска стои
- * `chromium-1194`. Път, който само изглежда верен, дава грешка две минути
- * по-късно и на съвсем друго място.
- */
-function nameriHroma() {
-  const kandidati = [
-    process.env['PROBA_HROM'],
-    (() => {
-      try {
-        return chromium.executablePath();
-      } catch {
-        return null;
-      }
-    })(),
-    '/opt/pw-browsers/chromium',
-    '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
-  ];
-  for (const k of kandidati) {
-    if (k && existsSync(k)) return k;
-  }
-  throw new Error(
-    'Не намирам Chromium. Сложи пътя в PROBA_HROM или пусни ' +
-      '`npx playwright-core install chromium`.',
-  );
-}
+// Пътят до Chromium се ТЪРСИ, не се заковава — стълбата от кандидати живее в
+// `stroezh/hrom.mjs`, защото рисувачът на икони иска същия отговор (правило 17).
 
 const HROM = nameriHroma();
 const PORT = Number(process.env['PROBA_PORT'] ?? 4178);

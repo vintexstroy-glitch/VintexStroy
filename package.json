@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "description": "MasterBook · имоти, наеми, продажби, кредити, счетоводство, проекти",
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build && node stroezh/pechat-sw.mjs",
