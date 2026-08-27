@@ -1,0 +1,229 @@
+import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
+import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, plochka, plochkaPod, redove, smeniKoefitsient, tekstNa } from '../yadro/pomoshtni.ts';
+import { join } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+
+/** 22 · Стойност на Състояние */
+export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '22 · Стойност на Състояние';
+    // Данните са от НЕГОВИТЕ два файла в Драйва, свити до пет обекта.
+    const ploshtiCSV = join(tmpdir(), 'ploshto.csv');
+    await writeFile(
+      ploshtiCSV,
+      [
+        'кота;етаж;№;обект;застроена площ, F1;общи части F2;F2;Общо F1+F2;прилежащ (придаден) двор',
+        'кота -2,88;подземен;1;Гараж 1;16,00;0,99;2,09;18,09;',
+        ';;3;Гараж 3 и склад;19,50;1,21;2,54;22,04;',
+        'кота ±0,00;първи;18;Апартамент 1;40,00;2,48;5,22;45,22;22,00',
+        ';;19;Апартамент 2;57,00;3,53;7,44;64,44;22,90',
+        'кота +2,85;втори;22;Апартамент 5;54,80;3,39;7,15;61,95;',
+        ';;;;1614,59;100,00;210,64;1825,23;',
+      ].join('\n'),
+    );
+    const tseniCSV = join(tmpdir(), 'tseni.csv');
+    await writeFile(
+      tseniCSV,
+      [
+        'Имоти;Етаж Кота;Стаи;Чиста площ;Общи части;;Обща площ;Изложение;Тераси;Цена с ДДС;Евро / кв.м.',
+        'Апартамент 1;етаж 1;2;40;2,48;5,22;45,22;СИ;22;ПРОДАДЕН;',
+        'Апартамент 2;;2;57;3,53;7,44;64,44;И;22,9;215400;3342',
+        'Апартамент 5;етаж 2;2;54,8;3,39;7,15;61,95;СИ;4,5;ПРОДАДЕН;',
+        'Гараж 1;сутерен;;16;0,99;2,09;18,09;;;38700;2139',
+        'Гараж 3 и склад;;;19,5;1,21;2,54;22,04;;;ПРОДАДЕН;',
+      ].join('\n'),
+    );
+
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+    proveri('шестият екран го има', (await tekstNa(p, '.shapka h1')).includes('Стойност на Състояние'), true);
+    proveri('А мълчи, докато няма данни', (await plochka(p, 'А · по площ')), '—');
+    proveri('Б мълчи също', (await plochka(p, 'Б · по състояние')), '—');
+    proveri('и трите пътя са налице', (await p.$$('#cheti-ploshti, #cheti-tseni, #pishi-tseni')).length, 3);
+    proveri('изборът коя цена се пуска стои до бутона', (await p.$$('#koya-tsena')).length, 1);
+
+    await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-ploshti', ploshtiCSV));
+    await p.waitForSelector('.red.stoynost');
+    const obekti = await redove(p, '.red.stoynost:not(.sbor)');
+    proveri('прочете петте обекта, а контролният ред не влиза', obekti.length, 5);
+    proveri('и казва СВЕРКАТА вход↔изход', (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
+    proveri('общите части се смятат — чиста 40,00 и обща 45,22', obekti[2]?.[2], '40,00');
+    proveri('и общата стои до нея', obekti[2]?.[3], '45,22');
+    proveri('видът се познава по името', (obekti[0]?.[1] as any).includes('гараж'), true);
+
+    // ДВЕТЕ КОЛОНИ, ЕДНА ДО ДРУГА · негово: „две ценови колони за сравнение"
+    // Хедърът минава през text-transform, затова се сверява без регистър.
+    const glavaNaStoynostta = (await tekstNa(p, '.glava.stoynost')).toLowerCase();
+    proveri('хедърът носи А', glavaNaStoynostta.includes('по площ'), true);
+    proveri('хедърът носи Б', glavaNaStoynostta.includes('по състояние'), true);
+    proveri('и разликата между тях', glavaNaStoynostta.includes('разлика'), true);
+    proveri('всеки ред носи и двете цени', obekti[3]?.[6] !== '' && obekti[3]?.[7] !== '', true);
+    proveri('и казва ОТКЪДЕ е наемът', (obekti[3]?.[5] as any).includes('очакван'), true);
+
+    const bezLista = await plochka(p, 'А · по площ');
+    const bezListaB = await plochka(p, 'Б · по състояние');
+    proveri('А вече говори', bezLista !== '—', true);
+    proveri('Б също', bezListaB !== '—', true);
+    proveri('и Б казва с колко стои под А', (await plochkaPod(p, 'Б · по състояние')).includes('%'), true);
+    proveri('нищо не е продадено, докато листата мълчи', (await p.$$('.red.stoynost.mahnata')).length, 0);
+    proveri('закръглянето се ВИЖДА, не се преглъща', (await plochkaPod(p, 'А · по площ')).includes('закръглено'), true);
+
+    await deystvieSPrerisuvane(p, () => p.setInputFiles('#fayl-tseni', tseniCSV));
+    await p.waitForSelector('.red.stoynost.mahnata');
+    proveri('ценовата листа каза кое е ПРОДАДЕН', (await p.$$('.red.stoynost.mahnata')).length, 3);
+    const sIzlozhenie = await redove(p, '.red.stoynost:not(.sbor)');
+    proveri('и даде изложението', sIzlozhenie[3]?.[4], 'И');
+    proveri('продаденото НЕ влиза в А', (await plochka(p, 'А · по площ')) !== bezLista, true);
+    proveri('нито в Б', (await plochka(p, 'Б · по състояние')) !== bezListaB, true);
+
+    // ПРЕВКЛЮЧВАТЕЛЯТ · „избираш само едната да се вижда"
+    proveri('подразбраното е „и двете"', await p.$eval('#koya-tsena', (e) => (e as any).value), 'dvete');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koya-tsena', 'sastoyanie'));
+    proveri('изборът се задържа след прерисуване', await p.$eval('#koya-tsena', (e) => (e as any).value), 'sastoyanie');
+    proveri('таблицата на екрана НЕ се мени — изборът е за износа', (await redove(p, '.red.stoynost:not(.sbor)')).length, 5);
+
+    // ══ 23 · Отчетите · всяко число с формулата си ═══════════════════════
+}
+
+/** 38 · Малинова Долина */
+export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '38 · Малинова Долина';
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+    await p.setInputFiles('#fayl-ploshti', new URL('../../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
+    const vestMD = (await tekstNa(p, '.vest')).replace(/[\s\u00A0\u202F]/g, '');
+    proveri('45-те обекта влизат · разликата е нула',
+      vestMD.includes('Прочетени45обекта→45реда·разлика0'), true);
+    proveri('листата носи цените · сбор 2 118 800,00 €',
+      vestMD.includes('цениза25обекта·сбор2118800,00€'), true);
+    proveri('и разминатите площи на файла се КАЗВАТ, не се преглъщат',
+      vestMD.includes('площитенафайланесесверяват'), true);
+
+    // ВПИСВАНЕТО: обектите стават Имоти, задачите — Дела, през Вратата
+    const predMD = await broySabitiya(p);
+    await p.click('#vpishi-obekti');
+    await p.waitForFunction(() => document.body.textContent.includes('Вписано:'));
+    const vestVpis = await tekstNa(p, '.vest');
+    proveri('вписани са 45 имота', vestVpis.includes('45 имота'), true);
+    proveri('и 79 дела (4 на сградата + 3 на всеки непродаден)',
+      vestVpis.includes('79 дела'), true);
+    proveri('всяко е събитие в Журнала', await broySabitiya(p), predMD + 45 + 79);
+
+    // ПОВТОРНОТО натискане НЕ удвоява — казва „вече бяха вписани"
+    await p.click('#vpishi-obekti');
+    await p.waitForFunction(() => document.body.textContent.includes('не се удвояват'));
+    proveri('повторното вписване не пише нищо', await broySabitiya(p), predMD + 45 + 79);
+
+    // обектите се ДВИЖАТ в другите таблици: Имоти ги вижда
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.fill('[data-tarsi-tablitsa="imoti"]', 'Малинова Долина');
+    await p.waitForFunction(() =>
+      document.querySelectorAll('.red.imot').length === 45);
+    proveri('Имоти показва 45-те обекта на Малинова Долина',
+      await p.$$eval('.red.imot', (r) => r.length), 45);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="imoti"]'));
+
+    // и Управление вижда делата — с Акт 16 към самата сграда
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const gantTekst = await p.evaluate(() => document.body.textContent);
+    proveri('Гант носи Акт 16', gantTekst.includes('Акт 16'), true);
+    proveri('и огледите за продажба или наем', gantTekst.includes('Оглед за продажба или Наем'), true);
+
+    // ══ 39 · диаграмите в Сметки (И92 т.4) ══════════════════════════════════
+}
+
+/** 51 · двете секции на Калкулатора */
+export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '51 · двете секции на Калкулатора';
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+
+    proveri('секция „Калкулатор" стои горе',
+      Boolean(await p.$('[data-sektsiya=kalkulator]')), true);
+    proveri('секция „Ценова листа" стои под нея',
+      Boolean(await p.$('[data-sektsiya="tsenova-lista"]')), true);
+
+    // ПЕТТЕ КОЕФИЦИЕНТА · меню от ДУМИ, не свободно число („аз не знам")
+    proveri('петте коефициента са менюта',
+      await p.$$eval('.red.kalk-koef select[data-koef]', (r) => r.length), 5);
+    proveri('и всяко е меню от думи, не поле за число',
+      await p.$$eval('.red.kalk-koef select[data-koef] option',
+        (o) => o.every((x) => /[А-Яа-я]/.test(x.textContent))), true);
+
+    // КАК СЕ СМЯТА · двете графи, ред по ред
+    proveri('двете графи стоят една до друга',
+      await p.$$eval('.dve-grafi .grafa', (r) => r.length), 2);
+    const grafaA = await p.$eval('.dve-grafi .grafa:first-child', (e) => e.textContent);
+    proveri('Графа А тръгва от площ × база', grafaA.includes('площ × база'), true);
+    proveri('и всеки от петте коефициента е СВОЙ ред',
+      ['етаж', 'състояние', 'изложение', 'възраст', 'асансьор']
+        .every((d) => grafaA.includes(d)), true);
+    const grafaB = await p.$eval('.dve-grafi .grafa:last-child', (e) => e.textContent);
+    proveri('Графа Б показва четирите си стъпки',
+      ['годишен наем', 'заетост', 'нетен оперативен доход', 'доходност']
+        .every((d) => grafaB.includes(d)), true);
+
+    // ПРИМЕРЪТ ЗА КОЕФИЦИЕНТ · негово изрично искане · разгъва се ПОД реда
+    proveri('примерът е прибран, докато не се поиска',
+      Boolean(await p.$('.red.kalk-primer')), false);
+    await deystvieSPrerisuvane(p, () => p.click('[data-primer=etazh]'));
+    proveri('примерът се разгъва под реда, без изскачащ прозорец',
+      Boolean(await p.$('.red.kalk-primer')), true);
+    const parterat = await p.$eval('.red.kalk-primer tr[data-stapka=parter]', (r) => ({
+      mnozhitel: (r.querySelector('[data-mnozhitel]') as any).textContent.trim(),
+      meni: (r.querySelector('[data-meni]') as any).textContent.trim(),
+      pari: (r.querySelector('[data-meni-pari]') as any).textContent.trim(),
+    }));
+    proveri('множителят стои с три знака', parterat.mnozhitel, '0,920');
+    proveri('и до него — с колко процента мени', parterat.meni, '−8,00 %');
+    // Числото зависи от обекта, който се разбива; проверява се, че процентът е
+    // ПРЕВЕДЕН В ПАРИ и е отрицателен — „0,92" само по себе си не е пример.
+    proveri('процентът е преведен в ПАРИ, не оставен сам',
+      parterat.pari.startsWith('−') && parterat.pari !== '0,00', true);
+    proveri('избраната стъпка е назована с ДУМА, не само с цвят',
+      (await p.$eval('.red.kalk-primer', (e) => e.textContent)).includes('избрано'), true);
+
+    // РАЗЛИКАТА · и числото, което свързва двете графи
+    const razlikata = await p.$$eval('.plochka .etiket', (e) => e.map((x) => x.textContent));
+    proveri('разликата Б − А е показана', razlikata.includes('Разлика · Б − А'), true);
+    proveri('и подразбиращата се доходност също',
+      razlikata.includes('Подразбираща се доходност'), true);
+
+    // ВРЪЗКАТА МЕЖДУ ДВЕТЕ СЕКЦИИ · смяна горе мени числата долу
+    await p.setInputFiles('#fayl-ploshti', new URL('../../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
+    const predSmyana = await chisloNaPoleto(p, 'stoynost-a');
+    // ЧАКА СЕ ЧИСЛОТО, не прерисуването. Обработчикът е асинхронен и прави ДВЕ
+    // неща — пресмята листата и прерисува; шапката се отбелязва при второто,
+    // тъй че „шапката е нова" не значи „числото е новото". Платено с находка:
+    // проверката минаваше през път и падаше през път, което е по-лошо от
+    // проверка, която пада винаги.
+    await smeniKoefitsient(p, 'sastoyanie', 'novo-luks');
+    const sledSmyana = await chisloNaPoleto(p, 'stoynost-a');
+    proveri('коефициент, сменен ГОРЕ, мени листата ДОЛУ', sledSmyana > predSmyana, true);
+
+    // и обратно · връщането връща числото точно, без утайка от закръгляне
+    await smeniKoefitsient(p, 'sastoyanie', 'dobro');
+    proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predSmyana);
+
+    // И НИЩО ОТ ТОВА НЕ ПИША В ЖУРНАЛА · „няма редакция оттам, а само изчисляване"
+    const predKalk = await broySabitiya(p);
+    await smeniKoefitsient(p, 'izlozhenie', 'yug');
+    proveri('Калкулаторът не пише нищо в Журнала', await broySabitiya(p), predKalk);
+    await smeniKoefitsient(p, 'izlozhenie', 'iztok-zapad');
+
+    // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
+    //
+    // Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ в журнала… скачени с
+    // ТРЕТИ НОМЕР обединяващ и двата… извън графата на нормалния ред."
+}

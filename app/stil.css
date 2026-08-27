@@ -294,7 +294,29 @@
      втори син, той се кръщава отделно, вместо този да се преизползва. */
   --menyu-sinio: #2C5F8A;
   --menyu-cherno: #1A1714;
+
+  /* ТЕКСТОВАТА СКАЛА следва настройката на устройството/браузъра за размер
+     на текста (rem наследява от `html { font-size }` по-долу — зачита zoom и
+     „по-голям текст" на системата) и расте леко на широк екран (vw
+     компонентът). Числата пазят ТОЧНИЯ стар пропорционален мащаб (базата си
+     остава 14px = 1rem) — само единицата стана адаптивна. */
+  --text-base: clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem);
+  --text-xs: calc(var(--text-base) * 0.79);
+  --text-sm: calc(var(--text-base) * 0.89);
+  --text-md: var(--text-base);
+  --text-lg: calc(var(--text-base) * 1.11);
+  --text-xl: calc(var(--text-base) * 1.5);
+  --text-2xl: calc(var(--text-base) * 1.86);
+
+  /* Разстоянията са в rem (растат/спадат заедно с текста) и СТЕСНЕНИ спрямо
+     старите px стойности — по-малко празно пространство между секции. */
+  --space-xs: 0.3rem;
+  --space-sm: 0.55rem;
+  --space-md: 0.85rem;
+  --space-lg: 1.15rem;
 }
+
+html { font-size: 100%; }
 
 * { box-sizing: border-box; }
 
@@ -303,7 +325,7 @@ body {
   background: var(--hartiya);
   color: var(--mastilo);
   font-family: 'IBM Plex Sans', system-ui, sans-serif;
-  font-size: 14px;
+  font-size: var(--text-base);
 }
 
 a { color: var(--aktsent); text-decoration: none; }
@@ -321,8 +343,8 @@ a:hover { color: var(--aktsent-tumen); }
   flex-direction: column;
 }
 .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
-.marka b { font-family: Literata, Georgia, serif; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; }
-.marka span { font-size: 11px; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
+.marka b { font-family: Literata, Georgia, serif; font-size: 1.214rem; font-weight: 600; letter-spacing: -0.01em; }
+.marka span { font-size: 0.786rem; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
 
 .veriga {
   margin-top: auto;
@@ -332,7 +354,7 @@ a:hover { color: var(--aktsent-tumen); }
   flex-direction: column;
   gap: 8px;
 }
-.redche { display: flex; align-items: center; gap: 7px; font-size: 12px; color: var(--mastilo2); }
+.redche { display: flex; align-items: center; gap: 7px; font-size: 0.857rem; color: var(--mastilo2); }
 .tochka { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; background: var(--zeleno); }
 .tochka.zle { background: var(--aktsent); }
 
@@ -343,27 +365,27 @@ a:hover { color: var(--aktsent-tumen); }
   align-items: flex-end;
   justify-content: space-between;
   gap: 16px;
-  padding: 26px 32px 18px;
+  padding: var(--space-md) var(--space-lg) var(--space-sm);
   border-bottom: 1px solid var(--liniya);
   flex-wrap: wrap;
 }
-.shapka h1 { font-family: Literata, Georgia, serif; font-size: 26px; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
-.shapka p { margin: 0; font-size: 13px; color: var(--mastilo2); }
+.shapka h1 { font-family: Literata, Georgia, serif; font-size: 1.857rem; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
+.shapka p { margin: 0; font-size: 0.929rem; color: var(--mastilo2); }
 .desno-gore { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-.telo { flex-grow: 1; padding: 22px 32px 40px; display: flex; flex-direction: column; gap: 20px; }
+.telo { flex-grow: 1; padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
 
 /* ── бутони ──────────────────────────────────────────────────────── */
 button { font-family: inherit; cursor: pointer; }
 .glaven {
   background: var(--aktsent); color: #FFF9F4; border: none; border-radius: 4px;
-  padding: 10px 16px; font-size: 13px; font-weight: 600; min-height: 40px;
+  padding: 10px 16px; font-size: 0.929rem; font-weight: 600; min-height: 40px;
 }
 .glaven:hover { background: var(--aktsent-tumen); }
 .glaven:disabled { opacity: 0.5; cursor: not-allowed; }
 .vtorichen {
   background: transparent; border: 1px solid var(--liniya); border-radius: 4px;
-  padding: 10px 14px; font-size: 13px; color: var(--mastilo); min-height: 40px;
+  padding: 10px 14px; font-size: 0.929rem; color: var(--mastilo); min-height: 40px;
 }
 .vtorichen:hover { background: var(--panel); }
 /* Връзка, която изглежда като бутон: „Писмо" отваря пощата, значи е <a>, не
@@ -374,19 +396,19 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .plochka {
   background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px;
-  padding: 14px 16px 15px; display: flex; flex-direction: column; gap: 6px;
+  padding: var(--space-sm) var(--space-md) var(--space-sm); display: flex; flex-direction: column; gap: 6px;
 }
-.etiket { font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+.etiket { font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
 .chislo {
-  font-family: Literata, Georgia, serif; font-size: 27px; font-weight: 600;
+  font-family: Literata, Georgia, serif; font-size: 1.929rem; font-weight: 600;
   letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05;
 }
-.pod { font-size: 12px; color: var(--mastilo2); }
+.pod { font-size: 0.857rem; color: var(--mastilo2); }
 
 /* ── таблица ─────────────────────────────────────────────────────── */
 .dyalglava { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 15.5px; font-weight: 600; margin: 0; }
-.dyalglava span { font-size: 12px; color: var(--mastilo2); }
+.dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 1.107rem; font-weight: 600; margin: 0; }
+.dyalglava span { font-size: 0.857rem; color: var(--mastilo2); }
 
 /* Таблицата скролва ВЪТРЕ в себе си, като лист на Excel: главата и първата
    колона стоят замразени, а страницата не подскача. Менюто на филтъра остава
@@ -405,48 +427,51 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
-  font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px;
 }
 .red { border-bottom: 1px solid #EFE8DD; }
 .red:last-child { border-bottom: none; }
 .red:hover { background: #FDFBF7; }
 .kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.kletka b { font-weight: 500; font-size: 13.5px; }
-.kletka span { font-size: 12px; color: var(--mastilo2); overflow: hidden; text-overflow: ellipsis; }
-.suma { font-variant-numeric: tabular-nums; font-size: 14px; font-weight: 500; text-align: right; }
+.kletka b { font-weight: 500; font-size: 0.964rem; }
+.kletka span { font-size: 0.857rem; color: var(--mastilo2); overflow: hidden; text-overflow: ellipsis; }
+.suma { font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; text-align: right; }
 
-.znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 11.5px; font-weight: 500; white-space: nowrap; }
+.znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 0.821rem; font-weight: 500; white-space: nowrap; }
 .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
 .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
 
-.prazno { padding: 34px 18px; text-align: center; color: var(--mastilo2); font-size: 13.5px; line-height: 1.6; }
+.prazno { padding: 34px 18px; text-align: center; color: var(--mastilo2); font-size: 0.964rem; line-height: 1.6; }
 
 /* ── форми ───────────────────────────────────────────────────────── */
 .karta {
   border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
-  padding: 18px; display: flex; flex-direction: column; gap: 14px;
+  padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm);
 }
-.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+/* Максимумът е ЗАКОВАН (240px), не `1fr` — късо поле („Площ", „Падеж") спира
+   да се разтяга наравно с дълго („Място или адрес") само защото реда му е
+   широк. Празното място остава ПРАЗНО в края на реда, не се разпределя. */
+.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 240px)); gap: var(--space-sm); }
 .pole { display: flex; flex-direction: column; gap: 6px; }
 /* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
    „<label class=pole><span>". Втората е в личните форми; без този ред нейният
    надпис остава с ръста на текста и полето до него изглежда от друг екран. */
-.pole label, .pole > span { font-size: 12.5px; color: var(--mastilo2); }
+.pole label, .pole > span { font-size: 0.893rem; color: var(--mastilo2); }
 .pole input, .pole select {
-  font-family: inherit; font-size: 14px; color: var(--mastilo);
+  font-family: inherit; font-size: 1rem; color: var(--mastilo);
   border: 1px solid var(--liniya); border-radius: 4px; padding: 10px 12px;
   min-height: 44px; background: #FFFFFF;
 }
 .pole input:focus, .pole select:focus { outline: 2px solid var(--aktsent); outline-offset: -1px; }
 .pole input.zle { border-color: var(--aktsent); background: var(--toplo); }
-.greshka { font-size: 12px; color: var(--aktsent); min-height: 16px; }
+.greshka { font-size: 0.857rem; color: var(--aktsent); min-height: 16px; }
 .deystviya { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
-.drebno { margin: 0; font-size: 11.5px; color: var(--mastilo2); line-height: 1.55; }
+.drebno { margin: 0; font-size: 0.821rem; color: var(--mastilo2); line-height: 1.55; }
 
 /* ── съобщение ───────────────────────────────────────────────────── */
 .vest {
-  border-radius: 4px; padding: 11px 14px; font-size: 13px;
+  border-radius: 4px; padding: 11px 14px; font-size: 0.929rem;
   display: flex; align-items: center; gap: 8px;
 }
 .vest.dobre { background: #E6F0EA; color: #1F5C44; }
@@ -465,7 +490,7 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; border: none; border-radius: 4px;
   background: transparent; color: var(--mastilo);
-  font-family: inherit; font-size: 13.5px; text-align: left;
+  font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
 .navred:hover { background: #EAE2D6; }
@@ -475,7 +500,7 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .broyach {
   margin-left: auto; min-width: 20px; height: 20px; padding: 0 6px;
   border-radius: 10px; background: var(--aktsent); color: #FFF9F4;
-  font-size: 11.5px; font-weight: 600; font-variant-numeric: tabular-nums;
+  font-size: 0.821rem; font-weight: 600; font-variant-numeric: tabular-nums;
   display: flex; align-items: center; justify-content: center;
 }
 .navred.tuk .broyach { background: var(--hartiya); color: var(--mastilo); }
@@ -485,10 +510,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   grid-template-columns: 130px minmax(0, 2fr) minmax(0, 110px) 120px 100px;
   min-width: 700px;
 }
-.zakasnenie { color: var(--aktsent); font-size: 11.5px; }
+.zakasnenie { color: var(--aktsent); font-size: 0.821rem; }
 .suma.duljimo { color: var(--aktsent); }
 .suma.plateno { color: var(--zeleno); }
-.vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 12.5px; }
+.vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 0.893rem; }
 
 /* ── ТЕМАТИЧНИТЕ ИКОНИ · знак до всяко управление (И101 т.2 · ADR-045) ───
    Един стил за всички: само контур, цветът идва от текста до тях. Икона със
@@ -521,7 +546,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 }
 /* ── ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045) ────────────────── */
 .menyu-nastroyki { display: flex; flex-direction: column; gap: 2px; }
-.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 11px; color: var(--mastilo2); }
+.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 0.786rem; color: var(--mastilo2); }
 .menyu-nastroyki.otvoreno .strelka-dolu { transform: rotate(180deg); }
 .nastroyki-red {
   display: flex; flex-direction: column; gap: 1px;
@@ -532,7 +557,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 .nastroyki-red .tema {
   display: flex; align-items: flex-start; gap: 8px; text-align: left;
   background: none; border: none; border-radius: 4px; padding: 6px 8px;
-  color: var(--mastilo); font-family: inherit; font-size: 12.5px;
+  color: var(--mastilo); font-family: inherit; font-size: 0.893rem;
 }
 .nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible { background: var(--panel); }
 .nastroyki-red .tema .ikona { margin-top: 2px; color: var(--mastilo2); }
@@ -550,17 +575,17 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 }
 .red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
 .red.parametar input[type="text"], .red.parametar input:not([type]) {
-  width: 100%; font-family: inherit; font-size: 12.5px;
+  width: 100%; font-family: inherit; font-size: 0.893rem;
   border: 1px solid var(--liniya); border-radius: 4px; padding: 5px 8px; min-height: 30px;
 }
-.red.parametar select { font-family: inherit; font-size: 12.5px; padding: 5px 6px; min-height: 30px; }
-.znak-problem { font-size: 15px; line-height: 1; }
+.red.parametar select { font-family: inherit; font-size: 0.893rem; padding: 5px 6px; min-height: 30px; }
+.znak-problem { font-size: 1.071rem; line-height: 1; }
 
 /* ── ПОДРЕДБАТА · дребните бутончета до главата (И101 т.2 · ADR-045) ──── */
 .premestvane { margin-left: auto; display: inline-flex; gap: 2px; align-items: center; }
 .premestvach {
   background: none; border: 1px solid transparent; border-radius: 4px;
-  color: var(--mastilo2); font-size: 10px; line-height: 1;
+  color: var(--mastilo2); font-size: 0.714rem; line-height: 1;
   padding: 3px 5px; min-height: 22px; display: inline-flex; align-items: center; gap: 3px;
 }
 .premestvach:hover, .premestvach:focus-visible { border-color: var(--liniya); background: var(--panel); }
@@ -621,7 +646,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   border: 1px solid var(--aktsent);
   border-radius: 8px;
   background: var(--toplo);
-  font-size: 13.5px;
+  font-size: 0.964rem;
   line-height: 1.55;
 }
 .prechki li + li { margin-top: 5px; }
@@ -657,18 +682,18 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   min-height: 44px; width: 100%;
 }
 .punkt:hover { background: var(--panel); }
-.punkt b { font-size: 13.5px; font-weight: 500; }
-.punkt span { font-size: 12px; color: var(--mastilo2); }
+.punkt b { font-size: 0.964rem; font-weight: 500; }
+.punkt span { font-size: 0.857rem; color: var(--mastilo2); }
 .menyu .drebno { padding: 8px 10px 4px; border-top: 1px solid var(--liniya); margin-top: 4px; }
 .menyupapka {
   padding: 8px 10px 3px; margin: 0;
-  font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: 0.786rem; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--mastilo2);
 }
 .menyupapka:not(:first-child) { border-top: 1px solid var(--liniya); margin-top: 4px; }
 
 /* ── планът на актуализацията ────────────────────────────────────────── */
-.dyalglava h2.malko { font-size: 14px; }
+.dyalglava h2.malko { font-size: 1rem; }
 .filtar { display: flex; gap: 6px; flex-wrap: wrap; }
 .vtorichen.malak.tuk { background: var(--mastilo); color: var(--hartiya); border-color: var(--mastilo); }
 .glava.razlika, .red.razlika {
@@ -679,7 +704,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   grid-template-columns: 84px minmax(0, 1fr);
   min-width: 360px;
 }
-.red.propusnat span:last-child { color: var(--aktsent); font-size: 12.5px; }
+.red.propusnat span:last-child { color: var(--aktsent); font-size: 0.893rem; }
 
 /* ── Настройки · бутоните са модели на пътища ────────────────────────── */
 .glava.buton, .red.buton {
@@ -748,16 +773,16 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   min-width: 700px;
 }
 .red.kalk-koef select {
-  font-family: inherit; font-size: 13.5px; color: var(--mastilo);
+  font-family: inherit; font-size: 0.964rem; color: var(--mastilo);
   border: 1px solid var(--liniya); border-radius: 4px; padding: 7px 9px;
   min-height: 34px; background: #FFFFFF; width: 100%;
 }
 /* Примерът за коефициент · разгъва се ПОД реда, не в изскачащ прозорец */
 .red.kalk-primer { display: block; background: var(--panel); padding: 0; }
 .primerblok { padding: 12px 14px; display: flex; flex-direction: column; gap: 10px; }
-table.primer, table.razbivka { border-collapse: collapse; width: 100%; font-size: 13px; }
+table.primer, table.razbivka { border-collapse: collapse; width: 100%; font-size: 0.929rem; }
 table.primer th {
-  text-align: left; font-size: 11.5px; font-weight: 600; color: var(--mastilo2);
+  text-align: left; font-size: 0.821rem; font-weight: 600; color: var(--mastilo2);
   padding: 4px 8px; border-bottom: 1px solid var(--liniya);
 }
 table.primer td { padding: 5px 8px; border-bottom: 1px solid var(--liniya); }
@@ -773,14 +798,14 @@ table.primer th.suma, table.primer td.suma { text-align: right; }
 }
 .grafaglava { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
 table.razbivka td { padding: 6px 6px; border-bottom: 1px solid var(--liniya); vertical-align: top; }
-table.razbivka td.znak { width: 18px; color: var(--mastilo2); font-size: 15px; }
+table.razbivka td.znak { width: 18px; color: var(--mastilo2); font-size: 1.071rem; }
 table.razbivka td.suma { text-align: right; white-space: nowrap; }
-table.razbivka .drebno { font-size: 10.5px; }
+table.razbivka .drebno { font-size: 0.75rem; }
 .suma.zle { color: var(--aktsent); }
 .pole.tyasno { min-width: 210px; }
-.pole.tyasno select { font-size: 13px; }
-.plochka.golyama .chislo { font-size: 30px; }
-.plochka .chislo.malka { font-size: 17px; }
+.pole.tyasno select { font-size: 0.929rem; }
+.plochka.golyama .chislo { font-size: 2.143rem; }
+.plochka .chislo.malka { font-size: 1.214rem; }
 
 /* Редакторът на хедъри · колоната и лицата ѝ */
 .glava.redaktor, .red.redaktor {
@@ -803,7 +828,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 .red.redaktor select { width: 100%; font: inherit; padding: 3px 4px; }
 /* Колоната, чийто сбор ОТИВА нанякъде, го казва под падащото меню — иначе
    „евро" и „число" изглеждат като разлика в надпис, а не в поведение. */
-.red.redaktor .kletka > span { font-size: 10.5px; color: var(--mastilo2); }
+.red.redaktor .kletka > span { font-size: 0.75rem; color: var(--mastilo2); }
 .glava.opis, .red.opis {
   grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 1.4fr) minmax(0, 1.6fr);
   min-width: 700px;
@@ -836,13 +861,13 @@ table.razbivka .drebno { font-size: 10.5px; }
   display: inline-flex; align-items: center; justify-content: center;
   width: 22px; height: 22px; border-radius: 4px;
   background: var(--problem); color: #FFFFFF;
-  font-size: 12px; line-height: 1;
+  font-size: 0.857rem; line-height: 1;
 }
-.kazva-problem { font-size: 12px; color: var(--problem); margin-top: 4px; }
+.kazva-problem { font-size: 0.857rem; color: var(--problem); margin-top: 4px; }
 .kazva-problem[data-spira="da"] { font-weight: 500; }
 
 .legenda-vhod { margin: 10px 0; }
-.legenda-vhod summary { cursor: pointer; font-size: 13px; color: var(--mastilo2); }
+.legenda-vhod summary { cursor: pointer; font-size: 0.929rem; color: var(--mastilo2); }
 .glava.legenda, .red.legenda {
   grid-template-columns: 56px minmax(0, 1.2fr) 150px minmax(0, 2.4fr);
   min-width: 720px;
@@ -856,9 +881,9 @@ table.razbivka .drebno { font-size: 10.5px; }
 .koef-tochka { fill: var(--aktsent); }
 .koef-stalb { fill: var(--aktsent); opacity: 0.82; }
 .koef-plosht { fill: var(--aktsent); opacity: 0.14; }
-.koef-etiket { font-size: 10.5px; fill: var(--mastilo2); }
+.koef-etiket { font-size: 0.75rem; fill: var(--mastilo2); }
 .koef-formula {
-  font-variant-numeric: tabular-nums; font-size: 12.5px;
+  font-variant-numeric: tabular-nums; font-size: 0.893rem;
   background: var(--panel); border: 1px solid var(--liniya); border-radius: 4px;
   padding: 6px 10px; display: inline-block;
 }
@@ -872,7 +897,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr) 140px 130px;
   min-width: 820px;
 }
-.red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 12px; }
+.red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 0.857rem; }
 
 /* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
 .gant-dvete {
@@ -894,7 +919,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;
   min-width: 860px;
 }
-.red.mesetsat .suma .drebno { font-size: 10.5px; }
+.red.mesetsat .suma .drebno { font-size: 0.75rem; }
 
 /* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
 .glava.zadacha, .red.zadacha {
@@ -929,21 +954,21 @@ table.razbivka .drebno { font-size: 10.5px; }
 .ime-kolona:hover { color: var(--mastilo); }
 .ime-kolona.podredena { color: var(--aktsent); font-weight: 700; }
 .filtar-tarsi {
-  width: 100%; box-sizing: border-box; font: inherit; font-size: 12.5px;
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 0.893rem;
   padding: 6px 8px; margin-bottom: 6px;
   border: 1px solid var(--liniya); border-radius: 4px;
   text-transform: none; letter-spacing: normal;
 }
 .tarsene-v-tablitsa { display: block; margin: 0 0 10px; }
 .tarsene-v-tablitsa input {
-  width: min(320px, 100%); font: inherit; font-size: 13px;
+  width: min(320px, 100%); font: inherit; font-size: 0.929rem;
   padding: 8px 12px; border: 1px solid var(--liniya); border-radius: 4px;
   background: #FFFFFF; color: var(--mastilo);
 }
 .tarsene-v-tablitsa input:focus-visible { outline: 2px solid var(--aktsent); outline-offset: 1px; }
 .strelka {
   border: none; background: transparent; color: var(--mastilo2);
-  font-size: 10px; padding: 2px 4px; border-radius: 3px; line-height: 1;
+  font-size: 0.714rem; padding: 2px 4px; border-radius: 3px; line-height: 1;
   cursor: pointer;
 }
 .strelka:hover { background: #EAE2D6; color: var(--mastilo); }
@@ -954,7 +979,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 6px;
   box-shadow: 0 8px 24px rgba(42, 37, 33, 0.14);
   padding: 6px; display: flex; flex-direction: column; gap: 1px;
-  text-transform: none; letter-spacing: normal; font-size: 13px;
+  text-transform: none; letter-spacing: normal; font-size: 0.929rem;
   color: var(--mastilo); font-weight: 400; text-align: left; cursor: default;
 }
 .glavicha.suma .filtar-menyu { left: auto; right: 0; }
@@ -965,10 +990,10 @@ table.razbivka .drebno { font-size: 10.5px; }
 .otmetka:hover { background: var(--panel); }
 .otmetka input { accent-color: var(--aktsent); width: 15px; height: 15px; flex-shrink: 0; }
 .otmetka span { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.otmetka b { font-size: 11.5px; color: var(--mastilo2); font-weight: 500; font-variant-numeric: tabular-nums; }
+.otmetka b { font-size: 0.821rem; color: var(--mastilo2); font-weight: 500; font-variant-numeric: tabular-nums; }
 .izchisti-filtar {
   border: none; background: transparent; color: var(--aktsent);
-  font-family: inherit; font-size: 12.5px; text-align: left;
+  font-family: inherit; font-size: 0.893rem; text-align: left;
   padding: 8px; border-top: 1px solid var(--liniya); margin-top: 4px; cursor: pointer;
 }
 .filtar-skrito { margin-top: 6px; }
@@ -979,11 +1004,11 @@ table.razbivka .drebno { font-size: 10.5px; }
   padding: 8px 12px; box-sizing: border-box;
   border: none; border-top: 1px solid var(--liniya);
   background: var(--panel); color: var(--mastilo);
-  font: inherit; font-size: 12.5px; text-align: left; cursor: pointer;
+  font: inherit; font-size: 0.893rem; text-align: left; cursor: pointer;
 }
 .grupata:hover { background: #EFE9DE; }
 .grupata b { font-weight: 600; }
-.grupata .strelchitsa { color: var(--mastilo2); font-size: 10px; flex-shrink: 0; }
+.grupata .strelchitsa { color: var(--mastilo2); font-size: 0.714rem; flex-shrink: 0; }
 .grupata .sborove {
   margin-left: auto; color: var(--mastilo2);
   font-variant-numeric: tabular-nums; white-space: nowrap;
@@ -993,7 +1018,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 /* ── редакцията в клетката (вълна 3 · стъпка 1) ─────────────────────────── */
 [data-redakt] { cursor: text; }
 .kletka-redaktor {
-  width: 100%; box-sizing: border-box; font: inherit; font-size: 13px;
+  width: 100%; box-sizing: border-box; font: inherit; font-size: 0.929rem;
   padding: 4px 6px; text-align: right;
   border: 1px solid var(--aktsent); border-radius: 3px;
   background: #FFFFFF; color: var(--mastilo);
@@ -1008,7 +1033,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 }
 
 /* ── таблото · отметките и сравнението на плановете ─────────────────────── */
-.chislo.malak { font-size: 18px; letter-spacing: -0.01em; }
+.chislo.malak { font-size: 1.286rem; letter-spacing: -0.01em; }
 
 .vazmozhnosti { display: flex; flex-direction: column; gap: 2px; }
 
@@ -1021,8 +1046,8 @@ table.razbivka .drebno { font-size: 10.5px; }
 .vazm input { width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0; accent-color: var(--aktsent); }
 .vazm input:disabled { cursor: not-allowed; }
 .vazm-tyalo { display: flex; flex-direction: column; gap: 2px; flex-grow: 1; min-width: 0; }
-.vazm-tyalo b { font-weight: 500; font-size: 13.5px; }
-.vazm-tyalo span { font-size: 12px; color: var(--mastilo2); line-height: 1.5; }
+.vazm-tyalo b { font-weight: 500; font-size: 0.964rem; }
+.vazm-tyalo span { font-size: 0.857rem; color: var(--mastilo2); line-height: 1.5; }
 
 /* Каквото планът изобщо не дава, се вижда — но избеляло и незакачаемо.
    Скриването му би оставило въпроса „а къде е", а точно него плащат нагоре. */
@@ -1039,7 +1064,7 @@ table.razbivka .drebno { font-size: 10.5px; }
    само криене от служителя на колони по избор." Затова редът стои НАД името
    на колоната, а не в отделен диалог: човек вижда какво пипа. */
 .hedar { margin: 14px 0; }
-.hedar > b { display: block; font-size: 13px; font-weight: 500; margin-bottom: 6px; }
+.hedar > b { display: block; font-size: 0.929rem; font-weight: 500; margin-bottom: 6px; }
 .skritred {
   display: flex; flex-wrap: wrap; gap: 6px;
   padding: 8px; border-radius: 5px;
@@ -1048,10 +1073,10 @@ table.razbivka .drebno { font-size: 10.5px; }
 .pravo {
   display: flex; align-items: center; gap: 7px;
   padding: 6px 9px; border-radius: 4px; cursor: pointer;
-  background: var(--hartiya); border: 1px solid var(--liniya); font-size: 12.5px;
+  background: var(--hartiya); border: 1px solid var(--liniya); font-size: 0.893rem;
 }
 .pravo input { width: 15px; height: 15px; accent-color: var(--aktsent); flex-shrink: 0; }
-.pravo .drebno { font-size: 11px; color: var(--mastilo2); }
+.pravo .drebno { font-size: 0.786rem; color: var(--mastilo2); }
 /* Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
    да се вижда, вместо да се помни. */
 .pravo.skrita { opacity: 0.5; }
@@ -1075,19 +1100,19 @@ table.razbivka .drebno { font-size: 10.5px; }
 .pole-otchet .glavata {
   display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
 }
-.pole-otchet .chislo { font-size: 21px; }
+.pole-otchet .chislo { font-size: 1.5rem; }
 .pole-otchet .kakvo {
-  margin: 6px 0 9px; font-size: 12px; line-height: 1.45; color: var(--mastilo2);
+  margin: 6px 0 9px; font-size: 0.857rem; line-height: 1.45; color: var(--mastilo2);
 }
 .pole-otchet .formula {
   list-style: none; margin: 0; padding: 8px 0 0; border-top: 1px dashed var(--liniya);
 }
 .pole-otchet .formula li {
   display: grid; grid-template-columns: 1fr auto; gap: 2px 10px;
-  padding: 4px 0; font-size: 12.5px;
+  padding: 4px 0; font-size: 0.893rem;
 }
 .pole-otchet .formula .otkade {
-  grid-column: 1 / -1; font-size: 11px; color: var(--mastilo2);
+  grid-column: 1 / -1; font-size: 0.786rem; color: var(--mastilo2);
 }
 .pole-otchet .formula .suma { font-variant-numeric: tabular-nums; }
 /* Непълното число го КАЗВА. Скритото „чака" е по-лошо от липсващото число:
@@ -1115,12 +1140,12 @@ table.razbivka .drebno { font-size: 10.5px; }
 .gant-glava, .gant-glava-vreme {
   height: 34px; display: flex; align-items: center; padding: 0 10px;
   background: var(--panel); border-bottom: 1px solid var(--liniya);
-  font-size: 11.5px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mastilo2);
+  font-size: 0.821rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mastilo2);
 }
 .gant-glava-vreme { display: grid; grid-template-columns: var(--vreme); padding: 0; }
 .gant-glava-vreme span {
   display: flex; align-items: center; justify-content: center;
-  font-size: 10.5px; border-left: 1px solid var(--liniya); white-space: nowrap;
+  font-size: 0.75rem; border-left: 1px solid var(--liniya); white-space: nowrap;
 }
 /* ДНЕС Е ПЪРВАТА КОЛОНА и се вижда като такава — иначе „скрол наляво показва
    историята" няма откъде да тръгне. */
@@ -1133,15 +1158,15 @@ table.razbivka .drebno { font-size: 10.5px; }
 .gant-myasto {
   height: 30px; display: flex; align-items: center; padding: 0 10px;
   background: var(--grafiteno); color: #F4EFE7;
-  font-weight: 600; font-size: 12.5px; letter-spacing: 0.01em;
+  font-weight: 600; font-size: 0.893rem; letter-spacing: 0.01em;
 }
 .gant-delo {
   height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
-  border-bottom: 1px solid var(--liniya); font-size: 12.5px;
+  border-bottom: 1px solid var(--liniya); font-size: 0.893rem;
 }
 /* „задачите с редуващи се цветове, бял и светло сив, за да се открояват" */
 .gant-delo:nth-of-type(even) { background: var(--panel); }
-.gant-delo.poddelo { padding-left: 34px; font-size: 12px; }
+.gant-delo.poddelo { padding-left: 34px; font-size: 0.857rem; }
 .gant-delo b { font-weight: 500; }
 .gant-delo .drebno { margin-left: auto; white-space: nowrap; }
 /* „С Удебелен Проекта и Задачите с по налък шрифт и не удебеллени" (р48·[99]) */
@@ -1150,13 +1175,13 @@ table.razbivka .drebno { font-size: 10.5px; }
 .gant-delo.prosrocheno b { color: var(--srok-prosrocheno); font-weight: 600; }
 .sgavach {
   width: 16px; height: 16px; padding: 0; flex-shrink: 0;
-  background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 10px;
+  background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 0.714rem;
 }
 .sgavach.prazen { cursor: default; }
 .gant-sbor, .gant-red.sumi {
   height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
 }
-.gant-sbor { display: flex; align-items: center; padding: 0 10px; font-size: 11.5px; color: var(--mastilo2); }
+.gant-sbor { display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2); }
 
 .gant-red {
   position: relative; height: 26px; display: grid; grid-template-columns: var(--vreme);
@@ -1174,7 +1199,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   grid-row: 1; grid-column: var(--ot) / span var(--broy);
   display: flex; align-items: center; gap: 2px; padding: 0 6px;
   border-radius: 3px; overflow: hidden; white-space: nowrap;
-  font-size: 11.5px; color: #FBF8F3; cursor: default;
+  font-size: 0.821rem; color: #FBF8F3; cursor: default;
   background: var(--srok-normalno);
 }
 .gant-lenta.zhalto { background: var(--srok-zhalto); }
@@ -1187,7 +1212,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 
 .gant-suma {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
-  border-left: 1px solid var(--liniya); font-size: 9.5px; line-height: 1.25;
+  border-left: 1px solid var(--liniya); font-size: 0.679rem; line-height: 1.25;
   font-variant-numeric: tabular-nums;
 }
 .gant-suma.dnes { background: var(--toplo); }
@@ -1198,7 +1223,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 .takt { display: inline-flex; border: 1px solid var(--liniya); border-radius: 5px; overflow: hidden; }
 .takt button {
   padding: 6px 12px; background: var(--hartiya); border: none;
-  border-right: 1px solid var(--liniya); cursor: pointer; font-size: 12.5px;
+  border-right: 1px solid var(--liniya); cursor: pointer; font-size: 0.893rem;
 }
 .takt button:last-child { border-right: none; }
 .takt button.izbran { background: var(--aktsent); color: #FBF8F3; }
@@ -1212,9 +1237,9 @@ table.razbivka .drebno { font-size: 10.5px; }
 .diagrama { display: block; min-width: 100%; }
 /* Решетката е БЛЕДА нарочно: ориентир, не съдържание. */
 .diagrama-liniya { stroke: var(--liniya); stroke-width: 1; }
-.diagrama-nadpis { fill: var(--mastilo2); font-size: 10px; }
-.diagrama-ime { fill: var(--mastilo); font-size: 12px; }
-.diagrama-red.poddelo .diagrama-ime { fill: var(--mastilo2); font-size: 11px; }
+.diagrama-nadpis { fill: var(--mastilo2); font-size: 0.714rem; }
+.diagrama-ime { fill: var(--mastilo); font-size: 0.857rem; }
+.diagrama-red.poddelo .diagrama-ime { fill: var(--mastilo2); font-size: 0.786rem; }
 .diagrama-lenta { fill: var(--srok-normalno); }
 .diagrama-red.zhalto .diagrama-lenta { fill: var(--srok-zhalto); }
 .diagrama-red.cherveno .diagrama-lenta { fill: var(--srok-cherveno); }
@@ -1222,7 +1247,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 /* ДНЕШНАТА ЛИНИЯ · това, което решетката не може да покаже — докъде е стигнало
    времето през ВСИЧКИ дела наведнъж. */
 .diagrama-dnes { stroke: var(--aktsent); stroke-width: 2; stroke-dasharray: 3 3; }
-.diagrama-dnesnadpis { fill: var(--aktsent); font-size: 10px; letter-spacing: 0.05em; }
+.diagrama-dnesnadpis { fill: var(--aktsent); font-size: 0.714rem; letter-spacing: 0.05em; }
 /* ОПАШКАТА НА ПРОСРОЧЕНОТО · щрихована, за да казва „това вече трябваше да
    свърши" без да се чете нито една дума. */
 .diagrama-zakasnyalo {
@@ -1236,7 +1261,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 .stalbove { margin-top: 6px; }
 .stalb-prihod { fill: var(--zeleno); }
 .stalb-razhod { fill: var(--aktsent); }
-.stalbove-nadpis { fill: var(--mastilo2); font-size: 10px; font-variant-numeric: tabular-nums; }
+.stalbove-nadpis { fill: var(--mastilo2); font-size: 0.714rem; font-variant-numeric: tabular-nums; }
 
 
 /* ── контекстното меню · десният бутон, както в Уиндоус ─────────────────── */
@@ -1248,7 +1273,7 @@ table.razbivka .drebno { font-size: 10.5px; }
 }
 .kontekstno-menyu button {
   background: none; border: none; text-align: left; cursor: pointer;
-  font: inherit; font-size: 13px; color: var(--mastilo);
+  font: inherit; font-size: 0.929rem; color: var(--mastilo);
   padding: 8px 12px; border-radius: 3px; min-height: 34px;
 }
 .kontekstno-menyu button:hover, .kontekstno-menyu button:focus-visible { background: var(--panel); outline: none; }
@@ -1265,21 +1290,21 @@ table.razbivka .drebno { font-size: 10.5px; }
   max-height: 80vh; overflow: auto; padding: 20px 24px;
   box-shadow: 0 12px 40px rgba(42, 37, 33, 0.25);
 }
-.istoriya-karta h3 { margin: 0 0 4px; font-size: 16px; }
+.istoriya-karta h3 { margin: 0 0 4px; font-size: 1.143rem; }
 .istoriya-karta .pod { margin-bottom: 12px; }
 .istoriya-sabitie {
   display: grid; grid-template-columns: 52px 1fr; gap: 4px 12px;
   padding: 10px 0; border-top: 1px solid var(--liniya);
-  font-size: 13px;
+  font-size: 0.929rem;
 }
 .istoriya-sabitie .seq { font-variant-numeric: tabular-nums; color: var(--mastilo2); }
 .istoriya-sabitie b { font-weight: 600; }
-.istoriya-sabitie .koga { grid-column: 2; font-size: 12px; color: var(--mastilo2); }
-.istoriya-sabitie .opis { grid-column: 2; font-size: 12.5px; }
+.istoriya-sabitie .koga { grid-column: 2; font-size: 0.857rem; color: var(--mastilo2); }
+.istoriya-sabitie .opis { grid-column: 2; font-size: 0.893rem; }
 .istoriya-zatvori { margin-top: 14px; }
 .butoncheto-istoriya {
   background: none; border: 1px solid var(--liniya); border-radius: 4px;
-  cursor: pointer; font-size: 12px; color: var(--mastilo2);
+  cursor: pointer; font-size: 0.857rem; color: var(--mastilo2);
   padding: 4px 8px; min-height: 28px;
 }
 .butoncheto-istoriya:hover { background: var(--panel); color: var(--mastilo); }
@@ -1303,7 +1328,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   display: flex; gap: 18px; padding: 8px 16px;
   background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 6px;
   box-shadow: 0 8px 24px rgba(42, 37, 33, 0.14);
-  font-size: 12.5px; color: var(--mastilo);
+  font-size: 0.893rem; color: var(--mastilo);
   font-variant-numeric: tabular-nums; white-space: nowrap;
 }
 
@@ -1319,7 +1344,7 @@ table.razbivka .drebno { font-size: 10.5px; }
   display: block;
   margin-top: 2px;
   min-height: 1em;          /* мястото стои празно, за да не подскача полето */
-  font-size: 11px;
+  font-size: 0.786rem;
   color: var(--mastilo2);
 }
 .znak-menyu.trevoga { color: var(--srok-cherveno); font-weight: 600; }

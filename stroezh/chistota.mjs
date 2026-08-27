@@ -92,7 +92,7 @@ const kod = [
   ...vsichkiFaylove(join(KOREN, 'app')),
 ];
 const testove = vsichkiFaylove(join(KOREN, 'tests'));
-const prohod = [join(KOREN, 'proba/prohod.mjs'), join(KOREN, 'proba/merki.test.ts')];
+const prohod = vsichkiFaylove(join(KOREN, 'proba'));
 
 const tekstat = new Map();
 for (const f of [...kod, ...testove, ...prohod]) tekstat.set(f, readFileSync(f, 'utf8'));

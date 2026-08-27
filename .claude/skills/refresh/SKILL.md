@@ -159,7 +159,8 @@ done
 ```bash
 find src app -name '*.ts' | xargs wc -l | tail -1        # редове код
 find tests -name '*.ts' | xargs wc -l | tail -1          # редове тестове
-wc -l proba/prohod.mjs proba/merki.test.ts stroezh/*.mjs | tail -1   # проход · мерки · строеж
+find proba -name '*.ts' | xargs wc -l | tail -1           # проход · мерки
+wc -l stroezh/*.mjs | tail -1                             # строеж
 ls tests/*.test.ts | wc -l                               # тестови файлове
 npm test 2>&1 | grep "Tests "                            # брой тестове
 npm run proba 2>&1 | grep "Минали:"                      # проверки в браузър (иска браузър)

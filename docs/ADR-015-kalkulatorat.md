@@ -143,7 +143,7 @@ VintexStroy/Калкулатор/
 | `src/kalkulator/tsenova-lista.ts` | чете изложението, пише неговия хедър |
 | `app/stoynost.ts` | шестият екран |
 | `tests/kalkulator.test.ts` | тестове върху НЕГОВИТЕ числа |
-| `proba/prohod.mjs` §22 | целият път на живо |
+| `proba/prohod.ts` §22 | целият път на живо |
 
 ## Какво ОСТАВА
 
