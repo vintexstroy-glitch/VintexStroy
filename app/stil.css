@@ -1269,6 +1269,22 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .stalbove-nadpis { fill: var(--mastilo2); font-size: 0.714rem; font-variant-numeric: tabular-nums; }
 
 
+/* ── ГРУПАТА ДЕЙСТВИЯ · един бутон с дума и стрелкичка (ADR-057) ─────────
+   Двата бутона се долепват в един лост: думата отляво, стрелкичката отдясно.
+   Менюто ѝ е СЪЩОТО като контекстното (виж по-долу) — вид, който живее на две
+   места, се разминава при първата смяна на палитрата. */
+.grupa-deystviya { display: inline-flex; align-items: stretch; }
+.grupa-deystviya > button:not(.strelkichka) {
+  border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;
+}
+/* Стрелкичката НЕ носи дума и затова не се свива на тесен екран — тя е
+   дръжката, а дръжка без ширина не се хваща с пръст. */
+.grupa-deystviya .strelkichka {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  padding-left: 7px; padding-right: 7px; line-height: 1;
+}
+.grupa-deystviya .strelkichka[aria-expanded="true"] { background: var(--panel); }
+
 /* ── контекстното меню · десният бутон, както в Уиндоус ─────────────────── */
 .kontekstno-menyu {
   position: fixed; z-index: 60; min-width: 180px;

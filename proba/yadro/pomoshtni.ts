@@ -100,6 +100,40 @@ export async function naEkran(p: Page, koy: string, znak: string): Promise<void>
   await p.waitForSelector(znak);
 }
 
+/**
+ * НАТИСКА бутон, който може да е СВИТ в група (ADR-057).
+ *
+ * Няколко действия на едно място стават един бутон със стрелкичка; видимият е
+ * онзи, който човекът е избрал последно. Затова проходът прави точно трите
+ * стъпки на човека: отваря стрелкичката, избира действието ПО ДУМАТА МУ, и
+ * чак тогава натиска. Ако бутонът вече се вижда, се натиска направо — както
+ * би направил и човек.
+ *
+ * Не е заобикаляне на групата, а проверка ПРЕЗ нея: скрит бутон не се натиска
+ * от Playwright, и точно това е причината да не може да се направи наум.
+ */
+export async function natisniVGrupata(p: Page, izbor: string): Promise<void> {
+  const svit = await p.$eval(izbor, (e) => (e as HTMLElement).hidden);
+  if (svit) {
+    const duma = await p.$eval(izbor, (e) =>
+      (e.querySelector('.duma')?.textContent ?? e.textContent ?? '').trim());
+    // `.first()` навсякъде · `page.click` също взема първото съвпадение, а
+    // локаторът иначе е строг и би отказал при няколко реда с еднакво действие.
+    await p
+      .locator(izbor)
+      .first()
+      .locator('xpath=ancestor::span[contains(@class,"grupa-deystviya")]')
+      .locator('.strelkichka')
+      .click();
+    await p.click(`.kontekstno-menyu [data-deystvie="${duma}"]`);
+    // Чака се с ЛОКАТОР, не с `querySelector` в страницата: изборът може да
+    // носи `:has-text(…)` — псевдоклас на Playwright, който браузърът не знае
+    // и отказва като невалиден селектор.
+    await p.locator(izbor).first().waitFor({ state: 'visible' });
+  }
+  await p.click(izbor);
+}
+
 /** Действие, което прерисува екрана, но не добавя събитие (бутон, отказ). */
 export async function deystvieSPrerisuvane(p: Page, deystvie: () => Promise<unknown>): Promise<void> {
   await chakayPrerisuvane(p, deystvie);

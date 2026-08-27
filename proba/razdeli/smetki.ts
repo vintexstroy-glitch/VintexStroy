@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { OBB, OTKRIVASHTOTO, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -190,7 +190,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     await p.setInputFiles('#fayl-iztochnik', krivo);
     await p.waitForSelector('.red.propusnat');
     proveri('непозволена ставка не се закръгля — казва се', (await redove(p, '.red.propusnat'))[0]?.[1]?.includes('Ставка 21 не съществува'), true);
-    await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#otkazhi-plan'));
 
 
     // ══ 19 · бутонът · моделът на ПЪТЯ ═══════════════════════════════════
@@ -249,7 +249,7 @@ export async function blok4(
     // Изтритото меню ЗАКЛЮЧВА името (ред 1994)
     await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
     await p.waitForSelector('.red.redaktor');
-    await sSabitie(p, () => p.click('[data-iztriy-menyu]'));
+    await sSabitie(p, () => natisniVGrupata(p, '[data-iztriy-menyu]'));
     await p.waitForSelector('.red.redaktor input:disabled');
     proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
     proveri(
@@ -270,7 +270,7 @@ export async function blok4(
 
     const parvoto = await p.$eval('[data-vid-stoynost]', (e) => (e as any).value);
     await p.selectOption('[data-vid-stoynost]', parvoto === 'evro' ? 'protsent' : 'evro');
-    await sSabitie(p, () => p.click('[data-zapishi-kolona="0"]'));
+    await sSabitie(p, () => natisniVGrupata(p, '[data-zapishi-kolona="0"]'));
     proveri('смяната на вида ражда ЕДНО събитие и се задържа',
       await p.$eval('[data-vid-stoynost]', (e) => (e as any).value),
       parvoto === 'evro' ? 'protsent' : 'evro');

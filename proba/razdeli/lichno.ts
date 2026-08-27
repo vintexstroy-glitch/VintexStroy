@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broyLichni, broySabitiya, deystvieSPrerisuvane, naEkran, ostatak, tekstNa } from '../yadro/pomoshtni.ts';
+import { broyLichni, broySabitiya, deystvieSPrerisuvane, naEkran, natisniVGrupata, ostatak, tekstNa } from '../yadro/pomoshtni.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 
 /** 53 · Личното · преди активиране | 53 · Личното · активирането иска МЯСТО | 53 · Личното · същата таблица | 53 · Личното · преносът | 53 · Личното · двата Журнала не се смесват | 54 · Личното · кой вижда личното | 55 · Личните пари · деликатно | 55 · Личните пари · темата | 55 · Личните пари · ръчният ред | 55 · Личните пари · изключеният ред | 55 · Личните пари · кредитът | 55 · Личните пари · извлечението | 55 · Личните пари · вторият внос | 55 · Личните пари · служебният пункт е скрит */
@@ -301,13 +301,13 @@ export async function blok2(ctx: KonteksNaProhoda, lichniyat: { broy: number } |
     await naEkran(p, 'lichno', '[data-sektsiya=lichen-iznos]');
     proveri('екранът напомня, че личният НЕ Е изнасян',
       (await p.$eval('[data-sektsiya=lichen-iznos]', (e) => e.textContent)).includes('не е изнасян'), true);
-    await p.click('#lichno-proveri');
+    await natisniVGrupata(p, '#lichno-proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Личната верига е цяла'));
     proveri('личната верига е цяла и се брои ОТДЕЛНО',
       (await tekstNa(p, '.vest')).includes('Личната верига е цяла'), true);
 
     razdel = '56 · Личният износ · файлът';
-    const [svalenLichen] = await Promise.all([p.waitForEvent('download'), p.click('#lichno-iznesi')]);
+    const [svalenLichen] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#lichno-iznesi')]);
     const patLichen = await svalenLichen.path();
     const izneseniLichni = JSON.parse(await readFile(patLichen, 'utf8'));
     proveri('името на файла казва ЛИЧЕН, без имейла с наставката',

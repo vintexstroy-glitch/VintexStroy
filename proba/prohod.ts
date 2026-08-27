@@ -100,6 +100,7 @@ async function main(): Promise<void> {
     await nastroyki.blok4(ctx);
     const lichniyat = await lichno.blok1(ctx);
     await udobstvoto.blok3(ctx);
+    await udobstvoto.blok4(ctx);
     await menyuta.blok2(ctx);
     await lichno.blok2(ctx, lichniyat);
     await menyuta.blok3(ctx);
@@ -120,6 +121,12 @@ async function main(): Promise<void> {
       vidyano: String(greshka).split('\n')[0] ?? String(greshka),
       ochakvano: 'да мине',
     });
+    // ЦЕЛИЯТ дневник на Playwright, не само първият ред. Първият ред казва
+    // „page.click: Timeout" и НИЩО повече — а долните редове казват КОЙ
+    // локатор и защо („element is not visible"). Струваше четири пуска на
+    // прохода, за да се разбере, че спънатият бутон не е онзи, чийто раздел
+    // пише отгоре: разделът изостава с една проверка.
+    console.log(`\n  ЦЯЛАТА ГРЕШКА:\n  ${String(greshka).replace(/\n/g, '\n  ')}\n`);
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
     // не казва нищо, а снимката се гледа чак после.
     const naEkrana = await p

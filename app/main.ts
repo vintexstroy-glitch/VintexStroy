@@ -38,6 +38,7 @@ import { butonSIkona, ikona } from './ikoni.js';
 import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
+import { zakachiGrupite } from './grupa-deystviya.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -783,6 +784,11 @@ async function trugvay(): Promise<void> {
     // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
     // След рисуването, защото пренарежда вече нарисувани възли.
     zakachiPodredbata(koren, ekran);
+    // ГРУПАТА ДЕЙСТВИЯ · няколко действия на едно място стават един бутон със
+    // стрелкичка (ADR-057). СЛЕД подредбата: тя мести цели секции, а групата
+    // пипа бутоните вътре в тях — обратният ред би свивал възли, които после
+    // се местят.
+    zakachiGrupite(koren, ekran);
     prilozhiSkritite(koren);
     zakachiGlavnite(k, prerisuvay);
   }

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, ostatak, plochka, redove, tekstNa } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, tekstNa } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -239,7 +239,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.evaluate(() => document.body.textContent.includes('Пробен клипборд ЕООД')), true);
     proveri('и нищо още не е записано — Вратата чака човека',
       await broySabitiya(p), predKlipborda);
-    await deystvieSPrerisuvane(p, () => p.click('#otkazhi-plan'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#otkazhi-plan'));
     proveri('отказът прибира предложението', await p.$('#otkazhi-plan'), null);
 
     // ══ 32 · фините филтри на ВСИЧКИ таблици ════════════════════════════
@@ -619,4 +619,96 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и нито два ключа не съвпадат в един екран', udvoeni, 0);
 
     if (nachalniyat) await zavedi(nachalniyat);
+}
+
+
+/**
+ * 69 · Групата действия · един бутон с дума и стрелкичка (ADR-057)
+ *
+ * Негово правило, дословно: „**С падащо меню когато е повече от един**…
+ * **Когато е една функция си го пише на бутона.**" И механиката: „Избираш
+ * действието — **то променя името на бутона**… и **чак когато избереш и
+ * натиснеш бутона стартира действието**."
+ *
+ * Затова НАЙ-ВАЖНАТА проверка тук не е че менюто се отваря, а че изборът от
+ * него **не добавя нито едно събитие**. Меню, което действа при избора, би
+ * изглеждало еднакво на екрана и би записвало в Журнала без човек да е
+ * натиснал — точно разликата, която той поиска.
+ */
+export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '69 · Групата действия · един бутон и стрелкичка';
+
+    // Блокът е вмъкнат по средата на прохода и затова НЕ мести състояние под
+    // следващия: накрая се връща на екрана, от който е тръгнал (същото правило
+    // като при §68).
+    const nachalniyat = await p.evaluate(
+      () => (document.querySelector('.navred.tuk') as HTMLElement | null)?.dataset['ekran'] ?? '',
+    );
+
+    // Таблото носи най-простата група: Драйвът е ДВЕ действия в един контейнер.
+    await naEkran(p, 'tablo', '#proveri');
+    const grupata = '[data-sektsiya=prenasyane] .grupa-deystviya';
+    proveri('двете действия на Драйва станаха ЕДНА група',
+      await p.$$eval(grupata, (e) => e.length), 1);
+    proveri('вижда се ЕДНО от тях',
+      await p.$$eval(`${grupata} button:not(.strelkichka):not([hidden])`, (e) => e.length), 1);
+    proveri('и това е първото · редът, в който екранът ги е нарисувал',
+      await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), false);
+    proveri('другото стои в DOM-а, само скрито · слушателят му не е пипан',
+      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), true);
+    proveri('стрелкичката КАЗВА, че носи меню',
+      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-haspopup')), 'menu');
+    proveri('и че е прибрана',
+      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-expanded')), 'false');
+
+    razdel = '69 · Групата действия · менюто ИЗПИСВА думите';
+    await p.click(`${grupata} .strelkichka`);
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('отвореното се казва на четеца на екран',
+      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-expanded')), 'true');
+    proveri('менюто изрежда ВСИЧКИ действия, с думите им',
+      (await p.$$eval('.kontekstno-menyu [data-deystvie]', (e) => e.map((x) => x.textContent))).join(' · '),
+      'Дръпни от Драйва · Бутни в Драйва');
+
+    razdel = '69 · Групата действия · изборът СМЕНЯ думата, но НЕ действа';
+    const predIzbora = await broySabitiya(p);
+    await p.click('.kontekstno-menyu [data-deystvie="Бутни в Драйва"]');
+    await p.waitForSelector('#butni-drayv:not([hidden])');
+    proveri('избраното стана видимото',
+      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), false);
+    proveri('а другото се прибра', await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), true);
+    // ТОВА е разликата между „меню" и „меню, което избира".
+    proveri('и НИТО ЕДНО събитие не е влязло в Журнала', await broySabitiya(p), predIzbora);
+    proveri('менюто се е прибрало след избора',
+      await p.$$eval('.kontekstno-menyu', (e) => e.length), 0);
+
+    razdel = '69 · Групата действия · изборът преживява смяна на екран';
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'tablo', '#proveri');
+    proveri('върнах се и думата е онази, която избрах',
+      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), false);
+
+    razdel = '69 · Групата действия · едно действие си пише думата';
+    // Негово правило: група се прави от ПОВЕЧЕ от едно. „Излез" е сам в своя
+    // контейнер и няма какво да избира — значи няма и стрелкичка.
+    proveri('самотното действие НЕ е в група',
+      await p.$eval('#izlez', (e) => Boolean(e.closest('.grupa-deystviya'))), false);
+    proveri('и си е с думата', await p.$eval('#izlez', (e) => e.textContent!.trim()), 'Излез');
+
+    razdel = '69 · Групата действия · голият знак остава отвън';
+    // ▲ и ▼ носят `aria-label`, но нямат ДУМА, а той каза „исписване".
+    // Стрелка, натискана пет пъти подред, в меню става неизползваема.
+    await naEkran(p, 'tabove', '#izbor-tab');
+    proveri('местенето с ▲ стои видимо, извън всяка група',
+      await p.$eval('[data-sektsiya-gore]', (e) =>
+        (e as HTMLElement).hidden || Boolean(e.closest('.grupa-deystviya'))), false);
+
+    if (nachalniyat) {
+      await deystvieSPrerisuvane(p, () => p.click(`[data-ekran=${nachalniyat}]`));
+      await p.keyboard.press('Escape');
+    }
 }
