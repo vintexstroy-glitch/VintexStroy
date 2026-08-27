@@ -449,7 +449,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
   padding: var(--space-md); display: flex; flex-direction: column; gap: var(--space-sm);
 }
-.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
+/* Максимумът е ЗАКОВАН (240px), не `1fr` — късо поле („Площ", „Падеж") спира
+   да се разтяга наравно с дълго („Място или адрес") само защото реда му е
+   широк. Празното място остава ПРАЗНО в края на реда, не се разпределя. */
+.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 240px)); gap: var(--space-sm); }
 .pole { display: flex; flex-direction: column; gap: 6px; }
 /* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
    „<label class=pole><span>". Втората е в личните форми; без този ред нейният
