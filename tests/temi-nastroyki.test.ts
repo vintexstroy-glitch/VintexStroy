@@ -16,10 +16,12 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import { OTKRIVASHTO_SABITIE } from '../src/domein/stopanin.js';
 import {
+  GRUPI,
   KOY_GLEDA,
   koyGleda,
   temaPoKlyuch,
   TEMI,
+  temiPoGrupi,
   temiZa,
   vizhdaTemata,
 } from '../src/domein/temi-nastroyki.js';
@@ -174,5 +176,60 @@ describe('кой гледа · различава се от ЖУРНАЛА, не
     const o = fold(await dnevnik.chetiVsichki('vintexstroy'));
     expect(o.stopanin).toBe('');
     expect(koyGleda('kojto-i-da-e@example.bg', o)).toBe('stopanin');
+  });
+});
+
+/**
+ * ПЕТТЕ ГРУПИ · заглавия в падащия ред (негов избор, 27.08 · ADR-057б).
+ *
+ * Групирането е при РИСУВАНЕ, а описът остава един масив — затова тук се пази
+ * не подредбата на екрана, а онова, което би се счупило тихо: тема без група,
+ * група без теми, и празно заглавие пред служителя.
+ */
+describe('групите · пет заглавия, нито едно празно', () => {
+  it('ключовете на групите са различни', () => {
+    const klyuchove = GRUPI.map((g) => g.klyuch);
+    expect(new Set(klyuchove).size).toBe(klyuchove.length);
+  });
+
+  /**
+   * ТЕМА БЕЗ ГРУПА НЕ СЕ РИСУВА НИКЪДЕ. `temiPoGrupi` минава по `GRUPI` и
+   * филтрира — тема с непозната група просто изчезва от падащия ред, тихо.
+   * Типът пази срещу правописна грешка; този тест пази срещу изтрита група.
+   */
+  it('всяка тема сочи СЪЩЕСТВУВАЩА група', () => {
+    const imaGrupa = new Set<string>(GRUPI.map((g) => g.klyuch));
+    for (const t of TEMI) expect(imaGrupa.has(t.grupa), `${t.klyuch} → ${t.grupa}`).toBe(true);
+  });
+
+  it('нито една тема не се губи при групирането · Стопанинът', () => {
+    const vGrupi = temiPoGrupi('stopanin').flatMap((g) => g.temi.map((t) => t.klyuch));
+    expect([...vGrupi].sort()).toEqual([...temiZa('stopanin').map((t) => t.klyuch)].sort());
+  });
+
+  it('и не се удвоява · всяка стои под ЕДНО заглавие', () => {
+    const vGrupi = temiPoGrupi('stopanin').flatMap((g) => g.temi.map((t) => t.klyuch));
+    expect(new Set(vGrupi).size).toBe(vGrupi.length);
+  });
+
+  it('Стопанинът вижда и петте заглавия', () => {
+    expect(temiPoGrupi('stopanin').length).toBe(GRUPI.length);
+  });
+
+  /**
+   * ПРАЗНА ГРУПА НЕ ИЗЛИЗА. Служителят няма нито една тема под „ХОРА И ПРАВА" —
+   * заглавие без нищо под себе си не е ориентир, а въпрос: „какво е трябвало да
+   * има тук и защо го няма?".
+   */
+  it('празно заглавие НЕ се рисува · служителят не вижда „ХОРА И ПРАВА"', () => {
+    for (const koy of KOY_GLEDA) {
+      for (const g of temiPoGrupi(koy)) expect(g.temi.length, `${koy} · ${g.grupa.klyuch}`).toBeGreaterThan(0);
+    }
+    expect(temiPoGrupi('sluzhitel').map((g) => g.grupa.klyuch)).not.toContain('hora');
+  });
+
+  it('редът на заглавията е онзи от описа, не азбучен', () => {
+    const red = temiPoGrupi('stopanin').map((g) => g.grupa.klyuch);
+    expect(red).toEqual(GRUPI.map((g) => g.klyuch));
   });
 });

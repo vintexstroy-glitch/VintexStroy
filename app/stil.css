@@ -559,6 +559,19 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   border-left: 2px solid var(--liniya);
 }
 .nastroyki-red .za-kogo { margin: 2px 0 4px; }
+/* ГРУПАТА · заглавие и темите под него (ADR-057б).
+   Обвивката е `role="group"` и затова трябва СВОЙ flex: инак темите ѝ спират
+   да наследяват колоната на реда и застават една до друга. */
+.nastroyki-red > [role="group"] { display: flex; flex-direction: column; gap: 1px; }
+/* Заглавието е НАДПИС, не бутон · дребно, разредено, приглушено. Групата
+   „МОЕТО" носи и тема „Моето" — главните букви и разредката ги различават,
+   без да се променя нито едно от двете имена. */
+.nastroyki-red .grupa-zaglavie {
+  margin: 8px 0 2px; padding: 0 8px;
+  font-size: 0.714rem; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--mastilo2);
+}
+.nastroyki-red > [role="group"]:first-of-type .grupa-zaglavie { margin-top: 2px; }
 .nastroyki-red .tema {
   display: flex; align-items: flex-start; gap: 8px; text-align: left;
   background: none; border: none; border-radius: 4px; padding: 6px 8px;
@@ -1274,6 +1287,13 @@ table.razbivka .drebno { font-size: 0.75rem; }
    Менюто ѝ е СЪЩОТО като контекстното (виж по-долу) — вид, който живее на две
    места, се разминава при първата смяна на палитрата. */
 .grupa-deystviya { display: inline-flex; align-items: stretch; }
+/* СКРИТОТО В ГРУПАТА СЕ СКРИВА НАИСТИНА.
+   `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а всяко авторско
+   правило за `display` я бие — независимо от тежестта на селектора. Бутонът с
+   знак носи `display: inline-flex` (`button.sIkona`), значи скритите оставаха
+   да се виждат: групата изглеждаше като четири бутона и една стрелкичка.
+   Проходът четеше СВОЙСТВОТО `hidden` и казваше „скрит е"; окото каза друго. */
+.grupa-deystviya > [hidden] { display: none; }
 .grupa-deystviya > button:not(.strelkichka) {
   border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;
 }

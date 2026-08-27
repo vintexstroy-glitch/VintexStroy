@@ -29,7 +29,7 @@ import { ikona } from './ikoni.js';
 import {
   IMENA_NA_GLEDASHTITE,
   temaPoKlyuch,
-  temiZa,
+  temiPoGrupi,
   type KoyGleda,
   type TemaNastroyka,
 } from '../src/domein/temi-nastroyki.js';
@@ -45,7 +45,7 @@ let otvoren = false;
  * биха питали човека нещо, което той не се е сещал да пита.
  */
 export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
-  const temi = temiZa(koy);
+  const grupi = temiPoGrupi(koy);
   return `
     <div class="menyu-nastroyki${otvoren ? ' otvoreno' : ''}">
       <button type="button" class="navred nastroyki-vhod" id="nastroyki-vhod"${
@@ -69,8 +69,28 @@ export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
       <div class="nastroyki-red" id="nastroyki-red" role="menu"
            aria-label="Теми на настройките"${otvoren ? '' : ' hidden'}>
         <p class="drebno za-kogo">Твоите теми · ${ekraniraj(IMENA_NA_GLEDASHTITE[koy])}</p>
-        ${temi.map(redNaTema).join('')}
+        ${grupi.map(grupata).join('')}
       </div>
+    </div>`;
+}
+
+/**
+ * ЕДНА ГРУПА · заглавие и темите под него.
+ *
+ * `role="group"` с `aria-labelledby` е ЕДИНСТВЕНОТО, което върши работа тук:
+ * вътре в `role="menu"` детето може да е `menuitem`, `group` или `separator` —
+ * нищо друго. Само `<p>` със стил би било надпис, който четецът на екран
+ * изговаря като изгубен текст между бутоните, вместо като име на групата им.
+ *
+ * Заглавието НЕ е бутон и няма `tabindex`: клавиатурата спира само там, където
+ * има какво да се направи.
+ */
+function grupata(g: { grupa: { klyuch: string; ime: string }; temi: readonly TemaNastroyka[] }): string {
+  const nomer = `grupa-nastroyki-${ekraniraj(g.grupa.klyuch)}`;
+  return `
+    <div role="group" aria-labelledby="${nomer}">
+      <p class="grupa-zaglavie" id="${nomer}">${ekraniraj(g.grupa.ime)}</p>
+      ${g.temi.map(redNaTema).join('')}
     </div>`;
 }
 

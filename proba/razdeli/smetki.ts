@@ -96,7 +96,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('сверката на разхода', sverkiR[2]?.[1], '2 600,00 €');
 
     // сторно на фактурата — входящият ДДС си отива с нея
-    await sSabitie(p, () => p.click('.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
+    await sSabitie(p, () => natisniVGrupata(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
     proveri('деветнайсет събития', await broySabitiya(p), 19 + OTKRIVASHTOTO);
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');

@@ -48,6 +48,27 @@ type KadeZhivee =
   | { readonly vid: 'sektsiya'; readonly ekran: string; readonly sektsiya: string }
   | { readonly vid: 'prozorets' };
 
+/**
+ * ПЕТТЕ ГРУПИ · заглавия в падащия ред (негов избор, 27.08).
+ *
+ * Шестнайсет теми в един стълб се четат като списък с покупки: окото минава
+ * всички, за да намери една. Заглавието дели стълба на пет къси списъка и
+ * казва КЪДЕ да гледаш, преди да си почнал да четеш.
+ *
+ * Заглавията са НАДПИСИ, не бутони. Клавиатурата не спира на тях — тя спира
+ * само там, където има какво да се направи; спирка, която не прави нищо, е
+ * пречка, не ориентир.
+ */
+export const GRUPI = Object.freeze([
+  { klyuch: 'moeto', ime: 'МОЕТО' },
+  { klyuch: 'biznesat', ime: 'БИЗНЕСЪТ' },
+  { klyuch: 'hora', ime: 'ХОРА И ПРАВА' },
+  { klyuch: 'schetovodstvo', ime: 'СЧЕТОВОДСТВО' },
+  { klyuch: 'sigurnost', ime: 'СИГУРНОСТ И АРХИВ' },
+] as const);
+
+export type KlyuchGrupa = (typeof GRUPI)[number]['klyuch'];
+
 export interface TemaNastroyka {
   readonly klyuch: string;
   readonly ime: string;
@@ -56,6 +77,8 @@ export interface TemaNastroyka {
   /** име от единствения дом на знаците (`app/ikoni.ts`) */
   readonly ikona: string;
   readonly kade: KadeZhivee;
+  /** под кое заглавие стои в падащия ред */
+  readonly grupa: KlyuchGrupa;
   /** кой я вижда · изброено ПОИМЕННО, не по формула */
   readonly za: readonly KoyGleda[];
 }
@@ -70,6 +93,12 @@ const RABOTESHTITE: readonly KoyGleda[] = Object.freeze(['stopanin', 'sluzhitel'
  * Редът НЕ е азбучен, а по честота на пипане: онова, което се мени всеки ден,
  * стои горе; онова, което се мени веднъж — долу. Падащ ред, подреден по азбука,
  * кара човека да чете целия списък всеки път.
+ *
+ * ОТКАКТО ИМА ГРУПИ, това важи ВЪТРЕ в групата, не по целия списък: най-отгоре
+ * застава първата ГРУПА, а честотата решава реда в нея. Масивът остава ЕДИН и в
+ * този ред — групирането става при РИСУВАНЕ (`temiPoGrupi`), не при описване.
+ * Разбит на пет масива, описът щеше да иска пет места за поглеждане и шесто за
+ * реда помежду им.
  */
 export const TEMI: readonly TemaNastroyka[] = Object.freeze([
   {
@@ -78,6 +107,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'кой съм · през кого влизам · какъв е планът',
     ikona: 'sluzhitel',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'koy-sam' },
+    grupa: 'moeto',
     za: VSICHKI,
   },
   {
@@ -86,6 +116,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'отметките на функциите · изключено ≠ липсващо',
     ikona: 'pokazhi',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'vazmozhnosti' },
+    grupa: 'moeto',
     za: VSICHKI,
   },
   {
@@ -94,6 +125,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'вторият Журнал · пуска се и се прибира оттук',
     ikona: 'lichno',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'tablo-lichno' },
+    grupa: 'moeto',
     za: VSICHKI,
   },
   {
@@ -102,6 +134,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'на всеки сам · НЕ е право и никой не го раздава (ADR-008)',
     ikona: 'pokazhi',
     kade: { vid: 'prozorets' },
+    grupa: 'moeto',
     za: VSICHKI,
   },
   {
@@ -110,6 +143,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'пътят обратно · вписва се ПРЕДИ да потрябва',
     ikona: 'sigurnost',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'zapasen' },
+    grupa: 'sigurnost',
     za: SAMO_STOPANINAT,
   },
   {
@@ -118,6 +152,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'своите изгледи · таблици и диаграми, вързани за източник',
     ikona: 'tab',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'tablo-tabove' },
+    grupa: 'biznesat',
     za: SAMO_STOPANINAT,
   },
   {
@@ -126,6 +161,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'Редакторът · видът, номенклатурата и формулите на колоната',
     ikona: 'hedar',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'hedari' },
+    grupa: 'biznesat',
     za: SAMO_STOPANINAT,
   },
   {
@@ -134,6 +170,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'какво коя колона значи в един файл · отпечатъкът на главата',
     ikona: 'model',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'modeli' },
+    grupa: 'biznesat',
     za: SAMO_STOPANINAT,
   },
   {
@@ -142,6 +179,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'име · папка · действие · посока · позволени модели',
     ikona: 'buton',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'butoni' },
+    grupa: 'biznesat',
     za: SAMO_STOPANINAT,
   },
   {
@@ -150,6 +188,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'служители · роли · колонно право (Вижда · Скрито)',
     ikona: 'pravo',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'pravata' },
+    grupa: 'hora',
     za: SAMO_STOPANINAT,
   },
   {
@@ -158,6 +197,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'осем вида · своя сила и своя бележка · важат за целия бизнес',
     ikona: 'sigurnost',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'parametri' },
+    grupa: 'schetovodstvo',
     za: SAMO_STOPANINAT,
   },
   {
@@ -166,6 +206,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'моята фирма · клиенти · доставчици · ЕИК и адрес за одитния файл',
     ikona: 'kontragent',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'kontragenti' },
+    grupa: 'schetovodstvo',
     za: SAMO_STOPANINAT,
   },
   {
@@ -174,6 +215,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'главната книга и месечният XML за НАП · и какво още го спира',
     ikona: 'kniga',
     kade: { vid: 'sektsiya', ekran: 'smetki', sektsiya: 'saf-t' },
+    grupa: 'schetovodstvo',
     za: RABOTESHTITE,
   },
   {
@@ -182,6 +224,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'вход↔изход на всяка партида · и разликата, дори когато е нула',
     ikona: 'sverka',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'sverki' },
+    grupa: 'schetovodstvo',
     za: RABOTESHTITE,
   },
   {
@@ -190,6 +233,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'изнася се четим · връща се сверен ред по ред',
     ikona: 'arhiv',
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'zhurnalat' },
+    grupa: 'sigurnost',
     za: SAMO_STOPANINAT,
   },
   {
@@ -198,6 +242,7 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     opis: 'когато главният имейл вече не отваря',
     ikona: 'vnos',
     kade: { vid: 'sektsiya', ekran: 'tablo', sektsiya: 'vrashtane' },
+    grupa: 'sigurnost',
     za: VSICHKI,
   },
 ]);
@@ -222,6 +267,28 @@ export function koyGleda(imeyl: string, o: Ogledalo): KoyGleda {
 /** Темите, които ТОЗИ човек вижда · в реда на описа. */
 export function temiZa(koy: KoyGleda): readonly TemaNastroyka[] {
   return TEMI.filter((t) => t.za.includes(koy));
+}
+
+/**
+ * ТЕМИТЕ НА ТОЗИ ЧОВЕК, РАЗДЕЛЕНИ ПО ГРУПИ · в реда на `GRUPI`.
+ *
+ * ПРАЗНА ГРУПА НЕ ИЗЛИЗА. Служителят няма нито една тема под „ХОРА И ПРАВА" —
+ * а заглавие без нищо под себе си не е ориентир, а въпрос: „какво е трябвало да
+ * има тук и защо го няма?". Правило 15 („изключено ≠ липсващо") казва обратното
+ * за ОТМЕТКИТЕ и това не е противоречие: там човекът има правото и сам го е
+ * свалил; тук няма правото и няма какво да му се обяснява на място, което не
+ * е негово.
+ *
+ * Смята се при рисуване, не се пази: две места за „кое в коя група" се
+ * разминават при първата нова тема.
+ */
+export function temiPoGrupi(
+  koy: KoyGleda,
+): readonly { readonly grupa: (typeof GRUPI)[number]; readonly temi: readonly TemaNastroyka[] }[] {
+  const moite = temiZa(koy);
+  return GRUPI.map((grupa) => ({ grupa, temi: moite.filter((t) => t.grupa === grupa.klyuch) })).filter(
+    (g) => g.temi.length > 0,
+  );
 }
 
 /** Една тема по ключ · `undefined` при непозната. */

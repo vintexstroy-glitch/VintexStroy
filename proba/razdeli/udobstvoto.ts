@@ -49,7 +49,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'sticky');
 
     // ИСТОРИЯТА НА РЕДА · кой · какво · кога, от Журнала.
-    await p.click('.red.naem:has-text("Домакинство") [data-istoriya]');
+    await natisniVGrupata(p, '.red.naem:has-text("Домакинство") [data-istoriya]');
     await p.waitForSelector('.istoriya-karta');
     const istoriyata = await tekstNa(p, '.istoriya-karta');
     proveri('историята казва типа събитие', istoriyata.includes('НаемДобавен'), true);
@@ -172,7 +172,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // груповото сторно: една причина (диалогът я дава), запис на ред, вест
     const predaSborove = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => p.click('[data-storno-izbrani]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-storno-izbrani]'));
     proveri('груповото сторно пише ПО ЕДНО събитие на ред',
       await broySabitiya(p), predaSborove + 2);
     proveri('и казва какво стана', (await tekstNa(p, '.vest')).includes('Сторнирани 2 от 2'), true);
@@ -654,12 +654,19 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     const grupata = '[data-sektsiya=prenasyane] .grupa-deystviya';
     proveri('двете действия на Драйва станаха ЕДНА група',
       await p.$$eval(grupata, (e) => e.length), 1);
+    // МЕРИ СЕ ВИДИМОТО, не свойството `hidden`. Първата версия четеше атрибута
+    // и казваше „скрит е", докато на екрана стояха четири бутона: авторско
+    // правило за `display` бие `[hidden]` от таблицата на браузъра. Скрийншотът
+    // го хвана, проходът — не. Оттук нататък го хваща и той.
     proveri('вижда се ЕДНО от тях',
-      await p.$$eval(`${grupata} button:not(.strelkichka):not([hidden])`, (e) => e.length), 1);
+      await p.$$eval(`${grupata} button:not(.strelkichka)`,
+        (e) => e.filter((x) => (x as HTMLElement).offsetParent !== null).length), 1);
     proveri('и това е първото · редът, в който екранът ги е нарисувал',
       await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), false);
     proveri('другото стои в DOM-а, само скрито · слушателят му не е пипан',
       await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), true);
+    proveri('и наистина не се вижда · не само по атрибут',
+      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).offsetParent === null), true);
     proveri('стрелкичката КАЗВА, че носи меню',
       await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-haspopup')), 'menu');
     proveri('и че е прибрана',

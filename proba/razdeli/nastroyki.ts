@@ -385,7 +385,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await p.selectOption('[data-parametar="dublikat"] [data-parametar-sila]', 'preduprezhdava');
     await p.fill('[data-parametar="dublikat"] [data-parametar-belezhka]', 'при нас се случва');
     await deystvieSPrerisuvane(p, () =>
-      p.click('[data-parametar="dublikat"] [data-parametar-zapishi]'),
+      natisniVGrupata(p, '[data-parametar="dublikat"] [data-parametar-zapishi]'),
     );
     proveri('записът влиза в ЖУРНАЛА, не в паметта на екрана',
       await broySabitiya(p), predParametara + 1);
@@ -461,6 +461,44 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     await p.waitForFunction(() => !document.querySelector('.istoriya-karta'));
     proveri('Escape го затваря · клавиатурата не остава в капан',
       Boolean(await p.$('.istoriya-karta')), false);
+
+    // ══ 70 · ПЕТТЕ ГРУПИ В ПАДАЩИЯ РЕД (негов избор, 27.08 · ADR-057б) ══════
+    //
+    // Шестнайсет теми в един стълб се четат като списък с покупки. Заглавието
+    // казва КЪДЕ да гледаш, преди да си почнал да четеш.
+    razdel = '70 · Настройките · петте групи';
+    await p.click('#nastroyki-vhod');
+    await p.waitForFunction(() => (document.querySelector('#nastroyki-red') as any)?.hidden === false);
+    proveri('Стопанинът вижда ПЕТ заглавия',
+      await p.$$eval('#nastroyki-red .grupa-zaglavie', (e) => e.length), 5);
+    proveri('и те са неговите думи, в неговия ред',
+      (await p.$$eval('#nastroyki-red .grupa-zaglavie', (e) => e.map((x) => x.textContent!.trim()))).join(' · '),
+      'МОЕТО · БИЗНЕСЪТ · ХОРА И ПРАВА · СЧЕТОВОДСТВО · СИГУРНОСТ И АРХИВ');
+
+    razdel = '70 · Настройките · заглавието е НАДПИС, не бутон';
+    // Клавиатурата спира само там, където има какво да се направи. Спирка,
+    // която не прави нищо, е пречка, не ориентир.
+    proveri('нито едно заглавие не е бутон',
+      await p.$$eval('#nastroyki-red .grupa-zaglavie', (e) => e.filter((x) => x.tagName === 'BUTTON').length), 0);
+    proveri('и нито едно не се хваща с Tab',
+      await p.$$eval('#nastroyki-red .grupa-zaglavie', (e) => e.filter((x) => x.hasAttribute('tabindex')).length), 0);
+
+    razdel = '70 · Настройките · групата КАЗВА името си на четеца';
+    // Само `<p>` със стил би било изгубен текст между бутоните. `role="group"`
+    // с `aria-labelledby` прави от надписа ИМЕ на групата.
+    proveri('всяка група сочи своето заглавие',
+      await p.$$eval('#nastroyki-red [role=group]', (e) =>
+        e.filter((g) => {
+          const nomer = g.getAttribute('aria-labelledby');
+          return nomer !== null && g.querySelector(`#${nomer}`) !== null;
+        }).length),
+      5);
+
+    razdel = '70 · Настройките · нито една тема не остава извън заглавие';
+    const temiVGrupi = await p.$$eval('#nastroyki-red [role=group] [data-tema]', (e) => e.length);
+    proveri('всички теми стоят под някое заглавие',
+      await p.$$eval('#nastroyki-red [data-tema]', (e) => e.length), temiVGrupi);
+    proveri('и са шестнайсет · Стопанинът вижда всичко', temiVGrupi, 16);
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
