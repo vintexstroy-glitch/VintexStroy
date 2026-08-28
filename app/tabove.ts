@@ -51,7 +51,7 @@ import {
   adresnaKniga,
   samotni,
   sledvashtNomer,
-  vrazkataNaNomer,
+  svarzaniPoNomer,
   type RedVKnigata,
 } from '../src/domein/adresna-kniga.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
@@ -243,11 +243,22 @@ function blokAdresnaKniga(o: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * ЕДИН РЕД от адресната книга · номерът, колоната и КОЙ ГО СПОДЕЛЯ.
+ *
+ * „Кои колони носят този номер" се пита от ДОМЕЙНА (`svarzaniPoNomer`), а не се
+ * преписва тук. Дотук екранът си го смяташе сам с второ `filter` — и двете
+ * версии вече се различаваха по нюанс (домейновата връща и себе си). Второ
+ * място за един факт е второ място, което се разминава (правило 17), а
+ * функцията в домейна стоеше с НУЛА живи викащи, само с теста си.
+ *
+ * САМИЯТ РЕД се маха тук, не в домейна: „свързаните" е свойство на номера, а
+ * „другите освен мен" е въпрос на ЕКРАНА, който рисува точно този ред.
+ */
 function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
-  const drugite = kniga.filter(
-    (x) => x.nomer === r.nomer && r.nomer > 0 && !(x.tablitsa === r.tablitsa && x.kolona === r.kolona),
+  const drugite = svarzaniPoNomer(kniga, r.nomer).filter(
+    (x) => !(x.tablitsa === r.tablitsa && x.kolona === r.kolona),
   );
-  const vgradenaVrazka = vrazkataNaNomer(r.nomer);
   return `
     <div class="red opis${r.nomer === 0 ? ' propusnat' : ''}" translate="no">
       <span>${
@@ -261,9 +272,11 @@ function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
       <span>${
         r.nomer === 0
           ? '<span class="znachka tiha">без връзка</span>'
-          : ekraniraj(
-              drugite.map((x) => `${x.tablitsa} · ${x.kolona}`).join(' · ') ||
-                (vgradenaVrazka ? 'чака втори край' : 'чака втори край'),
+          : // ТЕРНАР С ДВА ЕДНАКВИ КЛОНА стоеше тук и викаше `vrazkataNaNomer`
+            // само за да не ползва отговора му. Шум в най-чистия си вид —
+            // негова дума за резен 18: „без никакъв шум" (ADR-069).
+            ekraniraj(
+              drugite.map((x) => `${x.tablitsa} · ${x.kolona}`).join(' · ') || 'чака втори край',
             )
       }${
         r.otkade === 'model'
