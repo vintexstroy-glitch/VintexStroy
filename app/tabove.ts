@@ -54,6 +54,7 @@ import {
   vrazkataNaNomer,
   type RedVKnigata,
 } from '../src/domein/adresna-kniga.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
 import { dayNomer } from '../src/domein/redaktor.js';
 import { reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
@@ -491,7 +492,10 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
     try {
       const ime = String(new FormData(formaTab).get('ime') ?? '');
       const tab = napraviTab({ ime });
-      await k.deystviya.zapishiTab(tab, { opId: `tab:${crypto.randomUUID()}` });
+      // СЪЗДАВАНЕ, не поправка: `sazdayTab` отказва зает ключ. Дотук новото
+      // име се записваше върху стария таб и той се връщаше ПРАЗЕН — секциите
+      // му изчезваха без нито една дума (дефект от голямата сверка).
+      await k.deystviya.sazdayTab(tab, { opId: `tab:${crypto.randomUUID()}` });
       izbranTab = tab.klyuch;
       zapomniEkranno('tabove.izbran', izbranTab);
       dobavyamTab = false;
@@ -640,7 +644,9 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
         if (!m) throw new Error('Хедърът вече го няма.');
         const nomer = pole?.value.trim() === '' ? 0 : Number(pole?.value);
         if (Number.isNaN(nomer)) throw new Error(`„${pole?.value}" не е номер.`);
-        const nov = dayNomer(m, Number(indeks), nomer, 'sobstvenik');
+        // РОЛЯТА се СМЯТА от Журнала, не се твърди с литерал: пазачът
+        // `samoUpravitel` иначе получава отговора, който иска (ADR-050).
+        const nov = dayNomer(m, Number(indeks), nomer, rolyataNa(k.kojSam.imeyl, o));
         await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
         greshka = '';
         k.vest('dobre', nomer === 0 ? 'Връзката е махната.' : `Колоната носи номер ${nomer}.`);

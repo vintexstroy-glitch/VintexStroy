@@ -34,6 +34,7 @@ import {
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
+import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
 import {
@@ -902,8 +903,26 @@ export class Deystviya {
     );
   }
 
+  /**
+   * Записва ТАБ · ПОПРАВКА на съществуващ или запис на вече проверен нов.
+   *
+   * Последният запис за ключа надделява — това е поправка, не втори таб.
+   * Създаването минава през `sazdayTab`, за да не може ново празно име да
+   * върне стар таб празен (дефект, намерен при голямата сверка).
+   */
   async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * СЪЗДАВА нов таб · и ОТКАЗВА, ако ключът е зает.
+   *
+   * Проверката стои ТУК, не на екрана — по образеца на `zapishiAgent`: вторият
+   * екран, който създаде таб, няма да знае, че съществува (правило 2 по дух).
+   */
+  async sazdayTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
+    proveriNovTab(danni, (await this.ogledalo()).tabove);
+    return this.zapishiTab(danni, z);
   }
 
   /**

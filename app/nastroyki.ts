@@ -40,6 +40,7 @@ import { obrazetsOtModel, ZNAK_ZATVORENA } from '../src/iznos/ot-model.js';
 import {
   belegNaButon,
   DEYSTVIYA,
+  IMENA_NA_DOKADE,
   napraviButon,
   papki,
   posokaNa,
@@ -100,6 +101,7 @@ import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -155,16 +157,49 @@ export function narisuvayNastroyki(
       </div>
       <div class="plochka">
         <span class="etiket">Построени действия</span>
-        <span class="chislo" translate="no">${DEYSTVIYA.filter((d) => d.postroeno).length} / ${DEYSTVIYA.length}</span>
-        <span class="pod">останалите са обявени, не построени</span>
+        <span class="chislo" translate="no">${
+          DEYSTVIYA.filter((d) => d.dokade === 'postroen').length
+        } / ${DEYSTVIYA.length}</span>
+        <span class="pod">${
+          DEYSTVIYA.filter((d) => d.dokade === 'bez-buton').length
+        } са построени, но БЕЗ БУТОН · останалите са само обявени</span>
       </div>
     </div>
 
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
 
-    ${blokNaButonite(butoni)}
+    ${
+      /**
+       * ДВЕТЕ СЕКЦИИ, КОИТО ИСКАТ ДРАЙВА · и само те.
+       *
+       * Дотук ЦЕЛИЯТ екран искаше `iztochnitsi` (`EKRANI.nastroyki.iska`), а
+       * тази възможност я дава само Драйвът. На двата ЛОКАЛНИ плана пунктът
+       * стоеше в лентата и натискането връщаше на Имоти — без дума защо, и с
+       * него падаха петнайсет теми, които нямат нищо общо с Драйва.
+       *
+       * Сега изискването живее на ТЕМАТА (`temi-nastroyki.ts`), а тук отпадат
+       * само двете ѝ секции. Правило 15: изключеното се КАЗВА, не се преглъща.
+       */
+      mozhe(izbor, 'iztochnitsi')
+        ? blokNaButonite(butoni)
+        : `<section data-sektsiya="butoni">
+      <div class="dyalglava"><h2>Бутоните · пътищата</h2><span>иска Драйв</span></div>
+      <p class="drebno">Бутонът е ПЪТ към файл в Драйва, а това издание е МЕСТНО —
+      Журналът е само на устройството. Възможността не е изключена, а я НЯМА в този
+      план: пътища без облак водят наникъде. Всичко останало в Настройки работи.</p>
+    </section>`
+    }
     ${dobavyam ? formaNaButon(modeli) : ''}
-    ${blokNaModelite(modeli)}
+    ${
+      mozhe(izbor, 'iztochnitsi')
+        ? blokNaModelite(modeli)
+        : `<section data-sektsiya="modeli">
+      <div class="dyalglava"><h2>Модели на таблици</h2><span>иска Драйв</span></div>
+      <p class="drebno">Моделът описва ВЪНШЕН файл — картата на неговата глава. Без
+      Драйв няма откъде да дойде такъв файл, затова темата я няма в този план.
+      Хедърите и колоните им се редактират нормално.</p>
+    </section>`
+    }
     ${blokNaRedaktora(modeli)}
     ${
       /**
@@ -348,7 +383,9 @@ function redNaButon(b: Buton): string {
 }
 
 function formaNaButon(modeli: readonly ModelNaTablitsa[]): string {
-  const postroeni = DEYSTVIYA.filter((d) => d.postroeno);
+  // САМО достижимите от бутон · „построен, но без бутон" не влиза в избора,
+  // защото такъв бутон би отворил файл и после отказал (`butoni.ts`).
+  const postroeni = DEYSTVIYA.filter((d) => d.dokade === 'postroen');
   return `
     <section data-sektsiya="nastroyki-nov-buton" class="karta izbrana">
       <div class="dyalglava"><h2>Нов бутон</h2><span>име · папка · действие · позволени модели</span></div>
@@ -1151,13 +1188,16 @@ function blokNaDeystviyata(): string {
           <span>${i + 1}</span>
           <span>${ekraniraj(d.ime)}</span>
           <span>${POSOKA_S_DUMI[d.posoka]}</span>
-          <span><span class="znachka ${d.postroeno ? 'dobre' : 'tiha'}">${
-            d.postroeno ? 'построен' : 'обявен'
-          }</span></span>
+          <span><span class="znachka ${
+            d.dokade === 'postroen' ? 'dobre' : d.dokade === 'bez-buton' ? 'trevoga' : 'tiha'
+          }">${IMENA_NA_DOKADE[d.dokade]}</span></span>
         </div>`,
         ).join('')}
       </div>
-      <p class="drebno">Бутон с обявено, но непостроено действие се отказва при създаване — бутон, който мълчи при натискане, е по-лош от липсващ бутон.</p>
+      <p class="drebno">Бутон с обявено действие се отказва при създаване — бутон, който мълчи
+      при натискане, е по-лош от липсващ бутон. <b>БЕЗ БУТОН</b> е третата дума и значи
+      друго: пътят Е построен, но никой викащ не се разклонява по действието — днес
+      „Създаване на таблица" се извървява от „Свали образец" в Редактора на хедъри.</p>
     </section>`;
 }
 
@@ -1212,6 +1252,22 @@ export function zakachiNastroyki(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.
+   *
+   * Дотук ДЕСЕТ викащи в затварянето подаваха дословно `'sobstvenik'` (плюс
+   * един единайсети в `app/tabove.ts`, поправен със същия ход).
+   * Днес това съвпадаше с истината — екранът е само за Стопанина — но пазачът
+   * `samoUpravitel` получаваше отговора, който иска, и затова не пазеше нищо:
+   * обявена защита без ВИКАЩ е надпис (ADR-041 · ADR-050). Загуби ли екранът
+   * `iskaRolya` някой ден, единайсет операции щяха да се отворят мълчешком.
+   *
+   * Смята се при всяко действие, не веднъж при закачането: Журналът се мени,
+   * а закачането става веднъж на рисуване.
+   */
+  const rolyata = async (): Promise<RolyaNaChovek> =>
+    rolyataNa(k.kojSam.imeyl, await k.deystviya.ogledalo());
+
   // Журналът от таблица (И96 т.8) · своя секция, свое закачане.
   zakachiZhurnalat(koren, k, prerisuvay);
 
@@ -1558,7 +1614,7 @@ export function zakachiNastroyki(
     try {
       const star = await hedarSega();
       if (!star) throw new Error('Хедърът вече го няма — избери наново.');
-      const nov = smeniFormula(star, kolona, formulaOtFormata(new FormData(formaFormula)), 'sobstvenik');
+      const nov = smeniFormula(star, kolona, formulaOtFormata(new FormData(formaFormula)), await rolyata());
       await zapishiHedar(star, nov, `Формулата на „${star.glavi[kolona]}" е сменена.`);
       smenyamFormula = null;
       await prerisuvay();
@@ -1589,7 +1645,7 @@ export function zakachiNastroyki(
         const nov = dobaviFormulnaKolona(star, {
           ime,
           formula: formulaOtFormata(danni),
-          rolya: 'sobstvenik',
+          rolya: await rolyata(),
         });
         await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
         dobavyamKolona = false;
@@ -1601,7 +1657,7 @@ export function zakachiNastroyki(
       const opts = {
         ime: String(danni.get('ime') ?? ''),
         // Настройки е екранът на главния акаунт (И57); кой е натиснал, пише Вратата.
-        rolya: 'sobstvenik' as RolyaNaChovek,
+        rolya: await rolyata(),
         zatvorena: String(danni.get('vid')) === 'zatvorena',
         ...(nomenklatura === 'opis' ? { menyu: chlenoveOt(String(danni.get('menyu') ?? '')) } : {}),
         ...(nomenklatura === 'vavezhdane' ? { otVavezhdane: true } : {}),
@@ -1640,12 +1696,12 @@ export function zakachiNastroyki(
         if (!star) return;
         let nov = star;
         if (ime.trim() !== '' && ime.trim() !== star.glavi[kolona]) {
-          nov = preimenuvayKolona(nov, kolona, ime, 'sobstvenik');
+          nov = preimenuvayKolona(nov, kolona, ime, await rolyata());
         }
         const chlenove = chlenoveOt(menyuTekst);
         const stari = nov.menyuta[kolona] ?? [];
         if (chlenove.length > 0 && chlenove.join('¦') !== stari.join('¦')) {
-          nov = zadayMenyu(nov, kolona, chlenove, 'sobstvenik');
+          nov = zadayMenyu(nov, kolona, chlenove, await rolyata());
         }
         // ВИДЪТ НА СТОЙНОСТТА · това е потвърждението, което `podskazhiVid()`
         // чакаше. Смяната минава само ако наистина се мени — иначе всеки запис
@@ -1654,7 +1710,7 @@ export function zakachiNastroyki(
           `[data-vid-stoynost="${kolona}"]`,
         )?.value as VidStoynost | undefined;
         if (izbranVid && izbranVid !== (nov.vidove[kolona] ?? 'tekst')) {
-          nov = smeniVidNaStoynost(nov, kolona, izbranVid, 'sobstvenik');
+          nov = smeniVidNaStoynost(nov, kolona, izbranVid, await rolyata());
         }
         await zapishiHedar(star, nov, `Колоната е записана в „${star.klyuch}".`);
         greshka = '';
@@ -1673,7 +1729,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = iztriyMenyu(star, kolona, 'sobstvenik');
+        const nov = iztriyMenyu(star, kolona, await rolyata());
         await zapishiHedar(star, nov, 'Менюто е изтрито — името на полето е заключено.');
         greshka = '';
       } catch (err) {
@@ -1689,7 +1745,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = otbelezhiVavezhdane(star, kolona, 'sobstvenik');
+        const nov = otbelezhiVavezhdane(star, kolona, await rolyata());
         await zapishiHedar(star, nov, 'Номенклатурата ще се ражда от въвеждането.');
         greshka = '';
       } catch (err) {
@@ -1713,7 +1769,7 @@ export function zakachiNastroyki(
       try {
         const star = await hedarSega();
         if (!star) return;
-        const nov = premahniKolona(star, kolona, { rolya: 'sobstvenik', imaDanni: false });
+        const nov = premahniKolona(star, kolona, { rolya: await rolyata(), imaDanni: false });
         await zapishiHedar(star, nov, `Колоната е премахната от „${star.klyuch}".`);
         greshka = '';
       } catch (err) {

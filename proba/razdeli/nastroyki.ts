@@ -12,7 +12,18 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '19 · бутонът';
     await naEkran(p, 'nastroyki', '#nov-buton');
-    proveri('Настройки казват колко пътя са ПОСТРОЕНИ', await plochka(p, 'Построени действия'), '2 / 10');
+    // ТРИ ДУМИ, не две (резен 18). Дотук тук стоеше „2 / 10" и второто от
+    // двете беше „Създаване на таблица" — път, който Е построен, но до който
+    // НИТО ЕДИН бутон не води. Числото беше вярно за механизма и невярно за
+    // човека, който натиска. Сега достижимите са ЕДИН, а другият се брои
+    // отделно, с думата си.
+    proveri('Настройки казват колко пътя са ДОСТИЖИМИ от бутон',
+      await plochka(p, 'Построени действия'), '1 / 10');
+    const patishta = await tekstNa(p, '[data-sektsiya=patishta]');
+    proveri('и казват, че един е построен, но БЕЗ БУТОН',
+      patishta.includes('БЕЗ БУТОН'), true);
+    proveri('като сочат откъде се извървява днес',
+      patishta.includes('Свали образец'), true);
     proveri('моделът от §18 се вижда тук', (await redove(p, '.red.model')).length, 1);
     // §14 тръгна начисто; оттам насам са двете прилагания на §18.
     proveri('записаните сверки са две', (await redove(p, '.red.zapisanasverka')).length, 2);

@@ -27,6 +27,7 @@ import { ekraniraj } from './obshto.js';
 import { otvoriProzorets } from './prozorets.js';
 import { zavediDoSektsiyata } from './menyu-ekran.js';
 import { ikona } from './ikoni.js';
+import type { Izbor } from '../src/domein/planove.js';
 import {
   IMENA_NA_GLEDASHTITE,
   temaPoKlyuch,
@@ -45,8 +46,11 @@ let otvoren = false;
  * а изборът в реда води до темата. Два отделни бутона („Настройки" и стрелка)
  * биха питали човека нещо, което той не се е сещал да пита.
  */
-export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
-  const grupi = temiPoGrupi(koy);
+export function redNaNastroykite(koy: KoyGleda, sEkran: boolean, izbor: Izbor): string {
+  // ИЗБОРЪТ влиза, за да отпаднат темите, чиято възможност планът не дава
+  // (двете, които искат Драйва). Дотук екранът искаше `iztochnitsi` ЦЕЛИЯТ и
+  // на локалните планове пунктът водеше обратно на Имоти — без дума защо.
+  const grupi = temiPoGrupi(koy, izbor);
   return `
     <div class="menyu-nastroyki${otvoren ? ' otvoreno' : ''}">
       <button type="button" class="navred nastroyki-vhod" id="nastroyki-vhod"${

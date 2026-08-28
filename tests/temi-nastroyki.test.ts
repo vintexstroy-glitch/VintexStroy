@@ -10,10 +10,12 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { operatsiya, SHA } from './pomoshtni.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
+import { izborPoPodrazbirane } from '../src/domein/planove.js';
 import { OTKRIVASHTO_SABITIE } from '../src/domein/stopanin.js';
 import {
   GRUPI,
@@ -231,5 +233,44 @@ describe('групите · пет заглавия, нито едно праз�
   it('редът на заглавията е онзи от описа, не азбучен', () => {
     const red = temiPoGrupi('stopanin').map((g) => g.grupa.klyuch);
     expect(red).toEqual(GRUPI.map((g) => g.klyuch));
+  });
+});
+
+/**
+ * ИЗИСКВАНЕТО ЖИВЕЕ НА ТЕМАТА, НЕ НА ЕКРАНА · дефект от голямата сверка.
+ *
+ * Дотук `EKRANI.nastroyki.iska` беше `'iztochnitsi'` — възможност, която дава
+ * само Драйвът. Пунктът обаче се връща БЕЗУСЛОВНО („Настройки не се скрива от
+ * никого", И101 т.2), значи на двата ЛОКАЛНИ плана той стоеше в лентата и
+ * натискането го връщаше на Имоти, без дума защо. С него падаха и езикът на
+ * интерфейса, и личният таб, и контрагентите, и колонното право.
+ */
+describe('темите · възможността живее на ТЕМАТА', () => {
+  const lokalno = izborPoPodrazbirane('profesionalen-lokalno');
+  const oblak = izborPoPodrazbirane('profesionalen');
+
+  it('без избор нищо не отпада · старото поведение остава дословно', () => {
+    expect(temiZa('stopanin').length).toBe(TEMI.filter((t) => t.za.includes('stopanin')).length);
+  });
+
+  it('локалният план губи САМО темите, които искат Драйва', () => {
+    const svsichko = new Set(temiZa('stopanin', oblak).map((t) => t.klyuch));
+    const bezDrayv = new Set(temiZa('stopanin', lokalno).map((t) => t.klyuch));
+    const padnali = [...svsichko].filter((k) => !bezDrayv.has(k));
+    expect(padnali.sort()).toEqual(['butoni', 'modeli']);
+  });
+
+  it('а всичко останало ОСТАВА · офлайн изданието не губи Настройки', () => {
+    const bezDrayv = temiZa('stopanin', lokalno).map((t) => t.klyuch);
+    for (const klyuch of ['ezik', 'lichno', 'kontragenti', 'pravata', 'moeto']) {
+      expect(bezDrayv, klyuch).toContain(klyuch);
+    }
+    expect(bezDrayv.length).toBeGreaterThan(10);
+  });
+
+  it('и екранът НЕ носи изискването · иначе целият пункт пада', () => {
+    const izvor = readFileSync('app/ekranite.ts', 'utf8');
+    const blok = izvor.slice(izvor.indexOf('nastroyki: {'), izvor.indexOf('stoynost: {'));
+    expect(blok).not.toMatch(/^\s*iska: /m);
   });
 });

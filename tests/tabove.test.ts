@@ -16,10 +16,12 @@ import {
   nosiKlyucha,
   premahniSektsiya,
   premestiSektsiya,
+  proveriNovTab,
   razvarzhiSektsiya,
   svarzhiSektsii,
   vazmozhniIzvori,
   verigaNaStesnenieto,
+  type Tab,
 } from '../src/domein/tabove.js';
 
 function smetkiSasImoti() {
@@ -189,5 +191,45 @@ describe('връзването · „изборът в едната стесня
       po: 'imot',
     });
     expect(t.sektsii[1]?.svarzanaS).toBe('имотите');
+  });
+});
+
+/**
+ * ВТОРИ ТАБ СЪС СЪЩИЯ КЛЮЧ · дефект, намерен при голямата сверка (резен 18).
+ *
+ * Секцията ВИНАГИ е имала такава проверка; табът — не. А Огледалото пази
+ * ПОСЛЕДНИЯ запис за ключ, и то нарочно (така се ПОПРАВЯ таб). Двете заедно
+ * даваха тиха загуба: ново име със същия ключ връщаше стария таб ПРАЗЕН.
+ */
+describe('нов таб · зает ключ се отказва', () => {
+  const sasZaet = (): ReadonlyMap<string, Tab> => {
+    const star = dobaviSektsiya(napraviTab({ ime: 'Моят таб' }), {
+      ime: 'Първа',
+      vid: 'tablitsa',
+      iztochnik: 'imoti',
+    });
+    return new Map([[star.klyuch, star]]);
+  };
+
+  it('отказва се, и се КАЗВА колко секции щяха да паднат', () => {
+    const nov = napraviTab({ ime: 'моят  таб' });
+    expect(() => proveriNovTab(nov, sasZaet())).toThrow(GreshkaTab);
+    expect(() => proveriNovTab(nov, sasZaet())).toThrow(/1 секции/);
+  });
+
+  it('свободният ключ минава · нищо не се стеснява напразно', () => {
+    expect(() => proveriNovTab(napraviTab({ ime: 'Друг таб' }), sasZaet())).not.toThrow();
+  });
+
+  /**
+   * ПОПРАВКАТА НЕ СЕ ЗАСЯГА · тя минава по другия път (`zapishiTab`).
+   * Проверката е за СЪЗДАВАНЕ; ако хванеше и поправката, нито една секция
+   * нямаше да може да се добави втори път.
+   */
+  it('но поправката на СЪЩИЯ таб не минава оттук изобщо', () => {
+    const star = [...sasZaet().values()][0]!;
+    const sOshte = dobaviSektsiya(star, { ime: 'Втора', vid: 'tablitsa', iztochnik: 'naemi' });
+    expect(sOshte.sektsii).toHaveLength(2);
+    expect(sOshte.klyuch).toBe(star.klyuch);
   });
 });

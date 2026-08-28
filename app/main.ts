@@ -1014,7 +1014,7 @@ function strana(
        * при натискане на настройки**". Пунктът остава на мястото си в лентата;
        * различава се само с това, което прави при натискане.
        */
-      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya));
+      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya), izbor);
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';

@@ -31,6 +31,7 @@
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import { svediImeyl } from './akaunt.js';
 import { eStopanin } from './stopanin.js';
+import { mozhe, type Izbor, type Vazmozhnost } from './planove.js';
 
 /** Трите му човека, с неговите думи. */
 export const KOY_GLEDA = ['stopanin', 'sluzhitel', 'upalnomoshten'] as const;
@@ -81,6 +82,20 @@ export interface TemaNastroyka {
   readonly grupa: KlyuchGrupa;
   /** кой я вижда · изброено ПОИМЕННО, не по формула */
   readonly za: readonly KoyGleda[];
+  /**
+   * ВЪЗМОЖНОСТТА, без която темата няма предмет · по избор.
+   *
+   * Живее на ТЕМАТА, не на екрана, и това е поправка на дефект: „Настройки"
+   * искаше `iztochnitsi` ЦЕЛИЯТ, а тази възможност я дава само Драйвът. На
+   * двата ЛОКАЛНИ плана пунктът стоеше в лентата и натискането го връщаше на
+   * Имоти — без дума защо. С това падаха и езикът на интерфейса, и личният
+   * таб, и контрагентите, и колонното право: седемнайсет теми заради две.
+   *
+   * Настройки НЕ се скрива от никого (правило 15 · И101 т.2). Стеснява се
+   * СЪДЪРЖАНИЕТО му — точно каквото собствената му бележка в `main.ts` вече
+   * обещаваше.
+   */
+  readonly iska?: Vazmozhnost;
 }
 
 const VSICHKI: readonly KoyGleda[] = Object.freeze(['stopanin', 'sluzhitel', 'upalnomoshten']);
@@ -172,6 +187,8 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'modeli' },
     grupa: 'biznesat',
     za: SAMO_STOPANINAT,
+    // Моделът описва ВЪНШЕН файл · без Драйв няма откъде да дойде.
+    iska: 'iztochnitsi',
   },
   {
     klyuch: 'butoni',
@@ -181,6 +198,8 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'butoni' },
     grupa: 'biznesat',
     za: SAMO_STOPANINAT,
+    // Бутонът е път КЪМ файл · без Драйв води наникъде.
+    iska: 'iztochnitsi',
   },
   {
     klyuch: 'pravata',
@@ -266,9 +285,15 @@ export function koyGleda(imeyl: string, o: Ogledalo): KoyGleda {
   return 'upalnomoshten';
 }
 
-/** Темите, които ТОЗИ човек вижда · в реда на описа. */
-export function temiZa(koy: KoyGleda): readonly TemaNastroyka[] {
-  return TEMI.filter((t) => t.za.includes(koy));
+/**
+ * Темите, които ТОЗИ човек вижда · в реда на описа.
+ *
+ * ИЗБОРЪТ Е ПО ЖЕЛАНИЕ и това е нарочно: викащ без него получава ВСИЧКИ теми,
+ * позволени за ролята — същото поведение, каквото имаше преди. Тема, чиято
+ * възможност не е дадена от плана, отпада само когато има с какво да се пита.
+ */
+export function temiZa(koy: KoyGleda, izbor?: Izbor): readonly TemaNastroyka[] {
+  return TEMI.filter((t) => t.za.includes(koy) && (!t.iska || !izbor || mozhe(izbor, t.iska)));
 }
 
 /**
@@ -286,8 +311,9 @@ export function temiZa(koy: KoyGleda): readonly TemaNastroyka[] {
  */
 export function temiPoGrupi(
   koy: KoyGleda,
+  izbor?: Izbor,
 ): readonly { readonly grupa: (typeof GRUPI)[number]; readonly temi: readonly TemaNastroyka[] }[] {
-  const moite = temiZa(koy);
+  const moite = temiZa(koy, izbor);
   return GRUPI.map((grupa) => ({ grupa, temi: moite.filter((t) => t.grupa === grupa.klyuch) })).filter(
     (g) => g.temi.length > 0,
   );

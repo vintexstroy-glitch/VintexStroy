@@ -418,14 +418,34 @@ describe('контейнерите като таблици · моделът с�
     expect(baytove.length).toBeGreaterThan(500);
   });
 
-  it('действие №4 вече е ПОСТРОЕНО и бутон по него се прави', () => {
-    expect(opisNaDeystvie('sazdavane-tablitsa').postroeno).toBe(true);
+  /**
+   * ПРЕНАПИСАН при голямата сверка (резен 18) — и това е поуката му.
+   *
+   * Дотук тестът се казваше „действие №4 вече е ПОСТРОЕНО и бутон по него се
+   * прави" и пазеше ТОЧНО дефекта. Половината беше вярна: пътят Е построен
+   * (`obrazetsOtModel` → `rabotnaKniga`, проверено в теста над този). Другата
+   * половина — че се извървява ОТ БУТОН — не беше вярна никога: нито един
+   * викащ в `app/` не се разклонява по `b.deystvie`, тъй че такъв бутон
+   * отваряше избор на файл и после отказваше с „не е за четене".
+   *
+   * Тест, който пази половин истина, е по-скъп от липсващ: той прави дефекта
+   * официален.
+   */
+  it('действие №4 е построено, но БЕЗ БУТОН · и създаването се отказва с думи', () => {
+    expect(opisNaDeystvie('sazdavane-tablitsa').dokade).toBe('bez-buton');
+    expect(posokaNa('sazdavane-tablitsa')).toBe('pishe');
+    expect(() =>
+      napraviButon({ klyuch: 'Образец ОББ', papka: 'Образци', deystvie: 'sazdavane-tablitsa' }),
+    ).toThrow(/Свали образец/);
+  });
+
+  it('а построеното И достижимото си прави бутон както преди', () => {
     const b = napraviButon({
-      klyuch: 'Образец ОББ',
-      papka: 'Образци',
-      deystvie: 'sazdavane-tablitsa',
+      klyuch: 'Извлечения ОББ',
+      papka: 'Извлечения',
+      deystvie: 'sveryavane-eksel',
     });
-    expect(posokaNa(b.deystvie)).toBe('pishe');
+    expect(posokaNa(b.deystvie)).toBe('chete');
   });
 });
 
