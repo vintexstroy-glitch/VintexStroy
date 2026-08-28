@@ -215,7 +215,14 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ikona: 'nastroyki',
     iska: 'iztochnitsi',
     iskaRolya: 'sobstvenik',
-    narisuvay: (r) => narisuvayNastroyki(r.ogledalo, r.broySabitiya, r.izbor),
+    narisuvay: (r) =>
+      narisuvayNastroyki(
+        r.ogledalo,
+        r.broySabitiya,
+        r.izbor,
+        // СТОПАНИНЪТ се СМЯТА от Журнала, не от самоличността (ADR-043).
+        r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
+      ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay),
   },
   stoynost: {

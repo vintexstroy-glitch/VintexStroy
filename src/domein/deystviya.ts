@@ -69,6 +69,7 @@ import type {
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
+  PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
   PayloadStorno,
@@ -576,6 +577,36 @@ export class Deystviya {
       );
     }
     return this.#pusni('ЗапасенКонтактЗаписан', VID.zapasen, danni.imeyl, danni, z);
+  }
+
+  /**
+   * ВКЛЮЧВА или ПРИБИРА ВРЪЗКАТА С НАП · само Стопанинът (резен 17).
+   *
+   * Проверката е ТУК, а не при Вратата — Вратата не чете Огледалото. Същият
+   * модел и същият прецедент като при запасния контакт и при реда на лентата.
+   *
+   * СЪГЛАСИЕТО ВЛИЗА В ТОВАРА, не в екрана. „Прочетох какво напуска
+   * устройството" е решение на ЧОВЕК, а решенията на хора имат имейл и следа
+   * (правило 18). Записано само като отметка на екрана, то щеше да изчезне при
+   * първото презареждане и никой нямаше да знае кой го е дал.
+   *
+   * ПРИБИРАНЕТО НЕ ИСКА СЪГЛАСИЕ · спирането на нещо не мени какво напуска.
+   */
+  async prevklyuchiNAP(danni: PayloadNAPVrazkaPrevklyuchena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Връзката с НАП се включва само от Стопанина — тя дава достъп на служител ' +
+          'и мени какво напуска устройството.',
+      );
+    }
+    if (danni.vklyucheno && danni.saglasieto.trim() === '') {
+      throw new GreshkaStopanin(
+        'Включването иска СЪГЛАСИЕ с имейл — кой е прочел какво напуска устройството. ' +
+          'Съгласие без име не може да се провери, а границата е негово решение.',
+      );
+    }
+    return this.#pusni('НАПВръзкаПревключена', VID.nap, 'NAP', danni, z);
   }
 
   /**

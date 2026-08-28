@@ -51,7 +51,8 @@ export type Vazmozhnost =
   | 'poveche-hranilishte' // иска платен план при Google/Microsoft/Apple
   | 'individualni-razrabotki' // поръчкови разработки по договор
   | 'svarzhi-ii' // ИИ — добавка с цена, НЕ вграден: свързва се (ADR-029)
-  | 'kalendar'; // покана към календара на служителя · ИСКАНЕ, не достъп (ADR-064)
+  | 'kalendar' // покана към календара на служителя · ИСКАНЕ, не достъп (ADR-064)
+  | 'nap-vrazka'; // НАП · СГЛОБЯВА файловете местно; НЕ подава и не праща (ADR-068)
 
 /** Какво прави всяка възможност — с едно изречение, за отметките на таблото. */
 export const OPISANIE: Readonly<Record<Vazmozhnost, string>> = Object.freeze({
@@ -74,6 +75,9 @@ export const OPISANIE: Readonly<Record<Vazmozhnost, string>> = Object.freeze({
   'svarzhi-ii':
     'Табло за агент: карта, протокол, закони, задачи и журнал на предложенията, ' +
     'плюс самото свързване с Клод — бутон, ключ и потвърждение с имейл (ADR-029).',
+  'nap-vrazka':
+    'Сглобява ДОКУМЕНТИТЕ за НАП на устройството и ги дава за сваляне. ' +
+    'НЕ подава, не пази електронен подпис и не праща нищо навън.',
   kalendar:
     'Праща задачата и като ПОКАНА в календара на служителя, по избор. ' +
     'Поканата е съобщение, не достъп: тя не отваря нищо в програмата, а Стопанинът ' +
@@ -195,6 +199,7 @@ export const PLANOVE: readonly Plan[] = Object.freeze([
       'individualni-razrabotki',
       'svarzhi-ii',
       'kalendar',
+      'nap-vrazka',
     ]),
   },
   {
@@ -225,6 +230,7 @@ export const PLANOVE: readonly Plan[] = Object.freeze([
       'individualni-razrabotki',
       'svarzhi-ii',
       'kalendar',
+      'nap-vrazka',
     ]),
   },
 ]);

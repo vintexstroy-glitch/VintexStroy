@@ -64,6 +64,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
+  PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
   PayloadLichnaTemaZapisana,
@@ -316,6 +317,14 @@ export interface Ogledalo {
    * който екраните са ОБЯВЕНИ в регистъра. Празното НЕ значи „скрий всичко":
    * сливането е `podredi`, а тя слага непознатите НАКРАЯ.
    */
+  /**
+   * НАП · включена ли е връзката, и КОЙ е дал съгласието (резен 17).
+   *
+   * Празен имейл значи „не е включвана" — трето състояние няма нужда: прибраната
+   * връзка пази съгласието, за да се вижда кой го е дал, ако се включи пак.
+   */
+  readonly napVklyuchena: boolean;
+  readonly napSaglasieto: string;
   readonly redNaLentata: readonly string[];
   readonly lichnoVklyucheno: boolean;
   /**
@@ -465,6 +474,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const svrazki = new Map<number, Svrazka>();
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
+  let napVklyuchena = false;
+  let napSaglasieto = '';
   let redNaLentata: readonly string[] = [];
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
@@ -609,6 +620,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ПреносОтчетен': {
         const p = s.payload as unknown as PayloadPrenosOtcheten;
         prenosi.set(`${p.prenosId}:${p.posoka}`, p);
+        break;
+      }
+
+      case 'НАПВръзкаПревключена': {
+        const p = s.payload as unknown as PayloadNAPVrazkaPrevklyuchena;
+        napVklyuchena = p.vklyucheno; // последната дума бие
+        // Съгласието се ПАЗИ и след прибиране: то е следа кой е чел границата,
+        // а не превключвател. Прибраното не е изтрито (ADR-036).
+        if (p.saglasieto) napSaglasieto = p.saglasieto;
         break;
       }
 
@@ -1030,6 +1050,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     svrazki,
     prehvarleni,
     prenosi,
+    napVklyuchena,
+    napSaglasieto,
     redNaLentata,
     lichnoVklyucheno,
     lichnoMyasto,

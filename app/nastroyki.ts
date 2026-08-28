@@ -80,6 +80,7 @@ import {
   type VidStoynost,
 } from '../src/domein/vid-stoynost.js';
 import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
+import { kartataNaSaglasieto } from './saglasie.js';
 import { klyuchNaPravo,
   IMENA_NA_VIDOVETE,
   IMENA_NA_PRAVATA,
@@ -125,7 +126,13 @@ let dobavyamKolona = false;
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
-export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izborPoPodrazbirane()): string {
+export function narisuvayNastroyki(
+  o: Ogledalo,
+  sabitiya = 0,
+  izbor: Izbor = izborPoPodrazbirane(),
+  /** влезлият · Стопанинът ли е (ADR-043 · ролята се СМЯТА от Журнала) */
+  negoviyat = true,
+): string {
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
 
@@ -176,9 +183,119 @@ export function narisuvayNastroyki(o: Ogledalo, sabitiya = 0, izbor: Izbor = izb
     ${blokNaParametrite(o)}
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
+    ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
     ${sektsiyaZhurnalat(o, sabitiya)}
     ${blokNaDeystviyata()}
     ${blokNaKartata()}`;
+}
+
+// ── НАП · активирането със съгласие (резен 17 · И108 · И112) ────────────────
+/**
+ * ВРЪЗКАТА С НАП · включва се ТУК, само от Стопанина, и с ПРОЧЕТЕНА граница.
+ *
+ * ═══ ОТКЪДЕ ИДВА СЪДЪРЖАНИЕТО · казано честно ═══
+ *
+ * Негови са ДВЕ неща и толкова: че този резен съществува и е „единият екран
+ * (най-голям, на подрезени)" (И108), и кога влиза (И112). Претърсването на
+ * четирите извора за „КЕП", „електронен подпис", „счетоводител" и „подаване"
+ * върна НУЛА попадения — рисковете и моделът долу са от НАШЕ външно проучване,
+ * не от негово изречение. Записано е така и в ADR-068, вместо да се сложи в
+ * устата му.
+ *
+ * ═══ ЗАЩО СЪБИТИЕ, А НЕ ОТМЕТКА НА ТАБЛОТО ═══
+ *
+ * Отметките там живеят в `localStorage` — на БРАУЗЪРА. Активиране, което дава
+ * достъп на СЛУЖИТЕЛ и мени какво напуска устройството, не може да значи
+ * „включено тук, изключено там". Точно затова и „Личното" не е сред тях.
+ *
+ * ═══ ПРАВИЛО 15 · пунктът се гати по ПРАВОТО, не по отметката ═══
+ *
+ * Изключената ВЪЗМОЖНОСТ маха блока; ПРИБРАНАТА връзка не маха нищо — тя се
+ * вижда прибрана, с думи защо. Инак „не го плащам" и „не съм го пуснал" щяха да
+ * изглеждат еднакво.
+ */
+function blokNaNAP(o: Ogledalo, negov: boolean): string {
+  if (o.napVklyuchena) {
+    return `
+    <section data-sektsiya="nap">
+      <div class="dyalglava">
+        <h2>Връзката с НАП</h2>
+        <span>включена · екранът „НАП" стои в лентата</span>
+      </div>
+      <p class="drebno">Съгласието е дадено от <b translate="no">${ekraniraj(o.napSaglasieto)}</b>.
+      Приложението СГЛОБЯВА документите на устройството и ги дава за сваляне —
+      не подава, не пази електронен подпис и не праща нищо навън.</p>
+      <div class="deystviya">
+        ${
+          negov
+            ? '<button type="button" class="vtorichen" id="priberi-nap">Прибери връзката</button>'
+            : '<p class="drebno">Прибира се само от Стопанина.</p>'
+        }
+      </div>
+    </section>`;
+  }
+
+  if (!negov) {
+    return `
+    <section data-sektsiya="nap">
+      <div class="dyalglava">
+        <h2>Връзката с НАП</h2>
+        <span>изключена · включва се само от Стопанина</span>
+      </div>
+      <p class="drebno">Тя дава достъп на служител и мени какво напуска устройството —
+      затова не е отметка, а решение с име зад него (правило 18).</p>
+    </section>`;
+  }
+
+  return kartataNaSaglasieto({
+    sektsiya: 'nap',
+    zaglavie: 'Връзката с НАП',
+    podnaslov: 'какво ще прави · какво НЯМА да прави · и какво може да се обърка',
+    shte:
+      'Сглобява на УСТРОЙСТВОТО типовите документи за НАП — месечния одитен файл, ' +
+      'Главната книга и дневниците — и ги дава за сваляне, за да ги подадеш ти.',
+    nyama:
+      'НЕ подава нищо, НЕ пази електронен подпис, НЕ праща данни навън и няма ' +
+      'ключ към портала. Каквото го няма, не може да изтече.',
+    riskove: [
+      {
+        ime: 'Отговорността е ТВОЯ',
+        kakvo:
+          'За подадена декларация отговаря данъчно задълженото лице, не софтуерът. ' +
+          'Файлът, който приложението сглобява, се проверява от човек, преди да тръгне.',
+      },
+      {
+        ime: 'Празни номенклатурни кодове',
+        kakvo:
+          'Кодовете на НАП се свалят от nra.bg и днес ги няма. Измислен код значи отказ ' +
+          'плюс глоба по чл. 277а — затова стоят ПРАЗНИ и екранът ги брои като пречки, ' +
+          'вместо да ги запълни с предположения.',
+      },
+      {
+        ime: 'Имената напускат устройството',
+        kakvo:
+          'В подадения файл влизат имена и ЕИК на контрагенти. Дотук обещанието беше, че ' +
+          'те НЕ напускат устройството (ADR-030 §4) — подаването е изричното изключение и ' +
+          'става с твоя ръка, не автоматично.',
+      },
+      {
+        ime: 'Ключ в браузъра НЕ се строи',
+        kakvo:
+          'Пряка връзка с портала би искала ключ, който живее в хранилището на браузъра — ' +
+          'без ротация, без канал за отнемане. Затова я няма и няма да я има без сървър.',
+      },
+      {
+        ime: 'Електронният подпис е недостижим',
+        kakvo:
+          'Частният ключ на КЕП живее на смарт-карта и браузърен JavaScript не го вижда. ' +
+          'Подаването остава ръчно, през портала — това не е избор за удобство, а граница.',
+      },
+    ],
+    otmetka: 'Прочетох какво прави и какво НЕ прави, и включвам връзката',
+    idNaOtmetkata: 'razbrah-nap',
+    potvardi: { id: 'vklyuchi-nap', duma: 'Включи връзката' },
+    otkazhi: { id: 'otkazhi-nap', duma: 'Не сега' },
+  });
 }
 
 // ── бутоните ───────────────────────────────────────────────────────────────
@@ -1247,6 +1364,56 @@ export function zakachiNastroyki(
       izbranSluzhitel = (e.target as HTMLSelectElement).value;
       await prerisuvay();
     });
+
+  /**
+   * НАП · включване и прибиране (резен 17).
+   *
+   * СЪГЛАСИЕТО СЕ ПРОВЕРЯВА ТУК, преди Вратата — но НЕ само тук: Действията пак
+   * отказват включване без имейл на съгласието. Двете не са дублирани, а са на
+   * различни пътища: този пази ЧОВЕКА от натискане по невнимание, онзи пази
+   * КНИГАТА от запис, дошъл отвсякъде другаде (конзолата, чужда верига).
+   */
+  koren.querySelector<HTMLButtonElement>('#vklyuchi-nap')?.addEventListener('click', async () => {
+    const otmetnato = koren.querySelector<HTMLInputElement>('#razbrah-nap')?.checked ?? false;
+    if (!otmetnato) {
+      k.vest('zle', 'Отметката „прочетох какво прави и какво НЕ прави" не е сложена — връзката не се включва без нея.');
+      await prerisuvay();
+      return;
+    }
+    try {
+      await k.deystviya.prevklyuchiNAP(
+        { vklyucheno: true, saglasieto: k.kojSam.imeyl },
+        { opId: `nap:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Връзката с НАП е включена. Екранът „НАП" вече стои в лентата.');
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#priberi-nap')?.addEventListener('click', async () => {
+    try {
+      // ПРИБИРАНЕТО НЕ ИСКА СЪГЛАСИЕ · спирането не мени какво напуска.
+      // Съгласието се ПОДАВА пак, защото товарът го носи — Журналът пази кой го
+      // е дал, а не „последно кой е натиснал".
+      await k.deystviya.prevklyuchiNAP(
+        { vklyucheno: false, saglasieto: k.kojSam.imeyl },
+        { opId: `nap:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Връзката с НАП е прибрана. Журналът не е пипан — само пунктът пада от лентата.');
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#otkazhi-nap')?.addEventListener('click', async () => {
+    const kutiya = koren.querySelector<HTMLInputElement>('#razbrah-nap');
+    if (kutiya) kutiya.checked = false;
+    k.vest('dobre', 'Нищо не е включено. Връзката стои тук и чака.');
+    await prerisuvay();
+  });
 
   for (const menyu of koren.querySelectorAll<HTMLSelectElement>('select[data-pravo]')) {
     menyu.addEventListener('change', async () => {

@@ -82,6 +82,7 @@ import {
   vidNaKolona,
 } from '../src/domein/kolonno.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import { kartataNaSaglasieto } from './saglasie.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './ekranite.js';
 
@@ -481,44 +482,51 @@ function kartaUmeniya(a: Agent): string {
  * СЪГЛАСИЕТО · рисковете С ДУМИ, без „нула риск".
  *
  * Образецът е Claude for Chrome: prompt injection е обявен за нерешен проблем,
- * а „по-ниско" не се представя за „никакво". Отметката НЕ е сложена
- * предварително — нищо не се появява без изричен избор (правило 13 по дух).
+ * а „по-ниско" не се представя за „никакво".
+ *
+ * ФОРМАТА вече живее ЕДИН път (`app/saglasie.ts`) — тук остават само ДУМИТЕ.
+ * Дотук същият шаблон беше писан на ръка тук и в Служители; третото копие (НАП)
+ * щеше да направи поправка в едното невидима за другите две — а обещанието
+ * „кутийката не е сложена предварително" е точно онова, което човек чете, преди
+ * да пусне нещо навън.
  */
 function kartaSaglasie(a: Agent): string {
-  return `
-    <section data-sektsiya="ii-vklyuchvane" class="karta izbrana" id="saglasieto">
-      <div class="dyalglava">
-        <h2>Включване на „${ekraniraj(a.ime)}"</h2>
-        <span>какво ще прави · какво НЯМА да прави · и какво може да се обърка</span>
-      </div>
-      <div class="tablitsa">
-        <div class="red opis" translate="no"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
-        <div class="red opis" translate="no"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
-      </div>
-      <div class="tablitsa">
-        <div class="glava opis"><span>Рискът</span><span>какво значи</span></div>
-        <div class="red opis" translate="no">
-          <span><b>Подхвърлен текст</b></span>
-          <span>Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той няма път към запис — но предложение, прието на доверие, пренася грешката. Затова всяко предложение носи сверка, и тя се гледа.</span>
-        </div>
-        <div class="red opis" translate="no">
-          <span><b>Умора от съгласия</b></span>
-          <span>Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" няма и няма да има — присъдата е ред по ред.</span>
-        </div>
-        <div class="red opis" translate="no">
-          <span><b>Сгрешена сметка</b></span>
-          <span>Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не го запишеш — и записът носи ТВОЯ имейл, не неговото име.</span>
-        </div>
-      </div>
-      <label class="vazm">
-        <input type="checkbox" id="razbrah">
-        <span class="vazm-tyalo"><b>Прочетох рисковете и включвам агента</b><span>отметката не е сложена предварително — изборът е изричен</span></span>
-      </label>
-      <div class="deystviya">
-        <button type="button" class="glaven" id="potvardi-vklyuchvane">Включи</button>
-        <button type="button" class="vtorichen" id="otkazhi-vklyuchvane">Откажи</button>
-      </div>
-    </section>`;
+  return kartataNaSaglasieto({
+    sektsiya: 'ii-vklyuchvane',
+    id: 'saglasieto',
+    zaglavie: `Включване на „${a.ime}"`,
+    podnaslov: 'какво ще прави · какво НЯМА да прави · и какво може да се обърка',
+    shte: harakteristika(a)?.tekst ?? '',
+    nyama:
+      'Не пише в Журнала, не изпраща нищо навън, не отнема достъп. ' +
+      'Предложението му чака ТВОЯ дума.',
+    riskove: [
+      {
+        ime: 'Подхвърлен текст',
+        kakvo:
+          'Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там ' +
+          'може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той ' +
+          'няма път към запис — но предложение, прието на доверие, пренася грешката. ' +
+          'Затова всяко предложение носи сверка, и тя се гледа.',
+      },
+      {
+        ime: 'Умора от съгласия',
+        kakvo:
+          'Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" ' +
+          'няма и няма да има — присъдата е ред по ред.',
+      },
+      {
+        ime: 'Сгрешена сметка',
+        kakvo:
+          'Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не ' +
+          'го запишеш — и записът носи ТВОЯ имейл, не неговото име.',
+      },
+    ],
+    otmetka: 'Прочетох рисковете и включвам агента',
+    idNaOtmetkata: 'razbrah',
+    potvardi: { id: 'potvardi-vklyuchvane', duma: 'Включи' },
+    otkazhi: { id: 'otkazhi-vklyuchvane', duma: 'Откажи' },
+  });
 }
 
 /** ПОЛЕТО СЪС ЗАКОНИТЕ · изброени поименно, всеки със своя дом. */

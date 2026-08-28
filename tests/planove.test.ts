@@ -13,6 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
 import {
   eIzklyuchena,
   izborPoPodrazbirane,
@@ -162,5 +163,53 @@ describe('отметките · вторият слой', () => {
     // обявена, но непостроена възможност.
     expect(OSHTE_NE_E_ZAPOCHNATO.size).toBe(0);
     expect(typeof OSHTE_NE_E_ZAPOCHNATO.has).toBe('function');
+  });
+});
+
+/**
+ * ВСЯКА ВЪЗМОЖНОСТ СТИГА ДО ОТМЕТКА · дупката, която обходът намери.
+ *
+ * `OPISANIE` е `Record<Vazmozhnost, string>` — компилаторът пази да има изречение
+ * за всяка. Но `RED` в `app/tablo.ts` е ОБИКНОВЕН МАСИВ: нова възможност може да
+ * влезе в план, да получи описание, и НИКОГА да не получи отметка на Таблото.
+ * Тогава планът я дава, човекът не може да я изключи, и нищо не пада.
+ *
+ * Точно това е и обратната половина на правило 15 („изключено ≠ липсващо"):
+ * ако възможността я няма на Таблото, „включена" и „несъществуваща" изглеждат
+ * еднакво. Затова тук се БРОИ, вместо да се разчита на дисциплина.
+ *
+ * Тестът чете ИЗВОРА на екрана, а не типовете: типовете се изтриват при
+ * компилация, а масивът трябва да се провери такъв, какъвто е написан. Същият
+ * похват като `sabitiyata.test.ts`.
+ */
+describe('всяка възможност има ОТМЕТКА на Таблото', () => {
+  const TABLO = readFileSync('app/tablo.ts', 'utf8');
+
+  /** Ключовете от `RED` — извадени от самия извор. */
+  function vRedaNaTabloto(): string[] {
+    const nachalo = TABLO.indexOf('const RED: readonly Vazmozhnost[] = [');
+    expect(nachalo, 'RED трябва да съществува').toBeGreaterThan(-1);
+    const blok = TABLO.slice(nachalo, TABLO.indexOf('];', nachalo));
+    return [...blok.matchAll(/'([^']+)'/g)].map((m) => m[1]!);
+  }
+
+  it('НИТО ЕДНА възможност не остава без отметка', () => {
+    const vRed = new Set(vRedaNaTabloto());
+    const bezOtmetka = Object.keys(OPISANIE).filter((v) => !vRed.has(v));
+    expect(bezOtmetka).toEqual([]);
+  });
+
+  it('и обратното · няма отметка за несъществуваща възможност', () => {
+    const vsichki = new Set(Object.keys(OPISANIE));
+    const izmisleni = vRedaNaTabloto().filter((v) => !vsichki.has(v));
+    expect(izmisleni).toEqual([]);
+  });
+
+  it('сверка вход↔изход · и разликата се КАЗВА, дори когато е нула', () => {
+    // Броят е ДВОЙКА, не единично число: две еднакви бройки с различни
+    // множества щяха да минат, ако се сравняваха само числата.
+    const vRed = vRedaNaTabloto();
+    expect(vRed.length).toBe(Object.keys(OPISANIE).length);
+    expect([...vRed].sort()).toEqual(Object.keys(OPISANIE).sort());
   });
 });
