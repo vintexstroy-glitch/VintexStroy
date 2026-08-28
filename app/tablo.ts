@@ -97,6 +97,7 @@ const RED: readonly Vazmozhnost[] = [
   'poveche-hranilishte',
   'individualni-razrabotki',
   'svarzhi-ii',
+  'kalendar',
 ];
 
 function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya: Rolya): string {

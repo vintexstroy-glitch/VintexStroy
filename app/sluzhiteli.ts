@@ -43,6 +43,14 @@ import {
   type Izprashtane,
   type SastoyanieNaZadacha,
 } from '../src/domein/zadachi-kam-hora.js';
+import {
+  IMENA_NA_OTGOVORITE_OT_KALENDARA,
+  KAKVO_NAPUSKA,
+  KAKVO_NE_NAPUSKA,
+  sabitieZaKalendar,
+  type OtgovorOtKalendara,
+} from '../src/domein/kalendar.js';
+import { mozhe, type Izbor } from '../src/domein/planove.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -52,7 +60,12 @@ import type { Konteks } from './ekranite.js';
 let izbran = chetiEkranno('sluzhiteli.izbran', '');
 let greshka = '';
 
-export function narisuvaySluzhiteli(o: Ogledalo, kojSam: Samolichnost, dnes: string): string {
+export function narisuvaySluzhiteli(
+  o: Ogledalo,
+  kojSam: Samolichnost,
+  dnes: string,
+  izbor: Izbor,
+): string {
   const az = svediImeyl(kojSam.imeyl);
   /**
    * СТОПАНИНЪТ СТОИ В СПИСЪКА · той също върши дела и също иска лист.
@@ -126,7 +139,7 @@ export function narisuvaySluzhiteli(o: Ogledalo, kojSam: Samolichnost, dnes: str
       }
     </section>
 
-    ${hora.length === 0 ? '' : formaZaPrashtane(o, hora, kogo, dnes)}
+    ${hora.length === 0 ? '' : formaZaPrashtane(o, hora, kogo, dnes, mozhe(izbor, 'kalendar'))}
     ${hora.length === 0 ? '' : listatNa(o, kogo, az)}`;
 }
 
@@ -142,6 +155,7 @@ function formaZaPrashtane(
   hora: readonly { readonly imeyl: string; readonly ime: string }[],
   kogo: string,
   dnes: string,
+  sKalendar: boolean,
 ): string {
   const dela = [...o.dela.values()].filter((d) => d.otsenka !== 'завършено');
   return `
@@ -199,17 +213,57 @@ function formaZaPrashtane(
                 <input type="text" id="z-belezhka" name="belezhka"
                   placeholder="празно значи името на делото" translate="no">
               </div>
+              ${kartaNaPokanata(sKalendar)}
               <div class="deystviya">
                 <button type="submit" class="glaven">Прати задачата</button>
                 <p class="greshka" id="greshka-zadacha"></p>
               </div>
               <p class="drebno">Датите идват от делото · ${ekraniraj(dnes)} е днес.
               Часът е ПО ИЗБОР: празен значи цял ден. Или и двата часа, или никой.
-              Поканата по имейл се закача в следващия резен — тук задачата влиза
-              В ПРОГРАМАТА, което е задължителното.</p>
+              Задачата влиза В ПРОГРАМАТА винаги — това е задължителното; поканата
+              по имейл е отделен избор и може да не тръгне, без да я пипне.</p>
             </form>`
       }
     </section>`;
+}
+
+/**
+ * КАРТАТА НА ПОКАНАТА · отметката и ДОСЛОВНИЯТ списък какво напуска.
+ *
+ * Образецът е `kartaSaglasie` от ИИ-таблото (ADR-029): какво ще прави, какво
+ * НЯМА да прави, и кутийка, която НЕ е сложена предварително. Разликата е една
+ * и е важна: там съгласието пази ЗАПИС, тук пази ИЗХОДЯЩО ПОВИКВАНЕ, което
+ * Вратата изобщо не вижда. Затова списъкът стои РАЗГЪНАТ, не зад „подробности".
+ *
+ * Списъкът се ЧЕТЕ от домейна (`KAKVO_NAPUSKA`), не се преписва тук: преписан,
+ * той щеше да остарее при първото ново поле — а точно този списък не бива да
+ * остарява (правило 17).
+ */
+function kartaNaPokanata(sKalendar: boolean): string {
+  if (!sKalendar) {
+    // ИЗКЛЮЧЕНО ≠ ЛИПСВАЩО (правило 15) · казва се, че го има и защо не работи.
+    return `<p class="drebno">Поканата в календара е ИЗКЛЮЧЕНА за този акаунт.
+      Включва се от Таблото · „Какво да се вижда"; без нея задачата пак се праща
+      и пак се приема — само че само в програмата.</p>`;
+  }
+  return `
+    <label class="vazm">
+      <input type="checkbox" id="i-po-imeyl">
+      <span class="vazm-tyalo"><b>И покана по имейл, в календара</b>
+      <span>по избор · задачата влиза в програмата и без нея</span></span>
+    </label>
+    <div class="tablitsa" id="kakvo-napuska">
+      <div class="glava opis"><span>Напуска устройството</span><span>НЕ напуска</span></div>
+      <div class="red opis" translate="no">
+        <span><ul>${KAKVO_NAPUSKA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}</ul></span>
+        <span><ul>${KAKVO_NE_NAPUSKA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}</ul></span>
+      </div>
+    </div>
+    <label class="vazm">
+      <input type="checkbox" id="razbrah-kalendar">
+      <span class="vazm-tyalo"><b>Прочетох какво напуска устройството</b>
+      <span>отметката не е сложена предварително — изборът е изричен</span></span>
+    </label>`;
 }
 
 /** Един ред от листа · състоянието се СМЯТА, не се чете от поле. */
@@ -229,6 +283,13 @@ function redNaZadacha(
     }</span>
     <span><b>${ekraniraj(IMENA_NA_SASTOYANIYATA[sastoyanie])}</b>${
       otgovor?.prichina ? `<span class="drebno">${ekraniraj(otgovor.prichina)}</span>` : ''
+    }${
+      // ДВАТА ОТГОВОРА СТОЯТ ОТДЕЛНО и НЕ се сливат: горният е НАШ факт, от
+      // Журнала; долният е на Google и се пита на живо. Слети, човек не би
+      // знаел кой от двата гледа — а те могат да се разминават законно.
+      z.kalendarId
+        ? `<span class="drebno kalendaren" data-kalendar="${ekraniraj(z.kalendarId)}">покана: изпратена</span>`
+        : ''
     }</span>
     <span class="butoni">${
       azSam && sastoyanie === 'chaka'
@@ -267,8 +328,64 @@ function listatNa(o: Ogledalo, kogo: string, az: string): string {
             </div>`
       }
       <p class="drebno">Отказаната задача НЕ изчезва — тя си седи в листа (негово).
-      Отказът иска причина, за да не гадае изпращачът.</p>
+      Отказът иска причина, за да не гадае изпращачът.${
+        negovite.some((z) => z.kalendarId)
+          ? ' Поканата в календара е ОТДЕЛЕН отговор и се пита с бутона до нея —' +
+            ' той е на Google, а състоянието вляво е нашето.'
+          : ''
+      }</p>
+      ${
+        negovite.some((z) => z.kalendarId)
+          ? '<div class="deystviya"><button type="button" class="vtorichen" id="pitay-kalendara">' +
+            'Питай календара приел ли е</button></div>'
+          : ''
+      }
     </section>`;
+}
+
+/**
+ * ПОКАНАТА · ВТОРА стъпка, никога първа.
+ *
+ * Свързващата част се тегли с ДИНАМИЧЕН внос — така офлайн изданието не я носи
+ * (ADR-063) и правило 10 остава непокътнато: нищо чуждо в готовия пакет, а
+ * скриптът на Google се тегли само при натискане.
+ *
+ * ПРИ УСПЕХ се пише ВТОРИ `ЗадачаИзпратена` със СЪЩИЯ `zadachaId`. Огледалото
+ * поправя, вместо да ражда втора задача — това е единственият механизъм, по
+ * който мрежов резултат може да влезе в append-only книга СЛЕД записа.
+ *
+ * ПРИ ОТКАЗ задачата остава както е: изпратена в програмата, без покана. Това
+ * не е половин работа, а неговата подредба — „задължително в програмата, по
+ * имейл ПО ИЗБОР".
+ */
+async function pratiPokanata(
+  k: Konteks,
+  izprashtane: Izprashtane,
+  delo: { readonly ime: string },
+  izhod: HTMLElement,
+): Promise<void> {
+  try {
+    const { KalendaratNaGoogle, vzemiZhetonZaKalendar } = await import('./kalendar-google.js');
+    const kalendar = new KalendaratNaGoogle(await vzemiZhetonZaKalendar());
+    const kalendarId = await kalendar.pokani(
+      sabitieZaKalendar(izprashtane, delo as Parameters<typeof sabitieZaKalendar>[1]),
+    );
+    await k.deystviya.pratiZadacha(
+      { ...izprashtane, poImeyl: true, kalendarId },
+      { opId: crypto.randomUUID() },
+    );
+    k.vest('dobre', 'Задачата е изпратена И поканата тръгна. Отговорът ѝ ще се види тук.');
+  } catch (err) {
+    // ЗАДАЧАТА НЕ СЕ ОТМЕНЯ · тя вече е в програмата и това е задължителното.
+    //
+    // КАЗВА СЕ С ВЕСТ, не в полето на формата. Полето живее ВЪТРЕ в екрана и
+    // умира при следващото прерисуване — а точно тук прерисуване има веднага
+    // след връщането. Съобщение, изтрито в същия миг, е по-лошо от липсващо:
+    // човек вижда „изпратена" и нищо повече, и остава с усещането, че поканата
+    // е тръгнала. Вестта стои в черупката и преживява прерисуването.
+    izhod.textContent = '';
+    k.vest('zle', `Задачата е записана, но поканата НЕ тръгна: ${dumiZaGreshka(err)}`);
+  }
 }
 
 export function zakachiSluzhitelite(
@@ -298,29 +415,71 @@ export function zakachiSluzhitelite(
       return;
     }
     const buton = forma.querySelector<HTMLButtonElement>('button[type=submit]')!;
+    const poImeyl = koren.querySelector<HTMLInputElement>('#i-po-imeyl')?.checked ?? false;
+    const razbrah = koren.querySelector<HTMLInputElement>('#razbrah-kalendar')?.checked ?? false;
+    // СЪГЛАСИЕТО СЕ ПРОВЕРЯВА ПРЕДИ ЗАПИСА · инак задачата влиза, поканата не
+    // тръгва, и човек остава с усещането, че е пратил и двете.
+    if (poImeyl && !razbrah) {
+      izhod.textContent =
+        'Отметката „прочетох какво напуска устройството" не е сложена — покана без нея не тръгва.';
+      return;
+    }
+
     buton.disabled = true;
+    const zadachaId = crypto.randomUUID();
     try {
       // ДАТИТЕ ИДВАТ ОТ ДЕЛОТО · не се въвеждат втори път. Два входа за едно
       // число се разминават, а тук разминаването значи задача за друг ден.
-      await k.deystviya.pratiZadacha(
-        {
-          zadachaId: crypto.randomUUID(),
-          deloId,
-          imeyl: String(d.get('imeyl') ?? ''),
-          ot: delo.ot,
-          do: delo.do,
-          chas: String(d.get('chas') ?? ''),
-          doChas: String(d.get('doChas') ?? ''),
-          poImeyl: false,
-          belezhka: String(d.get('belezhka') ?? ''),
-          kogato: new Date().toISOString(),
-        },
-        { opId: crypto.randomUUID() },
-      );
+      //
+      // ЗАПИСЪТ Е ПЪРВИ И ВИНАГИ `poImeyl: false`. Негово: задачата влиза в
+      // програмата ЗАДЪЛЖИТЕЛНО, поканата е по избор. Ако Google откаже,
+      // задачата пак е изпратена — и Журналът не твърди покана, която я няма.
+      const izprashtane = {
+        zadachaId,
+        deloId,
+        imeyl: String(d.get('imeyl') ?? ''),
+        ot: delo.ot,
+        do: delo.do,
+        chas: String(d.get('chas') ?? ''),
+        doChas: String(d.get('doChas') ?? ''),
+        poImeyl: false,
+        kalendarId: '',
+        belezhka: String(d.get('belezhka') ?? ''),
+        kogato: new Date().toISOString(),
+      };
+      await k.deystviya.pratiZadacha(izprashtane, { opId: crypto.randomUUID() });
       k.vest('dobre', 'Задачата е изпратена. Стои в листа му, докато не отговори.');
+
+      if (poImeyl) await pratiPokanata(k, izprashtane, delo, izhod);
       await prerisuvay();
     } catch (err) {
       izhod.textContent = dumiZaGreshka(err);
+    } finally {
+      buton.disabled = false;
+    }
+  });
+
+  /**
+   * ПИТАЙ КАЛЕНДАРА · негово „на Стопанина му показва приел ли е".
+   *
+   * Отговорът НЕ се записва в Журнала. Той е факт на Google, не наш — записан,
+   * той щеше да има два дома и да се разминава при всяка смяна (правило 17).
+   * Показва се на живо, до нашето състояние, и двете стоят ОТДЕЛНО.
+   */
+  koren.querySelector<HTMLButtonElement>('#pitay-kalendara')?.addEventListener('click', async (e) => {
+    const buton = e.currentTarget as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const { KalendaratNaGoogle, vzemiZhetonZaKalendar } = await import('./kalendar-google.js');
+      const kalendar = new KalendaratNaGoogle(await vzemiZhetonZaKalendar());
+      for (const belyag of koren.querySelectorAll<HTMLElement>('[data-kalendar]')) {
+        const otgovor: OtgovorOtKalendara = await kalendar.otgovorat(belyag.dataset.kalendar!);
+        belyag.textContent = `покана: ${IMENA_NA_OTGOVORITE_OT_KALENDARA[otgovor]}`;
+      }
+      k.vest('dobre', 'Питахме календара. Това е неговият отговор, не нашият запис.');
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+      await prerisuvay();
     } finally {
       buton.disabled = false;
     }

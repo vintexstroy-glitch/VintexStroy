@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -1466,6 +1466,61 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и носи причината си',
       (await p.$$eval('[data-zadacha]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('сгрешена сума'), true);
+
+    razdel = '83 · Поканата в календара · ПО ИЗБОР, и границата се КАЗВА';
+    // Негови думи, 27.08 (И110): „по имейл ПО ИЗБОР и задължително в програмата…
+    // но на Стопанина му показва приел ли е на календара или не."
+    proveri('отметката „и по имейл" е на екрана',
+      await p.$$eval('#i-po-imeyl', (e) => e.length), 1);
+    proveri('и НЕ е сложена предварително',
+      await p.$eval('#i-po-imeyl', (e) => (e as HTMLInputElement).checked), false);
+    // ГРАНИЦАТА СТОИ ПРЕД ОЧИТЕ, разгъната — не зад „подробности".
+    const granitsata = await tekstNa(p, '#kakvo-napuska');
+    proveri('казва се какво НАПУСКА устройството',
+      granitsata.includes('името на делото'), true);
+    proveri('и какво НЕ напуска · поименно',
+      granitsata.includes('Мястото и Обектът') && granitsata.includes('наематели'), true);
+
+    // БЕЗ ОТМЕТКА · НУЛА МРЕЖА. Брои се самата ЗАЯВКА, не намерението: обещание
+    // „по избор", проверено по надписа на екрана, е обещание, проверено по себе си.
+    let kamKalendara = 0;
+    p.on('request', (z) => {
+      if (z.url().includes('/calendar/v3/')) kamKalendara += 1;
+    });
+    await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
+    proveri('изпращане БЕЗ отметка не пипа мрежата · нула заявки', kamKalendara, 0);
+
+    // СЪГЛАСИЕТО СПИРА · отметка без прочетено не праща покана.
+    const predPokanata = await broySabitiya(p);
+    await p.check('#i-po-imeyl');
+    await p.click('#forma-zadacha button[type=submit]');
+    // ЧАКА СЕ САМИЯТ ТЕКСТ · отказът е синхронен (нула мрежа), но екранът се
+    // прерисува и `waitForFunction` върху него хваща стар възел.
+    await p.waitForSelector('#greshka-zadacha:not(:empty)');
+    proveri('без прочетената граница поканата НЕ тръгва',
+      (await tekstNa(p, '#greshka-zadacha')).includes('прочетох какво напуска'), true);
+    proveri('и НИТО едно събитие не влиза', await broySabitiya(p), predPokanata);
+
+    // С ДВЕТЕ ОТМЕТКИ · записът е ПЪРВИ, поканата ВТОРА, и поправката ги свързва.
+    await p.check('#razbrah-kalendar');
+    await sSabitiya(p, 2, () => p.click('#forma-zadacha button[type=submit]'));
+    proveri('записът и поправката са ДВЕ събития, не едно',
+      (await broySabitiya(p)) - predPokanata, 2);
+    proveri('и задачата вече носи белега на поканата',
+      (await p.$$eval('[data-kalendar]', (e) => e.length)) >= 1, true);
+    proveri('и СЕГА мрежата е пипната · точно веднъж', kamKalendara, 1);
+
+    // ОТГОВОРЪТ НА GOOGLE стои ОТДЕЛНО от нашия · пита се, не се записва.
+    const predPitaneto = await broySabitiya(p);
+    await p.click('#pitay-kalendara');
+    await p.waitForFunction(() =>
+      [...document.querySelectorAll('[data-kalendar]')].some((e) =>
+        (e.textContent ?? '').includes('ПРИЕЛ')));
+    proveri('календарът казва своя отговор',
+      (await p.$$eval('[data-kalendar]', (e) => e.map((x) => x.textContent ?? '').join(' ')))
+        .includes('ПРИЕЛ е поканата'), true);
+    proveri('и питането НЕ пише в Журнала · фактът е на Google, не наш',
+      await broySabitiya(p), predPitaneto);
 
     razdel = '82 · Служителите · копчето на всяко дело';
     await naEkran(p, 'gant', '#d-forma-delo');

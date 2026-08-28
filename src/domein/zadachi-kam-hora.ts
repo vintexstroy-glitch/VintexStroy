@@ -63,8 +63,24 @@ export interface Izprashtane {
   /** HH:MM · празно значи цял ден */
   readonly chas: string;
   readonly doChas: string;
-  /** тръгнала ли е и покана по имейл (резен 14б) · тук само се ЗАПИСВА */
+  /**
+   * ТРЪГНАЛА ЛИ Е И ПОКАНА ПО ИМЕЙЛ (резен 14б) · негово „по имейл ПО ИЗБОР".
+   *
+   * Пише се `false` ПЪРВО и става `true` едва СЛЕД като Google е върнал id.
+   * Обратното — да се вярва на отметката преди повикването — би сложило в
+   * Журнала „изпратено по имейл" за покана, която никога не е тръгнала.
+   * Поправката е втори запис със същия `zadachaId` (Огледалото поправя, не
+   * ражда втора задача) — единственият механизъм, по който мрежов резултат
+   * може да влезе в append-only книга СЛЕД записа.
+   */
   readonly poImeyl: boolean;
+  /**
+   * ID-то на календарното събитие · празно, докато покана не е тръгнала.
+   *
+   * Без него поканата не може нито да се пита за отговор, нито да се отмени —
+   * а „на Стопанина му показва приел ли е" (негово) иска точно питане.
+   */
+  readonly kalendarId: string;
   /** какво пише в поканата · празно значи името на делото */
   readonly belezhka: string;
   readonly kogato: string;
@@ -113,6 +129,7 @@ export function napraviIzprashtane(
     chas?: string;
     doChas?: string;
     poImeyl?: boolean;
+    kalendarId?: string;
     belezhka?: string;
     kogato: string;
   },
@@ -145,6 +162,16 @@ export function napraviIzprashtane(
     throw new GreshkaZadacha('В един ден краят на часа не може да е преди началото.');
   }
 
+  // „ПО ИМЕЙЛ: ДА" БЕЗ ID Е ЛЪЖА · правило 7 иска сверка вход↔изход, а тук
+  // входът е натиснатата отметка, изходът е id-то от Google. Без изхода
+  // записът твърди нещо, което не е станало.
+  if ((n.poImeyl ?? false) && (n.kalendarId ?? '').trim() === '') {
+    throw new GreshkaZadacha(
+      'Задача не може да се запише като „изпратена по имейл", преди Google да е върнал ' +
+        'номер на събитието. Първо се записва без покана, после поканата я поправя.',
+    );
+  }
+
   return Object.freeze({
     zadachaId: n.zadachaId,
     deloId: n.deloId.trim(),
@@ -154,6 +181,7 @@ export function napraviIzprashtane(
     chas,
     doChas,
     poImeyl: n.poImeyl ?? false,
+    kalendarId: (n.kalendarId ?? '').trim(),
     belezhka: (n.belezhka ?? '').trim(),
     kogato: n.kogato,
   });

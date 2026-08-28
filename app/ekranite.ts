@@ -220,7 +220,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ime: 'Служители',
     podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
     ikona: 'ekran-sluzhiteli',
-    narisuvay: (r) => narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes),
+    narisuvay: (r) => narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes, r.izbor),
     zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {

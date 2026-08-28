@@ -31,68 +31,27 @@
 
 import type { Drayv, FaylVDrayva } from '../src/nositel/drayv.js';
 import { GreshkaDrayv } from '../src/nositel/drayv.js';
-import { osiguriSkriptaNaGoogle } from './gis-skript.js';
+import { pitayGoogle, vzemiZhetonZaObhvat } from './gis-skript.js';
 
 const OBHVAT = 'https://www.googleapis.com/auth/drive.file';
-const KLIENT_NOMER =
-  '41382209788-ggjrn13mf5upp068flm6kup5u9usg5lg.apps.googleusercontent.com';
 
 const SPISAK = 'https://www.googleapis.com/drive/v3/files';
 const KACHVANE = 'https://www.googleapis.com/upload/drive/v3/files';
 
-interface ZhetonOtGoogle {
-  readonly access_token?: string;
-  readonly error?: string;
-}
-
-interface KlientZaZheton {
-  requestAccessToken(): void;
-}
-
-interface GoogleNaProzoretsa {
-  accounts?: {
-    oauth2?: {
-      initTokenClient(n: {
-        client_id: string;
-        scope: string;
-        callback: (o: ZhetonOtGoogle) => void;
-        error_callback?: (o: { type?: string }) => void;
-      }): KlientZaZheton;
-    };
-  };
-}
-
-function google(): GoogleNaProzoretsa['accounts'] {
-  return (window as unknown as { google?: GoogleNaProzoretsa }).google?.accounts;
-}
-
 /**
- * ИСКА СЪГЛАСИЕ и връща жетон · всеки път наново.
+ * ИСКА СЪГЛАСИЕ за ДРАЙВА · механиката е обща, ДУМИТЕ са тукашни.
  *
- * Не се кешира между натискания нарочно. Жетонът на Google живее около час, а
- * изтекъл жетон дава 401 в средата на пренасяне — тоест половин работа и
- * съобщение, което човек не свързва с изтекло разрешение.
+ * Машината (тегленето на скрипта, клиентът за жетон, двата вида отказ) живее
+ * ЕДИН път в `gis-skript.ts`. Тук остава само онова, което е СОБСТВЕНО на
+ * пренасянето: обхватът и трите изречения. „Прозорецът се затвори" тук значи
+ * „нищо не е пренесено", а при Календара — „покана НЕ е тръгнала"; общо
+ * съобщение би било вярно и безполезно.
  */
 export async function vzemiZheton(): Promise<string> {
-  await osiguriSkriptaNaGoogle(() => Boolean(google()?.oauth2), (t) => new GreshkaDrayv(t));
-  return new Promise<string>((gotovo, greshka) => {
-    const klient = google()!.oauth2!.initTokenClient({
-      client_id: KLIENT_NOMER,
-      scope: OBHVAT,
-      callback: (o) => {
-        if (o.access_token) gotovo(o.access_token);
-        else greshka(new GreshkaDrayv(`Google отказа достъп до Драйва: ${o.error ?? 'без причина'}.`));
-      },
-      error_callback: (o) =>
-        greshka(
-          new GreshkaDrayv(
-            o.type === 'popup_closed'
-              ? 'Прозорецът се затвори без съгласие — нищо не е пренесено.'
-              : `Достъпът до Драйва не се получи (${o.type ?? 'непозната пречка'}).`,
-          ),
-        ),
-    });
-    klient.requestAccessToken();
+  return vzemiZhetonZaObhvat(OBHVAT, (t) => new GreshkaDrayv(t), {
+    otkazan: (prichina) => `Google отказа достъп до Драйва: ${prichina}.`,
+    zatvoren: 'Прозорецът се затвори без съгласие — нищо не е пренесено.',
+    nepoluchen: (vid) => `Достъпът до Драйва не се получи (${vid}).`,
   });
 }
 
@@ -142,21 +101,18 @@ export class DrayvNaGoogle implements Drayv {
    * и всеки води до различно действие.
    */
   async #pitay(adres: string, kak: RequestInit): Promise<Response> {
-    const otgovor = await fetch(adres, {
-      ...kak,
-      headers: { ...(kak.headers ?? {}), Authorization: `Bearer ${this.#zheton}` },
+    return pitayGoogle(this.#zheton, adres, kak, (sastoyanie) => {
+      if (sastoyanie === 401) {
+        return new GreshkaDrayv('Разрешението за Драйва изтече. Натисни пак — Google ще попита наново.');
+      }
+      if (sastoyanie === 403) {
+        return new GreshkaDrayv(
+          'Google отказа: или достъпът не е даден, или дневната бройка е изчерпана. ' +
+            'Журналът на устройството не е пипан.',
+        );
+      }
+      return new GreshkaDrayv(`Драйвът отговори с ${sastoyanie}. Нищо не е пренесено.`);
     });
-    if (otgovor.ok) return otgovor;
-    if (otgovor.status === 401) {
-      throw new GreshkaDrayv('Разрешението за Драйва изтече. Натисни пак — Google ще попита наново.');
-    }
-    if (otgovor.status === 403) {
-      throw new GreshkaDrayv(
-        'Google отказа: или достъпът не е даден, или дневната бройка е изчерпана. ' +
-          'Журналът на устройството не е пипан.',
-      );
-    }
-    throw new GreshkaDrayv(`Драйвът отговори с ${otgovor.status}. Нищо не е пренесено.`);
   }
 }
 

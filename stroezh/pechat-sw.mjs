@@ -60,7 +60,7 @@ const eShrift = (f) => f.endsWith('.woff2');
  * парче — него този списък не може да го извади. Значи обещанието днес държи
  * за Клод, и ще държи за Календара, ако и той е динамичен.
  */
-const SVARZVASHTI = ['klod'];
+const SVARZVASHTI = ['klod', 'kalendar-google'];
 const eSvarzvashto = (f) => {
   const ime = relative(DIST, f);
   return SVARZVASHTI.some((s) => new RegExp(`(^|/)assets/${s}-[^/]*\\.js$`).test(ime));
