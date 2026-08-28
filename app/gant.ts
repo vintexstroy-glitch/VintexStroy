@@ -373,7 +373,7 @@ export function narisuvayGant(
           // подредбата на човека се губи в мига, в който първото дело влезе.
           `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
             <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi)}</div>
-            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes)}</div>` : ''}
+            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
           </div>`
     }
 

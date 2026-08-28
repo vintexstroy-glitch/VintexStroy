@@ -1380,6 +1380,39 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('разрезите са толкова, колкото начина има движение',
       (await p.$$eval('.gant-red.sumi', (e) => e.length)) >= 1, true);
 
+    razdel = '81 · Разбивката · парите В ПОЛЕТО на диаграмата';
+    // Негов въпрос: „…а в самата диаграма да се РАЗПРЕДЕЛИ В ПОЛЕТО от нея и
+    // пресято спрямо такта."
+    const lentiVPoleto = await p.$$eval('.diagrama-parichna', (e) => e.length);
+    const redoveNaSumite = await p.$$eval('.gant-red.sumi', (e) => e.length);
+    console.log(`\n  ПАРИТЕ В ПОЛЕТО: ${lentiVPoleto} ленти в диаграмата\n`);
+    proveri('диаграмата носи парична лента за всеки разрез с движение',
+      lentiVPoleto > 0 && lentiVPoleto <= redoveNaSumite, true);
+    proveri('всяка лента носи ИМЕТО на разреза си',
+      await p.$eval('.diagrama-parichna .diagrama-ime',
+        (e) => (e.textContent ?? '').trim().length > 0), true);
+    proveri('приходът и разходът се различават по ПОСОКА, не само по цвят',
+      await p.evaluate(() => {
+        const g = document.querySelector('.diagrama-parichna');
+        if (!g) return false;
+        const nula = Number(g.querySelector('.diagrama-nula')?.getAttribute('y1') ?? 0);
+        const gore = [...g.querySelectorAll('.diagrama-pari.prihod')];
+        const dolu = [...g.querySelectorAll('.diagrama-pari.razhod')];
+        const nad = gore.every((x) => Number(x.getAttribute('y')) <= nula + 0.01);
+        const pod = dolu.every((x) => Number(x.getAttribute('y')) >= nula - 0.01);
+        return (gore.length > 0 || dolu.length > 0) && nad && pod;
+      }), true);
+    // ЕДИН МАЩАБ · инак дребният контрагент изглежда като едрия.
+    proveri('най-високото стълбче е ТОЧНО едно · мащабът е един за всички ленти',
+      await p.evaluate(() => {
+        const vsichki = [...document.querySelectorAll('.diagrama-pari')]
+          .map((x) => Math.round(Number(x.getAttribute('height')) * 100) / 100);
+        if (vsichki.length === 0) return false;
+        const nay = Math.max(...vsichki);
+        return vsichki.filter((h) => h === nay).length >= 1 && nay <= 10.01;
+      }), true);
+
+    razdel = '81 · Разбивката · „разбий по…" и сверката вход↔изход';
     // РАЗРЕЗЪТ Е ПОГЛЕД · нито едно събитие не влиза в Журнала (ADR-022).
     proveri('смяната на разреза НЕ пише в Журнала', await broySabitiya(p), sabitiyaPredi);
     // И преживява смяна на екран · инак изборът скача обратно при всяко влизане.

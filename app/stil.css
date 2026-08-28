@@ -1523,6 +1523,17 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .gant-kletka.dnes { background: var(--toplo); }
 .gant-red.prazen .gant-kletka.dnes { background: rgba(178, 94, 56, 0.35); }
 
+/* ПАРИТЕ В ПОЛЕТО НА ДИАГРАМАТА (резен 13г · И102 · „да се разпредели в полето
+   от нея и пресято спрямо такта").
+
+   Приходът и разходът НЕ вземат цветовете на светофара: там цветът значи СРОК
+   (ADR-032 §1 · състояние никога само с цвят). Тук се различават по ПОСОКА —
+   нагоре и надолу от нулевата линия — а цветът е само подсилване. */
+.diagrama-nula { stroke: var(--liniya); stroke-width: 1; }
+.diagrama-pari.prihod { fill: var(--srok-normalno); }
+.diagrama-pari.razhod { fill: var(--aktsent); }
+.diagrama-parichna .diagrama-ime { fill: var(--mastilo2); }
+
 /* ЛЕНТАТА · „ЦВЕТОВЕТЕ СПОРЕД СРОКА КАТО ПЛЪТНА ЛЕНТА" (р59·[41], главните са
    негови). Не се влачи — негова забрана (р83·[35]). */
 .gant-lenta {

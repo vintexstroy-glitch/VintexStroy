@@ -48,7 +48,7 @@ import {
   svetofar,
   type Delo,
 } from '../src/domein/dela.js';
-import type { Reshetka } from '../src/domein/gant.js';
+import type { RedNaRazrez, Reshetka } from '../src/domein/gant.js';
 import { stepenNa } from '../src/domein/dela.js';
 import { ekraniraj } from './obshto.js';
 
@@ -58,11 +58,26 @@ const REDLO = 20;
 const GLAVA = 34;
 const IMENA = 210;
 const OTSTAP = 14;
+/** Височина на една лента с пари · приходът нагоре, разходът надолу от средата. */
+const LENTA_PARI = 26;
+/** Колко от полукривата е за стълбче · останалото е въздух между лентите. */
+const NAY_VISOKO = 10;
 
 export function narisuvayDiagrama(
   dela: readonly Delo[],
   r: Reshetka,
   dnes: string,
+  /**
+   * ПАРИТЕ В ПОЛЕТО НА ДИАГРАМАТА (резен 13г · И102).
+   *
+   * Негов въпрос: „…а в самата диаграма **да се разпредели в полето от нея** и
+   * пресято спрямо такта."
+   *
+   * Идват ГОТОВИ отвън — същите редове, които рисува и таблицата. Втора сметка
+   * тук би дала два отговора за едни и същи пари: таблицата казва едно,
+   * диаграмата друго, и никой не знае кое е вярното.
+   */
+  sumi: readonly RedNaRazrez[] = [],
 ): string {
   const parva = r.koloni[0]!;
   const posledna = r.koloni[r.koloni.length - 1]!;
@@ -73,7 +88,9 @@ export function narisuvayDiagrama(
   // Ширината расте с броя колони, за да не се смачка при такт „месец".
   const shirinaVreme = Math.max(560, r.koloni.length * 26);
   const shirina = IMENA + shirinaVreme;
-  const visochina = GLAVA + dela.reduce((s, d) => s + (d.nadDelo ? REDLO : RED), 0) + 28;
+  const visokoNaDelata = dela.reduce((s, d) => s + (d.nadDelo ? REDLO : RED), 0);
+  const parichniLenti = sumi.filter((red) => red.kletki.some((k) => k.prihod_st || k.razhod_st));
+  const visochina = GLAVA + visokoNaDelata + parichniLenti.length * LENTA_PARI + 28;
 
   const x = (data: string): number =>
     IMENA + ((Date.parse(`${data}T00:00:00Z`) - nachalo) / obhvat) * shirinaVreme;
@@ -111,12 +128,110 @@ export function narisuvayDiagrama(
                 x2="${dnesX.toFixed(1)}" y2="${visochina - 14}"></line>
           <text class="diagrama-dnesnadpis" x="${(dnesX + 4).toFixed(1)}" y="16">днес</text>
           ${redove}
+          ${lentiSPari(parichniLenti, r, x, GLAVA + visokoNaDelata)}
         </svg>
       </div>
       <p class="drebno">Днешната линия реже лентите — щрихованото след нея е закъснялото.
       Подделото е по-тънко и отместено: гнездото се вижда, без да се натиска.
-      Лентите не се влачат (негова забрана) — срокът се мени от полето за срок.</p>
+      Лентите не се влачат (негова забрана) — срокът се мени от полето за срок.${
+        parichniLenti.length
+          ? ` Долу парите са разпределени в полето по колоните на такта${
+              parichniLenti.length > 1 ? `, по един ред на разрез (${parichniLenti.length})` : ''
+            } — приходът нагоре, разходът надолу, с ЕДИН мащаб за всички.`
+          : ''
+      }</p>
     </section>`;
+}
+
+/**
+ * ПАРИТЕ В ПОЛЕТО · по един ред на разрез, разпределени по колоните на такта.
+ *
+ * Негов въпрос, 27.08 (И102): „…а в самата диаграма да се РАЗПРЕДЕЛИ В ПОЛЕТО
+ * от нея и ПРЕСЯТО СПРЯМО ТАКТА."
+ *
+ * ═══ ЕДИН МАЩАБ ЗА ВСИЧКИ ЛЕНТИ ═══
+ *
+ * Най-важното решение тук, и то не е графично. Ако всяка лента се мащабира по
+ * СВОЯ връх, контрагент с двеста евро изглежда точно колкото контрагент с
+ * двайсет хиляди — двете стълбчета опират тавана си. Мащабът е ЕДИН, взет от
+ * най-голямото число в целия блок, и затова лентите са сравними с очи. Точно за
+ * това служи разбивката.
+ *
+ * Числата идват ГОТОВИ от `obobshteniRedove` — същите, които рисува таблицата.
+ * Втора сметка тук би дала два отговора за едни и същи пари.
+ *
+ * Нулата не се рисува. Стълбче с нулева височина е линия, а линия на нула
+ * изглежда като „малко", не като „нищо".
+ */
+function lentiSPari(
+  redove: readonly RedNaRazrez[],
+  r: Reshetka,
+  x: (data: string) => number,
+  ot: number,
+): string {
+  if (redove.length === 0) return '';
+  let nayGolyamo = 0;
+  for (const red of redove) {
+    for (const k of red.kletki) {
+      if (k.prihod_st > nayGolyamo) nayGolyamo = k.prihod_st;
+      if (k.razhod_st > nayGolyamo) nayGolyamo = k.razhod_st;
+    }
+  }
+  if (nayGolyamo === 0) return '';
+
+  return redove
+    .map((red, i) => {
+      const gore = ot + i * LENTA_PARI;
+      const sredata = gore + LENTA_PARI / 2;
+      const stalbcheta = red.kletki
+        .map((k, j) => {
+          // Клетка с обхват нула дели деня си с предишната (часовете на такт
+          // „ден"): сумата вече е нарисувана над нея.
+          if (k.obhvat === 0) return '';
+          const kol = r.koloni[j];
+          if (!kol) return '';
+          const posledna = r.koloni[j + k.obhvat - 1] ?? kol;
+          const levo = x(kol.ot);
+          const dyasno = x(denSled(posledna.do));
+          const shirina = Math.max(1, dyasno - levo - 1);
+          const vis = (st: number): number => (st / nayGolyamo) * NAY_VISOKO;
+          const prihod =
+            k.prihod_st > 0
+              ? `<rect class="diagrama-pari prihod" x="${levo.toFixed(1)}" y="${(
+                  sredata - vis(k.prihod_st)
+                ).toFixed(1)}" width="${shirina.toFixed(1)}" height="${vis(k.prihod_st).toFixed(1)}"></rect>`
+              : '';
+          const razhod =
+            k.razhod_st > 0
+              ? `<rect class="diagrama-pari razhod" x="${levo.toFixed(1)}" y="${sredata.toFixed(
+                  1,
+                )}" width="${shirina.toFixed(1)}" height="${vis(k.razhod_st).toFixed(1)}"></rect>`
+              : '';
+          return prihod + razhod;
+        })
+        .join('');
+      return `<g class="diagrama-parichna" data-razrez="${ekraniraj(red.klyuch)}">
+        <line class="diagrama-nula" x1="${IMENA}" y1="${sredata.toFixed(1)}" x2="${(
+          IMENA + shirinataNaVremeto(r, x)
+        ).toFixed(1)}" y2="${sredata.toFixed(1)}"></line>
+        <text class="diagrama-ime" x="8" y="${(sredata + 4).toFixed(1)}">${ekraniraj(
+          skasi(red.nadpis === '' ? 'Приход · Разход' : red.nadpis, 26),
+        )}</text>
+        ${stalbcheta}
+      </g>`;
+    })
+    .join('');
+}
+
+/** Денят СЛЕД подадения · дясната граница на колоната е началото на следващия. */
+function denSled(data: string): string {
+  return new Date(Date.parse(`${data}T00:00:00Z`) + 86_400_000).toISOString().slice(0, 10);
+}
+
+/** Докъде стига времевата ос · последната колона плюс нейния ден. */
+function shirinataNaVremeto(r: Reshetka, x: (data: string) => number): number {
+  const posledna = r.koloni[r.koloni.length - 1];
+  return posledna ? x(denSled(posledna.do)) - IMENA : 0;
 }
 
 /**
