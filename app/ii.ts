@@ -75,7 +75,13 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
+import {
+  klyuchNaPravo,
+  mozheDaRedaktiraKolona,
+  pravoNaKolona,
+  vidNaKolona,
+} from '../src/domein/kolonno.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './ekranite.js';
 
@@ -361,8 +367,18 @@ function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
     klyuch: m.klyuch,
     glavi: m.glavi,
     zatvorena: (kolona: number) => vidNaKolona(m, kolona) === 'zatvorena',
+    // ДВАТА ВЪПРОСА СА РАЗЛИЧНИ, откакто правото има ТРИ стойности: „вижда ли
+    // я" е всичко освен скритото, а „пипа ли я" минава и през ролята, и през
+    // вида на колоната. Дотук тук стоеше `=== 'vizhda'` и то беше вярно, докато
+    // стойностите бяха две — днес щеше да брои свалената до „вижда" за СКРИТА.
     vizhdaYa: (kolona: number) =>
-      pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona) === 'vizhda',
+      pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona) !== 'skrito',
+    pipaYa: (kolona: number) =>
+      mozheDaRedaktiraKolona({
+        rolya: rolyataNa(a.otgovornik, o),
+        vid: vidNaKolona(m, kolona),
+        pravo: pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona),
+      }),
   }));
   const karta = kartaNaDostapa(a, { modeli });
   const broi = broeviNaKartata(karta);

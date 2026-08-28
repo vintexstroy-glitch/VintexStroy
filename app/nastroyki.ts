@@ -82,9 +82,14 @@ import {
 import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
 import { klyuchNaPravo,
   IMENA_NA_VIDOVETE,
+  IMENA_NA_PRAVATA,
   napraviPrava,
+  OBYASNENIYA_NA_PRAVATA,
+  PRAVA_NA_KOLONA,
   pravoNaKolona,
-  sPrevklyuchenaVidimost,
+  sPromenenoPravo,
+  zashtoNeDeystva,
+  type PravoNaKolona,
   vidNaKolona,
   type PravaZaModel,
 } from '../src/domein/kolonno.js';
@@ -637,14 +642,18 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
  * ПРАВАТА ПО КОЛОНА · точно неговата картина, без нов екран.
  *
  *   „Когато през настройки от падащо меню избереш служител, в всеки хедър се
- *    показва СКРИТ РЕД НАД ХЕДЪРА с отметки… само криене от служителя на колони
- *    по избор." (12.08)
+ *    показва СКРИТ РЕД НАД ХЕДЪРА с отметки… но по-правилното е да е с ПАДАЩО
+ *    МЕНЮ от фиксирани — изборът, редактира, вижда, скрито." (12.08)
  *
- * И последната му дума какво прави правото: „За всеки служител с дадена му вече
- * роля и достъп, може с тази функция НЕ ДА РЕДАКТИРА, А ДА СКРИВА САМО."
+ * И последната му дума (И105 · 27.08): „нека е с падащо меню с дума на избора
+ * и да са 3 варианта."
  *
- * Затова тук няма отметка „редактира": тя се СМЯТА от ролята и от вида на
- * колоната (`mozheDaRedaktiraKolona`), а не се раздава.
+ * Затова тук вече няма отметка, а ПАДАЩО МЕНЮ с трите думи. То не раздава
+ * редакция — то СТЕСНЯВА: „редактира" значи „не съм стеснил нищо", а кой може
+ * да пише, решават ролята и видът на колоната (`deystvashtoPravo`). Така
+ * последната му дума и И57 („не да редактира, а да скрива само") стоят заедно.
+ *
+ * Изборът, който не действа, се КАЗВА, не се преглъща (правило 15).
  */
 function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: Izbor): string {
   const hora = podredeni(o.sluzhiteli.values());
@@ -654,7 +663,7 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: I
     <section data-sektsiya="pravata">
       <div class="dyalglava">
         <h2>Кой какво вижда</h2>
-        <span>колонно право · скрива, не редактира</span>
+        <span>колонно право · три думи, и всяка само СТЕСНЯВА</span>
       </div>
       ${
         hora.length === 0
@@ -711,6 +720,20 @@ function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: I
     </section>`;
 }
 
+/**
+ * КАКВО СЕ КАЗВА СЛЕД ИЗБОРА · по дума, не по номер.
+ *
+ * Отделна функция, не три реда в слушателя: тя носи обещанието, което човек
+ * чува след натискане — че скритата колона ПАК СЕ СМЯТА. Пази я проход §20 в
+ * жив браузър, дума по дума; затова НЕ се изнася — изнесеното без викащ отвън
+ * е точно онова, което обходът за чистота брои.
+ */
+function dumiZaIzbora(novo: PravoNaKolona, imeyl: string): string {
+  if (novo === 'skrito') return `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`;
+  if (novo === 'vizhda') return `${imeyl} ще я ГЛЕДА, но няма да я пипа.`;
+  return `Колоната вече не е стеснена за ${imeyl} — решават ролята и видът ѝ.`;
+}
+
 function optsiyaZaChovek(h: Sluzhitel, izbran: boolean): string {
   return `<option value="${ekraniraj(h.imeyl)}"${izbran ? ' selected' : ''}>${ekraniraj(
     h.ime,
@@ -754,15 +777,25 @@ function kletkaNaPravo(
   kolona: number,
 ): string {
   const vid = vidNaKolona(m, kolona);
-  const skrita = pravoNaKolona(prava, kolona) === 'skrito';
+  const pravo = pravoNaKolona(prava, kolona);
+  const neDeystva = zashtoNeDeystva({ rolya: chovek.rolya, vid, pravo });
   return `
-    <label class="pravo${skrita ? ' skrita' : ''}">
-      <input type="checkbox"${skrita ? '' : ' checked'}
+    <label class="pravo pravo-${pravo}">
+      <span>${ekraniraj(ime || `колона ${kolona + 1}`)}</span>
+      <select translate="no"
         data-pravo="${ekraniraj(chovek.imeyl)}"
         data-hedar="${ekraniraj(m.klyuch)}"
         data-kolona="${kolona}">
-      <span>${ekraniraj(ime || `колона ${kolona + 1}`)}</span>
-      <span class="drebno">${IMENA_NA_VIDOVETE[vid]}</span>
+        ${PRAVA_NA_KOLONA.map(
+          (v) =>
+            `<option value="${v}"${v === pravo ? ' selected' : ''}>${
+              IMENA_NA_PRAVATA[v]
+            } · ${OBYASNENIYA_NA_PRAVATA[v]}</option>`,
+        ).join('')}
+      </select>
+      <span class="drebno">${IMENA_NA_VIDOVETE[vid]}${
+        neDeystva ? ` · <b data-ne-deystva>${ekraniraj(neDeystva)}</b>` : ''
+      }</span>
     </label>`;
 }
 
@@ -1215,28 +1248,20 @@ export function zakachiNastroyki(
       await prerisuvay();
     });
 
-  for (const otmetka of koren.querySelectorAll<HTMLInputElement>('[data-pravo]')) {
-    otmetka.addEventListener('change', async () => {
-      const imeyl = otmetka.dataset['pravo']!;
-      const model = otmetka.dataset['hedar']!;
-      const kolona = Number(otmetka.dataset['kolona']);
-      otmetka.disabled = true;
+  for (const menyu of koren.querySelectorAll<HTMLSelectElement>('select[data-pravo]')) {
+    menyu.addEventListener('change', async () => {
+      const imeyl = menyu.dataset['pravo']!;
+      const model = menyu.dataset['hedar']!;
+      const kolona = Number(menyu.dataset['kolona']);
+      const novo = menyu.value as PravoNaKolona;
+      menyu.disabled = true;
       try {
         const og = await k.deystviya.ogledalo();
         const sega = og.prava.get(klyuchNaPravo(imeyl, model)) ?? napraviPrava({ imeyl, model });
-        const prava = napraviPrava({
-          imeyl,
-          model,
-          skriti: sPrevklyuchenaVidimost(sega, kolona),
-        });
-        // Ключът носи ДЕЙСТВИЕТО: скрий → покажи → скрий не бива да се загуби.
+        const prava = sPromenenoPravo(sega, kolona, novo);
+        // Ключът носи ДЕЙСТВИЕТО: скрий → върни → скрий не бива да се загуби.
         await k.deystviya.zapishiPravo(prava, { opId: `pravo:${crypto.randomUUID()}` });
-        k.vest(
-          'dobre',
-          prava.skriti.includes(kolona)
-            ? `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`
-            : `Колоната е върната за ${imeyl}.`,
-        );
+        k.vest('dobre', dumiZaIzbora(novo, imeyl));
       } catch (err) {
         greshka = dumiZaGreshka(err);
       }

@@ -547,6 +547,8 @@ export interface DostapZaKartata {
     readonly zatvorena: (kolona: number) => boolean;
     /** true, ако ОТГОВОРНИКЪТ вижда колоната */
     readonly vizhdaYa: (kolona: number) => boolean;
+    /** true, ако ОТГОВОРНИКЪТ може да я редактира — не само да я гледа */
+    readonly pipaYa: (kolona: number) => boolean;
   }[];
 }
 
@@ -556,17 +558,25 @@ export function kartaNaDostapa(a: Agent, dostap: DostapZaKartata): readonly RedV
     m.glavi.forEach((ime, kolona) => {
       const vizhda = m.vizhdaYa(kolona);
       const zatvorena = m.zatvorena(kolona);
+      const pipa = m.pipaYa(kolona);
       redove.push({
         tablitsa: m.klyuch,
         kolona: ime,
         vizhda,
         redaktira: false,
-        predlaga: vizhda && !zatvorena,
+        // ТРЕТИЯТ множител, нов с трите стойности на правото: агентът не
+        // ПРЕДЛАГА там, където отговорникът му може само да гледа. Инак
+        // предложението би било покана човекът да наруши собственото си
+        // стеснение — а „агентът не вижда повече от отговорника си" важи и
+        // за писането, не само за гледането.
+        predlaga: vizhda && !zatvorena && pipa,
         zashto: !vizhda
           ? `скрита за ${a.otgovornik} — агентът не вижда повече от отговорника си`
           : zatvorena
             ? 'затворена колона — сметка не се предлага, тя се смята'
-            : 'вижда я и може да предложи промяна; записва човекът',
+            : !pipa
+              ? `${a.otgovornik} само я ГЛЕДА — агентът не предлага там, където той не пише`
+              : 'вижда я и може да предложи промяна; записва човекът',
       });
     });
   }

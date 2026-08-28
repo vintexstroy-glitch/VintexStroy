@@ -272,13 +272,14 @@ describe('непроменимият протокол (И94 т.6)', () => {
 });
 
 describe('картата · къде вижда, къде редактира (И94 т.6)', () => {
-  const dostap = (skriti: readonly number[] = []) => ({
+  const dostap = (skriti: readonly number[] = [], samoGleda: readonly number[] = []) => ({
     modeli: [
       {
         klyuch: 'Банка',
         glavi: ['Дата', 'Сума', 'Салдо'],
         zatvorena: (k: number) => k === 2,
         vizhdaYa: (k: number) => !skriti.includes(k),
+        pipaYa: (k: number) => !skriti.includes(k) && !samoGleda.includes(k) && k !== 2,
       },
     ],
   });
@@ -304,6 +305,18 @@ describe('картата · къде вижда, къде редактира (И
     expect(suma.predlaga).toBe(false);
     expect(suma.zashto).toContain(ACTOR);
     expect(broeviNaKartata(karta)).toEqual({ vsichki: 3, vizhda: 2, predlaga: 1, redaktira: 0 });
+  });
+
+  it('свалената до „вижда" СЕ ВИЖДА, но НЕ се предлага · третата стойност', () => {
+    // Новото с трите стойности (ADR-065): дотук имаше само две състояния —
+    // скрита или предлагана. Средното казва „гледам, не пипам", и агентът
+    // не предлага там, където отговорникът му няма право да пише.
+    const karta = kartaNaDostapa(schetovoditelyat(), dostap([], [1]));
+    const suma = karta.find((r) => r.kolona === 'Сума')!;
+    expect(suma.vizhda).toBe(true);
+    expect(suma.predlaga).toBe(false);
+    expect(suma.zashto).toContain('само я ГЛЕДА');
+    expect(broeviNaKartata(karta)).toEqual({ vsichki: 3, vizhda: 3, predlaga: 1, redaktira: 0 });
   });
 
   it('вторият имейл като отговорник · пробата, която той поиска', () => {

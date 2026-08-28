@@ -97,28 +97,62 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     const kletki = await p.$$eval('.pravo', (x) => x.map((k) => k.textContent.replace(/\s+/g, ' ').trim()));
     proveri('скритият ред показва колона по колона', kletki.length, 6);
     proveri('и казва вида на всяка', kletki[0]?.includes('променяща се'), true);
-    proveri('нищо не е скрито в началото', (await p.$$('.pravo.skrita')).length, 0);
+
+    // ══ ТРИТЕ СТОЙНОСТИ · И105 · „падащо меню с дума на избора, 3 варианта" ══
+    const dumite = await p.$$eval('.pravo select option', (o) =>
+      o.slice(0, 3).map((x) => ((x.textContent ?? '').split('\u00b7')[0] ?? '').trim()));
+    proveri('всяка колона има ПАДАЩО МЕНЮ с ТРИ думи', dumite, ['редактира', 'вижда', 'скрито']);
+    proveri('нищо не е стеснено в началото', (await p.$$('.pravo.pravo-skrito')).length, 0);
+    proveri('и по подразбиране стои НАЙ-ШИРОКАТА',
+      await p.$eval('.pravo select', (e) => (e as HTMLSelectElement).value), 'redaktira');
 
     // Числото в Сметки ПРЕДИ скриването — то не бива да мръдне.
     await naEkran(p, 'smetki', '#forma-period');
     const razhodPredi = await plochka(p, 'Разход');
 
-    // Скрий колоната „Сума по документа" за Бамстера
+    // ── СРЕДНАТА дума · новата · „гледа я, но не я пипа" ──────────────────
     await naEkran(p, 'nastroyki', '.pravo');
-    await sSabitie(p, () => p.click('.pravo input'));
-    await p.waitForSelector('.pravo.skrita');
-    proveri('колоната е скрита за него', (await p.$$('.pravo.skrita')).length, 1);
+    await sSabitie(p, () => p.selectOption('.pravo select', 'vizhda'));
+    await p.waitForSelector('.pravo.pravo-vizhda');
+    proveri('свалената до „вижда" СЕ ВИЖДА · не пада от списъка',
+      (await p.$$('.pravo.pravo-skrito')).length, 0);
+    proveri('и се казва какво значи',
+      (await tekstNa(p, '.vest')).includes('ще я ГЛЕДА, но няма да я пипа'), true);
+
+    // ── СКРИЙ колоната „Сума по документа" за Бамстера ────────────────────
+    await sSabitie(p, () => p.selectOption('.pravo select', 'skrito'));
+    await p.waitForSelector('.pravo.pravo-skrito');
+    proveri('колоната е скрита за него', (await p.$$('.pravo.pravo-skrito')).length, 1);
     proveri('и се казва на глас, че сборът остава', (await tekstNa(p, '.vest')).includes('Сборът ѝ остава'), true);
 
     await naEkran(p, 'smetki', '#forma-period');
     proveri('СКРИТОТО ПАК СЕ СМЯТА · числото не е мръднало', await plochka(p, 'Разход'), razhodPredi);
 
-    // Върни я — скрий → покажи → скрий не се губи (правило 20)
+    // Върни я — скрий → върни → скрий не се губи (правило 20)
     await naEkran(p, 'nastroyki', '.pravo');
-    await sSabitie(p, () => p.click('.pravo input'));
-    proveri('връща се със същата отметка', (await p.$$('.pravo.skrita')).length, 0);
-    await sSabitie(p, () => p.click('.pravo input'));
-    proveri('и се скрива пак — ключът носи ДЕЙСТВИЕТО', (await p.$$('.pravo.skrita')).length, 1);
+    await sSabitie(p, () => p.selectOption('.pravo select', 'redaktira'));
+    proveri('връща се с най-широката', (await p.$$('.pravo.pravo-skrito')).length, 0);
+    await sSabitie(p, () => p.selectOption('.pravo select', 'skrito'));
+    proveri('и се скрива пак — ключът носи ДЕЙСТВИЕТО', (await p.$$('.pravo.pravo-skrito')).length, 1);
+
+    // ── ИЗБОРЪТ САМО СТЕСНЯВА · и когато не действа, се КАЗВА (правило 15) ──
+    // Смяна на ролята на СЪЩИЯ имейл: „наблюдава" вече стеснява до „вижда",
+    // значи изборът „редактира" стои записан, но не действа — и екранът го
+    // казва, вместо да го преглътне. Това е и доказателството, че този екран
+    // НЕ е втора врата към достъпа (правило 14 · И57).
+    await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
+    await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
+    await p.selectOption('#forma-sluzhitel [name=rolya]', 'nablyudatel');
+    await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
+    await p.waitForSelector('.pravo [data-ne-deystva]');
+    proveri('на наблюдателя „редактира" НЕ действа · и се казва защо',
+      (await p.$$eval('.pravo [data-ne-deystva]', (e) =>
+        e.map((x) => x.textContent ?? '').join(' '))).includes('наблюдава'), true);
+    // Обратно на „редактира" — останалата част от прохода го иска такъв.
+    await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
+    await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
+    await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
+    await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
 
 
     // ══ 21 · Редакторът на хедъри · трите вида номенклатура ══════════════
@@ -215,6 +249,25 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await p.waitForSelector('.red.opis');
     proveri('Описът казва формулата на колоната',
       (await redove(p, '.red.opis')).some((r) => r[3]?.includes('формула: разлика(')), true);
+
+    // ══ 20б · ЗАТВОРЕНАТА КОЛОНА И ПРАВОТО · тук, защото ТУК я има ══════════
+    //
+    // §20 не можеше да я провери: тогава хедърът нямаше нито една затворена
+    // колона. Формулната, родена преди малко, Е затворена — тя е СМЕТКА. Значи
+    // третата дума не действа за никого върху нея, дори за собственика, и
+    // екранът го КАЗВА (правило 15 · ADR-065).
+    razdel = '20б · затворената колона и правото';
+    // ИЗБОРЪТ НА СЛУЖИТЕЛ Е ПОГЛЕД, не факт: живее в паметта на екрана и
+    // презареждането го изчиства (`udobstvoto.blok1` презарежда преди този
+    // блок). Затова тук се избира наново — точно каквото прави и човек.
+    await naEkran(p, 'nastroyki', '#izbor-sluzhitel');
+    await p.selectOption('#izbor-sluzhitel', 'ivaylo85petkov@gmail.com');
+    await p.waitForSelector('.pravo');
+    proveri('и до затворената пише ЗАЩО „редактира" не действа',
+      (await p.$$eval('.pravo [data-ne-deystva]', (e) =>
+        e.map((x) => x.textContent ?? '').join(' '))).includes('СМЕТКА'), true);
+    proveri('а самата колона се ВИЖДА · затворена не значи скрита',
+      (await p.$$('.pravo.pravo-skrito')).length, 1);
 
     // ══ 39б · границата на книгата · казана, не премълчана ═══════════════════
 }

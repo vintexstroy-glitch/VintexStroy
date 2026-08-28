@@ -25,7 +25,7 @@ import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
-import { klyuchNaPravo } from '../domein/kolonno.js';
+import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
@@ -787,8 +787,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       }
 
       case 'ПравоЗаписано': {
-        const p = s.payload as unknown as PravaZaModel;
-        prava.set(klyuchNaPravo(p.imeyl, p.model), p);
+        // ПРЕЗ ЧЕТЕЦА, не направо · събитията отпреди третата стойност нямат
+        // `samoVizhdat`, и първото `.includes` върху `undefined` би съборило
+        // цялото Огледало. Снизходителността е при ЧЕТЕНЕТО (правило 1).
+        const p = s.payload as unknown as Parameters<typeof pravaOtZhurnala>[0];
+        prava.set(klyuchNaPravo(p.imeyl, p.model), pravaOtZhurnala(p));
         break;
       }
 

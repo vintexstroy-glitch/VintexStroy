@@ -1344,16 +1344,22 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: var(--toplo); border: 1px dashed var(--liniya);
 }
 .pravo {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 9px; border-radius: 4px; cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 3px 9px;
+  padding: 6px 9px; border-radius: 4px;
   background: var(--hartiya); border: 1px solid var(--liniya); font-size: 0.893rem;
 }
-.pravo input { width: 15px; height: 15px; accent-color: var(--aktsent); flex-shrink: 0; }
-.pravo .drebno { font-size: 0.786rem; color: var(--mastilo2); }
-/* Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
+.pravo select { font: inherit; max-width: 230px; }
+/* Едното изречение под двете · то носи и вида, и „защо не действа". */
+.pravo .drebno { grid-column: 1 / -1; font-size: 0.786rem; color: var(--mastilo2); }
+.pravo .drebno b { color: var(--aktsent); font-weight: 600; }
+/* ТРИТЕ СЪСТОЯНИЯ СЕ РАЗЛИЧАВАТ И БЕЗ ЧЕТЕНЕ · но НИКОГА само с цвят
+   (ADR-032 §1): думата стои в самото меню, това тук е втори белег.
+   Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
    да се вижда, вместо да се помни. */
-.pravo.skrita { opacity: 0.5; }
-.pravo.skrita > span:first-of-type { text-decoration: line-through; }
+.pravo.pravo-skrito { opacity: 0.55; }
+.pravo.pravo-skrito > span:first-of-type { text-decoration: line-through; }
+.pravo.pravo-vizhda { border-left: 3px solid var(--toplo); }
 
 /* ── ОТЧЕТИТЕ · всяко число с формулата си ──────────────────────────────────
    Негова поръчка (И90): „полета в Секция Отчети… които да покзват тези
