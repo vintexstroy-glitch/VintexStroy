@@ -915,6 +915,37 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   line-height: 1.55;
 }
 .prechki li + li { margin-top: 5px; }
+
+/* КАКВО НАПУСКА УСТРОЙСТВОТО (резен 17в · ADR-068 · ADR-030 §4).
+   Разгънатите подробности са ТРИ и всяка носи бройка в заглавието си: човек,
+   който не отвори нито една, пак вижда КОЛКО имена ще носи файлът. */
+.opis-imena {
+  margin: 8px 0 0;
+  padding-left: 26px;
+  list-style: disc;
+  font-size: 0.964rem;
+  line-height: 1.55;
+  columns: 260px 3;
+}
+.opis-imena li.trevoga { color: var(--aktsent); font-weight: 600; }
+[data-sektsiya=nap-napuska] details {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--liniya);
+  border-radius: 8px;
+  background: var(--panel);
+}
+[data-sektsiya=nap-napuska] summary {
+  cursor: pointer;
+  font-size: 0.964rem;
+  color: var(--mastilo2);
+}
+[data-sektsiya=nap-napuska] details ul { margin: 8px 0 0; padding-left: 26px; line-height: 1.55; }
+/* Достъпът за счетоводителя · две колони, втората носи цяло изречение. */
+[data-sektsiya=nap-dostap] .glava.opis, [data-tablitsa=nap-dostap] .red.opis {
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-width: 560px;
+}
 .glava.kontragent, .red.kontragent {
   grid-template-columns: minmax(0, 440px) 120px 130px 140px minmax(0, 280px);
   min-width: 820px;

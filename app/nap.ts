@@ -42,6 +42,15 @@ import { butonSIkona } from './ikoni.js';
 import { safT } from '../src/iznos/saf-t.js';
 import { SHEMA } from '../src/iznos/saf-t-shema.js';
 import { oboroti, SMETKOPLAN } from '../src/domein/glavna-kniga.js';
+import {
+  bezEIK,
+  edinRedZaImeto,
+  IZVAN_PROGRAMATA,
+  KAKVO_NE_VLIZA,
+  KAKVO_VLIZA_V_FAYLA,
+  preborenoPoVid,
+  type ImeVFayla,
+} from '../src/domein/nap-dostap.js';
 import { pishi } from '../src/yadro/pari.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -138,6 +147,14 @@ export function preborenoDokade(): Readonly<Record<Dokade, number>> {
   });
 }
 
+/**
+ * Каквото ЕКРАНЪТ чете от одитния файл · не целият резултат.
+ *
+ * Стеснено нарочно: тесен договор казва какво точно се ползва и спира тихото
+ * разрастване „щом го има в резултата, да го покажем".
+ */
+type RezultatZaEkrana = ReturnType<typeof safT>;
+
 /** Кой месец се гледа · поглед, значи паметта на екрана (ADR-022). */
 function mesetsat(dnes: string): string {
   return chetiEkranno('nap.mesets', dnes.slice(0, 7));
@@ -154,12 +171,12 @@ function mesetsat(dnes: string): string {
  * акта. Пречката е ИЗРЕЧЕНИЕ, дошло готово от домейна — екранът само го изрежда
  * и не превежда флаг в дума.
  *
- * ФАЙЛЪТ СЕ СГЛОБЯВА ДВА ПЪТИ, и това е нарочно: веднъж за числата горе (при
- * всяко рисуване) и втори път при натискане на бутона. XML-ът е скъп низ, а
- * екранът иска само броевете.
+ * ФАЙЛЪТ СЕ СГЛОБЯВА ВЕДНЪЖ ЗА РИСУВАНЕТО и втори път при натискане на бутона.
+ * Първото е за числата горе и за описа „какво напуска" — те четат ЕДИН и същ
+ * резултат, за да не могат да се разминат (правило 17). Второто е нарочно: XML-ът
+ * е скъп низ, а екранът иска само броевете.
  */
-function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
-  const r = safT(o, mesets, new Date().toISOString());
+function blokNaOditniyaFayl(r: RezultatZaEkrana, mesets: string): string {
   const ob = oboroti(r.kniga);
   return `
     <section class="karta" data-sektsiya="saf-t">
@@ -197,10 +214,12 @@ function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
           : `<ul class="prechki">${r.prechki.map((p) => `<li>${ekraniraj(p)}</li>`).join('')}</ul>`
       }
 
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="nap-kniga">
         <div class="glava saft">
-          <span>Сметка</span><span>Национален код</span>
-          <span class="suma">Дебит</span><span class="suma">Кредит</span>
+          <span data-kolona="smetka" data-ime="Сметка">Сметка</span>
+          <span data-kolona="nra" data-ime="Национален код">Национален код</span>
+          <span class="suma" data-kolona="debit" data-ime="Дебит">Дебит</span>
+          <span class="suma" data-kolona="kredit" data-ime="Кредит">Кредит</span>
         </div>
         ${
           ob.length === 0
@@ -237,6 +256,143 @@ function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
         Той НЕ е проверен срещу самата XSD-схема на НАП: истинската проверка е ТЕСТОВОТО подаване
         през портала им. ${ekraniraj(ZASHTO_I_NULATA)}</p>
       </div>
+    </section>`;
+}
+
+/**
+ * КАКВО ТОЧНО НАПУСКА УСТРОЙСТВОТО · поименно, ПРЕДИ да си подал.
+ *
+ * ═══ ЗАЩО ПОИМЕННО, А НЕ „ИМА ИМЕНА" ═══
+ *
+ * ADR-030 §4 закова границата: „имена на наематели и доставчици не напускат
+ * устройството". Одитният файл е ИЗРИЧНОТО изключение — и изключение, което не
+ * се вижда поименно, е обещание с дупка. Затова тук не стои категория („имена
+ * на контрагенти"), а СПИСЪКЪТ за ТОЗИ месец, дошъл от същото място, което ги
+ * пише в XML-а.
+ *
+ * ═══ КОЙ ДЕЙСТВА ═══
+ *
+ * Не се пише „изпраща се". Приложението НЕ изпраща нищо: файлът се сваля на
+ * устройството и напуска, когато ЧОВЕК го подаде. Разликата не е стил — първото
+ * би било лъжа за това чия е ръката.
+ *
+ * ═══ БЕЗ ЕИК ═══
+ *
+ * Име без ЕИК заминава непълно и вече си има пречка горе. Тук се показва ДО
+ * името, защото пречката казва „N без ЕИК", а човек иска да види КОИ.
+ *
+ * ═══ ЗАЩО ИМЕНАТА СА РАЗГЪНАТИ, А КАТЕГОРИИТЕ — НЕ ═══
+ *
+ * ADR-030 §4 сложи дословния текст зад „подробности" и това беше вярно там.
+ * ТУК не е: имената са ИЗКЛЮЧЕНИЕТО от стоящо обещание, а изключение, което
+ * иска клик, е обещание с една стъпка пред него. Проходът го хвана — `innerText`
+ * не вижда затворено `<details>`, точно както не го вижда и окото.
+ *
+ * Категориите остават прибрани: те са справка, еднаква всеки месец. Имената се
+ * менят с всеки месец и са онова, което човек трябва да види, преди да подаде.
+ */
+function blokNaNapuskashtoto(imena: readonly ImeVFayla[], mesets: string): string {
+  const b = preborenoPoVid(imena);
+  const nepalni = bezEIK(imena);
+  return `
+    <section data-sektsiya="nap-napuska">
+      <div class="dyalglava">
+        <h2>Какво точно напуска устройството</h2>
+        <span data-broi-imena="${imena.length}">${imena.length} имена за ${ekraniraj(mesets)} · ${b.firma} фирма · ${b.klient} клиенти · ${b.dostavchik} доставчици</span>
+      </div>
+
+      <p class="drebno">Файлът се сваля на устройството и НЕ тръгва наникъде сам.
+      Напуска, когато ТИ го подадеш. Дотогава всичко долу стои само тук.</p>
+
+      <details open>
+        <summary>Имената, които ще носи файлът · ${imena.length}</summary>
+        ${
+          imena.length === 0
+            ? '<p class="prazno">Този месец не докосва нито един контрагент.<br>Празният месец пак дава валиден по структура файл.</p>'
+            : `<ul class="opis-imena" translate="no">${imena
+                .map(
+                  (i) =>
+                    `<li data-ime-v-fayla="${ekraniraj(i.ime)}"${i.sEIK ? '' : ' class="trevoga"'}>${ekraniraj(edinRedZaImeto(i))}</li>`,
+                )
+                .join('')}</ul>`
+        }
+        ${
+          nepalni.length === 0
+            ? ''
+            : `<p class="drebno">${nepalni.length} от тях заминават БЕЗ ЕИК — вписват се в Настройки · Контрагенти.</p>`
+        }
+      </details>
+
+      <details>
+        <summary>Какво ВЛИЗА във файла · ${KAKVO_VLIZA_V_FAYLA.length} вида</summary>
+        <ul>${KAKVO_VLIZA_V_FAYLA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}</ul>
+      </details>
+
+      <details>
+        <summary>Какво НЕ влиза · ${KAKVO_NE_VLIZA.length} вида</summary>
+        <ul>${KAKVO_NE_VLIZA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}</ul>
+        <p class="drebno">Отрицателният списък не е украса: без него положителният
+        се чете като „и вероятно още нещо".</p>
+      </details>
+    </section>`;
+}
+
+/**
+ * ДОСТЪПЪТ ЗА СЧЕТОВОДИТЕЛЯ · и защо екранът е ЕДНАКЪВ за трите роли.
+ *
+ * ═══ НЯМА ЧЕТВЪРТА РОЛЯ, И ТОВА Е РЕШЕНИЕ ═══
+ *
+ * Ролите са три (`IMENA_NA_ROLITE`) и остават три. Счетоводителят е СЛУЖИТЕЛ,
+ * когото Стопанинът вече е записал — правило 14 казва дословно: „Не каним хора…
+ * Виждаме онзи, когото доставчикът е пуснал." Четвърта роля, измислена тук, би
+ * била наша дума в неговата уста; а и `mozheDaRedaktira` смята редакцията от
+ * ролята — нова стойност там мени колонното право на ВСИЧКИ екрани.
+ *
+ * ═══ ЗАЩО НЯМА `iskaRolya` НА ТОЗИ ЕКРАН ═══
+ *
+ * Защото няма какво да пази. Тук няма нито един път към Вратата: `zakachiNAP`
+ * вика само `deystviya.ogledalo()`, и тест го брои. Гате по роля върху екран,
+ * който само чете, би бил надпис — а надписът, взет за защита, е по-опасен от
+ * липсата ѝ (ADR-041 · ADR-050).
+ *
+ * ═══ КАКВО ОСТАВА ИЗВЪН ПРОГРАМАТА ═══
+ *
+ * Екран, който казва само какво НЕ прави, оставя човека без следваща стъпка.
+ * Затова трите стъпки навън се изброяват поименно — те са работата на
+ * счетоводителя, а не наш пропуск.
+ */
+function blokNaSchetovoditelya(): string {
+  return `
+    <section data-sektsiya="nap-schetovoditel">
+      <div class="dyalglava">
+        <h2>Достъпът за счетоводителя</h2>
+        <span>чете и сваля · не пише · подава ИЗВЪН програмата</span>
+      </div>
+
+      <p class="drebno">Счетоводителят е СЛУЖИТЕЛ, записан в Настройки · Служители.
+      Не го каним и не му отнемаме достъп — виждаме онзи, когото доставчикът е пуснал,
+      и записваме имейла му (правило 14). Щом Стопанинът е включил връзката с НАП,
+      екранът е ЕДИН И СЪЩ за трите роли, защото тук няма какво да се пише.</p>
+
+      <div class="tablitsa" data-tablitsa="nap-dostap">
+        <div class="glava opis">
+          <span data-kolona="kade" data-ime="Къде">Къде</span>
+          <span data-kolona="kakvo" data-ime="Какво става">Какво става</span>
+        </div>
+        <div class="red opis" data-dostap="tuk">
+          <span><b>ТУК, в програмата</b></span>
+          <span>Чете месеца, вижда пречките поименно и сваля файла. Нито един бутон
+          на този екран не пише в Журнала — това е свойство, не пропуск.</span>
+        </div>
+        <div class="red opis" data-dostap="izvan">
+          <span><b>ИЗВЪН програмата</b></span>
+          <span>${IZVAN_PROGRAMATA.map((x) => ekraniraj(x)).join(' · ')}</span>
+        </div>
+      </div>
+
+      <p class="drebno">Електронният подпис не се пази тук и не може да се пази:
+      частният ключ на КЕП живее на смарт-карта, а браузърен JavaScript не я вижда.
+      Затова подаването остава ръчно — това е граница, не избор за удобство.</p>
     </section>`;
 }
 
@@ -282,8 +438,12 @@ function blokNaKodovete(): string {
       го блокира. Затова стоят празни и се БРОЯТ — измислен код значи отказ плюс глоба
       по чл. 277а. Мапингът е счетоводна ПРЕЦЕНКА, не аритметика (правило 18):
       вписва се от човек, не се гади от машина.</p>
-      <div class="tablitsa">
-        <div class="glava opis"><span>Сметка</span><span>Име</span><span>Национален код</span></div>
+      <div class="tablitsa" data-tablitsa="nap-smetkoplan">
+        <div class="glava opis">
+          <span data-kolona="nomer" data-ime="Сметка">Сметка</span>
+          <span data-kolona="ime" data-ime="Име">Име</span>
+          <span data-kolona="nra" data-ime="Национален код">Национален код</span>
+        </div>
         ${SMETKOPLAN.map(
           (s) => `<div class="red opis" translate="no" data-smetka="${ekraniraj(s.nomer)}">
           <span><b>${ekraniraj(s.nomer)}</b></span>
@@ -297,6 +457,9 @@ function blokNaKodovete(): string {
 
 export function narisuvayNAP(o: Ogledalo, dnes: string): string {
   const mesets = mesetsat(dnes);
+  // ЕДНО сглобяване за целия екран: числата горе и описът „какво напуска" четат
+  // ЕДИН резултат. Две сглобявания щяха да са две места, които се разминават.
+  const r = safT(o, mesets, new Date().toISOString());
   return `
     <section data-sektsiya="nap-mesets">
       <div class="dyalglava">
@@ -309,7 +472,9 @@ export function narisuvayNAP(o: Ogledalo, dnes: string): string {
       </label>
     </section>
     ${blokNaTipovite()}
-    ${blokNaOditniyaFayl(o, mesets)}
+    ${blokNaOditniyaFayl(r, mesets)}
+    ${blokNaNapuskashtoto(r.imenata, mesets)}
+    ${blokNaSchetovoditelya()}
     ${blokNaKodovete()}`;
 }
 

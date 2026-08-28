@@ -42,6 +42,7 @@ import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js'
 import { ekvXML, el, sumaXML } from './xml.js';
 import { glavnaKniga, IMENA_NA_DNEVNITSITE, SMETKOPLAN, type GlavnaKniga } from '../domein/glavna-kniga.js';
 import { kakvoLipsva, klyuchNaKontragent, type Kontragent } from '../domein/kontragenti.js';
+import type { ImeVFayla } from '../domein/nap-dostap.js';
 import { ddsOtObshta, stavkaNaReda, STAVKI } from '../domein/dds.js';
 import { dniVMeseca } from '../domein/nachislyavane.js';
 import { razhodiZaPerioda } from '../domein/smetki.js';
@@ -69,6 +70,15 @@ interface RezultatSAFT {
   readonly broiProdazhbi: number;
   readonly broiPokupki: number;
   readonly broiPlashtaniya: number;
+  /**
+   * ЧИИ ИМЕНА ще носи подаденият файл · от СЪЩОТО място, което ги пише в XML-а.
+   *
+   * Обещанието на ADR-030 §4 е, че имена не напускат устройството; одитният
+   * файл е изричното изключение. Изключение, което не се ВИЖДА поименно, е
+   * само обещание с дупка — затова списъкът излиза оттук, а не се пресмята
+   * втори път на екрана (правило 17).
+   */
+  readonly imenata: readonly ImeVFayla[];
 }
 
 /** Първият и последният ден на периода — `SelectionCriteria` ги иска. */
@@ -78,6 +88,11 @@ function obhvat(period: Period): { ot: string; doo: string } {
     ot: `${period}-01`,
     doo: `${period}-${String(dniVMeseca(g!, m!)).padStart(2, '0')}`,
   };
+}
+
+/** Едно име за описа „какво напуска" · ЕИК-ът решава пълно ли заминава. */
+function imeVFayla(vid: ImeVFayla['vid'], k: Kontragent): ImeVFayla {
+  return Object.freeze({ vid, ime: k.ime, sEIK: k.eik !== '' });
 }
 
 /** Контрагентът по име · празен запис, когато още не е вписан. */
@@ -493,5 +508,10 @@ export function safT(
     broiProdazhbi: prodazhbi.length,
     broiPokupki: pokupkiXML.length,
     broiPlashtaniya: plashtaniyaXML.length,
+    imenata: Object.freeze([
+      ...(firma.ime === '' ? [] : [imeVFayla('firma', firma)]),
+      ...[...klienti.values()].map((k) => imeVFayla('klient', k)),
+      ...[...dostavchitsi.values()].map((k) => imeVFayla('dostavchik', k)),
+    ]),
   };
 }

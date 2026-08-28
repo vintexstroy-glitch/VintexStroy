@@ -746,6 +746,69 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и се казва ЗАЩО стоят празни',
       (await tekstNa(p, '[data-sektsiya=nap-kodove]')).includes('чл. 277а'), true);
 
+    // ══ 86 · НАП · КАКВО НАПУСКА и достъпът за счетоводителя (резен 17в) ═══
+    razdel = '86 · НАП · какво напуска устройството · ПОИМЕННО';
+    await naEkran(p, 'nap', '[data-sektsiya=nap-napuska]');
+    const broyImena = Number(
+      await p.$eval('[data-broi-imena]', (e) => (e as HTMLElement).dataset['broiImena']),
+    );
+    proveri('обявява се БРОЯТ на имената, които файлът ще носи', broyImena > 0, true);
+    // Сверка вход↔изход НА ЕКРАНА: обявеното число = изредените редове.
+    proveri('и толкова реда наистина се изреждат',
+      await p.$$eval('[data-ime-v-fayla]', (e) => e.length), broyImena);
+
+    // ПОИМЕННО и БЕЗ КЛИК · имената са изключението от стоящо обещание, а
+    // изключение, което иска клик, е обещание с една стъпка пред него.
+    // (`innerText` не вижда затворено `<details>` — точно както и окото.)
+    const napuska = await tekstNa(p, '[data-sektsiya=nap-napuska]');
+    // Всяко обявено име се ЧЕТЕ на екрана · без да се отваря нищо. Имената идват
+    // от самия екран, не от познат фиксиран текст: тестът пази СВОЙСТВОТО
+    // („всяко обявено е и видяно"), а не една конкретна фирма от прохода.
+    const obyaveni = await p.$$eval('[data-ime-v-fayla]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['imeVFayla']!));
+    proveri('всяко обявено име се ЧЕТЕ поименно, без да се отваря нищо',
+      obyaveni.length > 0 && obyaveni.every((ime) => napuska.includes(ime)), true);
+    proveri('казва се, че файлът НЕ тръгва сам',
+      napuska.includes('НЕ тръгва наникъде сам'), true);
+    proveri('и непълните се отделят с ДУМИ, не само с бройка',
+      napuska.includes('БЕЗ ЕИК'), true);
+
+    // Категориите са СПРАВКА и стоят прибрани · но се отварят и се четат.
+    await p.click('[data-sektsiya=nap-napuska] details:last-of-type summary');
+    proveri('изброява се и какво НЕ влиза · включително самият Журнал',
+      (await tekstNa(p, '[data-sektsiya=nap-napuska]')).includes('самият Журнал'), true);
+
+    razdel = '86 · НАП · достъпът за счетоводителя · чете и сваля, не пише';
+    const dostap = await tekstNa(p, '[data-sektsiya=nap-schetovoditel]');
+    proveri('двата реда стоят · ТУК и ИЗВЪН програмата',
+      await p.$$eval('[data-dostap]', (e) => e.length), 2);
+    proveri('трите стъпки навън са назовани · портал, тестово подаване, разписка',
+      dostap.includes('portal.nra.bg') && dostap.includes('ТЕСТОВО'), true);
+    proveri('и се казва, че КЕП-ът е недостижим от браузър',
+      dostap.includes('смарт-карта'), true);
+    // НУЛА ПЪТ КЪМ ВРАТАТА · целият екран, не само тази секция. Няма нито една
+    // форма за подаване — свойство, не пропуск (пази го и `tests/nap.test.ts`).
+    proveri('на целия екран НЯМА форма, която да пише',
+      await p.$$eval('.telo form', (e) => e.length), 0);
+
+    razdel = '86 · НАП · правило 23 · скритата колона ПАК се смята';
+    // Сборът и броят събития се запомнят ПРЕДИ скриването — то не бива да
+    // помръдне нито едното, нито другото.
+    const predSkrivane = await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor .suma',
+      (e) => (e as HTMLElement).dataset['st']);
+    const predSabitiya = await broySabitiya(p);
+    await p.click('[data-tablitsa=nap-smetkoplan] .red.opis >> nth=0 >> span >> nth=2',
+      { button: 'right' });
+    await p.waitForSelector('.kontekstno-menyu');
+    await p.click('.kontekstno-menyu button:has-text("Скрий колоната")');
+    proveri('колоната изчезва от очите',
+      await p.$eval('[data-tablitsa=nap-smetkoplan] .glava > span:nth-child(3)',
+        (e) => (e as HTMLElement).hidden), true);
+    proveri('а сборът в книгата НЕ мърда · скритото ПАК се смята',
+      await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor .suma',
+        (e) => (e as HTMLElement).dataset['st']), predSkrivane);
+    proveri('и скриването НЕ влиза в Журнала', await broySabitiya(p), predSabitiya);
+
     razdel = '66 · Одитният файл · пречките се четат';
     // ДОШЪЛ Е В СВОЙ ЕКРАН (резен 17б). Секцията пази `data-sektsiya=saf-t`,
     // затова всички проверки долу оцеляват — сменя се само откъде се стига.

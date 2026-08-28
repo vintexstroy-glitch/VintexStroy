@@ -392,3 +392,46 @@ describe('пречките · какво СПИРА подаването', () =>
     expect(r.ime).toContain(EIK);
   });
 });
+
+/**
+ * КОИ ИМЕНА ЩЕ НОСИ ФАЙЛЪТ · описът и XML-ът четат ЕДНО.
+ *
+ * ADR-030 §4 обеща, че имена на наематели и доставчици не напускат
+ * устройството; одитният файл е ИЗРИЧНОТО изключение. Изключение, което не се
+ * вижда поименно, е обещание с дупка — затова `imenata` излиза от същото място,
+ * което пише XML-а, и тестът проверява точно СЪВПАДЕНИЕТО, не броя.
+ */
+describe('какво напуска устройството · описът срещу самия файл', () => {
+  it('всяко обявено име наистина е ВЪВ файла', async () => {
+    const { ogledalo } = await mesets();
+    const r = safT(await ogledalo(), '2026-07', KOGATO);
+    expect(r.imenata.length).toBeGreaterThan(0);
+    for (const i of r.imenata) expect(r.xml).toContain(`<Name>${i.ime}</Name>`);
+  });
+
+  /**
+   * И ОБРАТНАТА ПОСОКА · описът да не ПРОПУСКА име. Само едната посока би
+   * позволила файл, който носи повече, отколкото екранът е показал — тоест
+   * точно дупката, заради която описът съществува.
+   */
+  it('и всяко име ВЪВ файла е обявено · нито едно в повече', async () => {
+    const { ogledalo } = await mesets();
+    const r = safT(await ogledalo(), '2026-07', KOGATO);
+    const vavFayla = [...r.xml.matchAll(/<Name>([^<]*)<\/Name>/g)]
+      .map((m) => m[1]!)
+      // Невписаната фирма дава ПРАЗЕН `<Name>` и вече си има своя пречка —
+      // празното не е име и не се обявява като напускащо.
+      .filter((ime) => ime !== '');
+    expect(new Set(vavFayla)).toEqual(new Set(r.imenata.map((i) => i.ime)));
+  });
+
+  it('ЕИК-ът решава пълно ли заминава името · и това съвпада с пречката', async () => {
+    const { ogledalo } = await mesets();
+    const r = safT(await ogledalo(), '2026-07', KOGATO);
+    const nepalni = r.imenata.filter((i) => !i.sEIK);
+    expect(nepalni.length).toBeGreaterThan(0);
+    for (const i of nepalni) {
+      expect(r.prechki.some((prechka) => prechka.includes(i.ime))).toBe(true);
+    }
+  });
+});
