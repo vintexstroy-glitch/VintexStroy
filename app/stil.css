@@ -393,7 +393,7 @@ a:hover { color: var(--aktsent-tumen); }
   border-right: 1px solid var(--liniya);
   display: flex;
   flex-direction: column;
-  /* СВОЙ скрол (резен 9а): при десет пункта с падащи редове лентата става
+  /* СВОЙ скрол (резен 9а): при единайсет пункта с падащи редове лентата става
      по-висока от екрана — премерено 1003px при видими 900 — и БУТАШЕ цялата
      страница, с което главата на таблицата пак си отиваше. */
   overflow-y: auto;
@@ -410,7 +410,12 @@ a:hover { color: var(--aktsent-tumen); }
 .strana.svita .strelka-dolu,
 .strana.svita .nastroyki-red,
 .strana.svita .ekran-red,
+/* СТРЕЛКИТЕ СИ ОТИВАТ СЪС СВИВАНЕТО · в 52 пиксела няма къде да застанат, а
+   стърчащи ▲▼ изглеждат като счупен екран, не като свита лента. */
+.strana.svita .navmesti,
 .strana.svita .veriga { display: none; }
+/* …и се връщат, щом лентата се разтвори при минаване. */
+.strana.svita:hover .navmesti, .strana.svita:focus-within .navmesti { display: flex; }
 /* Марката се свива до първата буква · цялото име не се побира в 52px и
    стърчащият му остатък изглежда като счупен екран, не като свита лента. */
 .strana.svita .marka b { font-size: 0; }
@@ -699,7 +704,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 
 /* ── навигация между екраните ───────────────────────────────────────── */
-.nav { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+/* ДВЕ КОЛОНИ · пунктът и стрелките му падат на ЕДИН ред сами, без обвивка
+   (резен 15). Обвивка би счупила `.nav > [data-ekran]` — селекторът, с който
+   падащият ред на екрана си намира пункта. */
+.nav { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px; padding: 8px 12px; }
 .navred {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; border: none; border-radius: 4px;
@@ -707,6 +715,18 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
+/* „Да е СКРИТО с дребни бутончета" — негово (И101). Стрелките се появяват при
+   минаване с мишка ВЪРХУ ЛЕНТАТА и при фокус вътре: клавиатурата стига до тях,
+   без да ги държи пред очите през цялото време. `opacity`, не `display`, за да
+   не скача ширината на реда при всяко минаване. */
+.navmesti { display: flex; flex-direction: column; opacity: 0; transition: opacity 0.12s; }
+.nav:hover .navmesti, .nav:focus-within .navmesti { opacity: 1; }
+.navstrelka {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.6rem; line-height: 1;
+  padding: 1px 4px; border-radius: 3px;
+}
+.navstrelka:hover { background: #EAE2D6; color: var(--mastilo); }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
 .navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }

@@ -20,6 +20,7 @@ import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
 import { narisuvayTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
@@ -133,6 +134,15 @@ interface ZaRisuvane {
   readonly lichnoOgledalo: Ogledalo | null;
   readonly lichenAkaunt: string;
   readonly broyLichni: number;
+  /**
+   * КОИ ЕКРАНА СА ДОСТЪПНИ на този човек · СМЯТА се в `main.ts` (правило 17).
+   *
+   * Подава се, а не се смята пак тук: филтърът пита и плана, и ролята, и трите
+   * състояния на личното. Втора негова сметка щеше да е второ място, което се
+   * разминава — а разминаването тук значи пункт, който го има в лентата и го
+   * няма в картата, или обратното.
+   */
+  readonly dostapniEkrani: readonly string[];
 }
 
 interface ZaZakachane {
@@ -311,6 +321,21 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         {
           vsichki: r.ogledalo.tabove.size,
           dobaveni: [...r.ogledalo.tabove.values()].filter((t) => !t.statsionaren).length,
+        },
+        // ПУНКТОВЕТЕ НА ЛЕНТАТА · подредени по трите слоя, с ВСИЧКИ вътре —
+        // и скритите. Картата е мястото, където скритото се връща; списък само
+        // с видимите щеше да е капан без изход (правило 15).
+        {
+          punktove: podredeniPunktove(
+            r.dostapniEkrani,
+            r.ogledalo.redNaLentata,
+            moyatRed(),
+          ).map((klyuch) => ({
+            klyuch,
+            ime: EKRANI[klyuch as KoyEkran].ime,
+            skrit: skritiPunktove().includes(klyuch),
+          })),
+          moyatRedEPipnat: moyatRed().length > 0,
         },
       ),
     zakachi: (z) => z.zakachiTabloto(),

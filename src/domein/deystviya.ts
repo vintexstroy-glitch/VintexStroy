@@ -33,6 +33,7 @@ import {
 } from './lichni-pari.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
+import { napraviRedNaLentata } from './lenta.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
 import {
@@ -67,6 +68,7 @@ import type {
   PayloadParametarNaVhodaZapisan,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
+  PayloadLentaPodredena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
   PayloadStorno,
@@ -574,6 +576,42 @@ export class Deystviya {
       );
     }
     return this.#pusni('ЗапасенКонтактЗаписан', VID.zapasen, danni.imeyl, danni, z);
+  }
+
+  /**
+   * ПОДРЕЖДА ЛЕНТАТА · НАЧАЛНИЯТ ред, който всички получават (резен 15 · И111).
+   *
+   * Проверката „ти ли си Стопанинът" е ТУК, а не при Вратата — същият модел и
+   * същата причина като при запасния контакт: Вратата не чете Огледалото и не
+   * бива да го научава.
+   *
+   * ЗАПИСВА СЕ ЦЕЛИЯТ РЕД, не разлика. Разлика („мести Х с една нагоре") зависи
+   * от състоянието в мига на записа, а при много вериги (ADR-055) две
+   * едновременни размествания биха дали различен резултат според реда на
+   * прочитане. Цял списък е самодостатъчен.
+   *
+   * ЛИЧНОТО ПРЕНАРЕЖДАНЕ НЕ МИНАВА ОТТУК и това е половината от неговото
+   * решение: то е ПОГЛЕД и живее в паметта на екрана. Значи служител, който си
+   * подрежда менюто, не пише нито едно събитие — и проход §72 го брои.
+   */
+  async podrediLentata(danni: PayloadLentaPodredena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Началният ред на менюто се задава само от Стопанина — той е онова, което ' +
+          'ВСИЧКИ получават. Своя ред всеки си подрежда сам, и той не влиза в Журнала.',
+      );
+    }
+    // СТРОГОСТТА Е ПРИ ВХОДА · дубликат, записан веднъж, рисува пункт два пъти
+    // ЗАВИНАГИ (правило 1 · `lenta.ts`). Проверката е ПРЕДИ Вратата, защото
+    // Вратата пази парите и NFC, не смисъла на този товар.
+    return this.#pusni(
+      'ЛентаПодредена',
+      VID.lenta,
+      'LENTA',
+      { red: napraviRedNaLentata(danni.red) },
+      z,
+    );
   }
 
   /**

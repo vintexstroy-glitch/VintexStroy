@@ -44,6 +44,7 @@ import {
 } from '../src/domein/planove.js';
 import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
 import { ekraniraj } from './obshto.js';
+import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -233,6 +234,91 @@ function kartaOtmetki(izbor: Izbor): string {
         Изключената възможност изчезва от лентата и от бутоните веднага. Тя не е
         отнета — планът пак я дава и отметката я връща. Затова „изключена" и
         „няма я в този план" са различни думи тук.
+      </p>
+    </section>`;
+}
+
+/**
+ * КАРТАТА „МЕНЮТО" · тук се ВРЪЩА скритото и оттук се ПУБЛИКУВА редът (И111).
+ *
+ * ═══ ЗАЩО ТЯ Е ЕДНА, А ДЕЙСТВИЯТА СА ТРИ ═══
+ *
+ * Редът се подрежда В ЛЕНТАТА — там са стрелките и там го гледа човекът.
+ * Тук стоят ДРУГИТЕ три неща, които в лентата нямат място:
+ *
+ *   · ВИДИМОСТТА · отметка на всеки пункт, ЛИЧНА. Скритият пункт го няма в
+ *     лентата — значи няма и къде да се върне от нея. Затова картата изрежда
+ *     ВСИЧКИ, не само видимите (правило 15: изключено ≠ липсващо).
+ *   · „ЗАБРАВИ МОЯ РЕД" · връща реда на Стопанина. Без него човек, разместил
+ *     веднъж, няма как да се върне към общия — а „върни както беше" е първото,
+ *     което се търси след разместване.
+ *   · „ЗАПИШИ НАЧАЛНИЯ РЕД" · САМО за Стопанина. Взима РЕДА, който той вижда в
+ *     момента, и го записва като началния за ВСИЧКИ. Едно събитие, при натиснат
+ *     бутон — не при всяко местене: инак Журналът щеше да се пълни с междинни
+ *     подредби, а те не са решения, а движение на ръката.
+ *
+ * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (лентата) и се
+ * ПУБЛИКУВА на друго. Дотук същият похват е в `kontekstno-menyu.ts`: „менюто е
+ * втора дръжка на същата врата, не втора врата."
+ */
+function kartaLenta(
+  punktove: readonly { readonly klyuch: string; readonly ime: string; readonly skrit: boolean }[],
+  negov: boolean,
+  moyatRedEPipnat: boolean,
+): string {
+  const skriti = punktove.filter((p) => p.skrit).length;
+  return `
+    <section data-sektsiya="tablo-lenta" class="karta">
+      <div class="dyalglava">
+        <h2>Менюто</h2>
+        <span>${
+          skriti === 0
+            ? `${punktove.length} пункта · нищо не е скрито`
+            : `${skriti} ${skriti === 1 ? 'скрит пункт' : 'скрити пункта'} от ${punktove.length}`
+        }</span>
+      </div>
+      <div class="vazmozhnosti" data-sektsiya="lenta-punktove">
+        ${punktove
+          .map(
+            (p) => `
+          <label class="vazm${p.skrit ? ' izklyuchena' : ''}">
+            <input type="checkbox" data-punkt="${ekraniraj(p.klyuch)}"${p.skrit ? '' : ' checked'}${
+              NESKRIVAEMI.includes(p.klyuch) ? ' disabled' : ''
+            }>
+            <span class="vazm-tyalo">
+              <b>${ekraniraj(p.ime)}</b>
+              <span>${
+                NESKRIVAEMI.includes(p.klyuch)
+                  ? p.klyuch === 'tablo'
+                    ? 'не се скрива — оттук се връща скритото'
+                    : 'не се скрива — темите му са различни за всяка роля'
+                  : p.skrit
+                    ? 'скрит от МОЯТА лента · другите не са пипнати'
+                    : 'вижда се'
+              }</span>
+            </span>
+          </label>`,
+          )
+          .join('')}
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="zabravi-moya-red"${
+          moyatRedEPipnat ? '' : ' disabled'
+        }>Забрави моя ред</button>
+        ${
+          negov
+            ? `<button type="button" class="glaven" id="zapishi-nachalniya-red">Запиши началния ред за всички</button>`
+            : ''
+        }
+      </div>
+      <p class="drebno">
+        Редът се мести със стрелките В ЛЕНТАТА и е <b>твой</b> — нула записа в
+        Журнала. ${
+          negov
+            ? 'Бутонът горе взима реда, който виждаш СЕГА, и го записва като НАЧАЛНИЯ за всички; всеки после може да го пренарежда за себе си.'
+            : 'Началният ред идва от Стопанина; твоите размествания стоят върху него и не го менят.'
+        }
+        Скриването е лично и също не влиза в Журнала.
       </p>
     </section>`;
 }
@@ -459,6 +545,11 @@ export function narisuvayTablo(
   zapasen: { readonly imeyl: string; readonly poslednite: string } | null = null,
   /** табовете · брой всички и брой ДОБАВЕНИ (И101 т.1) */
   tabove: { readonly vsichki: number; readonly dobaveni: number } = { vsichki: 0, dobaveni: 0 },
+  /** пунктовете на лентата · подредени и с това кой е скрит (резен 15 · И111) */
+  lenta: {
+    readonly punktove: readonly { readonly klyuch: string; readonly ime: string; readonly skrit: boolean }[];
+    readonly moyatRedEPipnat: boolean;
+  } = { punktove: [], moyatRedEPipnat: false },
 ): string {
   const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
@@ -467,6 +558,7 @@ export function narisuvayTablo(
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
+    kartaLenta(lenta.punktove, negov, lenta.moyatRedEPipnat) +
     kartaOtmetki(izbor) +
     kartaSravnenie(izbor, koj)
   );
@@ -532,6 +624,19 @@ export function zakachiTablo(
       await prerisuvay();
     });
   }
+
+  // ВИДИМОСТТА НА ПУНКТ · лична, паметта на екрана, НУЛА събития (И111).
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-punkt]')) {
+    kutiya.addEventListener('change', async () => {
+      prevklyuchiPunkt(kutiya.dataset['punkt']!);
+      await prerisuvay();
+    });
+  }
+
+  koren.querySelector<HTMLButtonElement>('#zabravi-moya-red')?.addEventListener('click', async () => {
+    zabraviMoyaRed();
+    await prerisuvay();
+  });
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-plan]')) {
     b.addEventListener('click', async () => {

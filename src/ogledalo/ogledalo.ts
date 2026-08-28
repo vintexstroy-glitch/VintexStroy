@@ -26,6 +26,7 @@ import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
+import { redOtZhurnala } from '../domein/lenta.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
@@ -62,6 +63,7 @@ import type {
   PayloadZapasenKontaktZapisan,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
+  PayloadLentaPodredena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
   PayloadLichnaTemaZapisana,
@@ -307,6 +309,14 @@ export interface Ogledalo {
    * ЛИЧНОТО · включено ли е (И98). Смисъл има само в ЛИЧЕН Журнал: пита се
    * от последното `ЛичноПревключено`; празният Журнал е „не е активирано".
    */
+  /**
+   * НАЧАЛНИЯТ РЕД НА ЛЕНТАТА · решението на Стопанина (резен 15 · И111).
+   *
+   * Празен списък значи „още никой не е подреждал" — и тогава важи редът, в
+   * който екраните са ОБЯВЕНИ в регистъра. Празното НЕ значи „скрий всичко":
+   * сливането е `podredi`, а тя слага непознатите НАКРАЯ.
+   */
+  readonly redNaLentata: readonly string[];
   readonly lichnoVklyucheno: boolean;
   /**
    * МЯСТОТО в личния драйв, с което личното е активирано (И99).
@@ -455,6 +465,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const svrazki = new Map<number, Svrazka>();
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
+  let redNaLentata: readonly string[] = [];
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
@@ -598,6 +609,18 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ПреносОтчетен': {
         const p = s.payload as unknown as PayloadPrenosOtcheten;
         prenosi.set(`${p.prenosId}:${p.posoka}`, p);
+        break;
+      }
+
+      case 'ЛентаПодредена': {
+        const p = s.payload as unknown as PayloadLentaPodredena;
+        // ПОСЛЕДНАТА ДУМА БИЕ · целият ред идва наведнъж, значи няма какво да се
+        // слива тук. Сливането с ЖИВИТЕ екрани става при рисуването (`podredi`),
+        // не при четенето: Огледалото не знае кои екрани съществуват днес.
+        // ПРЕЗ ЧЕТЕЦА · писачът вече отказва дубликат, но записът е ЗАВИНАГИ и
+        // книга може да дойде отвън (чужда верига, върнат архив). Дублиран ключ
+        // тук значи пункт, нарисуван ДВА пъти — и двата закачени.
+        redNaLentata = redOtZhurnala(p.red);
         break;
       }
 
@@ -1007,6 +1030,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     svrazki,
     prehvarleni,
     prenosi,
+    redNaLentata,
     lichnoVklyucheno,
     lichnoMyasto,
     lichniDostapi,

@@ -590,8 +590,10 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       await p.keyboard.press('Escape');
     };
 
+    // ЕДИНАЙСЕТ, не десет · `sluzhiteli` (резен 14а) липсваше тук и §68
+    // минаваше зелен, без да го е отварял нито веднъж.
     const ekranite = ['imoti', 'pari', 'stoynost', 'gant', 'smetki',
-      'nastroyki', 'ii', 'tabove', 'lichno', 'tablo'] as const;
+      'nastroyki', 'ii', 'tabove', 'lichno', 'sluzhiteli', 'tablo'] as const;
     const nachalniyat = await koyEkranE();
 
     let bezMarker = 0;
@@ -611,7 +613,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       udvoeni += klyuchove.length - new Set(klyuchove).size;
     }
 
-    proveri('и десетте екрана се отварят от лентата в този миг', obhodeni, ekranite.length);
+    proveri('и единайсетте екрана се отварят от лентата в този миг', obhodeni, ekranite.length);
     proveri('и заедно носят секции за местене', vsichki > 40, true);
     proveri('НИТО ЕДНА не се ключува по заглавието си', bezMarker, 0);
     // Два еднакви ключа на един екран значат възел, прибавен два пъти при
@@ -789,6 +791,67 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и се връща разтворена',
       await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
     await naEkran(p, 'imoti', '#forma-imot');
+
+    // ══ 72 · РЕДЪТ НА МЕНЮТО · два слоя, и само единият пише (И111) ═══════
+    //
+    // Негово решение от 28.08, взето измежду три: „И ДВЕТЕ · начален ред +
+    // личен". Проходът брои точно това разделение — СЪБИТИЯТА.
+    razdel = '72 · Менюто · моят ред НЕ пише в Журнала';
+    const punktovePredi = await p.$$eval('[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
+    proveri('всеки пункт носи стрелки за местене',
+      (await p.$$eval('[data-mesti]', (e) => e.length)) >= punktovePredi.length - 1, true);
+    // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
+    // човека да не вярва на бутоните.
+    proveri('първият няма стрелка нагоре',
+      await p.$$eval('.navpunkt:first-child [data-posoka=gore]', (e) => e.length), 0);
+
+    const predMestene = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () =>
+      p.click(`[data-mesti="${punktovePredi[1]}"][data-posoka=gore]`));
+    const punktoveSled = await p.$$eval('[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
+    proveri('вторият пункт стана ПЪРВИ', punktoveSled[0], punktovePredi[1]);
+    proveri('и НИТО ЕДНО събитие не е влязло · редът ми е ПОГЛЕД',
+      await broySabitiya(p), predMestene);
+
+    razdel = '72 · Менюто · моят ред преживява смяна на екран';
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('редът стои след смяна на екран',
+      (await p.$$eval('[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
+
+    razdel = '72 · Менюто · скриването е ЛИЧНО и се ВРЪЩА от Таблото';
+    await naEkran(p, 'tablo', '[data-sektsiya="tablo-lenta"]');
+    proveri('картата изрежда ВСИЧКИ пунктове, не само видимите',
+      await p.$$eval('[data-punkt]', (e) => e.length), punktovePredi.length);
+    // ТАБЛОТО И НАСТРОЙКИ не се скриват · отметките им са заключени.
+    proveri('Таблото не може да се скрие',
+      await p.$eval('[data-punkt="tablo"]', (e) => (e as HTMLInputElement).disabled), true);
+    proveri('и Настройки също',
+      await p.$eval('[data-punkt="nastroyki"]', (e) => (e as HTMLInputElement).disabled), true);
+
+    const predSkrivaneto = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('[data-punkt="smetki"]'));
+    proveri('скритият пункт пада от лентата',
+      await p.$$eval('[data-ekran=smetki]', (e) => e.length), 0);
+    proveri('но СТОИ в картата · изключено ≠ липсващо',
+      await p.$$eval('[data-punkt="smetki"]', (e) => e.length), 1);
+    proveri('и скриването НЕ пише в Журнала', await broySabitiya(p), predSkrivaneto);
+    // …и се връща оттам, откъдето е скрито.
+    await deystvieSPrerisuvane(p, () => p.click('[data-punkt="smetki"]'));
+    proveri('връща се от Таблото', await p.$$eval('[data-ekran=smetki]', (e) => e.length), 1);
+
+    razdel = '72 · Менюто · НАЧАЛНИЯТ ред е ЕДНО събитие, при натиснат бутон';
+    const predZapisa = await broySabitiya(p);
+    await sSabitie(p, () => p.click('#zapishi-nachalniya-red'));
+    proveri('записът е ТОЧНО едно събитие', (await broySabitiya(p)) - predZapisa, 1);
+    proveri('и се казва на глас какво е станало',
+      (await tekstNa(p, '.vest')).includes('Началният ред е записан'), true);
+    // МОЯТ ред се забравя след публикуване — инак личният слой би повтарял
+    // основния и следващата промяна на основния нямаше да се вижда.
+    proveri('и „Забрави моя ред" вече няма какво да забравя',
+      await p.$eval('#zabravi-moya-red', (e) => (e as HTMLButtonElement).disabled), true);
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('а редът си остава онзи, който Стопанинът записа',
+      (await p.$$eval('[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
 
     razdel = '75 · Хедърът се ЗАДЪРЖА · една скролираща кутия на екран';
     // Негово: „Хедърите също при скрол трябваше да се задържат."
