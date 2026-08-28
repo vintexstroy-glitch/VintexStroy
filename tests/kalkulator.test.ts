@@ -155,7 +155,7 @@ describe('матрицата · цели базисни точки', () => {
     expect(koefitsient(MATRITSA_ZA_RAZRABOTKA.izlozheniya, 'ЮЗ')).toBe(10_300);
   });
 
-  it('3000 €/м² · неговото число за разработка', () => {
+  it('3000 €/м² · НЕГОВОТО число · И53 „цена за старт" · И55', () => {
     // 100 м², среден етаж (1,00), без изложение (1,00) → 300 000 €
     expect(
       tsenaTochno({ obshta_kvsm: 1_000_000, vid: 'apartament', etazh: 'трети', izlozhenie: '' }),

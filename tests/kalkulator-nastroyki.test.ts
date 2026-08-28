@@ -12,7 +12,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { VIDOVE_OBEKT } from '../src/kalkulator/chetene.js';
 import {
+  bazataENegova,
   DOBAVKI,
   EDINITSA_BT,
   GreshkaNastroyki,
@@ -20,6 +23,7 @@ import {
   KLYUCHOVE_KOEFITSIENTI,
   KOEFITSIENTI,
   NAY_GOLYAM_BT,
+  NEGOVI_BAZI,
   PO_PODRAZBIRANE,
   btOtDumata,
   dobavka_st,
@@ -423,5 +427,67 @@ describe('изписването · коефициент, процент, про
     expect(kolkoMeni(9_200)).toBe('−8,00 %');
     expect(kolkoMeni(10_300)).toBe('+3,00 %');
     expect(kolkoMeni(10_000)).toBe('0,00 %');
+  });
+});
+
+/**
+ * КОЕ ЧИСЛО Е НЕГОВО · и защо това има ТЕСТ, а не само коментар.
+ *
+ * Дотук кодът и три документа държаха петте бази в ЕДНА кофа („всяко число тук
+ * чака него"), докато две негови изречения от 23.08 даваха ЕДНО от тях:
+ *
+ *   „За цените има таблица — претвори я и сложи 3000 евро цена за старт." (И53)
+ *   „3000 евро беше цената, която калкулаторът да ползва…"                 (И55)
+ *
+ * Изречение в коментар не пада на червено, когато някой го надживее. Списъкът
+ * пада — и екранът чете СЪЩИЯ списък, значи двете не могат да се разминат.
+ */
+describe('дадено срещу чакащо · базите на Калкулатора', () => {
+  it('НЕГОВА е ЕДНА база — апартаментът, и тя е 3 000 €/м²', () => {
+    expect(NEGOVI_BAZI).toEqual(['apartament']);
+    expect(PO_PODRAZBIRANE.baza_st.apartament).toBe(300_000);
+    expect(bazataENegova('apartament')).toBe(true);
+  });
+
+  it('другите ЧЕТИРИ чакат него · и това се брои, не се чете от изречение', () => {
+    const chakat = VIDOVE_OBEKT.filter((v) => !bazataENegova(v));
+    expect(chakat).toEqual(['garazh', 'parkomyasto', 'sklad', 'drug']);
+    expect(chakat).toHaveLength(4);
+  });
+
+  it('и ПЕТТЕ имат база · нито един вид не се смята с нула', () => {
+    for (const vid of VIDOVE_OBEKT) {
+      expect(PO_PODRAZBIRANE.baza_st[vid]).toBeGreaterThan(0);
+    }
+    expect(VIDOVE_OBEKT).toHaveLength(5);
+  });
+
+  /**
+   * ЕКРАНЪТ ЧЕТЕ СЪЩИЯ СПИСЪК. Без този тест той можеше да покаже „негово
+   * число" под гаража, без нищо да падне — точно шарката на ADR-050.
+   */
+  it('екранът пита СПИСЪКА, не преписва думите му', () => {
+    const izvor = readFileSync('app/kalkulator.ts', 'utf8');
+    expect(izvor).toContain('bazataENegova(vid)');
+    expect(izvor).toContain('data-baza=');
+    // Полето вече не е ЕДНО: `sBaza` приемаше всеки вид, а екранът редактираше
+    // само апартамента — обявена възможност без лост.
+    expect(izvor).toContain('VIDOVE_OBEKT.map');
+  });
+
+  /**
+   * ПАРКОМЯСТОТО НОСИ ДВЕ ЦЕНИ · находка, обявена на глас, не изчистена наум.
+   *
+   * Като ГЛАВЕН обект се смята на м²; като ДОБАВКА — на брой. А собственият
+   * коментар на добавката казва, че „квадратните метри не значат нищо при
+   * паркомясто". И двете стоят, докато той не каже коя пада — но екранът го
+   * КАЗВА, вместо да го премълчи.
+   */
+  it('паркомястото има И цена на м², И цена на брой · и екранът го казва', () => {
+    expect(PO_PODRAZBIRANE.baza_st.parkomyasto).toBe(190_000);
+    const naBroy = DOBAVKI.find((d) => d.klyuch === 'parkomyasto')!;
+    expect(naBroy.vid).toBe('broy');
+    expect(naBroy.stoynost).toBe(12_000_00);
+    expect(readFileSync('app/kalkulator.ts', 'utf8')).toContain('data-parkomyasto-dvete');
   });
 });

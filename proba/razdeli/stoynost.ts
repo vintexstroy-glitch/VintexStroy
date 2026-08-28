@@ -222,6 +222,54 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('Калкулаторът не пише нищо в Журнала', await broySabitiya(p), predKalk);
     await smeniKoefitsient(p, 'izlozhenie', 'iztok-zapad');
 
+    // ══ 84 · БАЗИТЕ · дадено срещу чакащо, и петте с поле (резен 16) ════════
+    //
+    // Негови думи, 23.08: „сложи 3000 евро цена за старт" (И53) и „3000 евро
+    // беше цената, която калкулаторът да ползва" (И55). ЕДНО число е дадено;
+    // другите четири бази са наши и чакат него. Дотук `#kalk-baza` не беше
+    // пипано от нито една проверка — приета цена без пазач.
+    razdel = '84 · Базите · петте полета и кое е НЕГОВО';
+    proveri('всеки от петте вида има СВОЕ поле за база',
+      await p.$$eval('[data-baza]', (e) => e.length), 5);
+    proveri('и до апартамента пише, че числото е НЕГОВО',
+      (await p.$eval('[data-otkade=apartament]', (e) => e.textContent ?? '')).includes('НЕГОВО'), true);
+    proveri('а до гаража — че чака него',
+      (await p.$eval('[data-otkade=garazh]', (e) => e.textContent ?? '')).includes('чака него'), true);
+    proveri('паркомястото КАЗВА двойната си цена',
+      (await tekstNa(p, '[data-parkomyasto-dvete]')).includes('ДВЕ цени'), true);
+
+    razdel = '84 · Базите · смяната мени числото ДОЛУ';
+    const predBazata = await chisloNaPoleto(p, 'stoynost-a');
+    const predSabitiya = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, async () => {
+      await p.fill('#kalk-baza', '3500');
+      await p.dispatchEvent('#kalk-baza', 'change');
+    });
+    const sledBazata = await chisloNaPoleto(p, 'stoynost-a');
+    proveri('по-висока база дава по-висока стойност', sledBazata > predBazata, true);
+    proveri('и НИЩО от това не влиза в Журнала', await broySabitiya(p), predSabitiya);
+    // Връщането връща числото ТОЧНО — инак закръглянето би оставило утайка.
+    await deystvieSPrerisuvane(p, async () => {
+      await p.fill('#kalk-baza', '3000');
+      await p.dispatchEvent('#kalk-baza', 'change');
+    });
+    proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predBazata);
+
+    razdel = '84 · Базите · и ГАРАЖЪТ вече се пипа';
+    // `sBaza` приемаше всеки вид от самото начало; екранът редактираше само
+    // апартамента, значи гаражът се смяташе с число, недостижимо за човека.
+    await p.fill('[data-baza=garazh]', '1200');
+    await p.dispatchEvent('[data-baza=garazh]', 'change');
+    // ЧАКА СЕ САМАТА СТОЙНОСТ, не прерисуването: полето се пренаписва СЛЕД
+    // записа в паметта, и четене веднага след събитието хваща старото число.
+    await p.waitForFunction(() =>
+      ((document.querySelector('[data-baza=garazh]') as HTMLInputElement | null)?.value ?? '')
+        .replace(/\s/g, '')
+        .startsWith('1200'));
+    proveri('новата база на гаража се помни',
+      (await p.$eval('[data-baza=garazh]', (e) => (e as HTMLInputElement).value.replace(/\s/g, ''))).startsWith('1200'),
+      true);
+
     // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
     //
     // Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ в журнала… скачени с

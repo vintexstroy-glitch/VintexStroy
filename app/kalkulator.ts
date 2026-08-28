@@ -31,8 +31,14 @@
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { IMENA_NA_VIDOVETE_OBEKT, kvSmVM2 } from '../src/kalkulator/chetene.js';
 import {
+  IMENA_NA_VIDOVETE_OBEKT,
+  kvSmVM2,
+  VIDOVE_OBEKT,
+  type VidObekt,
+} from '../src/kalkulator/chetene.js';
+import {
+  bazataENegova,
   DOBAVKI,
   KLASOVE,
   KOEFITSIENTI,
@@ -71,11 +77,23 @@ let nastroyki: Nastroyki = Object.freeze({
   }),
   klas: chetiEkranno('kalk.klas', PO_PODRAZBIRANE.klas),
   dohodnost_bt: chetiEkranno('kalk.dohodnost', PO_PODRAZBIRANE.dohodnost_bt),
-  baza_st: Object.freeze({
-    ...PO_PODRAZBIRANE.baza_st,
-    apartament: chetiEkranno('kalk.baza', PO_PODRAZBIRANE.baza_st.apartament),
-  }),
+  baza_st: Object.freeze(
+    Object.fromEntries(
+      VIDOVE_OBEKT.map((vid) => [vid, chetiEkranno(klyuchNaBazata(vid), PO_PODRAZBIRANE.baza_st[vid])]),
+    ) as Record<VidObekt, number>,
+  ),
 });
+
+/**
+ * КЛЮЧЪТ НА ЕДНА БАЗА В ПАМЕТТА · ЕДИН дом (правило 17).
+ *
+ * Апартаментът пази СТАРИЯ си ключ `kalk.baza`: сменен на `kalk.baza.apartament`,
+ * той щеше да зареже онова, което човекът вече е въвел, и да се върне на
+ * подразбраното — тихо, при първото отваряне след обновяване.
+ */
+function klyuchNaBazata(vid: VidObekt): string {
+  return vid === 'apartament' ? 'kalk.baza' : `kalk.baza.${vid}`;
+}
 
 /** Кой обект се показва в разбивката · примерният, докато няма прочетен файл. */
 let pokazan: Vhod = PRIMEREN_OBEKT;
@@ -122,11 +140,32 @@ export function sektsiyaKalkulator(): string {
           : ''
       }
 
+      <div class="poleta" data-sektsiya="kalk-bazi">
+        ${VIDOVE_OBEKT.map((vid) => {
+          const negovo = bazataENegova(vid);
+          return `
+        <label class="pole${negovo ? ' negovo' : ''}">
+          <span>${ekraniraj(IMENA_NA_VIDOVETE_OBEKT[vid])} · €/м²</span>
+          <input translate="no" type="text" data-baza="${vid}"${
+            vid === 'apartament' ? ' id="kalk-baza"' : ''
+          } value="${pishiCyalo(nastroyki.baza_st[vid])}" inputmode="decimal">
+          <span class="drebno" data-otkade="${vid}">${
+            negovo
+              ? 'НЕГОВО число · И53 · И55'
+              : 'за разработка · чака него'
+          }</span>
+        </label>`;
+        }).join('')}
+      </div>
+      <p class="drebno" data-parkomyasto-dvete>
+        <b>Паркомястото носи ДВЕ цени, и това е находка, не решение.</b> Като
+        ГЛАВЕН обект то се смята на м² (полето горе); като ДОБАВКА към апартамент
+        — на БРОЙ (${pishi(DOBAVKI.find((d) => d.klyuch === 'parkomyasto')?.stoynost ?? 0)}). А методологията казва, че
+        при паркомясто „квадратните метри не значат нищо". И двете стоят, докато
+        той не каже коя пада — премълчаването би скрило разминаване в цена.
+      </p>
+
       <div class="poleta">
-        <label class="pole">
-          <span>Базова цена · €/м²</span>
-          <input translate="no" type="text" id="kalk-baza" value="${pishiCyalo(nastroyki.baza_st.apartament)}" inputmode="decimal">
-        </label>
         <label class="pole">
           <span>Доходност · клас</span>
           <select translate="no" id="kalk-klas">
@@ -361,13 +400,29 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
     await prerisuvay();
   });
 
-  koren.querySelector<HTMLInputElement>('#kalk-baza')?.addEventListener('change', async (e) => {
-    const st = stotinkiOtPole((e.target as HTMLInputElement).value);
-    if (st === undefined || st <= 0) return;
-    nastroyki = sBaza(nastroyki, 'apartament', st);
-    zapomniEkranno('kalk.baza', st);
-    await prerisuvay();
-  });
+  /**
+   * ПЕТТЕ БАЗИ · всяка със свое поле и свой ключ в паметта.
+   *
+   * `sBaza` приемаше всеки вид от самото начало, а екранът редактираше САМО
+   * апартамента — обявена възможност без лост (шарката на ADR-041). По-лошото
+   * беше тихо: човек, който смята ГАРАЖ, гледаше поле „Базова цена" и мислеше,
+   * че то важи за гаража; то важеше за апартамента, а гаражът се смяташе с
+   * число, което никой не можеше да пипне.
+   *
+   * ПАМЕТТА, НЕ ЖУРНАЛЪТ · базата е настройка на екрана, не факт от книгата.
+   * Ключът на апартамента остава `kalk.baza` — сменен, той щеше да загуби
+   * онова, което човекът вече е въвел (правило 1 по дух: не се трие тихо).
+   */
+  for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-baza]')) {
+    pole.addEventListener('change', async (e) => {
+      const vid = pole.dataset['baza'] as VidObekt;
+      const st = stotinkiOtPole((e.target as HTMLInputElement).value);
+      if (st === undefined || st <= 0) return;
+      nastroyki = sBaza(nastroyki, vid, st);
+      zapomniEkranno(klyuchNaBazata(vid), st);
+      await prerisuvay();
+    });
+  }
 
   koren.querySelector<HTMLInputElement>('#kalk-dohodnost')?.addEventListener('change', async (e) => {
     // Процентът се въвежда като „6,00" и живее като 600 базисни точки —

@@ -48,6 +48,17 @@ export const IMENA_NA_VIDOVETE_OBEKT: Readonly<Record<VidObekt, string>> = Objec
   drug: 'друго',
 });
 
+/**
+ * ПЕТТЕ ВИДА, В РЕД · ИЗВЕДЕНИ от имената, не преписани до тях.
+ *
+ * Втори списък със същите пет ключа щеше да е второ място, което се разминава
+ * при шести вид (правило 17). Редът е онзи от съюза и от имената — той е и
+ * редът, в който екранът ги показва.
+ */
+export const VIDOVE_OBEKT: readonly VidObekt[] = Object.freeze(
+  Object.keys(IMENA_NA_VIDOVETE_OBEKT) as VidObekt[],
+);
+
 /** Един прочетен обект. Площите са в цели КВАДРАТНИ САНТИМЕТРИ — без float. */
 export interface ProchetenObekt {
   /** името, дословно: „Апартамент 1" · „Двоен гараж 7 и 8 и склад" */
