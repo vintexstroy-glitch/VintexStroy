@@ -684,6 +684,7 @@ async function trugvay(): Promise<void> {
         rolyataNa(kojSam.imeyl, ogledalo),
         lichnoOgledalo !== null,
         koyGleda(kojSam.imeyl, ogledalo),
+        ogledalo.napVklyuchena,
       )}
       <main class="glavno">
         <header class="shapka">
@@ -761,6 +762,7 @@ async function trugvay(): Promise<void> {
               rolya: rolyataNa(kojSam.imeyl, ogledalo),
               lichnoVklyucheno,
               lichnoPipnato: lichnoOgledalo !== null,
+              napVklyuchena: ogledalo.napVklyuchena,
             }),
           })}
         </div>
@@ -805,15 +807,7 @@ async function trugvay(): Promise<void> {
           ?.addEventListener('click', async () => {
             try {
               const og = await k.deystviya.ogledalo();
-              const red = podredeniPunktove(
-                dostapniteEkrani({
-                  rolya: rolyataNa(kojSam.imeyl, og),
-                  lichnoVklyucheno,
-                  lichnoPipnato: lichnoOgledalo !== null,
-                }),
-                og.redNaLentata,
-                moyatRed(),
-              );
+              const red = podredeniPunktove(dostapnite(og), og.redNaLentata, moyatRed());
               await k.deystviya.podrediLentata(
                 { red: [...red] },
                 { opId: `lenta:${crypto.randomUUID()}` },
@@ -870,6 +864,21 @@ async function trugvay(): Promise<void> {
     // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
     // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
+    /**
+     * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
+     *
+     * Стрелките и бутонът „Запиши началния ред" питат едно и също, и питаха го
+     * с два еднакви къса — обходът за чистота ги хвана веднага. Разминат ли се,
+     * човек ще подрежда по един списък, а ще публикува друг.
+     */
+    const dostapnite = (og: Ogledalo) =>
+      dostapniteEkrani({
+        rolya: rolyataNa(kojSam.imeyl, og),
+        lichnoVklyucheno,
+        lichnoPipnato: lichnoOgledalo !== null,
+        napVklyuchena: og.napVklyuchena,
+      });
+
     // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
     zakachiSvivachaNaLentata(koren, prerisuvay);
     // И СЕ ПОДРЕЖДА · всеки за себе си (И111). Стрелките пишат в паметта на
@@ -881,11 +890,7 @@ async function trugvay(): Promise<void> {
         e.stopPropagation();
         const og = await k.deystviya.ogledalo();
         premestiVMoyaRed(
-          dostapniteEkrani({
-            rolya: rolyataNa(kojSam.imeyl, og),
-            lichnoVklyucheno,
-            lichnoPipnato: lichnoOgledalo !== null,
-          }),
+          dostapnite(og),
           og.redNaLentata,
           b.dataset['mesti']!,
           b.dataset['posoka'] as 'gore' | 'dolu',
@@ -938,6 +943,8 @@ function dostapniteEkrani(n: {
   readonly rolya: Rolya;
   readonly lichnoVklyucheno: boolean;
   readonly lichnoPipnato: boolean;
+  /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
+  readonly napVklyuchena: boolean;
 }): readonly KoyEkran[] {
   return (Object.keys(EKRANI) as KoyEkran[]).filter((koy) => {
       // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
@@ -948,6 +955,10 @@ function dostapniteEkrani(n: {
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
       if (koy === 'lichno') return n.lichnoVklyucheno || !n.lichnoPipnato;
+      // НАП · ТРЕТАТА врата · включена ли е връзката В ЖУРНАЛА (резен 17).
+      // Планът и отметката се питат по-долу, като за всеки друг екран; това тук
+      // е фактът, който само Стопанинът може да смени и който всички получават.
+      if (koy === 'nap') return n.napVklyuchena;
       // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
       // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
       // НЕГОВИ — езикът на интерфейса и личният таб.
@@ -966,6 +977,8 @@ function strana(
   lichnoPipnato = false,
   /** кой гледа · оттам идват темите на падащия ред (И101 т.2) */
   gledashtiyat: KoyGleda = 'stopanin',
+  /** връзката с НАП · ФАКТ от Журнала, третата врата на пункта (резен 17) */
+  napVklyuchena = false,
 ): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
@@ -978,7 +991,7 @@ function strana(
   // СВИТА ЛИ Е · поглед, не факт: чете се от паметта на екрана (ADR-058).
   const svita = lentataESvita();
 
-  const dostapni = dostapniteEkrani({ rolya, lichnoVklyucheno, lichnoPipnato });
+  const dostapni = dostapniteEkrani({ rolya, lichnoVklyucheno, lichnoPipnato, napVklyuchena });
   /**
    * ТРИТЕ СЛОЯ НА РЕДА · и ЧЕТВЪРТИЯТ въпрос, кое се вижда (резен 15 · И111).
    *

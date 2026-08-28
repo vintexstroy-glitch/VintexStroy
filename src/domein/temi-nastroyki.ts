@@ -214,7 +214,9 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     ime: 'Одитен файл (SAF-T)',
     opis: 'главната книга и месечният XML за НАП · и какво още го спира',
     ikona: 'kniga',
-    kade: { vid: 'sektsiya', ekran: 'smetki', sektsiya: 'saf-t' },
+    // ЕДИН РЕД · това е цялата цена на преместването от Сметки в НАП
+    // (резен 17б). Темата не знае къде живее секцията — знае само ключа ѝ.
+    kade: { vid: 'sektsiya', ekran: 'nap', sektsiya: 'saf-t' },
     grupa: 'schetovodstvo',
     za: RABOTESHTITE,
   },

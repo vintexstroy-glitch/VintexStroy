@@ -691,8 +691,65 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
   let razdel = '—';
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    // ══ 85 · НАП · ПРЕДИ активиране НЯМА такъв пункт (резен 17 · И108) ══════
+    razdel = '85 · НАП · пунктът се появява СЛЕД активиране';
+    proveri('преди активиране НЯМА пункт „НАП" в лентата',
+      await p.$$eval('[data-ekran=nap]', (e) => e.length), 0);
+
+    await naEkran(p, 'nastroyki', '[data-sektsiya=nap]');
+    proveri('но в Настройки СТОИ картата със съгласието',
+      await p.$$eval('#razbrah-nap', (e) => e.length), 1);
+    proveri('и кутийката НЕ е сложена предварително',
+      await p.$eval('#razbrah-nap', (e) => (e as HTMLInputElement).checked), false);
+    // ПЕТТЕ РИСКА се КАЗВАТ, не се подразбират.
+    const riskovete = await tekstNa(p, '[data-sektsiya=nap]');
+    proveri('казва се, че отговорността е на данъчно задълженото лице',
+      riskovete.includes('отговаря данъчно задълженото лице'), true);
+    proveri('и че електронният подпис е НЕДОСТИЖИМ от браузър',
+      riskovete.includes('смарт-карта'), true);
+    proveri('и че приложението НЕ подава',
+      riskovete.includes('НЕ подава'), true);
+
+    // БЕЗ ОТМЕТКА · нула събития и нула пункт.
+    const predNAP = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#vklyuchi-nap'));
+    proveri('без отметка връзката НЕ се включва', await broySabitiya(p), predNAP);
+    proveri('и се казва защо',
+      (await tekstNa(p, '.vest')).includes('не е сложена'), true);
+
+    // С ОТМЕТКА · ЕДНО събитие, и пунктът се появява.
+    await p.check('#razbrah-nap');
+    await sSabitie(p, () => p.click('#vklyuchi-nap'));
+    proveri('с отметка влиза ТОЧНО едно събитие', await broySabitiya(p), predNAP + 1);
+    await p.waitForSelector('[data-ekran=nap]');
+    proveri('и пунктът „НАП" се появява в лентата',
+      await p.$$eval('[data-ekran=nap]', (e) => e.length), 1);
+    proveri('а Настройки показва КОЙ е дал съгласието',
+      (await tekstNa(p, '[data-sektsiya=nap]')).includes('vintexstroy@gmail.com'), true);
+
+    razdel = '85 · НАП · типовите таблици с ЧЕСТЕН статус';
+    await naEkran(p, 'nap', '[data-sektsiya=nap-tipovi]');
+    proveri('деветте типови таблици се изреждат',
+      await p.$$eval('[data-tipova]', (e) => e.length), 9);
+    // ТРИ думи, не две · „частично" е онова, което две думи биха скрили.
+    const dokade = await p.$$eval('[data-dokade]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['dokade']));
+    proveri('и трите състояния присъстват',
+      new Set(dokade).size, 3);
+    proveri('поне едно е ЧАСТИЧНО · половин работа не минава за цяла',
+      dokade.includes('chastichno'), true);
+
+    razdel = '85 · НАП · празните кодове се БРОЯТ';
+    proveri('немапнатите сметки се броят на екрана',
+      Number(await p.$eval('[data-broi-kodove]', (e) => (e as HTMLElement).dataset['broiKodove'])),
+      13);
+    proveri('и се казва ЗАЩО стоят празни',
+      (await tekstNa(p, '[data-sektsiya=nap-kodove]')).includes('чл. 277а'), true);
+
     razdel = '66 · Одитният файл · пречките се четат';
-    await naEkran(p, 'smetki', '[data-sektsiya=saf-t]');
+    // ДОШЪЛ Е В СВОЙ ЕКРАН (резен 17б). Секцията пази `data-sektsiya=saf-t`,
+    // затова всички проверки долу оцеляват — сменя се само откъде се стига.
+    await naEkran(p, 'nap', '[data-sektsiya=saf-t]');
     proveri('секцията е на екрана с версията на схемата',
       (await p.$eval('[data-sektsiya=saf-t] .dyalglava span', (e) => e.textContent)).includes('1.0.2'),
       true);
@@ -737,7 +794,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и редът се появява като ПЪЛЕН',
       (await p.$eval('.red.kontragent .znachka', (e) => e.textContent)).trim(), 'пълен');
 
-    await naEkran(p, 'smetki', '[data-sektsiya=saf-t]');
+    await naEkran(p, 'nap', '[data-sektsiya=saf-t]');
     proveri('пречките са с ЕДНА по-малко',
       (await p.$$eval('[data-sektsiya=saf-t] .prechki li', (e) => e.length)) < prechkiPredi, true);
     proveri('и вече не пише, че фирмата липсва',

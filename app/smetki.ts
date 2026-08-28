@@ -267,7 +267,6 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
 
-    ${blokNaOditniyaFayl(o, mesets)}
 
     <section data-sektsiya="smetki-sverka">
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
@@ -317,98 +316,6 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${kalkulator()}
   `;
-}
-
-/**
- * ОДИТНИЯТ ФАЙЛ · Главната книга и месечният XML за НАП (И96 т.11 · ADR-047).
- *
- * ЗАЩО В СМЕТКИ, а не в Настройки: това е ЧИСЛО ЗА МЕСЕЦ, като справката до
- * него. Файлът за юли се прави от юлските данни и се сверява срещу тях —
- * човекът, който гледа сметките на месеца, е и онзи, който подава.
- *
- * ЗАЩО ПРЕЧКИТЕ СА ГОРЕ: файл, обявен за готов, когато не е, се разбира от
- * акта. Затова първото, което се вижда, е какво още липсва — поименно.
- */
-function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
-  const r = safT(o, mesets, new Date().toISOString());
-  const ob = oboroti(r.kniga);
-  return `
-    <section class="karta" data-sektsiya="saf-t">
-      <div class="dyalglava">
-        <h2>Одитен файл (SAF-T)</h2>
-        <span>схема ${ekraniraj(SHEMA.versiya)} · в сила от ${ekraniraj(SHEMA.vSilaOt)} · ${ekraniraj(mesets)}</span>
-      </div>
-
-      <div class="plochki">
-        <div class="plochka">
-          <span class="etiket">Статии</span>
-          <span class="chislo" translate="no">${r.broiStatii}</span>
-          <span class="pod">двустранни · дебит = кредит</span>
-        </div>
-        <div class="plochka">
-          <span class="etiket">Продажби · покупки</span>
-          <span class="chislo" translate="no">${r.broiProdazhbi} · ${r.broiPokupki}</span>
-          <span class="pod">фактурите в SourceDocuments</span>
-        </div>
-        <div class="plochka">
-          <span class="etiket">Плащания</span>
-          <span class="chislo" translate="no">${r.broiPlashtaniya}</span>
-          <span class="pod">Payments</span>
-        </div>
-        <div class="plochka${r.prechki.length === 0 ? '' : ' trevoga'}">
-          <span class="etiket">Готовност</span>
-          <span class="chislo" translate="no">${r.prechki.length === 0 ? '—' : r.prechki.length}</span>
-          <span class="pod">${r.prechki.length === 0 ? 'няма пречки за подаване' : 'пречки · изброени долу'}</span>
-        </div>
-      </div>
-
-      ${
-        r.prechki.length === 0
-          ? ''
-          : `<ul class="prechki">${r.prechki.map((p) => `<li>${ekraniraj(p)}</li>`).join('')}</ul>`
-      }
-
-      <div class="tablitsa">
-        <div class="glava saft">
-          <span>Сметка</span><span>Национален код</span>
-          <span class="suma">Дебит</span><span class="suma">Кредит</span>
-        </div>
-        ${
-          ob.length === 0
-            ? '<p class="prazno">Няма статии за този месец.<br>Празният месец пак дава валиден по структура файл.</p>'
-            : ob
-                .map(
-                  (r2) => `
-          <div class="red saft" translate="no">
-            <span class="kletka"><b>${ekraniraj(r2.smetka.nomer)}</b><span>${ekraniraj(r2.smetka.ime)}</span></span>
-            <span>${r2.smetka.nra === '' ? '<em>не е мапната</em>' : ekraniraj(r2.smetka.nra)}</span>
-            <span class="suma" data-st="${r2.debit_st}">${pishi(r2.debit_st)}</span>
-            <span class="suma" data-st="${r2.kredit_st}">${pishi(r2.kredit_st)}</span>
-          </div>`,
-                )
-                .join('')
-        }
-        <div class="red saft sbor" translate="no">
-          <span class="kletka"><b>Общо</b><span>дебит ↔ кредит</span></span>
-          <span></span>
-          <span class="suma" data-st="${r.kniga.debit_st}">${pishi(r.kniga.debit_st)}</span>
-          <span class="suma${r.kniga.debit_st === r.kniga.kredit_st ? '' : ' duljimo'}" data-st="${r.kniga.kredit_st}">${pishi(r.kniga.kredit_st)}</span>
-        </div>
-      </div>
-
-      <div class="deystviya">
-        ${butonSIkona({
-          ikona: 'iznos',
-          tekst: 'Свали файла',
-          title: 'Сглобява XML-а и го сваля на устройството',
-          klas: 'vtorichen',
-          danni: { 'svali-saft': mesets },
-        })}
-        <p class="drebno">Файлът се сглобява МЕСТНО и се сваля — приложението не го изпраща наникъде.
-        Той НЕ е проверен срещу самата XSD-схема на НАП: истинската проверка е ТЕСТОВОТО подаване
-        през портала им. ${ekraniraj(ZASHTO_I_NULATA)}</p>
-      </div>
-    </section>`;
 }
 
 /**
@@ -1070,25 +977,6 @@ export function zakachiSmetki(
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
 
-  /**
-   * ОДИТНИЯТ ФАЙЛ (И96 т.11) · сглобява се при НАТИСКАНЕ, не при рисуване.
-   *
-   * XML-ът за месец с хиляди записи е мегабайти низ; сглобен при всяко
-   * прерисуване, той щеше да струва на всяко натискане на клавиш. Числата
-   * горе идват от същата функция, но екранът ги иска и без да се сваля —
-   * затова се сглобява два пъти само когато човекът наистина поиска файла.
-   */
-  koren.querySelector<HTMLButtonElement>('[data-svali-saft]')?.addEventListener('click', async (e) => {
-    const mesets = (e.currentTarget as HTMLElement).dataset['svaliSaft']!;
-    const r = safT(await k.deystviya.ogledalo(), mesets, new Date().toISOString());
-    svaliFayl(new Blob([r.xml], { type: 'application/xml' }), r.ime);
-    k.vest(
-      r.prechki.length === 0 ? 'dobre' : 'zle',
-      r.prechki.length === 0
-        ? `Файлът ${r.ime} е свален · ${r.broiStatii} статии`
-        : `Файлът е свален, но ${r.prechki.length} пречки още стоят — виж описа над бутона.`,
-    );
-  });
   zakachiKoefitsientite(koren, prerisuvay);
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
   zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
