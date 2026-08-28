@@ -159,5 +159,74 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('наем без поща не показва празен бутон',
       await p.$$eval('.red.vzemane:has-text("Домакинство") [data-pismo]', (e) => e.length), 0);
 
+    // ══ 87 · РЕГИСТЪРЪТ НА НАЕМИТЕ · три изгледа, един сбор (резен 13б) ═══
+    razdel = '87 · регистърът на наемите · трите изгледа';
+    await naEkran(p, 'imoti', '[data-sektsiya=naemi-registar]');
+    proveri('трите изгледа стоят ВИДИМИ наведнъж · скритото не се сравнява',
+      await p.$$eval('[data-registar-izgled]', (e) => e.length), 3);
+    proveri('и точно ЕДИН е избран',
+      await p.$$eval('[data-registar-izgled][aria-pressed=true]', (e) => e.length), 1);
+
+    const ostatakNa = async (): Promise<string> =>
+      p.$eval('[data-registar=ostatak]', (e) => (e as HTMLElement).textContent!.trim());
+    const grupiNa = async (): Promise<number> => p.$$eval('[data-grupa]', (e) => e.length);
+    const smeniMeseca = async (m: string): Promise<void> => {
+      await deystvieSPrerisuvane(p, () =>
+        p.$eval('#registar-mesets', (e, stoynost) => {
+          (e as HTMLInputElement).value = stoynost as string;
+          e.dispatchEvent(new Event('change', { bubbles: true }));
+        }, m));
+    };
+
+    // РЕГИСТЪРЪТ ОТВАРЯ НА ТЕКУЩИЯ МЕСЕЦ, а данните на прохода са за 2026-02.
+    // Насочваме го натам, ИНАЧЕ всички числа са нула и сверката отдолу сравнява
+    // нула с нула — тя мина, докато я счупих нарочно, и това я хвана.
+    await smeniMeseca('2026-02');
+
+    const ostatakPoNaemateli = await ostatakNa();
+    const grupiPoNaemateli = await grupiNa();
+    proveri('регистърът показва редове', grupiPoNaemateli > 0, true);
+    // ЧИСЛОТО ТРЯБВА ДА Е РАЗЛИЧНО ОТ НУЛА · инак сверката долу сравнява нула с
+    // нула и минава, каквото и да е счупено. Проверка, която не може да се
+    // спъне, е надпис — това се хвана при нарочно счупване.
+    proveri('и остатъкът НЕ е нула · инак сверката отдолу мери нищо',
+      Number(await p.$eval('[data-registar=ostatak]', (e) =>
+        (e as HTMLElement).closest('.plochka')!.querySelector('.chislo')!.textContent!
+          .replace(/[^\d]/g, ''))) > 0, true);
+
+    // СВЕРКА ВХОД↔ИЗХОД НА ЕКРАНА · трите изгледа са ГРУПИРОВКИ на едни и същи
+    // редове. Дадат ли различни числа, вариантът престава да е избор и става
+    // три отделни истини — точно затова не са три таблици.
+    const predIzgleda = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('[data-registar-izgled=imoti]'));
+    proveri('по ИМОТ сборът е СЪЩИЯТ', await ostatakNa(), ostatakPoNaemateli);
+    proveri('но групите са ДРУГИ · инак изгледът не носи нищо',
+      (await grupiNa()) !== grupiPoNaemateli, true);
+    proveri('и превключването добавя НУЛА събития · това е ПОГЛЕД',
+      await broySabitiya(p), predIzgleda);
+
+    await deystvieSPrerisuvane(p, () => p.click('[data-registar-izgled=naemateli]'));
+    proveri('връщането дава пак първото число', await ostatakNa(), ostatakPoNaemateli);
+
+    razdel = '87 · регистърът · стъпката се СМЯТА и се КАЗВА с дума';
+    const stapki = await p.$$eval('[data-stapka]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['stapka']));
+    proveri('всеки ред носи стъпка', stapki.length > 0, true);
+    proveri('и всяка е от четирите познати',
+      stapki.every((x) => ['nezapochnat', 'nachislen', 'chastichno', 'sabran'].includes(x!)), true);
+    const tekstRegistar = await tekstNa(p, '[data-sektsiya=naemi-registar]');
+    proveri('състоянието се казва с ДУМА, не само с цвят',
+      /начислен|събран|частично|няма начисление/.test(tekstRegistar), true);
+    proveri('и се казва, че регистърът само ЧЕТЕ',
+      tekstRegistar.includes('само ЧЕТЕ Журнала'), true);
+
+    razdel = '87 · регистърът · месецът се избира и мени числата';
+    const predMeseca = await broySabitiya(p);
+    await smeniMeseca('2020-01');
+    proveri('празен месец казва защо е празен',
+      (await tekstNa(p, '[data-sektsiya=naemi-registar]')).includes('Няма живо наемане'), true);
+    proveri('и смяната на месец също е ПОГЛЕД · нула събития',
+      await broySabitiya(p), predMeseca);
+
     // ══ 27 · удобството · сортиране, търсене, памет, история, меню ═══════
 }

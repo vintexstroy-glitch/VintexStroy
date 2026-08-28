@@ -17,6 +17,18 @@ import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
 import { poImot } from '../src/ogledalo/izgledi.js';
+import {
+  grupirano,
+  IMENA_NA_IZGLEDITE,
+  IMENA_NA_STAPKITE,
+  IZGLEDI,
+  registarZaGodina,
+  registarZaMeseca,
+  sboroveNaRegistara,
+  VAPROSAT_NA_IZGLEDA,
+  type IzgledNaRegistara,
+} from '../src/domein/registar-naemi.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { butonSIkona } from './ikoni.js';
@@ -380,8 +392,136 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
     </section>`
     }
+    ${sektsiyaNaRegistara(ogledalo, dnes)}
     ${sektsiyaPoImot(ogledalo)}
   `;
+}
+
+/**
+ * РЕГИСТЪРЪТ НА НАЕМИТЕ · отчитане и събиране (резен 13б · И43 · ADR-070).
+ *
+ * ═══ НЕГОВАТА ПОРЪЧКА ═══
+ *
+ *   „Ти предложи най-модерната таблица, използвана в такива програми за
+ *    отчитане и събиране на наеми, и предложи решения като варианти."
+ *
+ * Затова тук НЕ се избира вместо него: и трите варианта се рисуват, и той ги
+ * превключва с един бутон. Разликата се ВИЖДА, вместо да се описва.
+ *
+ * ═══ ЗАЩО ИЗГЛЕДИ, А НЕ ТРИ ТАБЛИЦИ ═══
+ *
+ * Три отделни таблици биха дали ТРИ ЧИСЛА за едни и същи пари — и точно тогава
+ * той не би могъл да ги сравни. Изгледите са ГРУПИРОВКИ на едни и същи редове;
+ * сборът им е равен и това се брои от тест, не се обещава тук.
+ *
+ * ═══ ИЗБОРЪТ Е ПОГЛЕД ═══
+ *
+ * Кой изглед и кой месец се помнят в паметта на екрана, не в Журнала (ADR-022 ·
+ * правило 23): това е какво гледам аз, не какво е вярно за всички. Затова
+ * превключването добавя НУЛА събития — и проходът го брои.
+ *
+ * ЗАПАЗЕНАТА ГРАНИЦА: този регистър само ЧЕТЕ. Негова дума (р57·[14]): „в наеми
+ * само наема да регистрираш и статуса, нямаш добавяне" — въвеждането става от
+ * формите горе, не оттук.
+ */
+function sektsiyaNaRegistara(o: Ogledalo, dnes: string): string {
+  if (o.naemi.size === 0) return '';
+  const izgled = chetiEkranno<IzgledNaRegistara>('registar.izgled', 'naemateli');
+  const mesets = chetiEkranno('registar.mesets', dnes.slice(0, 7));
+  // „По месец" иска дванайсетте месеца ДО избрания; другите два — само него.
+  const redove =
+    izgled === 'mesetsi' ? registarZaGodina(o, mesets, dnes) : registarZaMeseca(o, mesets, dnes);
+  const sbor = sboroveNaRegistara(redove);
+  const grupi = grupirano(redove, izgled);
+
+  return `
+    <section data-sektsiya="naemi-registar">
+      <div class="dyalglava">
+        <h2>Регистър на наемите</h2>
+        <span>${VAPROSAT_NA_IZGLEDA[izgled]}</span>
+      </div>
+
+      <div class="registar-lostove">
+        <div class="izgledi" role="group" aria-label="изглед на регистъра">
+          ${IZGLEDI.map(
+            (i) => `<button type="button" class="chip-izgled" data-registar-izgled="${i}"
+              aria-pressed="${i === izgled}">${IMENA_NA_IZGLEDITE[i]}</button>`,
+          ).join('')}
+        </div>
+        <label class="pole tesen">
+          <span>${izgled === 'mesetsi' ? 'До месец' : 'Месец'}</span>
+          <input translate="no" type="month" id="registar-mesets" value="${ekraniraj(mesets)}">
+        </label>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">Начислено</span>
+          <span class="chislo" translate="no" data-registar="nachisleno">${pishi(sbor.nachisleno_st)}</span>
+          <span class="pod">${sbor.redove} ${sbor.redove === 1 ? 'ред' : 'реда'}</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Събрано</span>
+          <span class="chislo" translate="no" data-registar="plateno">${pishi(sbor.plateno_st)}</span>
+          <span class="pod">по вземанията</span>
+        </div>
+        <div class="plochka${sbor.ostatak_st === 0 ? '' : ' trevoga'}">
+          <span class="etiket">Остава</span>
+          <span class="chislo" translate="no" data-registar="ostatak">${pishi(sbor.ostatak_st)}</span>
+          <span class="pod">${sbor.prosrocheni === 0 ? 'нищо просрочено' : `${sbor.prosrocheni} просрочени`}</span>
+        </div>
+      </div>
+
+      ${
+        grupi.length === 0
+          ? '<p class="prazno">Няма живо наемане за този месец.<br>Регистърът чете Журнала — той не добавя наеми.</p>'
+          : grupi
+              .map(
+                (g) => `<div class="registar-grupa" data-grupa="${ekraniraj(g.klyuch)}">
+        <div class="grupa-glava">
+          <b translate="no">${ekraniraj(g.ime)}</b>
+          <span class="suma" data-st="${g.sborove.ostatak_st}">${
+            g.sborove.ostatak_st === 0 ? 'събрано' : `остава ${pishi(g.sborove.ostatak_st)}`
+          }</span>
+        </div>
+        <div class="tablitsa" data-tablitsa="registar-${ekraniraj(g.klyuch)}">
+          <div class="glava registar">
+            <span data-kolona="koy" data-ime="Наемател">Наемател</span>
+            <span data-kolona="imot" data-ime="Имот">Имот</span>
+            <span data-kolona="mesets" data-ime="Месец">Месец</span>
+            <span class="suma" data-kolona="nachisleno" data-ime="Начислено">Начислено</span>
+            <span class="suma" data-kolona="plateno" data-ime="Платено">Платено</span>
+            <span class="suma" data-kolona="ostatak" data-ime="Остава">Остава</span>
+            <span data-kolona="stapka" data-ime="Стъпка">Стъпка</span>
+          </div>
+          ${g.redove
+            .map(
+              (r) => `<div class="red registar" translate="no" data-red-naem="${ekraniraj(r.naemId)}">
+            <span>${ekraniraj(r.naemetel)}</span>
+            <span>${ekraniraj(r.imot)}</span>
+            <span>${ekraniraj(r.mesets)}</span>
+            <span class="suma" data-st="${r.nachisleno_st}">${pishi(r.nachisleno_st)}</span>
+            <span class="suma" data-st="${r.plateno_st}">${pishi(r.plateno_st)}</span>
+            <span class="suma${r.ostatak_st === 0 ? '' : ' duljimo'}" data-st="${r.ostatak_st}">${pishi(r.ostatak_st)}</span>
+            <span><span class="znachka ${r.stapka === 'sabran' ? 'dobre' : r.dniZakasnenie > 0 ? 'trevoga' : 'tiha'}"
+              data-stapka="${r.stapka}">${IMENA_NA_STAPKITE[r.stapka]}</span>${
+                r.dniZakasnenie > 0
+                  ? `<span class="zakasnenie">${r.dniZakasnenie} ${r.dniZakasnenie === 1 ? 'ден' : 'дни'}</span>`
+                  : ''
+              }</span>
+          </div>`,
+            )
+            .join('')}
+        </div>
+      </div>`,
+              )
+              .join('')
+      }
+
+      <p class="drebno">Регистърът само ЧЕТЕ Журнала — наем се добавя от формите горе,
+      плащане се приема в Пари. Смяната на изглед и на месец е ПОГЛЕД: тя не влиза в
+      Журнала и не мени нито едно число.</p>
+    </section>`;
 }
 
 /**
@@ -543,6 +683,25 @@ function opisi(i: Imot): string {
 export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · наемателят е живо поле.
   zakachiMenyuta(koren, rechnitsite(RECHNIK_NAEM));
+
+  /**
+   * ДВАТА ЛОСТА НА РЕГИСТЪРА · и двата са ПОГЛЕД (резен 13б · ADR-070).
+   *
+   * Изгледът и месецът живеят в паметта на екрана, не в Журнала: те казват
+   * какво гледам АЗ, не какво е вярно за всички (ADR-022 · правило 23).
+   * Затова тук няма нито едно повикване към Вратата — превключването добавя
+   * НУЛА събития, и проходът брои точно това.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-registar-izgled]')) {
+    b.addEventListener('click', async () => {
+      zapomniEkranno('registar.izgled', b.dataset['registarIzgled']!);
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLInputElement>('#registar-mesets')?.addEventListener('change', async (e) => {
+    zapomniEkranno('registar.mesets', (e.target as HTMLInputElement).value);
+    await prerisuvay();
+  });
 
   // ── имот: нов или поправен ───────────────────────────────────────────────
   const formaImot = koren.querySelector<HTMLFormElement>('#forma-imot');

@@ -916,6 +916,59 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 }
 .prechki li + li { margin-top: 5px; }
 
+/* РЕГИСТЪРЪТ НА НАЕМИТЕ (резен 13б · ADR-070) · три изгледа върху едни редове. */
+.registar-lostove {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.izgledi { display: flex; gap: 2px; }
+/* Превключвателят е ЕДИН ред бутони, не падащо меню: и трите варианта трябва
+   да се ВИЖДАТ наведнъж — той ги сравнява, а скритото не се сравнява. */
+.chip-izgled {
+  font: inherit;
+  font-size: 0.929rem;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: var(--hartiya);
+  color: var(--mastilo2);
+  border: 1px solid var(--liniya);
+}
+.chip-izgled:first-child { border-radius: 6px 0 0 6px; }
+.chip-izgled:last-child { border-radius: 0 6px 6px 0; }
+.chip-izgled:hover { color: var(--mastilo); border-color: var(--mastilo2); }
+.chip-izgled[aria-pressed='true'] {
+  background: var(--mastilo);
+  color: var(--hartiya);
+  border-color: var(--mastilo);
+}
+.registar-grupa { margin-bottom: var(--space-md); }
+.grupa-glava {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  background: var(--panel);
+  border-radius: 6px 6px 0 0;
+  font-size: 0.964rem;
+}
+.grupa-glava .suma { color: var(--mastilo2); font-size: 0.893rem; }
+.glava.registar, .red.registar {
+  grid-template-columns: minmax(0, 200px) minmax(0, 260px) 92px 120px 120px 120px minmax(0, 210px);
+  min-width: 900px;
+}
+/* Дните закъснение стоят ДО думата, не вместо нея: числото без дума е упрек,
+   а думата без число не казва колко (ADR-032 §1 — състояние никога само с цвят). */
+.zakasnenie {
+  margin-left: 6px;
+  font-size: 0.821rem;
+  color: var(--srok-prosrocheno);
+  font-variant-numeric: tabular-nums;
+}
+
 /* КАКВО НАПУСКА УСТРОЙСТВОТО (резен 17в · ADR-068 · ADR-030 §4).
    Разгънатите подробности са ТРИ и всяка носи бройка в заглавието си: човек,
    който не отвори нито една, пак вижда КОЛКО имена ще носи файлът. */
