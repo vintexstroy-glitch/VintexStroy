@@ -26,6 +26,7 @@ import {
   mozheDaRedaktiraKolona,
   napraviPrava,
   poTyasnoto,
+  stesniVsichki,
   PRAVA_NA_KOLONA,
   pravaOtZhurnala,
   pravoNaKolona,
@@ -465,5 +466,63 @@ describe('изданието · Стартъп Алфа', () => {
     // Ако някой ден се слеят, това ще падне пръв.
     expect(PLAN_PO_PODRAZBIRANE).toBe('profesionalen');
     expect(String(SEGA.stepen)).not.toBe(String(PLAN_PO_PODRAZBIRANE));
+  });
+});
+
+/**
+ * ТРИТЕ ОБХВАТА · И103: „по цяло меню или по отделна таблица и колона от
+ * хедъра". Тук се пази СРЕДНИЯТ — цялата таблица с една дума. Цялото меню е
+ * същият изход, повторен на всяка таблица в групата: право на таб няма и не се
+ * измисля (`hedari-po-tabove.test.ts` пази групирането).
+ */
+describe('цялата таблица с ЕДНА дума', () => {
+  const prazni = napraviPrava({ imeyl: 'a@b.bg', model: 'Банка' });
+
+  it('„скрито" слага ВСИЧКИ колони в скритите', () => {
+    const p = stesniVsichki(prazni, 4, 'skrito');
+    expect(p.skriti).toEqual([0, 1, 2, 3]);
+    expect(p.samoVizhdat).toEqual([]);
+  });
+
+  it('„вижда" слага всички в СВОЯ списък, не в скритите — двете стеснения са две', () => {
+    const p = stesniVsichki(prazni, 3, 'vizhda');
+    expect(p.samoVizhdat).toEqual([0, 1, 2]);
+    expect(p.skriti).toEqual([]);
+  });
+
+  it('„редактира" ИЗПРАЗВА двата списъка · записват се само отклоненията', () => {
+    const skrito = stesniVsichki(prazni, 3, 'skrito');
+    const varnato = stesniVsichki(skrito, 3, 'redaktira');
+    expect(varnato.skriti).toEqual([]);
+    expect(varnato.samoVizhdat).toEqual([]);
+  });
+
+  it('по-широкият обхват ЗАМЕНЯ по-тесния избор, не се наслагва върху него', () => {
+    const smesen = napraviPrava({ imeyl: 'a@b.bg', model: 'Банка', skriti: [0], samoVizhdat: [2] });
+    const p = stesniVsichki(smesen, 4, 'vizhda');
+    expect(p.skriti).toEqual([]);
+    expect(p.samoVizhdat).toEqual([0, 1, 2, 3]);
+  });
+
+  it('имейлът и хедърът НЕ се менят — обхватът пипа колоните, не двойката', () => {
+    const p = stesniVsichki(prazni, 2, 'skrito');
+    expect(p.imeyl).toBe('a@b.bg');
+    expect(p.model).toBe('Банка');
+  });
+
+  it('таблица с НУЛА колони дава празни списъци, не гърми', () => {
+    expect(stesniVsichki(prazni, 0, 'skrito').skriti).toEqual([]);
+  });
+
+  it('брой колони, който не е брой, се ОТКАЗВА гласно', () => {
+    expect(() => stesniVsichki(prazni, -1, 'skrito')).toThrow(GreshkaPravo);
+    expect(() => stesniVsichki(prazni, 2.5, 'skrito')).toThrow(GreshkaPravo);
+  });
+
+  it('видът на колоната се чете и от НЕ-модел · вградената таблица няма модел', () => {
+    // Вградените таблици (Имоти · Наеми · …) се раждат в кода, не от файл.
+    // Правилото им е ЕДНО и също: сметнатата колона не се редактира от никого.
+    expect(vidNaKolona({ zatvoreni: [1, 3] }, 1)).toBe('zatvorena');
+    expect(vidNaKolona({ zatvoreni: [1, 3] }, 2)).toBe('promenlyva');
   });
 });

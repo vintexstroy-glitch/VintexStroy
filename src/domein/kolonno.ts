@@ -77,7 +77,6 @@
  * Пълната тема — `docs/izvori/03-koloni-hedari-tablitsi.md` · ADR-065.
  */
 
-import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import {
   IMENA_NA_ROLITE,
   mozheDaRedaktira,
@@ -255,8 +254,20 @@ export function belegNaPravo(p: PravaZaModel): string {
   return `${p.imeyl}|${p.model}|${[...p.skriti].join('.')}|${[...p.samoVizhdat].join('.')}`;
 }
 
-/** Видът на една колона — от модела на хедъра, където го е записал човекът. */
-export function vidNaKolona(m: ModelNaTablitsa, kolona: number): VidKolona {
+/**
+ * Видът на една колона — от ЗАТВОРЕНИТЕ ѝ, където ги е записал човекът.
+ *
+ * ПРИЕМА „каквото носи списък `zatvoreni`", а не цял модел, и това не е
+ * разхлабване от мързел: от резен 14 в матрицата влизат и ВГРАДЕНИТЕ таблици
+ * на програмата (Имоти · Наеми · Вземания · Плащания · Разходи · Обекти), а те
+ * не са `ModelNaTablitsa` — родени са в кода, не от файл. Правилото им е
+ * ЕДНО и също: сметнатата колона не се редактира от никого. Второ копие на
+ * това правило щеше да се разминае при първата поправка.
+ */
+export function vidNaKolona(
+  m: { readonly zatvoreni: readonly number[] },
+  kolona: number,
+): VidKolona {
   return m.zatvoreni.includes(kolona) ? 'zatvorena' : 'promenlyva';
 }
 
@@ -273,6 +284,41 @@ export function pravoNaKolona(
   if (prava?.skriti.includes(kolona)) return 'skrito';
   if (prava?.samoVizhdat.includes(kolona)) return 'vizhda';
   return 'redaktira';
+}
+
+/**
+ * ЦЯЛАТА ТАБЛИЦА С ЕДНА ДУМА · вторият от трите обхвата (И103).
+ *
+ * Негови думи: „можеш по ЦЯЛО МЕНЮ или по отделна ТАБЛИЦА и КОЛОНА от хедъра
+ * да дадеш достъп за контрол или преглед." Трите обхвата не са три механизма —
+ * те са една и съща дума, приложена върху една колона, върху всички колони на
+ * една таблица, или върху всички таблици на един таб.
+ *
+ * „Редактира" ИЗПРАЗВА двата списъка, вместо да ги пълни: записват се само
+ * ОТКЛОНЕНИЯТА (правило 3 от шапката). Списък с всичко разрешено би трябвало да
+ * се пренаписва при всяка нова колона, и първата забравена колона щеше да
+ * изчезне тихо от нечий екран.
+ *
+ * ЦЯЛОТО МЕНЮ НЕ Е ТУК, и то нарочно: правото е на двойката (служител, хедър),
+ * значи цял таб са N права — N записа в Журнала, по един на таблица. Функция,
+ * която ги слива в едно, щеше да измисли четвърта същност „право на таб",
+ * каквато няма нито в Журнала, нито в думите му.
+ */
+export function stesniVsichki(
+  prava: PravaZaModel,
+  broyKoloni: number,
+  pravo: PravoNaKolona,
+): PravaZaModel {
+  if (!Number.isInteger(broyKoloni) || broyKoloni < 0) {
+    throw new GreshkaPravo(`„${broyKoloni}" не е брой колони.`);
+  }
+  const vsichki = Array.from({ length: broyKoloni }, (_, k) => k);
+  return napraviPrava({
+    imeyl: prava.imeyl,
+    model: prava.model,
+    skriti: pravo === 'skrito' ? vsichki : [],
+    samoVizhdat: pravo === 'vizhda' ? vsichki : [],
+  });
 }
 
 /**

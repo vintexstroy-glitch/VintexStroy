@@ -1465,6 +1465,41 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .pravo.pravo-skrito > span:first-of-type { text-decoration: line-through; }
 .pravo.pravo-vizhda { border-left: 3px solid var(--toplo); }
 
+/* ── ГРУПАТА ХЕДЪРИ · подредени по табовете на менюто (И103) ────────────────
+   Негови думи: „подредени както са по табовете в менюто И ОТДЕЛЕНИ ПРИ СКРОЛ."
+   „Отделени" е залепването: заглавието на таба остава горе, докато под него
+   текат неговите хедъри, и се сменя на границата между два таба.
+
+   ЗАЩО `top: 0` ЛЕПИ ЗА ОКОТО: единствената скролираща кутия е `.telo`
+   (резен 9а), значи `sticky` брои спрямо нея, а не спрямо някаква вътрешна.
+   Втора скролираща кутия тук щеше да залепи заглавието за нещо, което човек
+   не гледа.
+
+   ЗАГЛАВИЕТО Е НАДПИС, НЕ БУТОН (`role="presentation"`) — клавиатурата не бива
+   да спира на нещо, което не прави нищо. Лостът ДО него е бутонът. */
+.grupa-hedari { margin: 18px 0; }
+/* СВОЕ ИМЕ, не назаем: `.grupa-zaglavie` вече е заето от заглавията в падащия
+   ред на Настройки (резен 6). Взето назаем, залепването щеше да се приложи и
+   ТАМ — стил, който пътува до чужд екран, без някой да го е искал. Проходът го
+   намери: първият `.grupa-zaglavie` на страницата беше НЕ моят. */
+.hedari-zaglavie {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px; margin-bottom: 8px;
+  background: var(--panel); border: 1px solid var(--liniya); border-radius: 5px;
+  font-weight: 600; letter-spacing: 0.02em;
+}
+/* Лостът на обхвата · дума + падащо меню, същият вид и на групата, и на
+   таблицата: двата обхвата се различават по МЯСТО, не по вид. */
+.obhvat { display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.obhvat select { font: inherit; font-size: var(--text-sm); }
+.hedar-glava {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.hedar-glava > b { font-size: 0.929rem; font-weight: 500; }
+
 /* ── ОТЧЕТИТЕ · всяко число с формулата си ──────────────────────────────────
    Негова поръчка (И90): „полета в Секция Отчети… които да покзват тези
    стойности с формули между всички таблици."

@@ -1491,6 +1491,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // падащо меню и да се пращат задачите ЗА ПРИЕМАНЕ… но в листа на всеки
     // служител СИ СЕДИ." И от 08.08 (р57·[160]): „копче за всяко дело… РЪЧНО."
     await naEkran(p, 'sluzhiteli', '[data-sektsiya="sluzhiteli-horata"]');
+    // КОГО ГЛЕДАМ е ЕДИН избор за целия екран — и листът, и правата четат него
+    // (ADR-022). §20 остави избран Бамстера; тук се гледа СВОЯТ лист, значи
+    // изборът се връща на себе си, точно както би направил човек.
+    await deystvieSPrerisuvane(p, () => p.click('[data-chovek="vintexstroy@gmail.com"]'));
     proveri('единайсетият екран е на мястото си',
       await tekstNa(p, '[data-sektsiya="sluzhiteli-horata"] h2'), 'Хората в програмата');
     proveri('хората се изреждат',
@@ -1596,4 +1600,86 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('#z-delo', (e) => (e as HTMLSelectElement).value !== ''), true);
     await naEkran(p, 'imoti', '#forma-imot');
 
+    // ══ 88 · ХЕДЪРИТЕ ПО ТАБОВЕТЕ · трите обхвата на едно действие (И103) ══
+    //
+    // Негови думи, 27.08: „от там се дават и хедърите на всички таблици с имена
+    // и подредени КАКТО СА ПО ТАБОВЕТЕ В МЕНЮТО и ОТДЕЛЕНИ ПРИ СКРОЛ… можеш по
+    // ЦЯЛО МЕНЮ или по отделна ТАБЛИЦА и КОЛОНА от хедъра да дадеш достъп."
+    razdel = '88 · хедърите по табовете · трите обхвата';
+    await naEkran(p, 'sluzhiteli', '[data-sektsiya="pravata"]');
+
+    // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.
+    proveri('вградените таблици влизат в матрицата',
+      (await p.$$eval('[data-hedar-red]', (e) =>
+        e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:')).length, 6);
+    proveri('и вносният хедър стои до тях',
+      (await p.$$('[data-hedar-red="Банка ОББ"]')).length, 1);
+
+    // ГРУПИТЕ СА ПО ТАБОВЕ и редът им е РЕДЪТ НА ЛЕНТАТА, не азбучен.
+    const grupi = await p.$$eval('[data-grupa-hedari]', (e) =>
+      e.map((x) => x.getAttribute('data-grupa-hedari') ?? ''));
+    proveri('хедърите са ГРУПИРАНИ по табове', grupi.length >= 3, true);
+    const vLentata = await p.$$eval('.nav > [data-ekran]', (e) =>
+      e.map((x) => x.getAttribute('data-ekran') ?? ''));
+    const nazvani = grupi.filter((g) => g !== '');
+    proveri('и редът на групите е редът на ЛЕНТАТА',
+      nazvani.map((g) => vLentata.indexOf(g)),
+      [...nazvani.map((g) => vLentata.indexOf(g))].sort((a, b) => a - b));
+
+    // ГРУПАТА „ОЩЕ НЕ Е СЛОЖЕН НА ТАБ" се БРОИ · вносният още няма таб.
+    proveri('нямащите таб се БРОЯТ и се казват',
+      Number(await tekstNa(p, '[data-bez-tab]')) >= 1, true);
+    proveri('и стоят в ПОСЛЕДНАТА група', grupi.at(-1), '');
+
+    // ЗАЛЕПВАНЕТО ПРИ СКРОЛ · „отделени при скрол" е негова дума.
+    proveri('заглавието на групата е ЗАЛЕПЕНО, не тече с текста',
+      await p.$eval('.hedari-zaglavie', (e) => getComputedStyle(e).position), 'sticky');
+    proveri('и е НАДПИС, не бутон · клавиатурата не спира на него',
+      await p.$eval('.hedari-zaglavie', (e) => e.getAttribute('role')), 'presentation');
+
+    // ══ ЦЯЛАТА ТАБЛИЦА С ЕДНА ДУМА · вторият обхват ═══════════════════════
+    const IMOTI_RED = '[data-hedar-red="vgraden:imoti"]';
+    const koloniNaImoti = await p.$$eval(`${IMOTI_RED} .pravo`, (e) => e.length);
+    proveri('вградената таблица показва колоните си', koloniNaImoti > 1, true);
+    const skritiPredi = await p.$$eval('.pravo.pravo-skrito', (e) => e.length);
+    await deystvieSPrerisuvane(p, () =>
+      p.selectOption(`${IMOTI_RED} select[data-obhvat=tablitsa]`, 'skrito'));
+    proveri('„цялата таблица" скрива ВСИЧКИТЕ ѝ колони с ЕДНО действие',
+      (await p.$$eval('.pravo.pravo-skrito', (e) => e.length)) - skritiPredi, koloniNaImoti);
+    proveri('и казва колко записа е направила',
+      (await tekstNa(p, '.vest')).includes('1 таблица'), true);
+
+    // ══ ЦЯЛО МЕНЮ · третият обхват · N таблици, N записа ══════════════════
+    // Табът „Имоти" носи ДВЕ вградени таблици — Имоти и Наеми. Едно действие,
+    // два записа, защото правото е на двойката (служител, хедър).
+    const tablitsiVImoti = await p.$$eval('[data-grupa-hedari=imoti] [data-hedar-red]', (e) => e.length);
+    proveri('табът „Имоти" носи повече от една таблица', tablitsiVImoti >= 2, true);
+    const kolonivImoti = await p.$$eval('[data-grupa-hedari=imoti] .pravo', (e) => e.length);
+    // ЧАКА СЕ ЕКРАНЪТ, не броят събития. `sSabitiya(N)` би паднало с TIMEOUT —
+    // изход, който казва „нещо не стана", вместо „чакани 8 скрити, видени 5".
+    // Диагноза с число е по-евтина от диагноза с таймаут: счупих обхвата
+    // нарочно да пипа само първата таблица и точно това ме научи.
+    await deystvieSPrerisuvane(p, () =>
+      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'skrito'));
+    proveri('„цяло меню" скрива всички колони на ВСИЧКИТЕ му таблици',
+      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), kolonivImoti);
+    proveri('и записите са по ЕДИН на таблица · право на таб няма',
+      (await tekstNa(p, '.vest')).includes(`${tablitsiVImoti} таблици`), true);
+
+    // ВРЪЩАНЕТО · „редактира" изпразва стеснението, не го пълни.
+    await deystvieSPrerisuvane(p, () =>
+      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'redaktira'));
+    proveri('и се връща наведнъж · записват се само отклоненията',
+      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), 0);
+
+    // ЗАТВОРЕНАТА КОЛОНА НА ВГРАДЕНАТА · сметка не се редактира от никого.
+    proveri('и вградената има затворени колони, и се казва защо',
+      (await p.$$eval(`${IMOTI_RED} .pravo [data-ne-deystva]`, (e) =>
+        e.map((x) => x.textContent ?? '').join(' '))).includes('СМЕТКА'), true);
+
+    // ГРАНИЦАТА · Управление още не влиза, и това се КАЗВА, не се премълчава.
+    proveri('границата стои с думи на екрана',
+      (await tekstNa(p, '[data-granitsa-upravlenie]')).includes('Управление'), true);
+
+    await naEkran(p, 'imoti', '#forma-imot');
 }

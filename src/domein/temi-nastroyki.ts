@@ -204,9 +204,12 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
   {
     klyuch: 'pravata',
     ime: 'Кой какво вижда',
-    opis: 'служители · роли · колонно право (Вижда · Скрито)',
+    opis: 'служители · роли · колонно право (Редактира · Вижда · Скрито)',
     ikona: 'pravo',
-    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'pravata' },
+    // ДОМЪТ Ѝ СМЕНИ АДРЕСА С ЕДИН РЕД · И103: „ОТ ТАМ се дават и хедърите на
+    // всички таблици" — „там" е табът на служителите. Точно ползата от един дом
+    // (правило 17): темата води другаде, без нито един втори списък да се пипа.
+    kade: { vid: 'sektsiya', ekran: 'sluzhiteli', sektsiya: 'pravata' },
     grupa: 'hora',
     za: SAMO_STOPANINAT,
   },

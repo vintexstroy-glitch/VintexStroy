@@ -558,6 +558,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // данни. Празната карта е вярната им стойност, не липса.
           formuli: p.formuli ?? {},
           nomera: p.nomera ?? {},
+          // Хедърите отпреди резен 14 не знаят на кой таб стоят. Празното е
+          // ВЯРНАТА им стойност — „още не е сложен на таб" (И103), не липса.
+          ekran: p.ekran ?? '',
         });
         break;
       }

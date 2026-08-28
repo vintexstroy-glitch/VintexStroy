@@ -189,7 +189,7 @@ export function narisuvayStoynost(): string {
 }
 
 /** Колоните на обектите — фините филтри важат и тук (ADR-022 · вълна 2). */
-function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
+export function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
   return [
     { klyuch: 'obekt', ime: 'Обект', vid: 'tekst', vzemi: (r) => r.obekt },
     {

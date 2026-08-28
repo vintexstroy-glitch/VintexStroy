@@ -90,7 +90,7 @@ function novOpId(): string {
 /** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2).
  *  Картата е с ЖИВИТЕ наеми, сметната веднъж — `vzemi` се вика от търсене,
  *  подредба и групиране, и филтриране на всяко повикване би било разточително. */
-function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
+export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
   const zhiviNa = (i: Imot) => zhiviPoImot.get(i.id) ?? [];
   return [
     { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
@@ -116,7 +116,7 @@ function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFilta
 }
 
 /** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
-function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
+export function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   return [
     { klyuch: 'koy', ime: 'Наемател', vid: 'tekst', vzemi: (n) => n.naemetel },
     {

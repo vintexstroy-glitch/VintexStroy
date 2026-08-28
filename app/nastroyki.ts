@@ -58,6 +58,7 @@ import {
   otbelezhiVavezhdane,
   preimenuvayKolona,
   premahniKolona,
+  dayEkran,
   dobaviFormulnaKolona,
   semeystvo,
   smeniFormula,
@@ -80,22 +81,10 @@ import {
   ZNAK_NA_VIDA,
   type VidStoynost,
 } from '../src/domein/vid-stoynost.js';
-import { IMENA_NA_ROLITE as ROLI_NA_HORATA } from '../src/yadro/samolichnost.js';
 import { kartataNaSaglasieto } from './saglasie.js';
-import { klyuchNaPravo,
-  IMENA_NA_VIDOVETE,
-  IMENA_NA_PRAVATA,
-  napraviPrava,
-  OBYASNENIYA_NA_PRAVATA,
-  PRAVA_NA_KOLONA,
-  pravoNaKolona,
-  sPromenenoPravo,
-  zashtoNeDeystva,
-  type PravoNaKolona,
-  vidNaKolona,
-  type PravaZaModel,
-} from '../src/domein/kolonno.js';
-import { napraviSluzhitel, podredeni, type Sluzhitel } from '../src/domein/sluzhiteli.js';
+import { IMENA_NA_VIDOVETE, vidNaKolona } from '../src/domein/kolonno.js';
+import type { PunktNaMenyuto } from '../src/domein/hedari-po-tabove.js';
+import { IME_BEZ_TAB } from '../src/domein/hedari-po-tabove.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
@@ -114,7 +103,6 @@ const POSOKA_S_DUMI: Readonly<Record<string, string>> = Object.freeze({
 });
 
 /** Кой служител се редактира в момента. Празно значи „никой" — нагласа, не факт. */
-let izbranSluzhitel = '';
 
 /**
  * ЕДНОТО МЯСТО с двете лица (И58): „Две отделни, но свързани, и се редактират
@@ -123,6 +111,15 @@ let izbranSluzhitel = '';
 let litseNaRedaktora: 'hedari' | 'opis' = 'hedari';
 /** Кой хедър е отворен в Редактора. Празно значи „никой". */
 let izbranHedar = '';
+
+/**
+ * ПУНКТОВЕТЕ НА МЕНЮТО, каквито последното рисуване ги е видяло.
+ *
+ * Падащото меню „на кой таб стои" ги изрежда, а слушателят му ги ПРОВЕРЯВА
+ * (`dayEkran` отказва ключ, който не е между тях). Следа от четене, не втори
+ * дом: домът е `podredeniPunktove` (ADR-066).
+ */
+let punktoveNaLentata: readonly PunktNaMenyuto[] = [];
 /** Отворена ли е формата за нова колона. */
 let dobavyamKolona = false;
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
@@ -134,7 +131,16 @@ export function narisuvayNastroyki(
   izbor: Izbor = izborPoPodrazbirane(),
   /** влезлият · Стопанинът ли е (ADR-043 · ролята се СМЯТА от Журнала) */
   negoviyat = true,
+  /**
+   * ПУНКТОВЕТЕ НА МЕНЮТО · за въпроса „на кой таб стои този хедър" (И103).
+   *
+   * Подават се, не се смятат тук: домът на реда е `podredeniPunktove`
+   * (ADR-066). Празен списък значи, че въпросът не се задава — а не че
+   * отговорът е „никъде".
+   */
+  punktove: readonly PunktNaMenyuto[] = [],
 ): string {
+  punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
 
@@ -201,20 +207,6 @@ export function narisuvayNastroyki(
     </section>`
     }
     ${blokNaRedaktora(modeli)}
-    ${
-      /**
-       * ТРИТЕ ВЪЗМОЖНОСТИ, КОИТО ДОТУК НЕ ПИПАХА НИЩО (ADR-041).
-       *
-       * „Други имейли", „Роли за достъп" и „Колонно право" стояха в Таблото с
-       * отметки, които НЕ ВЛИЯЕХА на нито един екран. Отметка без последица е
-       * НАДПИС, а правило 15 иска точно обратното: „изключено ≠ липсващо".
-       *
-       * Трите се сливат в ЕДИН блок нарочно — те са една функция, разказана на
-       * три части: кого добавяш, каква роля му даваш, коя колона му скриваш.
-       * Изключиш ли добавянето на хора, другите две нямат върху кого да важат.
-       */
-      mozhe(izbor, 'drugi-imeyli') ? blokNaPravata(o, modeli, izbor) : ''
-    }
     ${blokNaParametrite(o)}
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
@@ -539,7 +531,42 @@ function litseHedari(
           .join('')}
       </select>
     </label>
+    ${izbran === undefined ? '' : poleZaTaba(izbran)}
     ${izbran === undefined ? '' : koloniteNa(izbran, modeli)}`;
+}
+
+/**
+ * НА КОЙ ТАБ СТОИ ТОЗИ ХЕДЪР · И103, и се ПИТА, а не се гади.
+ *
+ * По него матрицата на правата (таб „Служители") подрежда хедърите „както са по
+ * табовете в менюто". Хедър без отговор не изчезва — той стои в последната
+ * група и се БРОИ (правило 15).
+ *
+ * ЗАЩО ТУК, а не при правата: това е свойство на ХЕДЪРА, като номера на
+ * връзката и вида на стойността, и се редактира там, където се редактира
+ * хедърът. Свойство, питано на два екрана, се разминава.
+ */
+function poleZaTaba(m: ModelNaTablitsa): string {
+  if (punktoveNaLentata.length === 0) {
+    return `<p class="drebno" data-bez-punktove>Няма живи пунктове в лентата, значи няма
+      от какво да се избере таб. Хедърът стои в групата „${ekraniraj(IME_BEZ_TAB)}".</p>`;
+  }
+  const sega = m.ekran ?? '';
+  return `
+    <label class="pole" data-pole-tab>
+      <span>На кой таб стои</span>
+      <select translate="no" id="izbor-tab-na-hedar" data-hedar="${ekraniraj(m.klyuch)}">
+        <option value=""${sega === '' ? ' selected' : ''}>— ${ekraniraj(IME_BEZ_TAB)} —</option>
+        ${punktoveNaLentata
+          .map(
+            (p) =>
+              `<option value="${ekraniraj(p.klyuch)}"${p.klyuch === sega ? ' selected' : ''}>${ekraniraj(p.ime)}</option>`,
+          )
+          .join('')}
+      </select>
+    </label>
+    <p class="drebno">По този таб се подреждат хедърите в „Кой какво вижда" (таб
+    <b>Служители</b>). Празното е състояние, не липса — брои се и се показва.</p>`;
 }
 
 function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
@@ -791,168 +818,6 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
 }
 
 // ── сверките ───────────────────────────────────────────────────────────────
-// ── колонното право · скритият ред над хедъра ──────────────────────────────
-/**
- * ПРАВАТА ПО КОЛОНА · точно неговата картина, без нов екран.
- *
- *   „Когато през настройки от падащо меню избереш служител, в всеки хедър се
- *    показва СКРИТ РЕД НАД ХЕДЪРА с отметки… но по-правилното е да е с ПАДАЩО
- *    МЕНЮ от фиксирани — изборът, редактира, вижда, скрито." (12.08)
- *
- * И последната му дума (И105 · 27.08): „нека е с падащо меню с дума на избора
- * и да са 3 варианта."
- *
- * Затова тук вече няма отметка, а ПАДАЩО МЕНЮ с трите думи. То не раздава
- * редакция — то СТЕСНЯВА: „редактира" значи „не съм стеснил нищо", а кой може
- * да пише, решават ролята и видът на колоната (`deystvashtoPravo`). Така
- * последната му дума и И57 („не да редактира, а да скрива само") стоят заедно.
- *
- * Изборът, който не действа, се КАЗВА, не се преглъща (правило 15).
- */
-function blokNaPravata(o: Ogledalo, modeli: readonly ModelNaTablitsa[], izbor: Izbor): string {
-  const hora = podredeni(o.sluzhiteli.values());
-  const izbran = hora.find((h) => h.imeyl === izbranSluzhitel);
-
-  return `
-    <section data-sektsiya="pravata">
-      <div class="dyalglava">
-        <h2>Кой какво вижда</h2>
-        <span>колонно право · три думи, и всяка само СТЕСНЯВА</span>
-      </div>
-      ${
-        hora.length === 0
-          ? `<p class="prazno">Още няма записан служител.<br>Достъпът се дава при доставчика; тук се записва кой работи и с каква роля.</p>`
-          : `<label class="pole">
-        <span>Служител</span>
-        <select translate="no" id="izbor-sluzhitel">
-          <option value="">— избери —</option>
-          ${hora.map((h) => optsiyaZaChovek(h, h.imeyl === izbranSluzhitel)).join('')}
-        </select>
-      </label>`
-      }
-      ${
-        // КОЛОННОТО ПРАВО е СВОЯ възможност: може да добавяш хора и да им
-        // даваш роли, без изобщо да скриваш колони. Изключено, матрицата
-        // изчезва — а СКРИТИТЕ ВЕЧЕ колони си остават записани в Журнала.
-        izbran === undefined || !mozhe(izbor, 'kolonno-pravo')
-          ? ''
-          : hedariteNa(izbran, o, modeli)
-      }
-      ${
-        izbran !== undefined && !mozhe(izbor, 'kolonno-pravo')
-          ? `<p class="drebno"><b>Колонното право е изключено</b> от Таблото. Вече скритите колони
-             СТОЯТ записани в Журнала и важат — изключването маха матрицата, не решенията
-             (правило 15: „изключено ≠ липсващо").</p>`
-          : ''
-      }
-      <form id="forma-sluzhitel" class="forma">
-        <label class="pole"><span>Имейл</span><input translate="no" name="imeyl" type="email" required placeholder="ime@gmail.com"></label>
-        <label class="pole"><span>Име</span><input translate="no" name="ime" required placeholder="как му казваш"></label>
-        ${
-          // РОЛИТЕ са трета възможност. Изключени, всеки нов човек влиза като
-          // НАБЛЮДАТЕЛ — най-тясното, а не най-широкото: забравена отметка не
-          // бива да раздава повече права, отколкото е поискано.
-          mozhe(izbor, 'roli-za-dostap')
-            ? `<label class="pole"><span>Роля</span>
-                 <select translate="no" name="rolya">
-                   <option value="redaktor">редактира</option>
-                   <option value="nablyudatel">наблюдава</option>
-                   <option value="sobstvenik">собственик</option>
-                 </select>
-               </label>`
-            : `<input type="hidden" name="rolya" value="nablyudatel">
-               <p class="drebno">Ролите за достъп са изключени — новият влиза като
-               <b>наблюдава</b>. Най-тясното, не най-широкото.</p>`
-        }
-        <div class="dugmeta">
-          <button type="submit" class="glavno">Запиши служителя</button>
-          <span id="greshka-sluzhitel" class="greshka"></span>
-        </div>
-      </form>
-      <p class="drebno">Не каним никого и не отнемаме достъп — това е при доставчика (правило 14). Тук се записва кой е пуснат и с каква роля работи вътре.</p>
-      <p class="drebno">Скритата колона пак се смята: сборовете ѝ остават в Сметки и в Управление. Скриването пипа екрана, не числата.</p>
-    </section>`;
-}
-
-/**
- * КАКВО СЕ КАЗВА СЛЕД ИЗБОРА · по дума, не по номер.
- *
- * Отделна функция, не три реда в слушателя: тя носи обещанието, което човек
- * чува след натискане — че скритата колона ПАК СЕ СМЯТА. Пази я проход §20 в
- * жив браузър, дума по дума; затова НЕ се изнася — изнесеното без викащ отвън
- * е точно онова, което обходът за чистота брои.
- */
-function dumiZaIzbora(novo: PravoNaKolona, imeyl: string): string {
-  if (novo === 'skrito') return `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`;
-  if (novo === 'vizhda') return `${imeyl} ще я ГЛЕДА, но няма да я пипа.`;
-  return `Колоната вече не е стеснена за ${imeyl} — решават ролята и видът ѝ.`;
-}
-
-function optsiyaZaChovek(h: Sluzhitel, izbran: boolean): string {
-  return `<option value="${ekraniraj(h.imeyl)}"${izbran ? ' selected' : ''}>${ekraniraj(
-    h.ime,
-  )} · ${ROLI_NA_HORATA[h.rolya]}</option>`;
-}
-
-function hedariteNa(
-  chovek: Sluzhitel,
-  o: Ogledalo,
-  modeli: readonly ModelNaTablitsa[],
-): string {
-  if (modeli.length === 0) {
-    return '<p class="prazno">Още няма нито един хедър — правото важи за модел, не за екран.</p>';
-  }
-  return modeli
-    .map((m) => hedaraNa(chovek, o.prava.get(klyuchNaPravo(chovek.imeyl, m.klyuch)), m))
-    .join('');
-}
-
-function hedaraNa(
-  chovek: Sluzhitel,
-  prava: PravaZaModel | undefined,
-  m: ModelNaTablitsa,
-): string {
-  // Главите дословно, не сведеният отпечатък: „Наем €" и „наем €" не са едно.
-  const glavi = m.glavi;
-  return `
-    <div class="hedar" translate="no">
-      <b>${ekraniraj(m.klyuch)}</b>
-      <div class="skritred">
-        ${glavi.map((ime, k) => kletkaNaPravo(chovek, prava, m, ime, k)).join('')}
-      </div>
-    </div>`;
-}
-
-function kletkaNaPravo(
-  chovek: Sluzhitel,
-  prava: PravaZaModel | undefined,
-  m: ModelNaTablitsa,
-  ime: string,
-  kolona: number,
-): string {
-  const vid = vidNaKolona(m, kolona);
-  const pravo = pravoNaKolona(prava, kolona);
-  const neDeystva = zashtoNeDeystva({ rolya: chovek.rolya, vid, pravo });
-  return `
-    <label class="pravo pravo-${pravo}">
-      <span>${ekraniraj(ime || `колона ${kolona + 1}`)}</span>
-      <select translate="no"
-        data-pravo="${ekraniraj(chovek.imeyl)}"
-        data-hedar="${ekraniraj(m.klyuch)}"
-        data-kolona="${kolona}">
-        ${PRAVA_NA_KOLONA.map(
-          (v) =>
-            `<option value="${v}"${v === pravo ? ' selected' : ''}>${
-              IMENA_NA_PRAVATA[v]
-            } · ${OBYASNENIYA_NA_PRAVATA[v]}</option>`,
-        ).join('')}
-      </select>
-      <span class="drebno">${IMENA_NA_VIDOVETE[vid]}${
-        neDeystva ? ` · <b data-ne-deystva>${ekraniraj(neDeystva)}</b>` : ''
-      }</span>
-    </label>`;
-}
-
 /**
  * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ · осемте вида, настроени за ТОЗИ бизнес (И96 т.1).
  *
@@ -1393,34 +1258,6 @@ export function zakachiNastroyki(
     }
   });
 
-  const formaChovek = koren.querySelector<HTMLFormElement>('#forma-sluzhitel');
-  formaChovek?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const kazhi = koren.querySelector<HTMLElement>('#greshka-sluzhitel')!;
-    kazhi.textContent = '';
-    const danni = new FormData(formaChovek);
-    try {
-      const chovek = napraviSluzhitel({
-        imeyl: String(danni.get('imeyl') ?? ''),
-        ime: String(danni.get('ime') ?? ''),
-        rolya: String(danni.get('rolya')) as RolyaNaChovek,
-      });
-      await k.deystviya.zapishiSluzhitel(chovek, { opId: `sluzhitel:${crypto.randomUUID()}` });
-      izbranSluzhitel = chovek.imeyl;
-      k.vest('dobre', `${chovek.ime} е записан · ${ROLI_NA_HORATA[chovek.rolya]}.`);
-      await prerisuvay();
-    } catch (err) {
-      kazhi.textContent = dumiZaGreshka(err);
-    }
-  });
-
-  koren
-    .querySelector<HTMLSelectElement>('#izbor-sluzhitel')
-    ?.addEventListener('change', async (e) => {
-      izbranSluzhitel = (e.target as HTMLSelectElement).value;
-      await prerisuvay();
-    });
-
   /**
    * НАП · включване и прибиране (резен 17).
    *
@@ -1471,27 +1308,6 @@ export function zakachiNastroyki(
     await prerisuvay();
   });
 
-  for (const menyu of koren.querySelectorAll<HTMLSelectElement>('select[data-pravo]')) {
-    menyu.addEventListener('change', async () => {
-      const imeyl = menyu.dataset['pravo']!;
-      const model = menyu.dataset['hedar']!;
-      const kolona = Number(menyu.dataset['kolona']);
-      const novo = menyu.value as PravoNaKolona;
-      menyu.disabled = true;
-      try {
-        const og = await k.deystviya.ogledalo();
-        const sega = og.prava.get(klyuchNaPravo(imeyl, model)) ?? napraviPrava({ imeyl, model });
-        const prava = sPromenenoPravo(sega, kolona, novo);
-        // Ключът носи ДЕЙСТВИЕТО: скрий → върни → скрий не бива да се загуби.
-        await k.deystviya.zapishiPravo(prava, { opId: `pravo:${crypto.randomUUID()}` });
-        k.vest('dobre', dumiZaIzbora(novo, imeyl));
-      } catch (err) {
-        greshka = dumiZaGreshka(err);
-      }
-      await prerisuvay();
-    });
-  }
-
   // ── Редакторът на хедъри · двете лица и операциите му ────────────────────
   koren.querySelector<HTMLButtonElement>('#litse-hedari')?.addEventListener('click', async () => {
     litseNaRedaktora = 'hedari';
@@ -1510,6 +1326,7 @@ export function zakachiNastroyki(
     dobavyamKolona = true;
     await prerisuvay();
   });
+
   koren.querySelector<HTMLButtonElement>('#otkazhi-kolona')?.addEventListener('click', async () => {
     dobavyamKolona = false;
     await prerisuvay();
@@ -1557,6 +1374,36 @@ export function zakachiNastroyki(
   /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */
   const hedarSega = async (): Promise<ModelNaTablitsa | undefined> =>
     (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+
+  // ТАБЪТ НА ХЕДЪРА (И103) · поправка на модела, не нов вид събитие.
+  koren
+    .querySelector<HTMLSelectElement>('#izbor-tab-na-hedar')
+    ?.addEventListener('change', async (e) => {
+      const menyu = e.target as HTMLSelectElement;
+      menyu.disabled = true;
+      try {
+        const m = await hedarSega();
+        if (!m) throw new Error('Хедърът вече го няма.');
+        // РОЛЯТА се СМЯТА от Журнала, не се твърди с литерал (ADR-050).
+        const nov = dayEkran(
+          m,
+          menyu.value,
+          punktoveNaLentata.map((p) => p.klyuch),
+          await rolyata(),
+        );
+        await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
+        greshka = '';
+        k.vest(
+          'dobre',
+          menyu.value === ''
+            ? `„${m.klyuch}" вече няма таб — стои в групата „${IME_BEZ_TAB}".`
+            : `„${m.klyuch}" стои на таб „${punktoveNaLentata.find((p) => p.klyuch === menyu.value)?.ime ?? menyu.value}".`,
+        );
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
 
   /**
    * Записва променения хедър: нов МоделЗаписан със същия ключ — поправка, не

@@ -134,7 +134,7 @@ interface RedNaSmyatane {
 let smyatane: RedNaSmyatane[] = [];
 
 /** Колоните на списъка „Разходи" — фините филтри в стил Уиндоус. */
-const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
+export const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
   // Петата глава пише „ДДС" и колоната Е ДДС (правило 20 · ADR-014): дотук
   // беше описана като ДАТА и филтърът под „ДДС" предлагаше „Днес · Вчера ·
   // Тази седмица" — глава, която лъже какво стои под нея. Дата-филтърът пада

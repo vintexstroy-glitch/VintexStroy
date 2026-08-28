@@ -40,7 +40,7 @@ function novOpId(): string {
 }
 
 /** Колоните на вземанията — фините филтри важат и тук (ADR-022 · вълна 2). */
-function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
+export function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
   return [
     {
       klyuch: 'koy',
@@ -58,7 +58,7 @@ function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
 }
 
 /** Колоните на приетите плащания. */
-function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
+export function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
   return [
     { klyuch: 'data', ime: 'Дата', vid: 'data', vzemi: (p) => p.data },
     {

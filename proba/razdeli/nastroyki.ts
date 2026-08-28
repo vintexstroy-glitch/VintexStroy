@@ -92,9 +92,16 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
 
 
     // ══ 20 · колонното право · Бамстера и скритата колона ════════════════
+    //
+    // ДОМЪТ Ѝ Е ТАБЪТ СЛУЖИТЕЛИ (И103 · резен 14): „ОТ ТАМ се дават и хедърите
+    // на всички таблици." Дотук секцията стоеше в Настройки; темата смени адреса
+    // си с ЕДИН ред и §58 по-долу пази, че водù насам.
     razdel = '20 · колонното право';
-    await naEkran(p, 'nastroyki', '#forma-sluzhitel');
-    proveri('още няма записан служител', (await p.$$('#izbor-sluzhitel')).length, 0);
+    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
+    // СТОПАНИНЪТ СТОИ В СПИСЪКА и без нито един вписан служител — той е първото
+    // събитие в Журнала (ADR-043). Значи „още няма никого" се брои по ДРУГИТЕ.
+    proveri('още няма вписан служител · само Стопанинът',
+      await p.$$eval('#izbor-pravo-chovek option', (o) => o.length), 1);
 
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
@@ -102,28 +109,33 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
 
     await p.waitForSelector('.pravo');
-    const optsii = await p.$$eval('#izbor-sluzhitel option', (o) => o.map((x) => x.textContent.trim()));
-    proveri('служителят е записан с ролята си', optsii.includes('Бамстера · редактира'), true);
+    await p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com');
+    await p.waitForSelector('.pravo');
+    const optsii = await p.$$eval('[data-chovek]', (o) => o.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
+    proveri('служителят е записан с ролята си',
+      optsii.some((r) => r.includes('Бамстера') && r.includes('редактира')), true);
 
-    const kletki = await p.$$eval('.pravo', (x) => x.map((k) => k.textContent.replace(/\s+/g, ' ').trim()));
+    // ВНОСНИЯТ хедър „Банка ОББ" · неговите шест колони, не всички на програмата.
+    const OBB_RED = '[data-hedar-red="Банка ОББ"]';
+    const kletki = await p.$$eval(`${OBB_RED} .pravo`, (x) => x.map((k) => k.textContent.replace(/\s+/g, ' ').trim()));
     proveri('скритият ред показва колона по колона', kletki.length, 6);
     proveri('и казва вида на всяка', kletki[0]?.includes('променяща се'), true);
 
     // ══ ТРИТЕ СТОЙНОСТИ · И105 · „падащо меню с дума на избора, 3 варианта" ══
-    const dumite = await p.$$eval('.pravo select option', (o) =>
+    const dumite = await p.$$eval(`${OBB_RED} .pravo select option`, (o) =>
       o.slice(0, 3).map((x) => ((x.textContent ?? '').split('\u00b7')[0] ?? '').trim()));
     proveri('всяка колона има ПАДАЩО МЕНЮ с ТРИ думи', dumite, ['редактира', 'вижда', 'скрито']);
     proveri('нищо не е стеснено в началото', (await p.$$('.pravo.pravo-skrito')).length, 0);
     proveri('и по подразбиране стои НАЙ-ШИРОКАТА',
-      await p.$eval('.pravo select', (e) => (e as HTMLSelectElement).value), 'redaktira');
+      await p.$eval(`${OBB_RED} .pravo select`, (e) => (e as HTMLSelectElement).value), 'redaktira');
 
     // Числото в Сметки ПРЕДИ скриването — то не бива да мръдне.
     await naEkran(p, 'smetki', '#forma-period');
     const razhodPredi = await plochka(p, 'Разход');
 
     // ── СРЕДНАТА дума · новата · „гледа я, но не я пипа" ──────────────────
-    await naEkran(p, 'nastroyki', '.pravo');
-    await sSabitie(p, () => p.selectOption('.pravo select', 'vizhda'));
+    await naEkran(p, 'sluzhiteli', OBB_RED);
+    await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'vizhda'));
     await p.waitForSelector('.pravo.pravo-vizhda');
     proveri('свалената до „вижда" СЕ ВИЖДА · не пада от списъка',
       (await p.$$('.pravo.pravo-skrito')).length, 0);
@@ -131,7 +143,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
       (await tekstNa(p, '.vest')).includes('ще я ГЛЕДА, но няма да я пипа'), true);
 
     // ── СКРИЙ колоната „Сума по документа" за Бамстера ────────────────────
-    await sSabitie(p, () => p.selectOption('.pravo select', 'skrito'));
+    await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'skrito'));
     await p.waitForSelector('.pravo.pravo-skrito');
     proveri('колоната е скрита за него', (await p.$$('.pravo.pravo-skrito')).length, 1);
     proveri('и се казва на глас, че сборът остава', (await tekstNa(p, '.vest')).includes('Сборът ѝ остава'), true);
@@ -140,10 +152,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     proveri('СКРИТОТО ПАК СЕ СМЯТА · числото не е мръднало', await plochka(p, 'Разход'), razhodPredi);
 
     // Върни я — скрий → върни → скрий не се губи (правило 20)
-    await naEkran(p, 'nastroyki', '.pravo');
-    await sSabitie(p, () => p.selectOption('.pravo select', 'redaktira'));
+    await naEkran(p, 'sluzhiteli', OBB_RED);
+    await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'redaktira'));
     proveri('връща се с най-широката', (await p.$$('.pravo.pravo-skrito')).length, 0);
-    await sSabitie(p, () => p.selectOption('.pravo select', 'skrito'));
+    await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'skrito'));
     proveri('и се скрива пак — ключът носи ДЕЙСТВИЕТО', (await p.$$('.pravo.pravo-skrito')).length, 1);
 
     // ── ИЗБОРЪТ САМО СТЕСНЯВА · и когато не действа, се КАЗВА (правило 15) ──
@@ -151,6 +163,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     // значи изборът „редактира" стои записан, но не действа — и екранът го
     // казва, вместо да го преглътне. Това е и доказателството, че този екран
     // НЕ е втора врата към достъпа (правило 14 · И57).
+    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'nablyudatel');
@@ -271,8 +284,8 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // ИЗБОРЪТ НА СЛУЖИТЕЛ Е ПОГЛЕД, не факт: живее в паметта на екрана и
     // презареждането го изчиства (`udobstvoto.blok1` презарежда преди този
     // блок). Затова тук се избира наново — точно каквото прави и човек.
-    await naEkran(p, 'nastroyki', '#izbor-sluzhitel');
-    await p.selectOption('#izbor-sluzhitel', 'ivaylo85petkov@gmail.com');
+    await naEkran(p, 'sluzhiteli', '#izbor-pravo-chovek');
+    await p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com');
     await p.waitForSelector('.pravo');
     proveri('и до затворената пише ЗАЩО „редактира" не действа',
       (await p.$$eval('.pravo [data-ne-deystva]', (e) =>

@@ -165,6 +165,22 @@ interface ZaZakachane {
 }
 
 /**
+ * ПУНКТОВЕТЕ НА МЕНЮТО · ключ и име, В РЕДА ИМ · ЕДНА сметка (правило 17).
+ *
+ * Два екрана питат за нея — Служители (матрицата на правата се подрежда по
+ * табовете, И103) и Настройки (Редакторът пита хедъра на кой таб стои). Написана
+ * два пъти, тя щеше да се разминава: хедър, който в единия списък стои под
+ * „Пари", а в другия под нищо.
+ *
+ * Скритите пунктове ПАДАТ: скрит таб не е дом на хедър, който човек ще търси.
+ */
+function punktoveNaMenyuto(r: ZaRisuvane): readonly { klyuch: string; ime: string }[] {
+  return podredeniPunktove(r.dostapniEkrani, r.ogledalo.redNaLentata, moyatRed())
+    .filter((klyuch) => !skritiPunktove().includes(klyuch))
+    .map((klyuch) => ({ klyuch, ime: EKRANI[klyuch as KoyEkran].ime }));
+}
+
+/**
  * ЕДИН ЕКРАН · ЕДИН ДОМ (правило 17).
  *
  * Дотук един екран се знаеше на ШЕСТ места: съюза `KoyEkran`, картата с имена,
@@ -237,6 +253,8 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         r.izbor,
         // СТОПАНИНЪТ се СМЯТА от Журнала, не от самоличността (ADR-043).
         r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
+        // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
+        punktoveNaMenyuto(r),
       ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay),
   },
@@ -252,7 +270,18 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ime: 'Служители',
     podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
     ikona: 'ekran-sluzhiteli',
-    narisuvay: (r) => narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes, r.izbor),
+    narisuvay: (r) =>
+      narisuvaySluzhiteli(
+        r.ogledalo,
+        r.kojSam,
+        r.dnes,
+        r.izbor,
+        // Матрицата на правата подрежда хедърите по реда на менюто (И103).
+        punktoveNaMenyuto(r),
+        // ПРАВАТА ГИ РАЗДАВА САМО СТОПАНИНЪТ (И57) · ролята се СМЯТА от
+        // Журнала, не се твърди от самоличността (ADR-043).
+        rolyataNa(r.kojSam.imeyl, r.ogledalo) === 'sobstvenik',
+      ),
     zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {
