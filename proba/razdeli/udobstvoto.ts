@@ -1423,4 +1423,59 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'bez'));
     await naEkran(p, 'imoti', '#forma-imot');
 
+    razdel = '82 · Служителите · задачата се праща и се ПРИЕМА в програмата';
+    // Негови думи, 27.08 (И110): „Да има служители таб и там да се избират от
+    // падащо меню и да се пращат задачите ЗА ПРИЕМАНЕ… но в листа на всеки
+    // служител СИ СЕДИ." И от 08.08 (р57·[160]): „копче за всяко дело… РЪЧНО."
+    await naEkran(p, 'sluzhiteli', '[data-sektsiya="sluzhiteli-horata"]');
+    proveri('единайсетият екран е на мястото си',
+      await tekstNa(p, '[data-sektsiya="sluzhiteli-horata"] h2'), 'Хората в програмата');
+    proveri('хората се изреждат',
+      (await p.$$eval('[data-chovek]', (e) => e.length)) >= 1, true);
+    proveri('и има падащо меню с тях',
+      (await p.$$eval('#z-chovek option', (e) => e.length)) >= 1, true);
+    proveri('и падащо меню с делата', (await p.$$eval('#z-delo option', (e) => e.length)) >= 1, true);
+
+    // ИЗПРАЩАНЕТО · точно едно събитие, и то в Журнала.
+    const azSam = await p.$eval('#z-chovek', (e) => (e as HTMLSelectElement).value);
+    await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
+    proveri('изпратената задача влиза в листа',
+      (await p.$$eval('[data-zadacha]', (e) => e.length)) >= 1, true);
+    proveri('и състоянието ѝ е „чака отговор"',
+      (await tekstNa(p, '[data-zadacha]')).includes('чака отговор'), true);
+    console.log(`\n  ЗАДАЧАТА: изпратена на ${azSam}\n`);
+
+    // ПРИЕМАНЕТО · в ПРОГРАМАТА, не в Google. Влезлият е Стопанинът и задачата
+    // е на него, значи бутоните са негови.
+    proveri('на СВОЯ лист стоят бутоните за отговор',
+      (await p.$$eval('[data-priemi]', (e) => e.length)) >= 1, true);
+    // ДВАТА бутона са в ГРУПА действия (ADR-057): видим е един, другият е зад
+    // стрелкичката. Проходът прави трите стъпки на човека, не заобикаля групата.
+    await sSabitie(p, () => natisniVGrupata(p, '[data-priemi]'));
+    proveri('приемането мени състоянието',
+      (await tekstNa(p, '[data-zadacha]')).includes('приета'), true);
+    proveri('и бутоните за отговор си отиват · веднъж отговорено е отговорено',
+      await p.$$eval('[data-priemi]', (e) => e.length), 0);
+
+    // ОТКАЗАНАТА СИ СЕДИ · негово. Праща се втора и се отказва.
+    const zadachiPredi = await p.$$eval('[data-zadacha]', (e) => e.length);
+    await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
+    await sSabitie(p, () => natisniVGrupata(p, '[data-otkazhi]'));
+    proveri('отказаната НЕ изчезва от листа',
+      await p.$$eval('[data-zadacha]', (e) => e.length), zadachiPredi + 1);
+    proveri('и носи причината си',
+      (await p.$$eval('[data-zadacha]', (e) =>
+        e.map((x) => x.textContent ?? '').join(' '))).includes('сгрешена сума'), true);
+
+    razdel = '82 · Служителите · копчето на всяко дело';
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('всяко дело носи копче за пращане',
+      (await p.$$eval('[data-prati]', (e) => e.length)) >= 1, true);
+    // Копчето минава през СЪЩАТА врата · пунктът в лентата, не втора форма.
+    await deystvieSPrerisuvane(p, () => p.click('[data-prati]'));
+    await p.waitForSelector('[data-sektsiya="sluzhiteli-prashtane"]');
+    proveri('копчето води до Служители с ИЗБРАНОТО дело',
+      await p.$eval('#z-delo', (e) => (e as HTMLSelectElement).value !== ''), true);
+    await naEkran(p, 'imoti', '#forma-imot');
+
 }

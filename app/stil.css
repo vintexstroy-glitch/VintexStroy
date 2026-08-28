@@ -1486,6 +1486,24 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 0.714rem;
 }
 .sgavach.prazen { cursor: default; }
+/* КОПЧЕТО НА ВСЯКО ДЕЛО (резен 14а · р57·[160] „копче за всяко дело… ръчно").
+   Стои свито като степенките: три бутона на всеки ред е шум, а редът, върху
+   който е ръката, е точно онзи, който се праща. */
+.prati-zadacha {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1; margin-left: 4px;
+  background: none; border: none; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.714rem;
+  opacity: 0; transition: opacity 0.12s;
+}
+.gant-delo:hover .prati-zadacha,
+.prati-zadacha:focus { opacity: 1; }
+.prati-zadacha:hover { color: var(--aktsent); }
+
+/* СЪСТОЯНИЕТО НА ЗАДАЧАТА · дума И цвят, никога само цвят (ADR-032 §1). */
+.red.zadacha-prieta { box-shadow: inset 3px 0 0 var(--srok-normalno); }
+.red.zadacha-otkazana { box-shadow: inset 3px 0 0 var(--aktsent); }
+.red.zadacha-chaka { box-shadow: inset 3px 0 0 var(--srok-zhalto); }
+
 /* СТЕПЕНКИТЕ · навътре и навън (резен 12б · „вкараш нова степен от главното
    дърво"). Стоят СВИТИ, докато редът не се посочи: два бутона на всеки ред са
    шум, а редът, върху който е ръката, е точно онзи, който се мести. */

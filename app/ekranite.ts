@@ -17,6 +17,7 @@
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
+import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayTablo } from './tablo.js';
@@ -42,6 +43,7 @@ export type KoyEkran =
   | 'ii'
   | 'tabove'
   | 'lichno'
+  | 'sluzhiteli'
   | 'tablo';
 
 /**
@@ -213,6 +215,13 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     iskaRolya: 'sobstvenik',
     narisuvay: () => narisuvayStoynost(),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
+  },
+  sluzhiteli: {
+    ime: 'Служители',
+    podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
+    ikona: 'ekran-sluzhiteli',
+    narisuvay: (r) => narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes),
+    zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {
     ime: 'Управление',

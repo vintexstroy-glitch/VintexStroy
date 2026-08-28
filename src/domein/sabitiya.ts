@@ -28,6 +28,7 @@ import type { Sashtnost } from '../yadro/index.js';
 import type { Agent, Predlozhenie } from './agenti.js';
 import type { Tab } from './tabove.js';
 import type { Zadacha } from './zadachi.js';
+import type { Izprashtane, OtgovorNaZadacha } from './zadachi-kam-hora.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
 import type { PravaZaModel } from './kolonno.js';
@@ -65,6 +66,14 @@ export const VID = {
   tab: 'tab',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
+  /**
+   * ЗАДАЧАТА КЪМ ЧОВЕК (резен 14а · И110) · НЕ е `zadacha`.
+   *
+   * `zadacha` е задача на АГЕНТ с разписание (И94 т.1). Тази е върху ДЕЛО, праща
+   * се на служител и се ПРИЕМА. Един вид за двете щеше да ги слее в Журнала —
+   * и „кой какво е приел" щеше да се търси между разписания на агенти.
+   */
+  zadachaKamChovek: 'zadacha-kam-chovek',
   svrazka: 'svrazka',
   lichno: 'lichno',
   prenos: 'prenos',
@@ -126,6 +135,8 @@ export type TipSabitie =
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
+  | 'ЗадачаИзпратена'
+  | 'ОтговорНаЗадача'
   | 'СвръзкаЗаписана'
   | 'ЛичноПревключено'
   | 'ДелоПрехвърлено'
@@ -663,6 +674,22 @@ export type PayloadPredlozhenieZapisano = Predlozhenie;
  * (`potvarzhdenie.ts`).
  */
 export type PayloadZadachaZapisana = Zadacha;
+
+/**
+ * ЗАДАЧА, ИЗПРАТЕНА НА ЧОВЕК (резен 14а · И110).
+ *
+ * Пише се в веригата на ИЗПРАЩАЧА. Отговорът е ДРУГО събитие, в веригата на
+ * онзи, който отговаря (ADR-055) — слети, отговорът щеше да носи чужд `actor`.
+ */
+export type PayloadZadachaIzpratena = Izprashtane;
+
+/**
+ * ОТГОВОРЪТ · приета или отказана.
+ *
+ * ДУМА, не булево: „чака" е трето състояние и се СМЯТА от липсата на този запис.
+ * Булево поле щеше да има две стойности за три състояния.
+ */
+export type PayloadOtgovorNaZadacha = OtgovorNaZadacha;
 
 /**
  * СВРЪЗКАТА · третият номер, който залепва два файла (И96 т.8).

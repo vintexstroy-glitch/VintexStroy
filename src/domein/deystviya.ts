@@ -13,6 +13,11 @@ import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/ind
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
 import { praviTsikal } from './dela.js';
+import {
+  GreshkaZadacha,
+  napraviIzprashtane,
+  napraviOtgovor,
+} from './zadachi-kam-hora.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaPravo } from './kolonno.js';
@@ -72,7 +77,9 @@ import type {
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
   PayloadAgentZapisan,
+  PayloadOtgovorNaZadacha,
   PayloadTabZapisan,
+  PayloadZadachaIzpratena,
   PayloadPredlozhenieZapisano,
   PayloadZadachaZapisana,
   TipSabitie,
@@ -763,6 +770,69 @@ export class Deystviya {
    * НЕ иска отключен период: табът не мени нито едно число — той решава
    * какво се ПОКАЗВА. Заключен месец се гледа през същите секции.
    */
+  /**
+   * ПРАЩА ЗАДАЧА НА ЧОВЕК (резен 14а · И110 · негово „ръчно", р57·[160]).
+   *
+   * ДВЕ проверки стоят ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата, а тези две пазят смисъла:
+   *
+   *   1. получателят е ЖИВ служител · инак задачата няма кой да я приеме;
+   *   2. делото СЪЩЕСТВУВА · задача върху нищо е бележка, не задача.
+   *
+   * Проверките четат Огледалото, значи мястото им е тук, а не при Вратата —
+   * дословният прецедент на `vpishiZapasen`: Вратата не чете Огледалото.
+   *
+   * НЕ иска отключен период: задачата не мени нито едно число.
+   */
+  async pratiZadacha(danni: PayloadZadachaIzpratena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.dela.has(danni.deloId)) {
+      throw new GreshkaZadacha(
+        'Няма такова дело. Задачата виси на дело — инак не се вижда нито в таблицата, нито в диаграмата.',
+      );
+    }
+    // Пресъздава се през домейна: така екранът и вносът минават през ЕДНА
+    // проверка, вместо всеки да носи своята половина.
+    // СТОПАНИНЪТ Е ВАЛИДЕН ПОЛУЧАТЕЛ · той също върши дела и също иска лист.
+    // Той не е „служител" (не се вписва като такъв — той е ПЪРВОТО събитие в
+    // Журнала, ADR-043), затова се добавя тук поименно, а не се крие в картата.
+    const poluchateli = [...o.sluzhiteli.keys()];
+    if (o.stopanin !== '') poluchateli.push(o.stopanin);
+    const proveren = napraviIzprashtane(danni, poluchateli);
+    return this.#pusni(
+      'ЗадачаИзпратена',
+      VID.zadachaKamChovek,
+      `ZADACHA:${proveren.zadachaId}`,
+      proveren,
+      z,
+    );
+  }
+
+  /**
+   * ОТГОВАРЯ на задача · приема я или я отказва.
+   *
+   * Пише се в СВОЯТА верига (ADR-055): служителят отговаря от своя Журнал, със
+   * своя `actor`. Затова тук НЕ се проверява „ти ли си получателят" — веригата
+   * го казва по-силно от всяка проверка: чуждият отговор просто не е в неговата
+   * книга, а Огледалото чете всички вериги и вижда кой какво е написал.
+   *
+   * Задачата обаче трябва да СЪЩЕСТВУВА: отговор на нищо е ехо.
+   */
+  async otgovoriNaZadacha(danni: PayloadOtgovorNaZadacha, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.izprateniZadachi.has(danni.zadachaId)) {
+      throw new GreshkaZadacha('Няма такава задача — отговор на нищо не се записва.');
+    }
+    const proveren = napraviOtgovor(danni);
+    return this.#pusni(
+      'ОтговорНаЗадача',
+      VID.zadachaKamChovek,
+      `OTGOVOR:${proveren.zadachaId}`,
+      proveren,
+      z,
+    );
+  }
+
   async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
   }

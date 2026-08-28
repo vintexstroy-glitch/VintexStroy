@@ -95,6 +95,8 @@ export const IKONI: Readonly<Record<string, string>> = Object.freeze({
   'ekran-gant': '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
   'ekran-ii': '<rect x="4" y="7" width="16" height="12" rx="2"></rect><path d="M9 12v3M15 12v3"></path><path d="M12 3.5V7"></path><circle cx="12" cy="3" r="1"></circle>',
   'ekran-tabove': '<rect x="3" y="4.5" width="18" height="15" rx="1.5"></rect><path d="M3 9h18"></path><path d="M8.5 9v10.5"></path>',
+  /** СЛУЖИТЕЛИТЕ · двама души · екранът, на който се пращат и приемат задачи. */
+  'ekran-sluzhiteli': '<circle cx="9" cy="8" r="3"></circle><path d="M3 19a6 6 0 0 1 12 0"></path><path d="M16 5.5a3 3 0 0 1 0 5"></path><path d="M17.5 14.5A5.5 5.5 0 0 1 21 19"></path>',
   'ekran-tablo': '<circle cx="12" cy="8" r="3.5"></circle><path d="M4.5 20.5a7.5 7.5 0 0 1 15 0"></path>',
 
   /** кабарче · застопорява лентата разтворена (негова дума: „да може да се застопори") */

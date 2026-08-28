@@ -33,6 +33,7 @@ import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
 import type { LichenDostap } from '../domein/lichen-dostap.js';
 import type { LichenKredit, LichnaTema, LichnoDvizhenie } from '../domein/lichni-pari.js';
+import type { Izprashtane, OtgovorNaZadacha } from '../domein/zadachi-kam-hora.js';
 import type { Kontragent, VidKontragent } from '../domein/kontragenti.js';
 import { klyuchNaKontragent } from '../domein/kontragenti.js';
 import type {
@@ -234,6 +235,15 @@ export interface Ogledalo {
   /** имейл → служителят с ролята му; вж. `src/domein/sluzhiteli.ts` */
   readonly sluzhiteli: ReadonlyMap<string, PayloadSluzhitelZapisan>;
   /**
+   * ЗАДАЧИТЕ КЪМ ХОРАТА (резен 14а · И110) · изпратените и отговорите им.
+   *
+   * Две карти, не една: изпращането и отговорът идват от РАЗЛИЧНИ вериги, а
+   * Огледалото чете всички (ADR-055). Състоянието „чака" НЕ се пази — то е
+   * липсата на отговор и се смята (`sastoyanieNaZadacha`).
+   */
+  readonly izprateniZadachi: ReadonlyMap<string, Izprashtane>;
+  readonly otgovoriNaZadachi: ReadonlyMap<string, OtgovorNaZadacha>;
+  /**
    * „<имейл>|<модел>" → скритите за него колони в този хедър.
    *
    * Ключът е двоен, защото правото важи за ДВОЙКА: един човек в един хедър.
@@ -426,6 +436,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const modeli = new Map<string, ModelNaTablitsa>();
   const butoni = new Map<string, Buton>();
   const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
+  const izprateniZadachi = new Map<string, Izprashtane>();
+  const otgovoriNaZadachi = new Map<string, OtgovorNaZadacha>();
   // ПЪРВИЯТ печели: втори „СтопанинЗаписан" Вратата не пуска, но Огледалото
   // не разчита на това — четенето остава вярно и върху пипнат отвън Журнал.
   let stopanin = '';
@@ -525,6 +537,22 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           formuli: p.formuli ?? {},
           nomera: p.nomera ?? {},
         });
+        break;
+      }
+
+      case 'ЗадачаИзпратена': {
+        // Повторният запис на същия `zadachaId` ПОПРАВЯ задачата — същото
+        // правило като при делото. Второ изпращане не се ражда.
+        const p = s.payload as unknown as Izprashtane;
+        izprateniZadachi.set(p.zadachaId, p);
+        break;
+      }
+
+      case 'ОтговорНаЗадача': {
+        // ПОСЛЕДНАТА дума бие: човек, приел и после отказал, е отказал. Двата
+        // записа остават в Журнала — тук стои само в сила кой е.
+        const p = s.payload as unknown as OtgovorNaZadacha;
+        otgovoriNaZadachi.set(p.zadachaId, p);
         break;
       }
 
@@ -963,6 +991,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     modeli,
     butoni,
     sluzhiteli,
+    izprateniZadachi,
+    otgovoriNaZadachi,
     prava,
     pototsi,
     salda,

@@ -599,7 +599,9 @@ function imeNaDeloto(
     <b>${ekraniraj(d.ime)}</b>
     ${
       sasSgavachi
-        ? `<span class="stepenki">
+        ? `<button type="button" class="prati-zadacha" data-prati="${ekraniraj(d.id)}"
+            title="Прати задачата на служител" aria-label="Прати задачата на служител">✉</button>
+          <span class="stepenki">
             <button type="button" data-navan="${ekraniraj(d.id)}" title="Навън · едно ниво нагоре"
               aria-label="Навън · едно ниво нагоре">◄</button>
             <button type="button" data-navatre="${ekraniraj(d.id)}" title="Навътре · под реда над него"
@@ -852,6 +854,22 @@ export function zakachiGant(
       p.svoy = id === '#svoy-ot' ? { ...p.svoy, ot: v } : { ...p.svoy, do: v };
       zapomniPogleda(p);
       await prerisuvay();
+    });
+  }
+
+  /**
+   * КОПЧЕ ЗА ВСЯКО ДЕЛО · негово, 08.08 *(р57·[160])*: „важно да има копче за
+   * всяко дело да има отговорник и да му се праща сигнал към календара РЪЧНО."
+   *
+   * Не отваря втора форма. Запомня КОЕ дело и минава през СЪЩАТА врата, през
+   * която минава и човек — пунктът в лентата. Втора форма за едно нещо се
+   * разминава с първата при първата поправка (дословният урок на ADR-057:
+   * „втора дръжка на същата врата, не втора врата").
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-prati]')) {
+    b.addEventListener('click', () => {
+      zapomniEkranno('sluzhiteli.delo', b.dataset.prati ?? '');
+      document.querySelector<HTMLElement>('[data-ekran=sluzhiteli]')?.click();
     });
   }
 
