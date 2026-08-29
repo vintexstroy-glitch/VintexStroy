@@ -80,6 +80,7 @@ import type {
   PayloadPlashtanePoKredit,
   PayloadKeshZahranen,
   PayloadSedmitsaPrehvarlena,
+  PayloadTablitsaOtFaylSazdadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
@@ -327,6 +328,14 @@ export interface Ogledalo {
 
   /** Захранванията на общия кеш-джоб · ДОБАВЯТ се; сторнираното го няма тук. */
   readonly zahranvaniyaNaKesha: readonly ZahranvaneNaKesha[];
+
+  /**
+   * ТАБЛИЦИТЕ, СЪЗДАДЕНИ ОТ ФАЙЛ (резен 21 · ADR-081).
+   *
+   * Последният запис за едно име БИЕ: второ четене на същия файл ПОПРАВЯ
+   * таблицата, не ражда втора с това име.
+   */
+  readonly tablitsiOtFayl: ReadonlyMap<string, PayloadTablitsaOtFaylSazdadena>;
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -568,6 +577,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const zaplati = new Map<string, RedNaZaplata>();
   const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
   const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
+  const tablitsiOtFayl = new Map<string, PayloadTablitsaOtFaylSazdadena>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -1080,6 +1090,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ТаблицаОтФайлСъздадена': {
+        const p = s.payload as unknown as PayloadTablitsaOtFaylSazdadena;
+        tablitsiOtFayl.set(p.klyuch, p);
+        break;
+      }
+
       case 'КешЗахранен': {
         // ДОБАВЯ СЕ · салдото на джоба е СБОР, не поле. Сторното го сваля
         // оттук по `seq`, и кешът пада обратно сам.
@@ -1312,6 +1328,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     zaplati,
     prehvarleniSedmitsi,
     zahranvaniyaNaKesha,
+    tablitsiOtFayl,
     pototsi,
     salda,
     dela,

@@ -172,6 +172,14 @@ export const VID = {
    * щеше да изтрие първото и историята „кога влязоха пари" щеше да я няма.
    */
   keshZahranen: 'kesh-zahranen',
+  /**
+   * ТАБЛИЦА, СЪЗДАДЕНА ОТ ФАЙЛ (резен 21 · ADR-081).
+   *
+   * Своя същност, а не поле на модела: моделът описва как се ЧЕТЕ чужда
+   * таблица, а това е РАЖДАНЕТО на наша. Адресът е `TOF:<име>`, и последният
+   * запис бие — второ четене на същия файл поправя, не удвоява.
+   */
+  tablitsaOtFayl: 'tablitsa-ot-fayl',
   lichno: 'lichno',
   prenos: 'prenos',
   dostap: 'dostap',
@@ -255,6 +263,7 @@ export type TipSabitie =
   | 'ЗаплатаЗаписана'
   | 'СедмицаПрехвърлена'
   | 'КешЗахранен'
+  | 'ТаблицаОтФайлСъздадена'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -786,6 +795,26 @@ export interface PayloadKeshZahranen {
   readonly suma_st: number;
   readonly data: string;
   readonly belezhka: string;
+}
+
+/**
+ * ТАБЛИЦАТА, СЪЗДАДЕНА ОТ ФАЙЛ · и защо носи и НЕПРЕВЕДЕНОТО.
+ *
+ * `nekopirani` е списък от изречения „коя колона · какъв израз · защо не".
+ * Той влиза В ЖУРНАЛА нарочно: човекът ще прави тези сметки вътре, и след
+ * месец единственият начин да си спомни КОИ са те е записът. Изхвърлен като
+ * шум на екрана, той щеше да остави таблица с необяснени дупки.
+ *
+ * Байтовете на файла НЕ влизат — само отпечатъкът му (ADR-073).
+ */
+export interface PayloadTablitsaOtFaylSazdadena {
+  readonly klyuch: string;
+  readonly otFayl: string;
+  readonly otpechatak: string;
+  readonly glavi: readonly string[];
+  readonly vidove: Readonly<Record<string, string>>;
+  readonly formuli: Readonly<Record<string, { readonly deystvie: string; readonly ot: readonly number[] }>>;
+  readonly nekopirani: readonly string[];
 }
 
 /**

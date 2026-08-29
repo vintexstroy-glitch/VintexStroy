@@ -37,6 +37,7 @@ import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
 import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.js';
 import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
+import { GreshkaTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import {
   dnitteNaSedmitsata,
   GreshkaZaplata,
@@ -97,6 +98,7 @@ import type {
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
   PayloadKeshZahranen,
+  PayloadTablitsaOtFaylSazdadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -1232,6 +1234,71 @@ export class Deystviya {
       VID.keshZahranen,
       `KSH:${danni.zahranvaneId}`,
       danni,
+      z,
+    );
+  }
+
+  /**
+   * СЪЗДАВА ТАБЛИЦА ОТ ФАЙЛ · и брои какво НЕ е дошло (резен 21 · ADR-081).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана:
+   *
+   *   1. ИМЕТО не е празно · таблица без име не се намира после;
+   *   2. ГЛАВИТЕ не са нула · таблица без колони не е таблица;
+   *   3. НИТО ЕДНА ГЛАВА не е празна · безименна колона не се вика от формула;
+   *   4. ФОРМУЛА НЕ СОЧИ ФОРМУЛНА КОЛОНА и не сочи себе си · плитък граф
+   *      (`formuli.ts`): формула върху формула прави верига, която гние тихо.
+   *
+   * ОТПЕЧАТЪКЪТ е задължителен: без него в Журнала стои таблица, за която не
+   * се знае от кой файл е дошла — а точно това после никой не може да провери.
+   *
+   * НЕ иска отключен период: таблицата не е число за месец, а описание.
+   */
+  async zapishiTablitsaOtFayl(
+    danni: PayloadTablitsaOtFaylSazdadena,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const ime = danni.klyuch.trim();
+    if (ime === '') {
+      throw new GreshkaTablitsaOtFayl('Таблицата иска име — по него ще се търси после.');
+    }
+    if (danni.glavi.length === 0) {
+      throw new GreshkaTablitsaOtFayl('Таблица без нито една колона не е таблица.');
+    }
+    const prazna = danni.glavi.findIndex((g) => g.trim() === '');
+    if (prazna >= 0) {
+      throw new GreshkaTablitsaOtFayl(
+        `Колона ${prazna + 1} няма име. Безименната колона не се вика от формула и ` +
+          'не се чете от човек.',
+      );
+    }
+    if (danni.otpechatak.trim() === '') {
+      throw new GreshkaTablitsaOtFayl(
+        'Липсва отпечатъкът на файла. Без него в Журнала стои таблица, за която ' +
+          'не се знае откъде е дошла.',
+      );
+    }
+    for (const [kade, f] of Object.entries(danni.formuli)) {
+      const sebe = Number(kade);
+      for (const k of f.ot) {
+        if (k === sebe) {
+          throw new GreshkaTablitsaOtFayl(
+            `Колона „${danni.glavi[sebe]}" сочи себе си — това не е сметка, а кръг.`,
+          );
+        }
+        if (danni.formuli[String(k)] !== undefined) {
+          throw new GreshkaTablitsaOtFayl(
+            `Колона „${danni.glavi[sebe]}" сочи „${danni.glavi[k]}", която сама е ` +
+              'формулна. Формула върху формула прави верига, която гние тихо.',
+          );
+        }
+      }
+    }
+    return this.#pusni(
+      'ТаблицаОтФайлСъздадена',
+      VID.tablitsaOtFayl,
+      `TOF:${ime}`,
+      { ...danni, klyuch: ime },
       z,
     );
   }

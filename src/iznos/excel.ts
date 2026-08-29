@@ -50,7 +50,15 @@ interface Zapis {
   readonly nachalo: number;
 }
 
-function zip(faylove: readonly { ime: string; tekst: string }[]): Uint8Array {
+/**
+ * ЕДИН ZIP · и той е ИЗНЕСЕН, за да го ползва и тестът на четеца.
+ *
+ * Четенето на формули (резен 21) иска истински .xlsx с `<f>` възли, а писачът
+ * тук пише само стойности. Тестът си сглобява такъв файл — но със СЪЩИЯ zip,
+ * не с втори, преписан в тестовете: два архиватора се разминават точно в
+ * ъгъла, който никой не гледа (правило 17).
+ */
+export function zipiray(faylove: readonly { ime: string; tekst: string }[]): Uint8Array {
   const kodirach = new TextEncoder();
   const chasti: Uint8Array[] = [];
   const zapisi: Zapis[] = [];
@@ -201,7 +209,7 @@ export function rabotnaKniga(listove: readonly List[]): Uint8Array {
       .join('') +
     '</Relationships>';
 
-  return zip([
+  return zipiray([
     { ime: '[Content_Types].xml', tekst: tipove },
     { ime: '_rels/.rels', tekst: koren },
     { ime: 'xl/workbook.xml', tekst: kniga },

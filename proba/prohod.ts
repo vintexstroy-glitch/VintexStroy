@@ -37,6 +37,7 @@ import * as lichno from './razdeli/lichno.ts';
 import * as prodazhbi from './razdeli/prodazhbi.ts';
 import * as krediti from './razdeli/krediti.ts';
 import * as zaplati from './razdeli/zaplati.ts';
+import * as tablitsaOtFayl from './razdeli/tablitsa-ot-fayl.ts';
 
 async function main(): Promise<void> {
   const server = pusniServer();
@@ -133,6 +134,7 @@ async function main(): Promise<void> {
     await krediti.blok2(ctx);
     await zaplati.blok1(ctx);
     await zaplati.blok2(ctx);
+    await tablitsaOtFayl.blok1(ctx);
     await tablo.blok2(ctx);
     await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);

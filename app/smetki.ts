@@ -78,6 +78,7 @@ import { butonIstoriya } from './istoriya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { blokNaKreditite, redPodRazhodite, zakachiKreditite } from './krediti.js';
 import { blokNaZaplatite, zakachiZaplatite } from './zaplati.js';
+import { blokNaTablitsaOtFayl, zakachiTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import { butonSIkona } from './ikoni.js';
 import { safT } from '../src/iznos/saf-t.js';
 import { SHEMA } from '../src/iznos/saf-t-shema.js';
@@ -355,6 +356,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
     </section>`
     }
+
+    ${blokNaTablitsaOtFayl()}
 
     ${redPodRazhodite(o, mesets, dnes)}
 
@@ -1029,6 +1032,8 @@ export function zakachiSmetki(
   zakachiKreditite(koren, k, prerisuvay);
   // ЗАПЛАТИТЕ · седмицата, кешът и следата (резен 20 · ADR-080).
   zakachiZaplatite(koren, k, prerisuvay);
+  // ТАБЛИЦА ОТ ФАЙЛ · експериментът с Фактури (резен 21 · ADR-081).
+  zakachiTablitsaOtFayl(koren, k, prerisuvay);
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
   zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
 
