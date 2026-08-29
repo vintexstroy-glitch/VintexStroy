@@ -379,3 +379,34 @@ export async function smetni(p: Page, opis: string, suma: string, stavka: string
   await p.click('#forma-smyatane button[type=submit]');
   await p.waitForFunction((n) => document.querySelectorAll('.red.smyatane').length > (n as number), predi);
 }
+
+/**
+ * СМЕНЯ едно поле и чака САМАТА СТОЙНОСТ да се появи на екрана.
+ *
+ * `deystvieSPrerisuvane` чака ПРЕРИСУВАНЕТО. То свършва — но полето се
+ * пренаписва СЛЕД записа в паметта на екрана, и следващото попълване пада в
+ * МЪРТЪВ ВЪЗЕЛ: написаното се изтрива под ръцете, а проверката отдолу мери
+ * старото число.
+ *
+ * Капанът е платен ТРИ пъти — при базите (§84, ADR-034), при възрастта (§89,
+ * ADR-072 §7.4) и при обхвата на справките (§92). Първите два се поправиха НА
+ * МЯСТО, всеки със свое чакане; третият получи този дом (правило 17).
+ *
+ * ═══ И НЕ ВСЯКО ПОЛЕ ГО ТЪРПИ ═══
+ *
+ * Опитах да го сложа и на §84 — и го СЧУПИХ детерминирано: базата на
+ * Калкулатора се пренаписва от екрана в СВОЙ вид, значи чакането на дословната
+ * стойност не се сбъдва никога и проходът спира. Затова помощникът НЕ се
+ * налага навсякъде: ползва се там, където полето връща онова, което е приело.
+ * Обобщение, направено без мярка, е по-скъпо от повторението, което заменя.
+ */
+export async function smeniPoleto(p: Page, znak: string, stoynost: string): Promise<void> {
+  await deystvieSPrerisuvane(p, async () => {
+    await p.fill(znak, stoynost);
+    await p.dispatchEvent(znak, 'change');
+  });
+  await p.waitForFunction(
+    ([z, v]) => (document.querySelector(z as string) as HTMLInputElement | null)?.value === v,
+    [znak, stoynost],
+  );
+}

@@ -109,6 +109,7 @@ async function main(): Promise<void> {
     await smetki.blok9(ctx);
     await smetki.blok10(ctx);
     await smetki.blok11(ctx);
+    await smetki.blok12(ctx);
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
     await tablo.blok2(ctx);

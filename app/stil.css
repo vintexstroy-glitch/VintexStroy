@@ -894,6 +894,15 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   min-width: 900px;
 }
 /* СВЕРКАТА С ИЗВЛЕЧЕНИЕТО (резен 17в) · пет колони, петата носи ДУМИТЕ. */
+/* СПРАВКИТЕ ЗА СЧЕТОВОДСТВОТО (резен 17г) · шест колони, две за двете оси. */
+.glava.spravkared, .red.spravkared {
+  grid-template-columns: minmax(0, 240px) minmax(0, 240px) 90px 130px 130px 140px;
+  min-width: 960px;
+}
+.glava.chakapodavane, .red.chakapodavane {
+  grid-template-columns: 120px 100px 140px;
+  min-width: 360px;
+}
 .glava.izvlechenie, .red.izvlechenie {
   grid-template-columns: minmax(0, 320px) 110px 110px 130px minmax(0, 260px);
   min-width: 860px;

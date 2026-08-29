@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -906,6 +906,9 @@ export async function blok9(ctx: KonteksNaProhoda): Promise<void> {
  */
 const MOYAT = '.red.razhod:has-text("Хартия ООД")';
 
+/** Редът на МОЯ разход в справките · познат по своето име, не по позиция. */
+const MOYAT_RED = '.red.spravkared:has-text("Октомври ООД")';
+
 /**
  * ЗАТВАРЯ прозореца и ЧАКА воала да СИ ОТИДЕ.
  *
@@ -1135,5 +1138,118 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     (await tekstNa(p, '[data-sektsiya=sverki]')).includes('Сверка с извлечението'), true);
   proveri('и носи СВОЯ период',
     (await tekstNa(p, '[data-sektsiya=sverki]')).includes('2026-09'), true);
+  await naEkran(p, 'imoti', '#forma-imot');
+}
+
+/**
+ * 92 · МЯСТОТО НА СЧЕТОВОДСТВОТО В НАП · четирите справки (резен 17г · ADR-075)
+ *
+ * Мери с ЧИСЛА: колко реда във всяка справка, колко месеца чакат подаване,
+ * и дали подаването на справка ГАСИ находката.
+ */
+export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  /**
+   * Обхватът се СМЕНЯ през полетата, като човек — и в РЕДА, в който човек го
+   * прави: напред се мести първо краят, назад — първо началото. Инак средното
+   * състояние е обърнат обхват, екранът отказва (с право) и плочките ги няма.
+   */
+  const obhvat = async (ot: string, do_: string): Promise<void> => {
+    const segashnoDo = await p.$eval('#spravki-do', (e) => (e as HTMLInputElement).value);
+    if (ot > segashnoDo) {
+      await smeniPoleto(p, '#spravki-do', do_);
+      await smeniPoleto(p, '#spravki-ot', ot);
+    } else {
+      await smeniPoleto(p, '#spravki-ot', ot);
+      await smeniPoleto(p, '#spravki-do', do_);
+    }
+  };
+
+  /** Числото на една плочка · в центове, както го носи `data-st`. */
+  const plochkaNaSpravka = async (klyuch: string): Promise<number> =>
+    Number(await p.$eval(`[data-spravka=${klyuch}]`, (e) => (e as HTMLElement).dataset['st']));
+
+  razdel = '92 · Справките · обхватът е СВОЙ, не месецът на файла';
+  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  proveri('обхватът има свои две полета',
+    await p.$$eval('#spravki-ot, #spravki-do', (e) => e.length), 2);
+
+  // ОБЪРНАТИЯТ ОБХВАТ · „от" след „до". Човек, който мести началото напред,
+  // минава ПРЕЗ това състояние, и екранът трябва да го КАЖЕ, не да падне
+  // (правило 15). Проходът го намери сам: първата версия на §92 нареждаше
+  // полетата точно така и се спъна.
+  await deystvieSPrerisuvane(p, async () => {
+    await p.fill('#spravki-ot', '2027-06');
+    await p.dispatchEvent('#spravki-ot', 'change');
+  });
+  proveri('обърнатият обхват се КАЗВА с думи, не срива екрана',
+    (await tekstNa(p, '[data-sektsiya=nap-spravki]')).includes('Краят е преди началото'), true);
+
+  // ПРАЗЕН обхват · далеч напред, където никой блок не пише
+  await obhvat('2027-06', '2027-06');
+  proveri('празният обхват го КАЗВА',
+    (await tekstNa(p, '[data-tablitsa=spravki-redove]')).includes('Няма нито един ред'), true);
+  proveri('и нулата чакащи месеци също се казва',
+    await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
+
+  razdel = '92 · Справките · платено и НЕдекларирано СВЕТИ';
+  // МЕРИ СЕ ПРЕДИ И СЛЕД · абсолютните числа зависят от чужди блокове, а
+  // разликата — не (същата поука като в §90).
+  await obhvat('2026-10', '2026-10');
+  const predRedove = await p.$$eval('.red.spravkared', (e) => e.length);
+  const predNedeklarirani = await plochkaNaSpravka('nedeklariraniNoPlateni');
+  const predPlateni = await plochkaNaSpravka('plateni');
+
+  await naEkran(p, 'smetki', '#forma-period');
+  await p.fill('#smetki-period', '2026-10');
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Октомври ООД',
+    opis: 'платено, но недекларирано', suma: '400,00', nachin: 'банка',
+    data: '2026-10-08', dokument: 'O-1',
+  });
+
+  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  proveri('редът влиза в справките', await p.$$eval('.red.spravkared', (e) => e.length), predRedove + 1);
+  proveri('и е ПЛАТЕН · разходът се записва вече платен',
+    await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['plateno']), 'plateno');
+  proveri('и НЕ е деклариран · октомври не е подаван',
+    await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['deklarirano']), 'nedeklarirano');
+  proveri('сумата на „недекларирани, но платени" расте с точно 400,00',
+    (await plochkaNaSpravka('nedeklariraniNoPlateni')) - predNedeklarirani, 40_000);
+  proveri('и на „платени" — със същото',
+    (await plochkaNaSpravka('plateni')) - predPlateni, 40_000);
+  proveri('един месец ЧАКА подаване',
+    await p.$eval('[data-chakat]', (e) => e.textContent), '1');
+  proveri('и той е ОКТОМВРИ',
+    (await p.$$eval('[data-chaka]', (e) => e.map((x) => (x as HTMLElement).dataset['chaka']))).join(),
+    '2026-10');
+
+  razdel = '92 · Справките · четирите плочки и сверката';
+  proveri('четирите справки са на екрана',
+    await p.$$eval('[data-spravka]', (e) => e.length), 4);
+  proveri('сверката вход↔изход затваря',
+    await p.$eval('[data-sverka-spravki]', (e) => (e as HTMLElement).dataset['sverkaSpravki']), 'nared');
+  proveri('и границата се БРОИ, не се твърди',
+    await p.$eval('[data-lipsvashti]', (e) => (e as HTMLElement).dataset['lipsvashti']), '1');
+
+  razdel = '92 · Справките · подаването ГАСИ находката';
+  await naEkran(p, 'smetki', '#forma-period');
+  await p.fill('#spravka-data', '2026-11-14');
+  await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
+
+  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  proveri('нито един месец вече не чака',
+    await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
+  proveri('редът вече е ДЕКЛАРИРАН',
+    await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['deklarirano']), 'deklarirano');
+  proveri('и си ОСТАВА платен · подаването не мени парите',
+    await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['plateno']), 'plateno');
+  proveri('а „недекларирани, но платени" се СВИВА с точно 400,00',
+    predNedeklarirani - (await plochkaNaSpravka('nedeklariraniNoPlateni')) + 40_000, 40_000);
   await naEkran(p, 'imoti', '#forma-imot');
 }
