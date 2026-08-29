@@ -39,6 +39,7 @@ import * as krediti from './razdeli/krediti.ts';
 import * as zaplati from './razdeli/zaplati.ts';
 import * as tablitsaOtFayl from './razdeli/tablitsa-ot-fayl.ts';
 import * as plashtaniyaArhiv from './razdeli/plashtaniya-arhiv.ts';
+import * as prodazhbiIzhod from './razdeli/prodazhbi-izhod.ts';
 
 async function main(): Promise<void> {
   const server = pusniServer();
@@ -138,6 +139,8 @@ async function main(): Promise<void> {
     await tablitsaOtFayl.blok1(ctx);
     // §102 стои СЛЕД §99: заплатата, която то брои, се записва там.
     await plashtaniyaArhiv.blok1(ctx);
+    // §103 стои СЛЕД §94: сделката и двете ѝ движения се записват там.
+    await prodazhbiIzhod.blok1(ctx);
     await tablo.blok2(ctx);
     await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);

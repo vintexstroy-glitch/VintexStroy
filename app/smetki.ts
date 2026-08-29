@@ -84,6 +84,7 @@ import { safT } from '../src/iznos/saf-t.js';
 import { SHEMA } from '../src/iznos/saf-t-shema.js';
 import { oboroti } from '../src/domein/glavna-kniga.js';
 import { svaliFayl } from './obshto.js';
+import { CHAKA_DUMA_ZA_DDS } from '../src/domein/prodazhbi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
   menyuOtZhivi,
@@ -268,6 +269,17 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         </div>
         ${s.redove.map(redNaSmetka).join('')}
       </div>
+      <p class="drebno" data-sektsiya="prodazhbi-granitsa"><b>Потокът „Продажби"
+      се СМЯТА</b> от вноските по сделка, всяка по СВОЯТА дата — сделка от март
+      с вноска през август е приход за август. Нищо не се записва: записан, той
+      щеше да се удвои с реалното плащане от извлечението.
+      <b>Връщането и неустойката НЕ влизат</b> — „Неустойките се превеждат
+      отделно, никакво нетиране"; те стоят на своя ред в Продажби.</p>
+      <p class="drebno" data-chaka-dds="${CHAKA_DUMA_ZA_DDS.length}"><b>И НЕ влиза
+      в ДДС-основата.</b> Дали доставката е облагаема зависи от това нова ли е
+      сградата и коя част е земя (чл. 45 ЗДДС) — счетоводна преценка, не
+      аритметика. Тихо начислени 20 % върху продажба на имот са глоба, не
+      закръгляне. Чака се: ${CHAKA_DUMA_ZA_DDS.map((x) => ekraniraj(x)).join(' · ')}.</p>
     </section>
 
     <section data-sektsiya="smetki-dds">
@@ -577,7 +589,7 @@ function poleNaOtcheta(p: Pole): string {
           .map(
             (c) => `<li>
               <span class="ime">${ekraniraj(c.ime)}</span>
-              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${pishi(c.suma_st)}</span>
+              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}" data-st="${c.suma_st}">${pishi(c.suma_st)}</span>
               <span class="otkade">${ekraniraj(c.otkade)}</span>
             </li>`,
           )
@@ -925,7 +937,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
 
 function redNaSmetka(r: RedSmetka): string {
   return `
-    <div class="red smetka" translate="no">
+    <div class="red smetka" translate="no" data-potok="${ekraniraj(r.klyuch)}">
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>

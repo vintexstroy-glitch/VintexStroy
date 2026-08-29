@@ -30,6 +30,7 @@
 import { obshtOstatak } from './krediti.js';
 import type { Ogledalo, Plashtane, Razhod } from '../ogledalo/ogledalo.js';
 import { duljimo } from '../ogledalo/ogledalo.js';
+import { vzemaniyaOtProdazhbi } from './prodazhbi.js';
 import type { Period } from './nachislyavane.js';
 import { smetki } from './smetki.js';
 import { prihodnaChast, razhodnaChast, type LichnoDvizhenie } from './lichni-pari.js';
@@ -137,27 +138,48 @@ export function likvidnost(o: Ogledalo): Pole {
  * ВЗЕМАНИЯТА · ДВА ВИДА, които не се сливат в едно число.
  *
  * От НАЕМ: начислено, което още не е погасено — „кой ми дължи" (И8).
- * От ПРОДАЖБА: плащания по НЕЗАВЪРШИЛА сделка, до Акт 16 (И90). Границата е
- * актът: след нотариалната сделка сделката е приключила и е в архива, дори с
- * неплатени суми по договор.
+ * От ПРОДАЖБА: онова, което купувачът още дължи по НЕЗАВЪРШИЛА сделка, до
+ * Акт 16 (И90). Границата е актът: след нотариалната сделка сделката е
+ * приключила и е в архива, дори с неплатени суми по договор.
  *
- * Продажбите още ги няма като същност (M04 · M03 · нула код), затова вторият
- * ред стои с нула и казва какво чака. Скриването му би направило Вземанията да
- * изглеждат пълни, когато са наполовина.
+ * ═══ ЗАКОВАНАТА НУЛА СИ НАМЕРИ ИЗТОЧНИКА (резен 23 · ADR-083) ═══
+ *
+ * Дотук вторият ред стоеше с ЛИТЕРАЛНА нула и шапка „Продажбите още ги няма
+ * като същност (M04 · M03 · нула код)". Резен 18б ги построи, и нулата остана
+ * — точно както `zadalzheniya_st` и `kredititeOstatak_st` останаха, докато
+ * резен 19 не им намери източник (ADR-079). Числото вече идва от таблицата.
+ *
+ * НАДПЛАТЕНОТО НЕ СЕ ВАДИ. То е задължение КЪМ купувача, а не отрицателно
+ * вземане; извадено наум, би намалило „кой ми дължи" с пари, които НИЕ дължим.
+ * Затова се БРОИ и се КАЗВА в `chaka`, вместо да се нетира (правило 15).
  */
 export function vzemaniya(o: Ogledalo): Pole {
   const otNaem_st = duljimo(o);
+  const otProdazhbi = vzemaniyaOtProdazhbi(o);
   const sastavki: Sastavka[] = [
     { ime: 'От наем · непогасено', suma_st: otNaem_st, otkade: 'Журналът · вземания' },
-    { ime: 'От продажби · до Акт 16', suma_st: 0, otkade: 'таблица Архив Продажби' },
+    {
+      ime: 'От продажби · до Акт 16',
+      suma_st: otProdazhbi.sbor_st,
+      otkade: `таблица Продажби · ${otProdazhbi.redove.length} ${
+        otProdazhbi.redove.length === 1 ? 'сделка' : 'сделки'
+      }`,
+    },
   ];
+  const chaka: string[] = [];
+  if (otProdazhbi.nadplateni.length > 0) {
+    chaka.push(
+      `${otProdazhbi.nadplateni.length} надплатени сделки НЕ са извадени оттук — ` +
+        'надплатеното е задължение КЪМ купувача и мястото му сред Задълженията чака решение',
+    );
+  }
   return {
     klyuch: 'vzemaniya',
     ime: 'ВЗЕМАНИЯ',
     sbor_st: sbor(sastavki),
     sastavki,
-    chaka: ['таблица Продажби · сверката с банковите извлечения по Архив Продажби'],
-    kakvo: 'Какво дължат на нас. Наемът — непогасеното; продажбата — платеното до Акт 16.',
+    chaka,
+    kakvo: 'Какво дължат на нас. Наемът — непогасеното; продажбата — неплатеното до Акт 16.',
   };
 }
 
@@ -173,6 +195,13 @@ export function sredstva(o: Ogledalo, period: Period, kogato: string): Pole {
   const s = smetki(o, period, kogato);
   const sastavki: Sastavka[] = [
     { ime: 'Приход · начислено', suma_st: s.prihod_st, otkade: `Сметки · ${period}` },
+    // ТРЕТА СЪСТАВКА · вноските по сделка. Без нея Средствата биха мълчали за
+    // пари, които реално са влезли — а мълчанието изглежда като нула.
+    {
+      ime: 'Приход · продажби',
+      suma_st: s.prihodProdazhbi_st,
+      otkade: `Сметки · ${period} · поток Продажби`,
+    },
     { ime: 'Разход', suma_st: -s.razhod_st, otkade: `Сметки · ${period}` },
   ];
   return {
@@ -277,6 +306,10 @@ export function otcheti(
   for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
   let vzemaniya_st = 0;
   for (const v of o.vzemaniya.values()) vzemaniya_st += v.ostatak_st;
+  // И ВТОРИЯТ ПЪТ брои продажбите САМ · иначе сверката щеше да падне точно със
+  // сумата, която полето ВЗЕМАНИЯ вече показва — и това е доказателството, че
+  // тя не е алгебра: махне ли се този ред, разликата светва.
+  vzemaniya_st += vzemaniyaOtProdazhbi(o).sbor_st;
 
   const aktivi_st =
     (vanshni.stoynostNaSastoyanie_st ?? 0) +

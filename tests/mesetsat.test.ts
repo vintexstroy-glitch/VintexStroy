@@ -125,8 +125,8 @@ describe('трите раздела', () => {
     for (const razdel of RAZDELI) {
       expect(t.redove.some((r) => r.razdel === razdel), razdel).toBe(true);
     }
-    // Шестте потока стоят всичките — и празният поток е факт, не липса.
-    expect(t.redove.filter((r) => r.razdel === 'potok')).toHaveLength(6);
+    // СЕДЕМТЕ потока стоят всичките — и празният поток е факт, не липса.
+    expect(t.redove.filter((r) => r.razdel === 'potok')).toHaveLength(7);
   });
 
   it('главите са изписани и Разликата е между тях', async () => {
@@ -243,8 +243,10 @@ describe('сверките пътуват С таблицата (правило 
     const { deystviya } = stend();
     const t = mesetsatKatoTablitsa(await deystviya.ogledalo(), '2030-01', KOGATO);
 
-    expect(t.redove.filter((r) => r.razdel === 'potok')).toHaveLength(6);
+    expect(t.redove.filter((r) => r.razdel === 'potok')).toHaveLength(7);
     expect(t.redove.every((r) => r.razdel !== 'potok' || r.stoynost_st === 0)).toBe(true);
+    // ЧЕТИРИ · това са СОБСТВЕНИТЕ сверки на месечната таблица, не петте на
+    // Сметки: тя сверява СЕБЕ СИ срещу онова, което Сметки и Отчети казват.
     expect(t.sverki).toHaveLength(4);
     expect(t.nared).toBe(true);
   });

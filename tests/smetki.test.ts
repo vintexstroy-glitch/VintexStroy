@@ -110,7 +110,9 @@ describe('редът ДДС', () => {
 
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
 
-    expect(s.sverki).toHaveLength(4);
+    // ПЕТ, не четири: приходната страна вече има ДВЕ числа (наеми · продажби)
+    // и своя сверка върху самата таблица (резен 23 · ADR-083).
+    expect(s.sverki).toHaveLength(5);
     expect(s.sverki.every((x) => x.razlika === 0)).toBe(true);
     expect(s.sverki.every((x) => x.nared)).toBe(true);
   });
@@ -125,12 +127,15 @@ describe('редът ДДС', () => {
       MERKA.broy,
       MERKA.pari,
       MERKA.broy,
+      MERKA.pari,
     ]);
     expect(s.sverki[0]!.vhod).toBe(1700_00);
     expect(s.sverki[1]!.vhod).toBe(2);
     // Разходната страна е празна, но сверката ѝ пак се записва — нула също е отговор.
     expect(s.sverki[2]!.vhod).toBe(0);
     expect(s.sverki[3]!.vhod).toBe(0);
+    // Петата гледа ТАБЛИЦАТА: сборът на приходните редове, които СЪБИРАТ.
+    expect(s.sverki[4]!.vhod).toBe(1700_00);
   });
 });
 
@@ -183,6 +188,7 @@ describe('потоците пари', () => {
       'naemi',
       'kesh',
       'banka',
+      'prodazhbi',
       'zaplati',
       'krediti',
       'fakturi',

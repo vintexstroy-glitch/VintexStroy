@@ -37,7 +37,11 @@ import {
   sveri,
   vArhiva,
   VIDOVE_DVIZHENIE,
+  vzemaniyaOtProdazhbi,
   ZATVORENI,
+  CHAKA_DUMA_ZA_DDS,
+  ETAP_KOYTO_ZATVARYA,
+  prihodOtProdazhbi,
 } from '../src/domein/prodazhbi.js';
 import { SHA } from './pomoshtni.js';
 import { IMENA_NA_KAM as VIDOVE_KAM_IMENA, sashtnostNaDokumenti } from '../src/domein/dokumenti.js';
@@ -567,5 +571,154 @@ describe('неговите поправки от 29.08 · вечерта', () =>
     expect(imotatNaObekta('Апартамент 7', karta)).toBe('IM-7');
     // име без номер НЕ се връзва · и това е отказ, не догадка
     expect(imotatNaObekta('Мазе', karta)).toBeUndefined();
+  });
+});
+
+// ── ИЗХОДЪТ НА СДЕЛКАТА · Вземания и Приход (резен 23 · ADR-083) ───────────
+
+/** Едно движение по сделката · с СВОЯ дата, защото месецът се решава от нея. */
+async function sDvizhenie(
+  d: Deystviya,
+  vid: string,
+  suma_st: number,
+  data: string,
+  id = `PRD-${vid}`,
+) {
+  await d.zapishiDvizhenieNaProdazhba(
+    {
+      dvizhenieId: id,
+      prodazhbaId: 'PR-1',
+      vid,
+      suma_st,
+      data,
+      belezhka: `${vid} по сделката`,
+      nachin: 'банка',
+    },
+    { opId: `op-${id}` },
+  );
+}
+
+describe('ВЗЕМАНИЯТА от продажби · закованата нула си намери източника', () => {
+  it('сделка с капаро и без Акт 16 дължи ТОЧНО остатъка от проверката', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    const o = await ogledaloto(dnevnik);
+
+    const v = vzemaniyaOtProdazhbi(o);
+    // сделката е ПД 10 000 + СМР 14 000 = 24 000; платено 5 000
+    expect(v.sbor_st).toBe(19_000_00);
+    expect(v.redove).toHaveLength(1);
+    expect(v.redove[0]!.kupuvach).toBe('Иван Петров');
+    // и числото е СЪЩОТО, което колоната „проверка" показва · един дом
+    const red = redovete(o).find((r) => r.prodazhba.id === 'PR-1')!;
+    expect(v.sbor_st).toBe(red.proverka.razlika_st);
+  });
+
+  it('движението „Акт 16" я ВАДИ · актът е границата (И90)', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    expect((await ogledaloto(dnevnik)) && vzemaniyaOtProdazhbi(await ogledaloto(dnevnik)).sbor_st).toBe(
+      19_000_00,
+    );
+
+    await sDvizhenie(deystviya, ETAP_KOYTO_ZATVARYA, 1_000_00, '2026-09-01');
+    const v = vzemaniyaOtProdazhbi(await ogledaloto(dnevnik));
+    expect(v.sbor_st).toBe(0);
+    expect(v.redove).toEqual([]);
+  });
+
+  it('и АРХИВЪТ я вади · дори с неплатени суми по договор', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    await deystviya.zapishiProdazhba(
+      {
+        prodazhbaId: 'PR-1',
+        imotId: 'IM-1',
+        kupuvach: 'Иван Петров',
+        telefon: '0888123456',
+        tsena_st: 25_000_00,
+        prodazhba_st: 24_000_00,
+        smr_st: 14_000_00,
+        pd_st: 10_000_00,
+        sastoyanie: 'prodadena',
+      },
+      { opId: 'op-arhiv' },
+    );
+    expect(vzemaniyaOtProdazhbi(await ogledaloto(dnevnik)).sbor_st).toBe(0);
+  });
+
+  it('НАДПЛАТЕНАТА сделка не прави вземането отрицателно · брои се', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 30_000_00, '2026-08-10');
+    const v = vzemaniyaOtProdazhbi(await ogledaloto(dnevnik));
+    expect(v.sbor_st).toBe(0);
+    expect(v.redove).toEqual([]);
+    // Тя не изчезва мълчаливо: БРОИ се, защото е задължение КЪМ купувача.
+    expect(v.nadplateni).toEqual(['PR-1']);
+  });
+
+  it('СТОРНИРАНО движение вдига вземането обратно · без ред код за това', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    const predi = await ogledaloto(dnevnik);
+    expect(vzemaniyaOtProdazhbi(predi).sbor_st).toBe(19_000_00);
+
+    const seq = predi.dvizheniyaNaProdazhbi.find((d) => d.id === 'PRD-Капаро')!.seq;
+    await deystviya.storniraj(
+      'ST-1',
+      { pogasyavaSeq: seq, prichina: 'грешна сума' },
+      { opId: 'op-storno' },
+    );
+    expect(vzemaniyaOtProdazhbi(await ogledaloto(dnevnik)).sbor_st).toBe(24_000_00);
+  });
+});
+
+describe('ПРИХОДЪТ от вноски · „директно с датат"', () => {
+  it('вноската влиза в месеца на СВОЯТА дата, не на сделката', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    await sDvizhenie(deystviya, 'НС', 3_000_00, '2026-09-04');
+    const o = await ogledaloto(dnevnik);
+
+    expect(prihodOtProdazhbi(o, '2026-08')).toEqual({ suma_st: 5_000_00, broy: 1 });
+    expect(prihodOtProdazhbi(o, '2026-09')).toEqual({ suma_st: 3_000_00, broy: 1 });
+    expect(prihodOtProdazhbi(o, '2026-07')).toEqual({ suma_st: 0, broy: 0 });
+  });
+
+  it('ВРЪЩАНЕТО и НЕУСТОЙКАТА не влизат · „никакво нетиране"', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await sDvizhenie(deystviya, 'Капаро', 5_000_00, '2026-08-10');
+    await sDvizhenie(deystviya, 'връщане', -2_000_00, '2026-08-12');
+    await sDvizhenie(deystviya, 'неустойка', 500_00, '2026-08-13');
+
+    const o = await ogledaloto(dnevnik);
+    expect(prihodOtProdazhbi(o, '2026-08')).toEqual({ suma_st: 5_000_00, broy: 1 });
+    // а те си стоят на своя ред в таблицата — показани, не събрани
+    const izvan = izvanProverkata('PR-1', o.dvizheniyaNaProdazhbi);
+    expect(izvan.vrashtane_st).toBe(-2_000_00);
+    expect(izvan.neustoyka_st).toBe(500_00);
+  });
+
+  it('движение по НЕСЪЩЕСТВУВАЩА сделка изобщо не се записва · Вратата го спира', async () => {
+    const { deystviya } = await sasSdelka();
+    await expect(
+      deystviya.zapishiDvizhenieNaProdazhba(
+        {
+          dvizhenieId: 'PRD-X',
+          prodazhbaId: 'PR-NYAMA',
+          vid: 'Капаро',
+          suma_st: 1_000_00,
+          data: '2026-08-10',
+          belezhka: 'висящо',
+          nachin: 'банка',
+        },
+        { opId: 'op-visyashto' },
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('ДДС-то ЧАКА негова дума · и се БРОИ, вместо да се начисли тихо', () => {
+    expect(CHAKA_DUMA_ZA_DDS).toHaveLength(3);
+    expect(CHAKA_DUMA_ZA_DDS.join(' ')).toContain('чл. 45');
   });
 });

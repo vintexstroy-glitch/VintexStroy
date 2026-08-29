@@ -456,12 +456,32 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
       await sSabitie(p, () => p.click('#forma-plashtane button[type=submit]'));
     }
 
+    // ПОТОКЪТ „Продажби" · вноска по сделка, за СЪЩИЯ месец (резен 23).
+    // Без нея седмият ред щеше да стои на нула и проверката „нито един не
+    // остана празен" би паднала — тоест потокът трябва да се ХРАНИ, не да се
+    // извади от проверката.
+    await naEkran(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
+    await p.fill('#prodazhba-kupuvach', 'Мария Иванова');
+    await p.fill('#prodazhba-telefon', '0888777666');
+    await p.fill('#prodazhba-tsena', '120000,00');
+    await p.fill('#prodazhba-prodazhba', '118000,00');
+    await p.fill('#prodazhba-smr', '8000,00');
+    await p.fill('#prodazhba-pd', '110000,00');
+    await sSabitie(p, () => p.click('#nova-prodazhba'));
+    await p.waitForSelector('#forma-dvizhenie');
+    await p.selectOption('#dvizhenie-vid', 'Капаро');
+    await p.selectOption('#dvizhenie-nachin', 'банка');
+    await p.fill('#dvizhenie-suma', '12000,00');
+    await p.fill('#dvizhenie-data', '2026-11-09');
+    await p.fill('#dvizhenie-belezhka', 'капаро по предварителния');
+    await sSabitie(p, () => p.click('#forma-dvizhenie button[type=submit]'));
+
     await naEkran(p, 'smetki', '#forma-razhod');
     await p.fill('#smetki-period', '2026-11');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
 
-    proveri('шестте потока имат свой ред',
-      await p.$$eval('.red.smetka', (r) => r.length), 6);
+    proveri('СЕДЕМТЕ потока имат свой ред',
+      await p.$$eval('.red.smetka', (r) => r.length), 7);
     proveri('и нито един не остана празен',
       await p.$$eval('.red.smetka', (r) =>
         r.every((x) => Number((x.querySelector('.suma') as any)?.dataset.st ?? 0) > 0)), true);
@@ -476,9 +496,9 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     proveri('един акумулатор с ДВЕ ставки дава ДВА реда',
       akumulatorite.filter((a) => a.endsWith('покупки · услуги')).length, 2);
 
-    // ЧЕТИРИТЕ СВЕРКИ · всяка затваря, и нулата се ПОКАЗВА (правило 7)
+    // ПЕТТЕ СВЕРКИ · всяка затваря, и нулата се ПОКАЗВА (правило 7)
     const SVERKI = '.red.sverka:not(.otchet-sverka)';
-    proveri('четирите сверки са налице', await p.$$eval(SVERKI, (r) => r.length), 4);
+    proveri('петте сверки са налице', await p.$$eval(SVERKI, (r) => r.length), 5);
     proveri('и всяка затваря',
       await p.$$eval(SVERKI, (r) =>
         r.every((x) => x.textContent.includes('затваря') && !x.textContent.includes('НЕ затваря'))), true);
@@ -487,7 +507,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     proveri('разликата се показва и когато е нула',
       await p.$$eval(SVERKI, (r) =>
         r.map((x) => (x.querySelectorAll('.suma')[2]?.textContent ?? '').replace(/[^\d,-]/g, ''))),
-      ['0,00', '0', '0,00', '0']);
+      ['0,00', '0', '0,00', '0', '0,00']);
 
     // ══ 47 · счетоводният агент · пилотът на ADR-005 (резен 15б) ═════════════
     //
@@ -507,8 +527,8 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     const razdeli = await p.$$eval('.red.mesetsat', (r) =>
       [...new Set(r.map((x) => x.dataset.razdel))].sort());
     proveri('и носи трите раздела', razdeli.join('·'), 'akumulator·pokazatel·potok');
-    proveri('шестте потока са всичките',
-      await p.$$eval('.red.mesetsat[data-razdel="potok"]', (r) => r.length), 6);
+    proveri('седемте потока са всичките',
+      await p.$$eval('.red.mesetsat[data-razdel="potok"]', (r) => r.length), 7);
 
     // Δ се СМЯТА · сравнява се с ПРЕДХОДНИЯ месец, а той тук е празен
     proveri('главата назовава предходния месец',

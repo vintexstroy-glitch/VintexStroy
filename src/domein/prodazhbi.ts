@@ -554,3 +554,123 @@ export function sveri(
     .map((d) => d.id);
   return Object.freeze({ vhod, izhod, razlika: vhod - izhod, bezSdelka: Object.freeze(bezSdelka) });
 }
+
+// ── ИЗХОДЪТ НА СДЕЛКАТА · Вземания и Приход (резен 23 · ADR-083) ───────────
+
+/**
+ * ДОКЪДЕ СЕ БРОИ ВЗЕМАНЕ · границата, казана точно.
+ *
+ * Негова (И90): вземането от продажба е „до Акт 16". А шапката на полето в
+ * Отчети добавя второто: „след нотариалната сделка сделката е приключила и е в
+ * архива, дори с неплатени суми по договор."
+ *
+ * Значи границите са ДВЕ и важи по-РАННАТА:
+ *
+ *   · записано движение „Акт 16" — актът е дошъл;
+ *   · състояние В АРХИВА (`vArhiva`) — сделката е приключена от човек.
+ *
+ * Едната без другата би оставила вземане да виси: сделка в архива без Акт 16
+ * щеше да дължи вечно, а Акт 16 по текуща сделка щеше да я брои след акта.
+ */
+export const ETAP_KOYTO_ZATVARYA = 'Акт 16';
+
+export interface VzemaneOtProdazhba {
+  readonly prodazhbaId: string;
+  readonly kupuvach: string;
+  readonly ostatak_st: number;
+}
+
+export interface VzemaniyataOtProdazhbi {
+  readonly redove: readonly VzemaneOtProdazhba[];
+  readonly sbor_st: number;
+  /**
+   * НАДПЛАТЕНИТЕ · БРОЯТ се, не се нетират.
+   *
+   * Надплатена сделка е ЗАДЪЛЖЕНИЕ към купувача, не отрицателно вземане.
+   * Извадена наум от сбора, тя щеше да намали „кой ми дължи" с пари, които
+   * НИЕ дължим — точно нетирането, което той забрани при неустойките.
+   * Мястото ѝ сред Задълженията иска негова дума; дотогава се КАЗВА.
+   */
+  readonly nadplateni: readonly string[];
+}
+
+/**
+ * ВЗЕМАНИЯТА ОТ ПРОДАЖБИ · сметнати от вече построената проверка.
+ *
+ * `proverkata` дава `razlika_st` = сделка − вноски. Втора сметка тук би се
+ * разминала с колоната „проверка" в деня, в който едната се поправи
+ * (правило 17) — затова се ЧЕТЕ, не се смята наново.
+ */
+export function vzemaniyaOtProdazhbi(o: Ogledalo): VzemaniyataOtProdazhbi {
+  const etapi = etapite(o);
+  const redove: VzemaneOtProdazhba[] = [];
+  const nadplateni: string[] = [];
+
+  for (const p of o.prodazhbi.values()) {
+    if (vArhiva(p.sastoyanie)) continue;
+    const moite = o.dvizheniyaNaProdazhbi.filter((d) => d.prodazhbaId === p.id);
+    if (moite.some((d) => d.vid === ETAP_KOYTO_ZATVARYA)) continue;
+    const { razlika_st } = proverkata(p, moite, etapi);
+    if (razlika_st > 0) {
+      redove.push(Object.freeze({ prodazhbaId: p.id, kupuvach: p.kupuvach, ostatak_st: razlika_st }));
+    } else if (razlika_st < 0) {
+      nadplateni.push(p.id);
+    }
+  }
+
+  return Object.freeze({
+    redove: Object.freeze(redove.sort((a, b) => b.ostatak_st - a.ostatak_st)),
+    sbor_st: redove.reduce((s, r) => s + r.ostatak_st, 0),
+    nadplateni: Object.freeze(nadplateni.sort()),
+  });
+}
+
+/**
+ * ПРИХОДЪТ ОТ ВНОСКИ за един месец · „по датата на вноската".
+ *
+ * Негово *(р75·[50])*: „Така ще се праща директно с датат в редовете с Приход
+ * в главната таблица." Тоест месецът се решава от датата на ДВИЖЕНИЕТО, не от
+ * датата на сделката — сделка от март с вноска през август е приход за август.
+ *
+ * СМЯТА СЕ, не се записва. Записан, той щеше да се удвои с реалното плащане от
+ * извлечението — същата поука, която направи ред-проекцията на кредитите сбор,
+ * а не запис (ADR-079).
+ *
+ * ВРЪЩАНЕТО И НЕУСТОЙКАТА НЕ ВЛИЗАТ. Негово: „Неустойките се превеждат
+ * ОТДЕЛНО, никакво нетиране." Те се показват на своя ред в Продажби
+ * (`izvanProverkata`) и чакат собствен резен; събрани тук, те щяха да са точно
+ * нетирането, което той забрани.
+ */
+export interface PrihodOtProdazhbi {
+  readonly suma_st: number;
+  readonly broy: number;
+}
+
+export function prihodOtProdazhbi(o: Ogledalo, period: string): PrihodOtProdazhbi {
+  const etapi = etapite(o);
+  const nashi = o.dvizheniyaNaProdazhbi.filter(
+    (d) =>
+      d.data.slice(0, 7) === period &&
+      eVnoska(d.vid, etapi) &&
+      o.prodazhbi.has(d.prodazhbaId),
+  );
+  return Object.freeze({
+    suma_st: nashi.reduce((s, d) => s + d.suma_st, 0),
+    broy: nashi.length,
+  });
+}
+
+/**
+ * КАКВО ЧАКА НЕГОВАТА ДУМА ЗА ДДС · изброено поименно, БРОЕНО от екрана.
+ *
+ * Вноската по продажба на СГРАДА носи ДДС по правила, които зависят от това
+ * дали сградата е „нова" и от чл. 45 ЗДДС — това е СЧЕТОВОДНА ПРЕЦЕНКА, не
+ * аритметика (правило 18). Затова приходът от продажби НЕ влиза в
+ * ДДС-акумулаторите, и мълчанието тук би било по-скъпо от празния ред:
+ * тихо начислени 20 % върху продажба на имот са глоба, не закръгляне.
+ */
+export const CHAKA_DUMA_ZA_DDS: readonly string[] = Object.freeze([
+  'нова ли е сградата по смисъла на ЗДДС · от това зависи облагаема ли е доставката',
+  'коя част от вноската е земя и коя — сграда (чл. 45 ЗДДС ги дели)',
+  'ставката на реда, ако доставката е облагаема',
+]);
