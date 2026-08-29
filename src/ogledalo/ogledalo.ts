@@ -28,6 +28,7 @@ import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
 import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
+import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
@@ -67,6 +68,8 @@ import type {
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
   PayloadDokumentiZakacheni,
+  PayloadDvizhenieProdazhba,
+  PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
@@ -265,6 +268,21 @@ export interface Ogledalo {
    */
   readonly dokumenti: ReadonlyMap<string, ZakacheniDokumenti>;
   /**
+   * `prodazhbaId` → сделката с петнайсетте му колони (резен 18б).
+   *
+   * Последният запис за същността бие — поправка е НОВ запис на цялата сделка.
+   * Вж. `src/domein/prodazhbi.ts`.
+   */
+  readonly prodazhbi: ReadonlyMap<string, Prodazhba>;
+  /**
+   * Движенията по продажбите · вноска · връщане · неустойка.
+   *
+   * СПИСЪК, не карта: те се ДОБАВЯТ и нито едно не заменя друго. „Развалянето
+   * е ТРИ отделни движения… никакво нетиране" (И97) — карта с ключ по вид щеше
+   * да слее втората вноска с първата и да изяде датата ѝ.
+   */
+  readonly dvizheniyaNaProdazhbi: readonly DvizhenieNaProdazhba[];
+  /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
    * Ключът е ТРОЕН, защото редът е един за двойка колона·месец: повторното
@@ -455,6 +473,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
    * ВИКА същата функция — правило 17 важи и за логиката, не само за числата.
    */
   const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
+  /**
+   * И ТРЕТИЯТ СЪС СЪЩАТА ДУПКА · продажбата (резен 18б).
+   *
+   * `ПродажбаЗаписана` е и създаването, и поправката — точно устройството,
+   * заради което делото възкръсваше от собствената си поправка. Викането е
+   * СЪЩОТО, не преписано: правило 17 важи и за разсъждението.
+   */
+  const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -476,6 +502,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const kontragenti = new Map<string, Kontragent>();
   const prava = new Map<string, PravaZaModel>();
   const dokumenti = new Map<string, ZakacheniDokumenti>();
+  const prodazhbi = new Map<string, Prodazhba>();
+  const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -862,6 +890,51 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ПродажбаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · цялата сделка идва наведнъж, значи няма какво
+        // да се слива. Всяка предишна версия си стои в Журнала (правило 1).
+        //
+        // `seq` се пази от ПЪРВИЯ запис: сторното сочи раждането на сделката,
+        // а поправката не бива да мести целта му — същото решение като при
+        // имота и наема (`poletataNaNaema`).
+        const p = s.payload as unknown as PayloadProdazhbaZapisana;
+        // ПО СЪЩНОСТТА, не по голия `prodazhbaId`: адресът е `PRD:<id>`, и
+        // сравнението с голото число мълчеше — сделката възкръсваше от
+        // собствената си поправка. Тестът го хвана с „expected true to be false".
+        if (stornianiProdazhbi.has(s.sashtnost.id)) break;
+        const predishna = prodazhbi.get(p.prodazhbaId);
+        prodazhbi.set(p.prodazhbaId, {
+          id: p.prodazhbaId,
+          seq: predishna ? predishna.seq : s.seq,
+          imotId: p.imotId,
+          kupuvach: p.kupuvach,
+          telefon: p.telefon,
+          tsena_st: p.tsena_st,
+          prodazhba_st: p.prodazhba_st,
+          smr_st: p.smr_st,
+          pd_st: p.pd_st,
+          sastoyanie: p.sastoyanie,
+        });
+        break;
+      }
+
+      case 'ДвижениеПоПродажба': {
+        // ДОБАВЯ СЕ · нищо не се заменя. Сторното го сваля оттук по `seq`,
+        // както при плащанията — „Сторното не отменя, то добавя" (И97) значи,
+        // че редът в ЖУРНАЛА остава; свалено е само участието му в сметките.
+        const p = s.payload as unknown as PayloadDvizhenieProdazhba;
+        dvizheniyaNaProdazhbi.push({
+          id: p.dvizhenieId,
+          seq: s.seq,
+          prodazhbaId: p.prodazhbaId,
+          vid: p.vid,
+          suma_st: p.suma_st,
+          data: p.data,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
 
       case 'СверкаЗаписана': {
         const p = s.payload as unknown as PayloadSverkaZapisana;
@@ -1065,6 +1138,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     otgovoriNaZadachi,
     prava,
     dokumenti,
+    prodazhbi,
+    dvizheniyaNaProdazhbi,
     pototsi,
     salda,
     dela,

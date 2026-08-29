@@ -21,6 +21,14 @@ import {
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaDokumenti } from './dokumenti.js';
+import {
+  GreshkaProdazhba,
+  SASTOYANIYA,
+  sashtnostNaDvizhenie,
+  sashtnostNaProdazhba,
+  vArhiva,
+  VIDOVE_DVIZHENIE,
+} from './prodazhbi.js';
 import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
@@ -78,6 +86,8 @@ import type {
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
   PayloadDokumentiZakacheni,
+  PayloadDvizhenieProdazhba,
+  PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
@@ -851,6 +861,104 @@ export class Deystviya {
       'ДокументиЗакачени',
       VID.dokumenti,
       sashtnostNaDokumenti(danni.kam, danni.id),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ПРОДАЖБА · сделката с петнайсетте му колони (резен 18б).
+   *
+   * ТРИ ПРОВЕРКИ СТОЯТ ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата, а трите пазят смисъла:
+   *
+   *   1. ИМОТЪТ СЪЩЕСТВУВА · „Обект" и „Място" се четат от него; сделка върху
+   *      несъществуващ имот показва две празни колони и никой не разбира защо;
+   *   2. СЪСТОЯНИЕТО е едно от изброените · свободна стойност би паднала ТИХО
+   *      извън архива и щеше да отключи заключена сделка (същият капан като
+   *      при „карта", ADR-074);
+   *   3. АРХИВЪТ Е ЕДНОПОСОЧЕН · „Няма връщане от Продажби Архив. Там не се
+   *      трив нищо а само се сверява." Сделка, влязла в архива, не се
+   *      презаписва — нито обратно към „текуща", нито с нов купувач.
+   *
+   * НЕ ИСКА ОТКЛЮЧЕН ПЕРИОД · и това се казва на глас: сделката не е
+   * счетоводен запис в месец. Парите по нея влизат през ВНОСКИТЕ, всяка със
+   * своята дата — там е мястото на замразяването, ако някога потрябва.
+   */
+  async zapishiProdazhba(danni: PayloadProdazhbaZapisana, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.imoti.has(danni.imotId)) {
+      throw new GreshkaProdazhba(
+        'Няма такъв имот. Сделката чете „Обект" и „Място" от имота — без него ' +
+          'двете колони остават празни и никой не разбира защо.',
+      );
+    }
+    if (!SASTOYANIYA.some((s) => s.klyuch === danni.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        `Непознато състояние „${danni.sastoyanie}". Изброените са: ` +
+          `${SASTOYANIYA.map((s) => s.klyuch).join(' · ')}.`,
+      );
+    }
+    const predishna = o.prodazhbi.get(danni.prodazhbaId);
+    if (predishna && vArhiva(predishna.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        'Тази сделка е в Продажби Архив. „Няма връщане от Продажби Архив. Там не ' +
+          'се трив нищо а само се сверява." Поправка тук би отворила терминала.',
+      );
+    }
+    return this.#pusni(
+      'ПродажбаЗаписана',
+      VID.prodazhba,
+      sashtnostNaProdazhba(danni.prodazhbaId),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ДВИЖЕНИЕ ПО ПРОДАЖБА · вноска, връщане или неустойка.
+   *
+   * ТРИ ПРОВЕРКИ, по същата причина:
+   *
+   *   1. СДЕЛКАТА СЪЩЕСТВУВА · движение без сделка виси в Журнала и никой ред
+   *      не го показва — тиха загуба (`sveri` в `prodazhbi.ts` я БРОИ, но
+   *      по-добре е изобщо да не се ражда);
+   *   2. ВИДЪТ е един от седемте изброени · свободна стойност би паднала извън
+   *      проверката и щеше да изчезне от нея мълчаливо;
+   *   3. АРХИВЪТ НЕ ПРИЕМА НОВИ ДВИЖЕНИЯ · „там… само се сверява". Негово
+   *      (И90): „След нотариална сделка и да има неплатен суми по договор
+   *      сдеката е приключила и е в архива." Каквото влиза после, влиза през
+   *      Приходи — „праща се директно с датат в редовете с Приход в главната
+   *      таблица" *(р75·[50])*.
+   */
+  async zapishiDvizhenieNaProdazhba(
+    danni: PayloadDvizhenieProdazhba,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const prodazhba = o.prodazhbi.get(danni.prodazhbaId);
+    if (!prodazhba) {
+      throw new GreshkaProdazhba(
+        'Няма такава сделка. Движение без сделка не се вижда в нито един ред — ' +
+          'то е в Журнала, но никъде на екрана.',
+      );
+    }
+    if (!VIDOVE_DVIZHENIE.some((v) => v.klyuch === danni.vid)) {
+      throw new GreshkaProdazhba(
+        `Непознат вид движение „${danni.vid}". Изброените са: ` +
+          `${VIDOVE_DVIZHENIE.map((v) => v.klyuch).join(' · ')}.`,
+      );
+    }
+    if (vArhiva(prodazhba.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        'Тази сделка е в Продажби Архив и там само се сверява. Плащане след ' +
+          'нотариалната сделка влиза в Приходи, не тук.',
+      );
+    }
+    return this.#pusni(
+      'ДвижениеПоПродажба',
+      VID.dvizhenieProdazhba,
+      sashtnostNaDvizhenie(danni.dvizhenieId),
       danni,
       z,
     );

@@ -34,6 +34,7 @@ import * as mnogotoVerigi from './razdeli/mnogoto-verigi.ts';
 import * as ii from './razdeli/ii.ts';
 import * as tabove from './razdeli/tabove.ts';
 import * as lichno from './razdeli/lichno.ts';
+import * as prodazhbi from './razdeli/prodazhbi.ts';
 
 async function main(): Promise<void> {
   const server = pusniServer();
@@ -123,6 +124,9 @@ async function main(): Promise<void> {
     // състояние под следващия, е по-скъп от липсващ.
     await menyuta.blok4(ctx);
     await udobstvoto.blok5(ctx);
+    // §94 стои СЛЕД §71: той обхожда лентата и мени екрана, а Продажби отваря
+    // сделка и я праща в терминала — състояние, което не се връща.
+    await prodazhbi.blok1(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

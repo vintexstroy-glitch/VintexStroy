@@ -22,6 +22,7 @@ import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
 import { narisuvayNAP, zakachiNAP } from './nap.js';
+import { narisuvayProdazhbi, zakachiProdazhbite } from './prodazhbi.js';
 import { narisuvayTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
@@ -47,6 +48,7 @@ export type KoyEkran =
   | 'lichno'
   | 'sluzhiteli'
   | 'nap'
+  | 'prodazhbi'
   | 'tablo';
 
 /**
@@ -370,6 +372,21 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     iska: 'nap-vrazka',
     narisuvay: (r) => narisuvayNAP(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiNAP(z.koren, z.k, z.prerisuvay),
+  },
+  prodazhbi: {
+    ime: 'Продажби',
+    podnaslov: 'сделката, вноските ѝ и терминалът · оттам няма връщане',
+    ikona: 'ekran-prodazhbi',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`.
+     *
+     * Продажбата е РАБОТА, не настройка: същият служител, който води наемите,
+     * води и сделките. Роля тук би била надпис — кой какво пише, решават
+     * ролята при доставчика и колонното право (правило 23), а не втора врата
+     * на екрана.
+     */
+    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo),
+    zakachi: (z) => zakachiProdazhbite(z.koren, z.k, z.prerisuvay),
   },
   tablo: {
     ime: 'Табло',

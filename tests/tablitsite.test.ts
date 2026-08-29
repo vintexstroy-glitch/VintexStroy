@@ -20,9 +20,11 @@ const PRAZNO = fold([]);
 describe('регистърът на таблиците', () => {
   const vsichki = tablitsiteNaProgramata(PRAZNO);
 
-  it('вградените са ШЕСТ и всяка носи име, таб и глави', () => {
+  it('вградените са СЕДЕМ и всяка носи име, таб и глави', () => {
+    // Седмата дойде с резен 18б · Продажби. Числото е ТУК, за да падне на
+    // червено, ако някой добави таблица и забрави да я обяви (ADR-041).
     const vgradeni = vsichki.filter((t) => eVgradena(t.klyuch));
-    expect(vgradeni).toHaveLength(6);
+    expect(vgradeni).toHaveLength(7);
     for (const t of vgradeni) {
       expect(t.ime).not.toBe('');
       expect(t.ekran).not.toBe('');

@@ -48,6 +48,7 @@ import { koloniNaImotite, koloniNaNaemite } from './imoti.js';
 import { koloniNaVzemaniyata, koloniNaPlashtaniyata } from './pari.js';
 import { KOLONI_RAZHODI } from './smetki.js';
 import { koloniNaObektite } from './stoynost.js';
+import { koloniNaProdazhbite } from './prodazhbi.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { TablitsaSHedar } from '../src/domein/hedari-po-tabove.js';
 
@@ -57,7 +58,7 @@ interface SamoIme {
 }
 
 /**
- * ВГРАДЕНИТЕ ШЕСТ · ключ · име · таб · сметнати колони.
+ * ВГРАДЕНИТЕ СЕДЕМ · ключ · име · таб · сметнати колони.
  *
  * Редът е редът на екраните; вътре в екрана — редът, в който таблиците стоят
  * една под друга. Той е и редът в матрицата, защото човек ги търси там, където
@@ -113,6 +114,15 @@ const VGRADENI: readonly VgradenaTablitsa[] = Object.freeze<VgradenaTablitsa[]>(
     // „Поток" и „Сектор" са имена от номенклатура · „ДДС" е сметка от общата.
     zatvoreni: [1, 2, 4],
     koloni: () => KOLONI_RAZHODI,
+  },
+  {
+    klyuch: 'vgraden:prodazhbi',
+    ime: 'Продажби',
+    ekran: 'prodazhbi',
+    // „Обект" и „Място" идват от имота · „проверка" е сметка (`prodazhbi.ts`).
+    // Числата са ЕДНИ И СЪЩИ с `ZATVORENI` там — оттам ги чете и екранът.
+    zatvoreni: [0, 1, 13],
+    koloni: () => koloniNaProdazhbite(),
   },
   {
     klyuch: 'vgraden:obekti',

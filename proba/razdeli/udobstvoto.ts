@@ -1609,9 +1609,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'sluzhiteli', '[data-sektsiya="pravata"]');
 
     // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.
+    // СЕДЕМ от резен 18б насам: Продажби влезе със своите петнайсет колони.
     proveri('вградените таблици влизат в матрицата',
       (await p.$$eval('[data-hedar-red]', (e) =>
-        e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:')).length, 6);
+        e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:')).length, 7);
     proveri('и вносният хедър стои до тях',
       (await p.$$('[data-hedar-red="Банка ОББ"]')).length, 1);
 

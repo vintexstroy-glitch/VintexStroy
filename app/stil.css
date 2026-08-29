@@ -911,6 +911,22 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   grid-template-columns: minmax(0, 480px) 100px 100px 100px 128px;
   min-width: 700px;
 }
+/* ПРОДАЖБИ (резен 18б) · ПЕТНАЙСЕТ колони, неговите, в неговия ред.
+   Тясната решетка е нарочна: таблицата се СКРОЛИРА, а не се свива — колона,
+   стисната до нечетимост, е по-лоша от колона, до която се стига с плъзгане. */
+.glava.prodazhbared, .red.prodazhbared {
+  grid-template-columns:
+    minmax(0, 130px) minmax(0, 170px) minmax(0, 150px) 110px
+    108px 108px 108px 108px 108px 108px 108px 108px 108px 108px minmax(0, 130px);
+  min-width: 1720px;
+}
+.red.prodazhbared { cursor: pointer; }
+.red.prodazhbared.izbran { background: var(--toplo); }
+.glava.dvizhenieprodazhba, .red.dvizhenieprodazhba {
+  grid-template-columns: 120px 120px 100px 120px minmax(0, 320px);
+  min-width: 780px;
+}
+
 /* Одитният файл (И96 т.11) · оборотната ведомост под секцията SAF-T. */
 .glava.saft, .red.saft {
   grid-template-columns: minmax(0, 440px) minmax(0, 240px) 130px 130px;

@@ -1,0 +1,421 @@
+/**
+ * ПРОДАЖБИТЕ · сделката, петнайсетте колони и терминалът (резен 18б).
+ *
+ * ═══ НЕГОВИТЕ ДУМИ · ДОСЛОВНО ═══
+ *
+ * Хедърът, поименно *(р52·[284])*:
+ *
+ *   „Обект, Място, Купувач, Телефон, Цена €, Продажба €, СМР €, ПД, Капаро,
+ *    НС, НС кеш, АКт 15, Акт 16, проверка, Състояние"
+ *
+ * И собствената му корекция на реда *(р52·[280])*:
+ *
+ *   „Преди да продължиш едма корекция, реда в Продажби е: ПД, Капаро, НС,
+ *    НС кеш, АКт 15, Акт 16, проверка"
+ *
+ * Какво СМЯТА колоната „проверка" *(р52·[282])*:
+ *
+ *   „заедно ги събери като една обюа проверка на обющата Сума на сделката от
+ *    ПД и СМРи общата сума на вноските"
+ *
+ * ═══ ТРИТЕ ВИДА КОЛОНА, И ЗАЩО ТУК ГИ НЯМА ВСИЧКИТЕ ═══
+ *
+ * | вид | кои | къде живее |
+ * | :---- | :---- | :---- |
+ * | четена от ЧУЖДА същност | Обект · Място | имотът (`imotId`) |
+ * | записана на сделката | Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · Състояние | `PayloadProdazhbaZapisana` |
+ * | ДВИЖЕНИЕ, не поле | Капаро · НС · НС кеш · Акт 15 · Акт 16 | `PayloadDvizhenieProdazhba` |
+ * | СМЯТАНА | проверка | `proverkata()` тук |
+ *
+ * Петте вноски са движения, а не полета, заради едно негово изречение
+ * *(р75·[50])*: „в продажби и е добре да вкараме дати под вноските за да е
+ * прегледно после и в архива." Поле носи ЕДНО число; дата под него значи, че
+ * вноската има СВОЙ миг — тоест е събитие, не клетка.
+ *
+ * ═══ РАЗВАЛЯНЕТО · ТРИ ДВИЖЕНИЯ, НУЛА НЕТИРАНЕ ═══
+ *
+ * Негово (И97 · 25.08), и това е половината от изречение, което НЕ беше
+ * стигнало до пресятото — намерено в чистия извор по реда на правило 24:
+ *
+ *   „**Отпада сметката-задължение за капаро**… Развалянето е ТРИ отделни
+ *    движения: сторно на вноските · връщане на парите · неустойка…
+ *    **Сторното не отменя — то добавя**… Неустойките се превеждат
+ *    **отделно**, никакво нетиране."
+ *
+ * Затова:
+ *   · СТОРНОТО е съществуващото събитие `Сторно` — то гаси вноската и с това
+ *     я вади от проверката. Ново сторно тук не се строи (правило 17);
+ *   · ВРЪЩАНЕТО и НЕУСТОЙКАТА са движения със свои редове и НЕ влизат в
+ *     проверката. „Никакво нетиране" е точно забраната да се съберат наум;
+ *   · ПОСОКАТА няма поле — чете се от ЗНАКА (правило 20).
+ *
+ * ═══ ТЕРМИНАЛЪТ ═══
+ *
+ *   „само след Продажби спира движението и отиват в Продажби Архив. иначе се
+ *    въртят постоянно в наеми, ремонт и прпдажби." *(р79·[32])*
+ *   „Няма връщане от Продажби Архив. Там не се трив нищо а само се сверява."
+ *    *(р79·[34])*
+ *
+ * Архивът е ЕДНОПОСОЧЕН и това се пази ТУК, не на екрана: екран без бутон се
+ * заобикаля с конзолата.
+ */
+
+import type { Imot, Ogledalo } from '../ogledalo/ogledalo.js';
+
+export class GreshkaProdazhba extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaProdazhba';
+  }
+}
+
+/**
+ * ПЕТНАЙСЕТТЕ КОЛОНИ · в НЕГОВИЯ ред, с НЕГОВИТЕ имена.
+ *
+ * Списък, не разметка: така се брои от тест и не може да се разкраси при
+ * рисуване. Редът е неговият — включително собствената му корекция за седемте
+ * след „СМР €".
+ *
+ * „Колони не се трият, а само се добавят" — затова новото се ДОЛЕПЯ отдясно,
+ * а тези петнайсет стоят на местата си (същият закон като при ценовата листа,
+ * ADR-016 §4).
+ */
+export const KOLONI: readonly string[] = Object.freeze([
+  'Обект',
+  'Място',
+  'Купувач',
+  'Телефон',
+  'Цена €',
+  'Продажба €',
+  'СМР €',
+  'ПД',
+  'Капаро',
+  'НС',
+  'НС кеш',
+  'Акт 15',
+  'Акт 16',
+  'проверка',
+  'Състояние',
+]);
+
+/**
+ * ЗАТВОРЕНИТЕ · колони, които никой не редактира (правило 23).
+ *
+ * Позиции в `KOLONI`: 0 „Обект" и 1 „Място" идват от имота; 13 „проверка" е
+ * сметка. Негово: „Затворената колона от всякъде е само скриване за удобство
+ * и връщане, ако решиш" — тоест затвореността спира ПИСАНЕТО, не гледането.
+ *
+ * Петте вноски НЕ са тук: те се пишат, но през ДВИЖЕНИЕ, не в клетката.
+ */
+export const ZATVORENI: readonly number[] = Object.freeze([0, 1, 13]);
+
+/**
+ * ВИДОВЕТЕ ДВИЖЕНИЕ · петте му вноски плюс двете от развалянето.
+ *
+ * ИЗБРОЕНИ, не свободен текст — по същата причина, по която „карта" беше
+ * изброен при начините на плащане (ADR-074): свободна стойност би паднала
+ * ТИХО в чужда графа, и то точно в графата, която решава проверката.
+ */
+export const VIDOVE_DVIZHENIE = [
+  { klyuch: 'Капаро', vnoska: true },
+  { klyuch: 'НС', vnoska: true },
+  { klyuch: 'НС кеш', vnoska: true },
+  { klyuch: 'Акт 15', vnoska: true },
+  { klyuch: 'Акт 16', vnoska: true },
+  { klyuch: 'връщане', vnoska: false },
+  { klyuch: 'неустойка', vnoska: false },
+] as const;
+
+/**
+ * Вноска ли е · тоест влиза ли в проверката.
+ *
+ * ПРИЕМА `string`, не тесен съюз, и това е нарочно: видът идва от ЖУРНАЛА, а
+ * той може да носи стойност, писана от по-стара версия или от чужда верига.
+ * Тесен тип тук би значел, че четенето се доверява на писането — точно
+ * обратното на онова, за което Огледалото съществува. Затова и съюзен тип
+ * `VidDvizhenie` няма: изведен, той нямаше да има нито един викащ (ADR-041).
+ */
+export function eVnoska(vid: string): boolean {
+  return VIDOVE_DVIZHENIE.some((v) => v.klyuch === vid && v.vnoska);
+}
+
+/**
+ * СЪСТОЯНИЯТА · стрелочникът, с онова, което той Е казал.
+ *
+ * „Състоянието всъщност прави връзка с определени възможности между таблиците —
+ * кога една част от колоните на хедъра, кога друга."
+ *
+ * ЧЕТИРИ, и всяко има негова дума зад себе си:
+ *
+ *   · `nezadadeno` — „предупреждение в червено докато не му се смени статъса"
+ *     *(р57·[76])*. Новата продажба СЕ ОТВАРЯ тук и стои червена, докато човек
+ *     не каже какво е. Това не е липса, а състояние (правило 15);
+ *   · `tekushta`   — неговата „Таблица Текущи Продажби" *(р51·[66])*;
+ *   · `prodadena`  — „Продажби Архив" · ТЕРМИНАЛЪТ;
+ *   · `razvalena`  — „Развалянето е ТРИ отделни движения" *(И97)*.
+ *
+ * ЕТАПИТЕ МЕЖДУ ТЯХ ГИ НЯМА, и това е ЧЕСТНО, не пропуск: „етапите след
+ * Акт 15" стоят в списъка на седемте въпроса без негов отговор, отложени
+ * ИМЕННО за този резен (ADR-033 §7). Затова те се БРОЯТ от `CHAKAT_NEGOVA_DUMA`,
+ * а не се измислят тук — приложението не гади (ADR-072 §4).
+ */
+export const SASTOYANIYA = [
+  { klyuch: 'nezadadeno', ime: 'не е зададено', arhiv: false },
+  { klyuch: 'tekushta', ime: 'текуща', arhiv: false },
+  { klyuch: 'prodadena', ime: 'продадена · архив', arhiv: true },
+  { klyuch: 'razvalena', ime: 'развалена', arhiv: false },
+] as const;
+
+/** Името на състоянието · един дом за думите (правило 17). */
+export function imeNaSastoyanieto(k: string): string {
+  return SASTOYANIYA.find((s) => s.klyuch === k)?.ime ?? k;
+}
+
+/** В архива ли е · тоест заключена ли е сделката завинаги. */
+export function vArhiva(sastoyanie: string): boolean {
+  return SASTOYANIYA.some((s) => s.klyuch === sastoyanie && s.arhiv);
+}
+
+/**
+ * КАКВОТО ЧАКА НЕГОВАТА ДУМА · изброено поименно, БРОЕНО от екрана.
+ *
+ * Празен списък би значел „всичко е решено". Този не е празен — и точно
+ * затова стои като списък, а не като изречение в коментар, което никой обход
+ * не проверява (ADR-067 · ADR-072 · ADR-075).
+ */
+export const CHAKAT_NEGOVA_DUMA: readonly string[] = Object.freeze([
+  'етапите след Акт 15 — колко са, как се казват и кой ги мени (ADR-033 §7, ' +
+    'отложен ИМЕННО за този резен)',
+  'лихвата при просрочие на вноска — има ли я и как се смята (ADR-033 §7)',
+  'разминаването „Продажба €" срещу „ПД + СМР" — находка ли е, или двете числа ' +
+    'значат различни неща; проверката, която ТОЙ поръча, е само срещу вноските',
+]);
+
+/** Едно движение, както Огледалото го пази. */
+export interface DvizhenieNaProdazhba {
+  readonly id: string;
+  readonly seq: number;
+  readonly prodazhbaId: string;
+  readonly vid: string;
+  readonly suma_st: number;
+  readonly data: string;
+  readonly belezhka: string;
+}
+
+/** Една сделка, както Огледалото я пази. */
+export interface Prodazhba {
+  readonly id: string;
+  readonly seq: number;
+  readonly imotId: string;
+  readonly kupuvach: string;
+  readonly telefon: string;
+  readonly tsena_st: number;
+  readonly prodazhba_st: number;
+  readonly smr_st: number;
+  readonly pd_st: number;
+  readonly sastoyanie: string;
+}
+
+/** Адресът на една сделка · един дом (правило 17). */
+export function sashtnostNaProdazhba(id: string): string {
+  return `PRD:${id}`;
+}
+
+/** Адресът на едно движение. */
+export function sashtnostNaDvizhenie(id: string): string {
+  return `PRDD:${id}`;
+}
+
+/**
+ * ПРОВЕРКАТА · неговата колона, смятана.
+ *
+ * „обющата Сума на сделката от ПД и СМР" срещу „общата сума на вноските".
+ *
+ * ТРИ неща, които тя НЕ прави, и всяко е решение:
+ *   · НЕ брои връщането и неустойката — „никакво нетиране";
+ *   · НЕ брои сторнираните движения — тях Огледалото вече ги е свалило;
+ *   · НЕ се закръгля — тя е РАЗЛИКА на цели центове (правило 3 · `/matematika`:
+ *     закръгленото никога не влиза в сбор).
+ */
+export interface Proverka {
+  /** ПД + СМР */
+  readonly sdelka_st: number;
+  /** сборът на ВНОСКИТЕ · без връщане и неустойка */
+  readonly vnoski_st: number;
+  /** сделката минус вноските · нула значи изплатена */
+  readonly razlika_st: number;
+  /** ДУМАТА · за да не се чете знакът наум */
+  readonly duma: string;
+}
+
+export function proverkata(p: Prodazhba, dvizheniya: readonly DvizhenieNaProdazhba[]): Proverka {
+  const sdelka_st = p.pd_st + p.smr_st;
+  const vnoski_st = dvizheniya
+    .filter((d) => d.prodazhbaId === p.id && eVnoska(d.vid))
+    .reduce((s, d) => s + d.suma_st, 0);
+  const razlika_st = sdelka_st - vnoski_st;
+  return Object.freeze({
+    sdelka_st,
+    vnoski_st,
+    razlika_st,
+    duma: razlika_st === 0 ? 'изплатена' : razlika_st > 0 ? 'остава да плати' : 'надплатено',
+  });
+}
+
+/**
+ * КОЕТО НЕ ВЛИЗА В ПРОВЕРКАТА · показва се ОТДЕЛНО, не се събира.
+ *
+ * „Неустойките се превеждат ОТДЕЛНО, никакво нетиране." Едно число за двете
+ * би било точно нетирането, което той забрани — затова се връщат две.
+ */
+export interface IzvanProverkata {
+  readonly vrashtane_st: number;
+  readonly neustoyka_st: number;
+}
+
+export function izvanProverkata(
+  prodazhbaId: string,
+  dvizheniya: readonly DvizhenieNaProdazhba[],
+): IzvanProverkata {
+  const moite = dvizheniya.filter((d) => d.prodazhbaId === prodazhbaId);
+  return Object.freeze({
+    vrashtane_st: moite.filter((d) => d.vid === 'връщане').reduce((s, d) => s + d.suma_st, 0),
+    neustoyka_st: moite.filter((d) => d.vid === 'неустойка').reduce((s, d) => s + d.suma_st, 0),
+  });
+}
+
+/**
+ * ПОСОКАТА · СМЯТА се от знака, никога не се записва (правило 20).
+ *
+ * Негово, за неустойката: тя „няма поле за посока — вижда се от
+ * Приходи/Разходи". Тоест посоката Е знакът, а не втора клетка до него: две
+ * места за един факт се разминават при първата поправка (правило 17).
+ */
+export type Posoka = 'prihod' | 'razhod' | 'nula';
+
+export function posokata(suma_st: number): Posoka {
+  if (suma_st > 0) return 'prihod';
+  if (suma_st < 0) return 'razhod';
+  return 'nula';
+}
+
+/**
+ * ОБЕКТЪТ И МЯСТОТО · ЧЕТАТ се от имота, не се преписват на сделката.
+ *
+ * Имотът носи `adres` и `edinitsa`. Негов „Обект" е единицата (кой апартамент),
+ * негово „Място" е адресът (коя сграда) — същото разделение, което таблицата
+ * Имоти слепва в една колона „Място и единица".
+ *
+ * Преписани в сделката, двете щяха да се разминат при първата поправка на
+ * адреса — а поправката на имот е събитие, което сделките не виждат.
+ */
+export function obektIMyasto(p: Prodazhba, imoti: ReadonlyMap<string, Imot>): {
+  readonly obekt: string;
+  readonly myasto: string;
+} {
+  const i = imoti.get(p.imotId);
+  return Object.freeze({
+    obekt: i ? i.edinitsa : '',
+    myasto: i ? i.adres : '',
+  });
+}
+
+/**
+ * ЕДИН РЕД от таблицата · петнайсетте колони, готови за екрана.
+ *
+ * Смята се ТУК, не при рисуването: втора сметка на екрана щеше да се разминава
+ * с първата в деня, в който едната се поправи (правило 17).
+ */
+export interface RedNaProdazhbite {
+  readonly prodazhba: Prodazhba;
+  readonly obekt: string;
+  readonly myasto: string;
+  /** петте вноски по вид · сборът на всяка, СЛЕД сторната */
+  readonly vnoski: Readonly<Record<string, number>>;
+  readonly proverka: Proverka;
+  readonly izvan: IzvanProverkata;
+  /** датите под вноските · „за да е прегледно после и в архива" */
+  readonly dati: Readonly<Record<string, string>>;
+}
+
+export function redovete(o: Ogledalo): readonly RedNaProdazhbite[] {
+  const dvizheniya = [...o.dvizheniyaNaProdazhbi];
+  return Object.freeze(
+    [...o.prodazhbi.values()].map((p) => {
+      const moite = dvizheniya.filter((d) => d.prodazhbaId === p.id);
+      const vnoski: Record<string, number> = {};
+      const dati: Record<string, string> = {};
+      for (const v of VIDOVE_DVIZHENIE) {
+        if (!v.vnoska) continue;
+        const negovite = moite.filter((d) => d.vid === v.klyuch);
+        vnoski[v.klyuch] = negovite.reduce((s, d) => s + d.suma_st, 0);
+        // ПОСЛЕДНАТА дата, не първата: човек гледа докъде е стигнало плащането.
+        dati[v.klyuch] = negovite.length === 0 ? '' : negovite[negovite.length - 1]!.data;
+      }
+      const { obekt, myasto } = obektIMyasto(p, o.imoti);
+      return Object.freeze({
+        prodazhba: p,
+        obekt,
+        myasto,
+        vnoski: Object.freeze(vnoski),
+        dati: Object.freeze(dati),
+        proverka: proverkata(p, moite),
+        izvan: izvanProverkata(p.id, moite),
+      });
+    }),
+  );
+}
+
+/**
+ * НАЧАЛНАТА ПОДРЕДБА · негова, приета: „По правилото (спешност → Оценка →
+ * завършените долу)" *(р75·[50])*.
+ *
+ * Тук „завършените долу" е онова, което кодът МОЖЕ да изпълни днес: архивните
+ * падат най-отдолу, недовършените стоят горе. „Спешност" и „Оценка" искат
+ * етапите, които още чакат негова дума — затова не се преструваме, че ги има.
+ */
+export function podredeni(redove: readonly RedNaProdazhbite[]): readonly RedNaProdazhbite[] {
+  return Object.freeze(
+    [...redove].sort((a, b) => {
+      const aa = vArhiva(a.prodazhba.sastoyanie) ? 1 : 0;
+      const bb = vArhiva(b.prodazhba.sastoyanie) ? 1 : 0;
+      if (aa !== bb) return aa - bb;
+      // вътре в групата: първо онези, които ОЩЕ дължат
+      return b.proverka.razlika_st - a.proverka.razlika_st;
+    }),
+  );
+}
+
+/**
+ * СВЕРКА ВХОД↔ИЗХОД върху таблицата (правило 7).
+ *
+ * ВХОД: всяко движение, което Огледалото носи.
+ * ИЗХОД: онова, което таблицата ПОКАЗВА — вноски + връщане + неустойка.
+ *
+ * Разликата е нула и тогава, когато всичко е наред — и точно затова се записва:
+ * проверената нула е различна от нулата, за която никой не е питал.
+ *
+ * Хваща движение, увиснало на несъществуваща сделка: то е в Журнала, но никой
+ * ред не го показва — тиха загуба, ако не се брои.
+ */
+export interface SverkaNaProdazhbite {
+  readonly vhod: number;
+  readonly izhod: number;
+  readonly razlika: number;
+  readonly bezSdelka: readonly string[];
+}
+
+export function sveri(
+  o: Ogledalo,
+  redove: readonly RedNaProdazhbite[],
+): SverkaNaProdazhbite {
+  const vhod = o.dvizheniyaNaProdazhbi.length;
+  let izhod = 0;
+  for (const r of redove) {
+    izhod += o.dvizheniyaNaProdazhbi.filter((d) => d.prodazhbaId === r.prodazhba.id).length;
+  }
+  const bezSdelka = o.dvizheniyaNaProdazhbi
+    .filter((d) => !o.prodazhbi.has(d.prodazhbaId))
+    .map((d) => d.id);
+  return Object.freeze({ vhod, izhod, razlika: vhod - izhod, bezSdelka: Object.freeze(bezSdelka) });
+}
