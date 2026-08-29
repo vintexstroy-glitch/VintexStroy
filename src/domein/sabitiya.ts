@@ -32,6 +32,7 @@ import type { Izprashtane, OtgovorNaZadacha } from './zadachi-kam-hora.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from './butoni.js';
 import type { PravaZaModel } from './kolonno.js';
+import type { ZakacheniDokumenti } from './dokumenti.js';
 import type { Rolya } from '../yadro/samolichnost.js';
 
 export const VID = {
@@ -92,6 +93,14 @@ export const VID = {
    * в паметта на екрана (ADR-022 · правило 23).
    */
   lenta: 'lenta',
+  /**
+   * ДОКУМЕНТИТЕ · закачените за ЕДИН запис (резен 17б · р48·[42]).
+   *
+   * Своя същност, не поле на разхода: разходите идват от ВНЕСЕН файл, и
+   * закачено като поле, прикачването щеше да се презапише при следващия внос —
+   * тихо. Адресът е `DOK:<къде>:<id>` (`dokumenti.ts`).
+   */
+  dokumenti: 'dokumenti',
   lichno: 'lichno',
   prenos: 'prenos',
   dostap: 'dostap',
@@ -166,6 +175,7 @@ export type TipSabitie =
   | 'ЛиченРедИзключен'
   | 'ЛиченКредитЗаписан'
   | 'ЛичноИзвлечениеПрието'
+  | 'ДокументиЗакачени'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -495,6 +505,18 @@ export type PayloadModelZapisan = ModelNaTablitsa;
  * поправка е НОВО събитие върху същата същност, не втори бутон.
  */
 export type PayloadButonZapisan = Buton;
+
+/**
+ * ДОКУМЕНТИТЕ, ЗАКАЧЕНИ ЗА ЕДИН ЗАПИС · целият списък, не разликата.
+ *
+ * Последният запис за същността бие — както при правата и при лентата. Махането
+ * е ЗАПИС на списъка без него; Журналът пази всяка предишна версия (правило 1).
+ *
+ * ТОВАРЪТ НЕ НОСИ НИТО ЕДИН БАЙТ ОТ ФАЙЛА. Носи името, големината, часа и
+ * sha256 — доказателство КОЙ файл е закачен, не копие от него. Негово:
+ * „Да, без качване" и „никакъв файл без изрично разрешение за конкретния файл".
+ */
+export type PayloadDokumentiZakacheni = ZakacheniDokumenti;
 
 /**
  * СВЕРКАТА · вход ↔ изход ↔ разлика, записана ЗАВИНАГИ.

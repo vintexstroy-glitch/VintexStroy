@@ -61,6 +61,7 @@ import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { butonSIkona } from './ikoni.js';
 import { safT } from '../src/iznos/saf-t.js';
 import { SHEMA } from '../src/iznos/saf-t-shema.js';
@@ -307,7 +308,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ${
           filtriraniRazhodi.redove.length === 0
             ? PRAZEN_FILTAR
-            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, redNaRazhod)
+            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, (r) =>
+                redNaRazhod(r, o),
+              )
         }
       </div>
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
@@ -644,7 +647,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
     </section>`;
 }
 
-function redNaRazhod(r: Razhod): string {
+function redNaRazhod(r: Razhod, o: Ogledalo): string {
   const a = akumulator(r.sektor);
   // Ставката е НА РЕДА; секторът само подсказва, когато редът мълчи.
   const stavka = stavkaNaReda(r.sektor, r.stavka);
@@ -662,6 +665,7 @@ function redNaRazhod(r: Razhod): string {
       <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-razhod': String(r.seq) } })}
+        ${butonNaDokumentite('razhod', r.id, broyDokumenti(o, 'razhod', r.id))}
         ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;

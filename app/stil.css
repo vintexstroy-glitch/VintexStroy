@@ -1646,6 +1646,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .gant-delo:hover .prati-zadacha,
 .prati-zadacha:focus { opacity: 1; }
 .prati-zadacha:hover { color: var(--aktsent); }
+/* КОПЧЕТО ЗА ДОКУМЕНТИ В ГАНТА · числото стои, думата е в подсказката.
+   Колоната с имената е 180px с `overflow: hidden`: цял бутон там се реже, а
+   рязан бутон не се натиска — нито от човек, нито от прохода. */
+.gant-delo .butoncheto-dokumenti { flex-shrink: 0; margin-left: auto; padding: 0 5px; height: 18px; }
 
 /* СЪСТОЯНИЕТО НА ЗАДАЧАТА · дума И цвят, никога само цвят (ADR-032 §1). */
 .red.zadacha-prieta { box-shadow: inset 3px 0 0 var(--srok-normalno); }
@@ -1844,6 +1848,36 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .istoriya-sabitie .koga { grid-column: 2; font-size: 0.857rem; color: var(--mastilo2); }
 .istoriya-sabitie .opis { grid-column: 2; font-size: 0.893rem; }
 .istoriya-zatvori { margin-top: 14px; }
+
+/* ── закачените документи · ЕДИН блок за трите екрана (резен 17б) ───────── */
+.dokument-red {
+  display: grid;
+  grid-template-columns: 1fr 110px 150px auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--liniya);
+  font-size: 0.929rem;
+}
+.dokument-ime { display: flex; flex-direction: column; }
+.dokument-ime span { font-size: 0.857rem; color: var(--mastilo2); }
+.dokument-otpechatak { font-variant-numeric: tabular-nums; color: var(--mastilo2); font-size: 0.857rem; }
+.dokumenti-forma {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--liniya);
+}
+.dokumenti-forma label { display: flex; flex-direction: column; gap: 4px; font-size: 0.893rem; }
+.dokumenti-forma button[type='submit'] { align-self: end; }
+.dokumenti-forma .greshka { grid-column: 1 / -1; }
+/* Тесен екран: редът на документа се разгъва надолу, вместо да прелива. */
+@media (max-width: 620px) {
+  .dokument-red { grid-template-columns: 1fr auto; }
+  .dokument-otpechatak, .dokument-vrazka { grid-column: 1 / -1; }
+}
 /* „История" вече е второстепенен бутон като всички (`vtorichen malak`) и не
    носи свой вид: ръчният близнак се разминаваше при всяка смяна на палитрата
    и — по-лошо — държеше бутона ИЗВЪН групата действия. Класът остава само

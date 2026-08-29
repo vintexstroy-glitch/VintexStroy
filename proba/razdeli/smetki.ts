@@ -890,3 +890,154 @@ export async function blok9(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 64 · ПОДРЕДБАТА · всеки сам мести секциите си (И101 т.2) ═══════════
 }
+
+/**
+ * 90 · ДОКУМЕНТИТЕ · ЕДИН блок, три викащи (резен 17б · ADR-073)
+ *
+ * Мери седем неща, и всяко с ЧИСЛО, не с таймаут (поуката на §88): броят на
+ * закачените, броят на събитията, редовете в списъка. Диагноза „Timeout"
+ * казва „нещо не стана"; диагноза „чакани 1, видени 0" се поправя веднага.
+ */
+/**
+ * РЕДЪТ НА МОЯ разход · познат по СВОЕТО си име, не по позиция.
+ *
+ * `:has-text` е селектор на Playwright, не на браузъра: минава през
+ * `p.$eval`/`p.locator`, но не и през `document.querySelector` в страницата.
+ */
+const MOYAT = '.red.razhod:has-text("Хартия ООД")';
+
+/**
+ * ЗАТВАРЯ прозореца и ЧАКА воала да СИ ОТИДЕ.
+ *
+ * Кликът върху „Затвори" не е краят: воалът се маха в същия миг, но следващият
+ * `naEkran` натиска бутон в лентата ЗАД него. Останел ли воалът за миг, кликът
+ * отива в него и проходът пада с таймаут — диагноза, която казва „нещо не
+ * стана" вместо „воалът е още там".
+ */
+async function zatvoriProzoretsa(p: KonteksNaProhoda['stranitsa']): Promise<void> {
+  await p.click('.istoriya-zatvori');
+  await p.waitForSelector('.istoriya-fon', { state: 'detached' });
+}
+
+/** Думата на копчето · тя носи БРОЯ, и нулата се чете от нея. */
+async function dumataNaKopcheto(p: KonteksNaProhoda['stranitsa']): Promise<string> {
+  return (await p.$eval(`${MOYAT} [data-dokumenti] .duma`, (e) => e.textContent ?? '')).trim();
+}
+
+export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // Съдържание, което НЕ би оцеляло в име, големина, час и отпечатък. Ако то
+  // се появи някъде на екрана или в Журнала, значи файлът е влязъл — точно
+  // онова, което двете му правила забраняват.
+  const TAYNA = 'TAYNO-SADARZHANIE-NA-FAKTURATA-42';
+  const patFaktura = join(tmpdir(), 'faktura-1042.pdf');
+  const patPlatezhno = join(tmpdir(), 'platezhno-1042.pdf');
+  await writeFile(patFaktura, `${TAYNA}\nпърви файл\n`, 'utf8');
+  await writeFile(patPlatezhno, `${TAYNA}\nвтори файл\n`, 'utf8');
+
+  razdel = '90 · Документите · копчето на реда и НУЛАТА';
+  await naEkran(p, 'smetki', '#forma-period');
+  // СВОЙ разход, познат по СВОЕ име. Февруарските са сторнирани от по-ранен
+  // блок, а майските са три и не са мои: проверка, която стъпва върху чуждо
+  // състояние, пада в деня, в който онзи блок се промени — не в деня, в който
+  // нещо наистина се счупи.
+  await p.fill('#smetki-period', '2026-05');
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Хартия ООД',
+    opis: 'фактура с документи', suma: '120,00', nachin: 'банка',
+    data: '2026-05-12', dokument: '2077',
+  });
+  proveri('редът на МОЯ разход е точно един',
+    await p.$$eval(MOYAT, (e) => e.length), 1);
+  proveri('и носи копче за документи',
+    await p.$$eval(`${MOYAT} [data-dokumenti]`, (e) => e.length), 1);
+  proveri('и НУЛАТА се вижда · празното не различава „няма" от „не е питано"',
+    await dumataNaKopcheto(p), 'Документи · 0');
+
+  razdel = '90 · Документите · закачането е ТОЧНО ЕДНО събитие';
+  const predi = await broySabitiya(p);
+  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await p.waitForSelector('#forma-dokument');
+  proveri('границата се КАЗВА, не се подразбира',
+    (await tekstNa(p, '.istoriya-karta')).includes('не качва'), true);
+  proveri('и празният списък си има изречение',
+    (await tekstNa(p, '.dokumenti-spisak')).includes('Няма закачени'), true);
+
+  await p.selectOption('#forma-dokument select[name=vid]', 'faktura');
+  await p.setInputFiles('#dokument-fayl', patFaktura);
+  await deystvieSPrerisuvane(p, () => p.click('#forma-dokument button[type=submit]'));
+  proveri('едно събитие, не две', await broySabitiya(p), predi + 1);
+  proveri('копчето брои закаченото',
+    (await dumataNaKopcheto(p)),
+    'Документи · 1');
+
+  razdel = '90 · Документите · СЪЩИЯТ файл втори път е НУЛА събития';
+  const predVtoriya = await broySabitiya(p);
+  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await p.waitForSelector('#forma-dokument');
+  proveri('редът на документа стои в списъка',
+    await p.$$eval('.dokument-red', (e) => e.length), 1);
+  proveri('отпечатъкът се вижда · СЪДЪРЖАНИЕТО не',
+    (await tekstNa(p, '.istoriya-karta')).includes(TAYNA), false);
+  await p.selectOption('#forma-dokument select[name=vid]', 'faktura');
+  await p.setInputFiles('#dokument-fayl', patFaktura);
+  await p.click('#forma-dokument button[type=submit]');
+  // ЕДНО и СЪЩО чакане за двата изхода, за да излезе ЧИСЛО, а не таймаут.
+  // Записал ли е нещо, прозорецът се затваря сам; не е ли — стои отворен и
+  // `Escape` го затваря. И в двата случая воалът си отива, и чак СЛЕД това се
+  // брои. Чакане, което важи само за верния изход, дава „Timeout" — диагноза,
+  // която казва „нещо не стана" (поуката на §88).
+  await p.keyboard.press('Escape');
+  await p.waitForSelector('.istoriya-fon', { state: 'detached' });
+  // И ЕДНО ПРЕРИСУВАНЕ ОТГОРЕ · броячът в лентата се обновява при рисуване.
+  // Без него счупен запис се брои ПРЕДИ да е стигнал до екрана, и числото
+  // излиза вярно за миг — фалшива зелена, платена веднъж точно тук.
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+  proveri('нищо ново в Журнала · белегът мълчи', await broySabitiya(p), predVtoriya);
+
+  razdel = '90 · Документите · вторият РАЗЛИЧЕН файл влиза';
+  const predTretiya = await broySabitiya(p);
+  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await p.waitForSelector('#forma-dokument');
+  await p.selectOption('#forma-dokument select[name=vid]', 'platezhno');
+  await p.setInputFiles('#dokument-fayl', patPlatezhno);
+  await deystvieSPrerisuvane(p, () => p.click('#forma-dokument button[type=submit]'));
+  proveri('едно събитие', await broySabitiya(p), predTretiya + 1);
+  proveri('и копчето брои двата', await dumataNaKopcheto(p), 'Документи · 2');
+
+  razdel = '90 · Документите · махането е ЗАПИС, не триене';
+  const predMahaneto = await broySabitiya(p);
+  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await p.waitForSelector('#forma-dokument');
+  proveri('двата реда стоят', await p.$$eval('.dokument-red', (e) => e.length), 2);
+  await deystvieSPrerisuvane(p, () => p.click('.dokument-red [data-mahni-dokument]'));
+  proveri('махането ДОБАВЯ събитие', await broySabitiya(p), predMahaneto + 1);
+  proveri('и списъкът намалява',
+    (await dumataNaKopcheto(p)),
+    'Документи · 1');
+
+  razdel = '90 · Документите · СЪЩИЯТ блок при делото и при имота';
+  await naEkran(p, 'imoti', '#forma-imot');
+  proveri('имотът носи същото копче',
+    (await p.$$eval('.red.imot [data-dokumenti]', (e) => e.length)) > 0, true);
+  await natisniVGrupata(p, '.red.imot [data-dokumenti]');
+  await p.waitForSelector('#forma-dokument');
+  proveri('и същият прозорец се отваря',
+    (await tekstNa(p, '.istoriya-karta h3')).includes('имот'), true);
+  await zatvoriProzoretsa(p);
+
+  await naEkran(p, 'gant', '.gant-delo');
+  proveri('делото носи същото копче',
+    (await p.$$eval('.gant-delo [data-dokumenti]', (e) => e.length)) > 0, true);
+  await natisniVGrupata(p, '.gant-delo [data-dokumenti]');
+  await p.waitForSelector('#forma-dokument');
+  proveri('и пак същият прозорец',
+    (await tekstNa(p, '.istoriya-karta h3')).includes('дело'), true);
+  await zatvoriProzoretsa(p);
+  await naEkran(p, 'imoti', '#forma-imot');
+}

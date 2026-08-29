@@ -28,6 +28,7 @@ import { otData } from '../src/yadro/data.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import {
   CHASOVE_NA_DENYA,
   edinitsataNaSvoya,
@@ -372,7 +373,9 @@ export function narisuvayGant(
           // на ЕДНА секция, а не две секции. Различен ключ тук би значел, че
           // подредбата на човека се губи в мига, в който първото дело влезе.
           `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
-            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi)}</div>
+            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
+              broyDokumenti(o, 'delo', id),
+            )}</div>
             ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
           </div>`
     }
@@ -447,6 +450,14 @@ export function tablitsataSOcveteniPoleta(
    * се разгъне. Празно при копието в Сметки, където сгъвачи не се рисуват.
    */
   sgavaemi: ReadonlySet<string> = new Set<string>(),
+  /**
+   * КОЛКО ДОКУМЕНТА има делото · дадено ОТВЪН, и липсата му значи „без копче".
+   *
+   * Копието в Сметки не го подава и там копче не се рисува — то ЧЕТЕ за
+   * сверка, а закачането е писане и живее в Управление. Бутон без ръка зад
+   * него е лъжа (същата причина като при сгъвачите отгоре).
+   */
+  dokumentiNa?: (deloId: string) => number,
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -473,7 +484,7 @@ export function tablitsataSOcveteniPoleta(
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi, dokumentiNa)).join('')}`,
             )
             .join('')}
           ${
@@ -573,6 +584,7 @@ function imeNaDeloto(
   sgunati: ReadonlySet<string>,
   nomer: string,
   sgavaemi: ReadonlySet<string>,
+  dokumentiNa: ((deloId: string) => number) | undefined,
 ): string {
   // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
   const sgavaemo = sasSgavachi && sgavaemi.has(d.id);
@@ -609,6 +621,7 @@ function imeNaDeloto(
           </span>`
         : ''
     }
+    ${dokumentiNa ? butonNaDokumentite('delo', d.id, dokumentiNa(d.id), true) : ''}
     <span class="drebno">${ekraniraj(d.obekt || '—')} · ${ekraniraj(d.otgovornik)}</span>
   </div>`;
 }

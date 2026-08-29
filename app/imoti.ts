@@ -31,6 +31,7 @@ import {
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { butonSIkona } from './ikoni.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import {
@@ -362,7 +363,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? PRAZEN_FILTAR
-              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? [], ogledalo))
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
@@ -619,7 +620,7 @@ function formaPrekratyavane(naem: Naem): string {
     </section>`;
 }
 
-function redImot(imot: Imot, naemi: readonly Naem[]): string {
+function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
   // Всички живи наеми, не само първият — нищо не изчезва тихо.
   const zhivi = naemi.filter((n) => !n.prekraten);
   const sbor = zhivi.reduce((s, n) => s + n.naem_st, 0);
@@ -646,6 +647,7 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
       <span class="butoni">
         ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
+        ${butonNaDokumentite('imot', imot.id, broyDokumenti(o, 'imot', imot.id))}
         ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;

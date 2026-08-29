@@ -26,6 +26,8 @@ import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
 import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
+import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
+import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
@@ -64,6 +66,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
+  PayloadDokumentiZakacheni,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
@@ -253,6 +256,14 @@ export interface Ogledalo {
    * Вж. `src/domein/kolonno.ts`.
    */
   readonly prava: ReadonlyMap<string, PravaZaModel>;
+  /**
+   * „<към какво>|<id>" → закачените за ТОЗИ запис документи.
+   *
+   * Влиза ОТПЕЧАТЪКЪТ на файла, не байтовете му: име · големина · час · sha256.
+   * Последният запис за същността бие — както при правата и при лентата.
+   * Вж. `src/domein/dokumenti.ts`.
+   */
+  readonly dokumenti: ReadonlyMap<string, ZakacheniDokumenti>;
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -464,6 +475,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let parametriNaVhoda = nastroykiPoPodrazbirane();
   const kontragenti = new Map<string, Kontragent>();
   const prava = new Map<string, PravaZaModel>();
+  const dokumenti = new Map<string, ZakacheniDokumenti>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -841,6 +853,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ДокументиЗакачени': {
+        // Целият списък се пише наведнъж; махането е ЗАПИС на списъка без него
+        // (правило 1). Затова тук няма сливане — последният запис е истината,
+        // а всяка предишна версия си стои в Журнала.
+        const p = s.payload as unknown as PayloadDokumentiZakacheni;
+        dokumenti.set(klyuchNaDokumenti(p.kam, p.id), p);
+        break;
+      }
+
 
       case 'СверкаЗаписана': {
         const p = s.payload as unknown as PayloadSverkaZapisana;
@@ -1043,6 +1064,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     izprateniZadachi,
     otgovoriNaZadachi,
     prava,
+    dokumenti,
     pototsi,
     salda,
     dela,

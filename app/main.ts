@@ -66,6 +66,7 @@ import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
+import { zakachiDokumentite } from './dokumenti.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { zakachiKlaviatura } from './klaviatura.js';
 import { zakachiChernovata } from './chernova.js';
@@ -847,6 +848,8 @@ async function trugvay(): Promise<void> {
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
     if (sluzhebenEkran) {
       zakachiIstoriya(koren, k);
+      // ДОКУМЕНТИТЕ · ЕДИН закачач за трите екрана (резен 17б · ADR-073).
+      zakachiDokumentite(koren, k, prerisuvay);
       zakachiKontekstnoMenyu(koren, k);
       zakachiKlaviatura(koren, k, prerisuvay);
       zakachiRedaktsiya(koren, k, prerisuvay, rolyataNa(kojSam.imeyl, ogledalo));

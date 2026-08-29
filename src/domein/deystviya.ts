@@ -20,6 +20,7 @@ import {
 } from './zadachi-kam-hora.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { sashtnost, VID, type Vid } from './sabitiya.js';
+import { sashtnostNaDokumenti } from './dokumenti.js';
 import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
@@ -76,6 +77,7 @@ import type {
   PayloadStorno,
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
+  PayloadDokumentiZakacheni,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
@@ -833,6 +835,26 @@ export class Deystviya {
     );
   }
 
+
+  /**
+   * ЗАКАЧА ДОКУМЕНТИТЕ за един запис (резен 17б).
+   *
+   * НЕ ИСКА ОТКЛЮЧЕН ПЕРИОД, и това се казва на глас: документът не мени нито
+   * едно число — той е ДОКАЗАТЕЛСТВО за вече записано. Замразената справка
+   * заключва числата (правило 9), не хартията зад тях; иначе фактура, дошла с
+   * две седмици закъснение, нямаше да може да се закачи никога.
+   *
+   * Същото решение като при таба по-долу и по същата причина.
+   */
+  async zakachiDokumenti(danni: PayloadDokumentiZakacheni, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'ДокументиЗакачени',
+      VID.dokumenti,
+      sashtnostNaDokumenti(danni.kam, danni.id),
+      danni,
+      z,
+    );
+  }
 
   /**
    * Записва ТАБ · секциите му и връзките между тях (И92 т.9).
