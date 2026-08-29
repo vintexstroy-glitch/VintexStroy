@@ -49,6 +49,7 @@ import {
   type RedNaProdazhbite,
 } from '../src/domein/prodazhbi.js';
 import { NACHINI_NA_PLASHTANE } from '../src/domein/sabitiya.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
@@ -71,7 +72,9 @@ function parichni(etapi: readonly Etap[]): ReadonlySet<string> {
     'СМР €',
     'ПД',
     'проверка',
-    ...etapi.filter((e) => e.vnoska).map((e) => e.klyuch),
+    // ВСЕКИ ДОБАВЕН етап е пари · базовите „връщане" и „неустойка" нямат
+    // колона и не влизат тук (те живеят в своя блок).
+    ...etapi.filter((e) => e.vnoska || !e.bazov).map((e) => e.klyuch),
   ]);
 }
 
@@ -101,7 +104,7 @@ function kletkata(r: RedNaProdazhbite, kolona: string): string {
       return imeNaSastoyanieto(p.sastoyanie);
     default:
       // остават петте вноски · сборът им, СЛЕД сторната
-      return pishi(r.vnoski[kolona] ?? 0);
+      return pishi(r.poEtap[kolona] ?? 0);
   }
 }
 
@@ -117,7 +120,7 @@ function vTsentove(
   if (kolona === 'СМР €') return p.smr_st;
   if (kolona === 'ПД') return p.pd_st;
   if (kolona === 'проверка') return r.proverka.razlika_st;
-  if (pari.has(kolona)) return r.vnoski[kolona] ?? 0;
+  if (pari.has(kolona)) return r.poEtap[kolona] ?? 0;
   return undefined;
 }
 
@@ -198,6 +201,13 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
         </div>
       </div>
 
+      <p class="drebno">Хартията по сделката се закача тук:
+      ${butonNaDokumentite('prodazhba', r.prodazhba.id, broyDokumenti(o, 'prodazhba', r.prodazhba.id))}
+      Негово, 29.08: информацията за плащанията по банка от ПД „<b>ще е в фолдър
+      който ще се чете от ПДФ или друго</b>, където ще пише какви са вноските
+      името и друга нужна информация". Файлът остава в Драйва — влиза
+      отпечатъкът му, не байтовете (ADR-073).</p>
+
       <p class="drebno"><b>ПД и СМР са двата пътя на парите ПО БАНКА</b> — негово,
       29.08: „Пд и СМР е двата пътя на парите по банка за покупка с ПД(Предварителен
       Договор и) и СМР(Строително монтажнио работи(. Тях ги получаваме ние на ръка и
@@ -213,8 +223,8 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
 
       ${
         zaklyuchena
-          ? `<p class="drebno">Сделката е в <b>Продажби Архив</b>. „Няма връщане от
-             Продажби Архив. Там не се трив нищо а само се сверява." Ново движение
+          ? `<p class="drebno">Сделката е в <b>Продажби Завършени</b>. „Няма връщане
+             от Продажби Архив. Там не се трив нищо а само се сверява." Ново движение
              оттук нататък влиза в Приходи, не тук.</p>`
           : `<form id="forma-dvizhenie" class="redditsa">
           <label class="pole">
@@ -300,17 +310,17 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
   return `
     <section data-sektsiya="prodazhbi-tekushti">
       <div class="dyalglava">
-        <h2>Текущи Продажби</h2>
+        <h2>Продажби Активни</h2>
         <span>петнайсет колони · неговите, в неговия ред</span>
       </div>
 
       <div class="plochki">
         <div class="plochka">
-          <span class="etiket">Текущи</span>
+          <span class="etiket">Активни</span>
           <span class="chislo" translate="no" data-tekushti="${tekushti.length}">${tekushti.length}</span>
         </div>
         <div class="plochka">
-          <span class="etiket">В архива</span>
+          <span class="etiket">Завършени</span>
           <span class="chislo" translate="no" data-arhiv="${arhiv.length}">${arhiv.length}</span>
         </div>
         <div class="plochka">
@@ -410,23 +420,23 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
           <button type="submit">Смени състоянието</button>
         </form>
         <p class="greshka" id="greshka-sastoyanie"></p>
-        <p class="drebno"><b>„Продадена · архив" е еднопосочна.</b> Щом сделката
+        <p class="drebno"><b>„Продадена · завършена" е еднопосочна.</b> Щом сделката
         влезе там, нито тя, нито движенията ѝ се пипат повече — „Там не се трив
         нищо а само се сверява."</p>
       </section>`
       }`
     }
 
-    <section data-sektsiya="prodazhbi-arhiv">
+    <section data-sektsiya="prodazhbi-zavarsheni">
       <div class="dyalglava">
-        <h2>Продажби Архив</h2>
+        <h2>Продажби Завършени</h2>
         <span>терминалът · оттук няма връщане</span>
       </div>
-      <div class="tablitsa" data-tablitsa="prodazhbi-arhiv">
+      <div class="tablitsa" data-tablitsa="prodazhbi-zavarsheni">
         ${glavata(zhivi, zatvoreni)}
         ${
           arhiv.length === 0
-            ? '<p class="drebno">Архивът е празен · нито една сделка не е стигнала до нотариус.</p>'
+            ? '<p class="drebno">Няма завършена сделка · нито една не е стигнала до нотариус.</p>'
             : arhiv.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
         }
       </div>

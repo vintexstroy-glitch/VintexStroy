@@ -183,13 +183,34 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     true,
   );
 
+  razdel = '94 · Продажби · неговите имена';
+  proveri(
+    'таблицата горе се казва „Продажби Активни"',
+    (await tekstNa(p, '[data-sektsiya=prodazhbi-tekushti]')).includes('Продажби Активни'),
+    true,
+  );
+  proveri(
+    'а долната — „Продажби Завършени"',
+    (await tekstNa(p, '[data-sektsiya=prodazhbi-zavarsheni]')).includes('Продажби Завършени'),
+    true,
+  );
+  proveri(
+    'и хартията по сделката се закача ТУК · папката, четена от ПДФ',
+    (
+      await p.$$eval('[data-dokumenti]', (e) =>
+        e.map((x) => (x as HTMLElement).dataset['dokumenti'] ?? ''),
+      )
+    ).filter((x) => x.startsWith('prodazhba')).length,
+    1,
+  );
+
   razdel = '94 · Продажби · терминалът';
   const vArhivaPredi = Number(
     await p.$eval('[data-arhiv]', (e) => (e as HTMLElement).dataset['arhiv']),
   );
   await p.selectOption('#prodazhba-sastoyanie', 'prodadena');
   await sSabitie(p, () => p.click('#forma-sastoyanie button[type=submit]'));
-  await p.waitForSelector('[data-tablitsa=prodazhbi-arhiv] .red.prodazhbared');
+  await p.waitForSelector('[data-tablitsa=prodazhbi-zavarsheni] .red.prodazhbared');
 
   proveri(
     'архивът е с ЕДНА сделка повече',
@@ -363,6 +384,60 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     glavi.filter((k) => k !== 'Акт 17').join(' · '),
     'Обект · Място · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
       'Капаро · НС · НС кеш · Акт 15 · Акт 16 · проверка · Състояние',
+  );
+
+  await naEkranPryako(p, 'imoti', '#forma-imot');
+}
+
+
+/**
+ * 96 · ТРИТЕ ТОЧКИ В КАЛКУЛАТОРА · негова поръчка от 29.08.
+ *
+ *   „Всеки имот след като е вкаран в Калкулатора да има избор на всеки имот с
+ *    3 вертикални точки за различни функции… Там избираш продаден и го праща
+ *    от цени в таб Продажби."
+ */
+export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '96 · Трите точки · „продаден" праща реда в Продажби';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  await naEkranPryako(p, 'stoynost', '[data-sektsiya=stoynost-obektite]');
+  const tochki = await p.$$eval('[data-prodaden]', (e) => e.length);
+  proveri('всеки НЕпродаден ред носи трите точки', tochki > 0, true);
+  proveri(
+    'а продаденият НЕ ги носи · там няма какво да се избира',
+    await p.$$eval('.red.stoynost.mahnata [data-prodaden]', (e) => e.length),
+    0,
+  );
+
+  const koy = await p.$eval('[data-prodaden]', (e) => (e as HTMLElement).dataset['prodaden']);
+  await naEkranPryako(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
+  const predi = await p.$$eval('[data-prodazhba]', (e) => e.length);
+
+  await naEkranPryako(p, 'stoynost', '[data-sektsiya=stoynost-obektite]');
+  await sSabitie(p, () => p.click('[data-prodaden]'));
+  await p.waitForFunction(
+    (ime) =>
+      [...document.querySelectorAll('.red.stoynost.mahnata')].some((r) =>
+        (r.textContent ?? '').includes(ime as string),
+      ),
+    koy,
+    { timeout: 5_000 },
+  );
+  proveri('редът вече е ПРОДАДЕН в Калкулатора · и то от ЖУРНАЛА', true, true);
+
+  await naEkranPryako(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
+  proveri(
+    'а в Продажби Активни има ЕДНА сделка повече',
+    await p.$$eval('[data-prodazhba]', (e) => e.length),
+    predi + 1,
+  );
+  proveri(
+    'и тя стои ЧЕРВЕНА · състоянието ѝ още не е зададено',
+    await p.$$eval('.red.prodazhbared[data-sastoyanie=nezadadeno]', (e) => e.length) > 0,
+    true,
   );
 
   await naEkranPryako(p, 'imoti', '#forma-imot');

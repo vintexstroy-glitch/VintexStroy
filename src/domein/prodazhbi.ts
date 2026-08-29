@@ -107,16 +107,34 @@ export const KOLONI: readonly string[] = Object.freeze([
  * само мястото на сбора, който по устройство стои след слаганите.
  */
 export function koloni(o: Ogledalo): readonly string[] {
-  // САМО ВНОСКИТЕ СТАВАТ КОЛОНИ, и това е следствие, не ограничение: колона
-  // ПРЕДИ сбора, която не влиза в него, се чете грешно от всеки. Добавеното
-  // „извън проверката" се държи като неустойката — движение със свой ред, без
-  // своя колона. Двете места, където това се вижда, са ЕДНО (правило 17).
-  const dobaveni = etapite(o)
-    .filter((e) => !e.bazov && e.vnoska)
-    .map((e) => e.klyuch);
+  /**
+   * ВСЕКИ ДОБАВЕН ЕТАП СТАВА КОЛОНА · но от РАЗНИ страни на „проверка".
+   *
+   * Негов пример, 29.08: „ако реша да вкарам лихва на забавени плащания сам да
+   * мога да направя колона в таблицата". Лихвата НЕ е вноска по сделката —
+   * значи ограничението „само вноските стават колони" щеше да блокира точно
+   * неговия пример. То падна.
+   *
+   * Мястото обаче не е едно и също, и разликата не е украса:
+   *   · ВНОСКА → ПРЕДИ „проверка", защото сборът е върху нея;
+   *   · НЕ-вноска → СЛЕД „проверка", защото колона преди сбор, която не влиза
+   *     в него, се чете грешно от всеки.
+   *
+   * Базовите „връщане" и „неустойка" НЯМАТ колона: те не са етапи на сделката,
+   * а движения на РАЗВАЛЯНЕТО (§4 на ADR-078), и живеят в своя блок.
+   */
+  const dobaveni = etapite(o).filter((e) => !e.bazov);
   if (dobaveni.length === 0) return KOLONI;
+  const predi = dobaveni.filter((e) => e.vnoska).map((e) => e.klyuch);
+  const sled = dobaveni.filter((e) => !e.vnoska).map((e) => e.klyuch);
   const kade = KOLONI.indexOf('проверка');
-  return Object.freeze([...KOLONI.slice(0, kade), ...dobaveni, ...KOLONI.slice(kade)]);
+  return Object.freeze([
+    ...KOLONI.slice(0, kade),
+    ...predi,
+    'проверка',
+    ...sled,
+    ...KOLONI.slice(kade + 1),
+  ]);
 }
 
 /** Кои от ЖИВИТЕ колони са затворени · номерата се местят с добавените. */
@@ -237,7 +255,10 @@ export function eVnoska(vid: string, etapi: readonly Etap[] = VIDOVE_DVIZHENIE.m
 export const SASTOYANIYA = [
   { klyuch: 'nezadadeno', ime: 'не е зададено', arhiv: false },
   { klyuch: 'tekushta', ime: 'текуща', arhiv: false },
-  { klyuch: 'prodadena', ime: 'продадена · архив', arhiv: true },
+  // КЛЮЧЪТ НЕ СЕ МЕНИ, само името: Журналът вече носи „prodadena" и не се
+  // преписва (правило 1). Негово, 29.08: „Архив Продажби с ново име Продажби
+  // Завършени."
+  { klyuch: 'prodadena', ime: 'продадена · завършена', arhiv: true },
   { klyuch: 'razvalena', ime: 'развалена', arhiv: false },
 ] as const;
 
@@ -438,8 +459,14 @@ export interface RedNaProdazhbite {
   readonly prodazhba: Prodazhba;
   readonly obekt: string;
   readonly myasto: string;
-  /** петте вноски по вид · сборът на всяка, СЛЕД сторната */
-  readonly vnoski: Readonly<Record<string, number>>;
+  /**
+   * СБОРЪТ ПО ЕТАП · всеки етап, не само вноските (29.08).
+   *
+   * Добавената „лихва" също носи пари и също иска клетка — иначе колоната ѝ
+   * щеше да стои празна. Кое от тях влиза в проверката, решава `eVnoska`, не
+   * тази карта: една сметка, един дом (правило 17).
+   */
+  readonly poEtap: Readonly<Record<string, number>>;
   readonly proverka: Proverka;
   readonly izvan: IzvanProverkata;
   /** датите под вноските · „за да е прегледно после и в архива" */
@@ -452,12 +479,11 @@ export function redovete(o: Ogledalo): readonly RedNaProdazhbite[] {
   return Object.freeze(
     [...o.prodazhbi.values()].map((p) => {
       const moite = dvizheniya.filter((d) => d.prodazhbaId === p.id);
-      const vnoski: Record<string, number> = {};
+      const poEtap: Record<string, number> = {};
       const dati: Record<string, string> = {};
       for (const v of etapi) {
-        if (!v.vnoska) continue;
         const negovite = moite.filter((d) => d.vid === v.klyuch);
-        vnoski[v.klyuch] = negovite.reduce((s, d) => s + d.suma_st, 0);
+        poEtap[v.klyuch] = negovite.reduce((s, d) => s + d.suma_st, 0);
         // ПОСЛЕДНАТА дата, не първата: човек гледа докъде е стигнало плащането.
         dati[v.klyuch] = negovite.length === 0 ? '' : negovite[negovite.length - 1]!.data;
       }
@@ -466,7 +492,7 @@ export function redovete(o: Ogledalo): readonly RedNaProdazhbite[] {
         prodazhba: p,
         obekt,
         myasto,
-        vnoski: Object.freeze(vnoski),
+        poEtap: Object.freeze(poEtap),
         dati: Object.freeze(dati),
         proverka: proverkata(p, moite, etapi),
         izvan: izvanProverkata(p.id, moite),

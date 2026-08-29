@@ -179,6 +179,15 @@ export function stoynostNaSastoyanie(
   matritsa?: Matritsa,
   /** обект → действителен месечен наем от Журнала (`svarzvane.ts`) */
   naemiOtZhurnala: ReadonlyMap<string, number> = new Map(),
+  /**
+   * КОИ ОБЕКТИ ВЕЧЕ ИМАТ СДЕЛКА · продаденото се чете И от Журнала (29.08).
+   *
+   * Дотук единственият източник беше НЕГОВИЯТ файл. Негово: „Там избираш
+   * продаден и го праща от цени в таб Продажби" — значи изборът ражда сделка,
+   * а сделката е фактът. Двата източника се СЪБИРАТ: файлът пази заварените,
+   * Журналът — направените оттук нататък.
+   */
+  prodadeniOtZhurnala: ReadonlySet<string> = new Set(),
 ): StoynostNaSastoyanie {
   const redove: RedNaStoynost[] = [];
   let obshto_tochno_st = 0;
@@ -188,7 +197,10 @@ export function stoynostNaSastoyanie(
   let prodadeni = 0;
 
   for (const o of obekti) {
-    const dop = otLista.get(o.obekt.trim()) ?? PRAZNO_OT_LISTA;
+    const otFayla = otLista.get(o.obekt.trim()) ?? PRAZNO_OT_LISTA;
+    const dop = prodadeniOtZhurnala.has(o.obekt.trim())
+      ? { ...otFayla, prodaden: true }
+      : otFayla;
 
     // ── А · ПО ПЛОЩ · продажната цена ────────────────────────────────────
     const tsena_tochno_st = tsenaTochno({

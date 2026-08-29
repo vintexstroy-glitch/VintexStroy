@@ -40,6 +40,10 @@ import {
   ZATVORENI,
 } from '../src/domein/prodazhbi.js';
 import { SHA } from './pomoshtni.js';
+import { IMENA_NA_KAM as VIDOVE_KAM_IMENA, sashtnostNaDokumenti } from '../src/domein/dokumenti.js';
+import { imotatNaObekta, kartaNaImotite } from '../src/kalkulator/svarzvane.js';
+
+const VIDOVE_KAM = Object.keys(VIDOVE_KAM_IMENA);
 
 const NAEMATEL = 'vintexstroy';
 
@@ -365,7 +369,7 @@ describe('таблицата · редовете, подредбата и све
     const r = redovete(await ogledaloto(dnevnik));
     expect(r).toHaveLength(1);
     // ДВЕ вноски от един вид се СЪБИРАТ · датата е на ПОСЛЕДНАТА
-    expect(r[0]!.vnoski['Капаро']).toBe(2_000_00);
+    expect(r[0]!.poEtap['Капаро']).toBe(2_000_00);
     expect(r[0]!.dati['Капаро']).toBe('2026-04-01');
     expect(r[0]!.dati['Акт 16']).toBe('');
   });
@@ -456,8 +460,12 @@ describe('етапите РАСТАТ · негова дума от 29.08', () =
     const o = await ogledaloto(dnevnik);
     expect(proverkata(o.prodazhbi.get('PR-1')!, o.dvizheniyaNaProdazhbi, etapite(o)).vnoski_st)
       .toBe(0);
-    // и колоната ѝ я НЯМА в главата · само вноските стават колони
-    expect(koloni(o)).not.toContain('бонус');
+    // НО КОЛОНА ПАК ИМА · негово, 29.08: „ако реша да вкарам лихва на забавени
+    // плащания сам да мога да направя колона". Мястото ѝ обаче е СЛЕД
+    // „проверка" — колона преди сбор, която не влиза в него, се чете грешно.
+    const zhivi = koloni(o);
+    expect(zhivi).toContain('бонус');
+    expect(zhivi.indexOf('бонус')).toBe(zhivi.indexOf('проверка') + 1);
   });
 
   it('НЕГОВИТЕ седем не се презаписват · дори с друго „вноска"', async () => {
@@ -502,5 +510,62 @@ describe('начинът е ИЗБОР · „Даа има избор." (29.08)'
     }
     const o = await ogledaloto(dnevnik);
     expect(o.dvizheniyaNaProdazhbi.map((d) => d.nachin)).toEqual(nachini);
+  });
+});
+
+describe('неговите поправки от 29.08 · вечерта', () => {
+  it('ЛИХВАТА може да е колона · и тя застава СЛЕД „проверка"', async () => {
+    // Негов пример, дословно: „ако реша да вкарам лихва на забавени плащания
+    // сам да мога да направя колона в таблицата". Той обори моето „само
+    // вноските стават колони" — то щеше да блокира точно неговия случай.
+    const { dnevnik, deystviya } = await sasSdelka();
+    await deystviya.zapishiEtapNaProdazhba(
+      { klyuch: 'лихва', vnoska: false },
+      { opId: 'e-lihva' },
+    );
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'Акт 17', vnoska: true }, { opId: 'e-17' });
+    const o = await ogledaloto(dnevnik);
+    const zhivi = koloni(o);
+    expect(zhivi).toHaveLength(17);
+    // вноската ПРЕДИ сбора, лихвата СЛЕД него
+    expect(zhivi.indexOf('Акт 17')).toBe(zhivi.indexOf('проверка') - 1);
+    expect(zhivi.indexOf('лихва')).toBe(zhivi.indexOf('проверка') + 1);
+    // и „Състояние" си остава ПОСЛЕДНА · стрелочникът не се мести
+    expect(zhivi[zhivi.length - 1]).toBe('Състояние');
+  });
+
+  it('лихвата НЕ влиза в проверката · само стои до нея', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'лихва', vnoska: false }, { opId: 'e1' });
+    await deystviya.zapishiDvizhenieNaProdazhba(
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'лихва', suma_st: 120_00, data: '2026-09-01', belezhka: 'закъснение', nachin: 'банка' },
+      { opId: 'op-1' },
+    );
+    const o = await ogledaloto(dnevnik);
+    const r = redovete(o)[0]!;
+    expect(r.proverka.vnoski_st).toBe(0);
+    // но клетката ѝ НЕ е празна · инак колоната щеше да е надпис
+    expect(r.poEtap['лихва']).toBe(120_00);
+  });
+
+  it('името на завършената се смени · КЛЮЧЪТ не', () => {
+    // Негово: „Архив Продажби с ново име Продажби Завършени." Ключът остава
+    // `prodadena`, защото Журналът вече го носи и не се преписва (правило 1).
+    expect(imeNaSastoyanieto('prodadena')).toBe('продадена · завършена');
+    expect(SASTOYANIYA.filter((x) => x.arhiv).map((x) => x.klyuch)).toEqual(['prodadena']);
+  });
+
+  it('документите се закачат и за ПРОДАЖБА · четвъртият адрес', () => {
+    expect(VIDOVE_KAM).toContain('prodazhba');
+    expect(sashtnostNaDokumenti('prodazhba', 'PR-1')).toBe('DOK:prodazhba:PR-1');
+  });
+
+  it('обектът намира ИМОТА си по вид и номер · инак сделка не се отваря', () => {
+    const karta = kartaNaImotite([
+      { id: 'IM-7', edinitsa: 'АП. № 7', naem_mesechen_st: 0 },
+    ]);
+    expect(imotatNaObekta('Апартамент 7', karta)).toBe('IM-7');
+    // име без номер НЕ се връзва · и това е отказ, не догадка
+    expect(imotatNaObekta('Мазе', karta)).toBeUndefined();
   });
 });

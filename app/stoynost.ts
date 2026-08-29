@@ -51,7 +51,7 @@ import {
   prochetiTsenovaLista,
   type KoyaTsena,
 } from '../src/kalkulator/tsenova-lista.js';
-import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
+import { imotatNaObekta, kartaNaImotite, kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import {
   nastroykiteNaKalkulatora,
@@ -70,6 +70,10 @@ let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 let otMD: ProchetenoTseniMD | null = null;
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
+/** обект → `imotId` · „Продаден" от менюто иска САМОЛИЧНОСТ, не число (29.08) */
+let imotiPoObekt: ReadonlyMap<string, string> = new Map();
+/** кои обекти вече имат сделка · продаденото се чете И от Журнала */
+let prodadeniOtZhurnala: ReadonlySet<string> = new Set();
 /** Коя цена се пуска при износ. Негов отговор: „и двете" · изборът се помни. */
 let koyaTsena: KoyaTsena = chetiEkranno<KoyaTsena>('stoynost.koyaTsena', 'dvete');
 let vest = '';
@@ -270,8 +274,33 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
         </div>
       </div>
       ${redZaSkritoto(f, 'stoynost')}
+      <p class="greshka" id="greshka-prodaden"></p>
+      <p class="drebno">Трите точки на реда отварят неговите функции. Днес там
+      има ЕДНА: <b>Продаден</b> — праща реда от цените в таб <b>Продажби</b> и
+      сделката застава в „Продажби Активни", червена, докато не ѝ се зададе
+      състояние.</p>
       <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор. Скритото от филтъра ПАК влиза в сбора отгоре — той е стойността на състоянието, не на екрана (правило 23).</p>
     </section>`;
+}
+
+/**
+ * ТРИТЕ ВЕРТИКАЛНИ ТОЧКИ на един ред · неговата поръчка от 29.08.
+ *
+ *   „Всеки имот след като е вкаран в Калкулатора да има избор на всеки имот с
+ *    3 вертикални точки за различни функции които да се вкарат там ако има
+ *    смисъл и е по добре за кода. Там избираш продаден и го праща от цени в
+ *    таб Продажби."
+ *
+ * ЕДНА функция днес, и тя е неговата: „Продаден". Менюто е ОТВОРЕНО за още —
+ * но празни пунктове „скоро" не се слагат: надпис върху непостроено е точно
+ * онова, което ADR-041 брои като дефект.
+ *
+ * ПРОДАДЕНИЯТ РЕД НЕ ГО ПОКАЗВА · там вече няма какво да се избира.
+ */
+function tochkiteNaReda(r: StoynostNaSastoyanie['redove'][number]): string {
+  if (r.prodaden) return '';
+  return `<button type="button" class="tochki" data-prodaden="${ekraniraj(r.obekt)}"
+          title="Продаден · праща реда в Продажби">⋮</button>`;
 }
 
 function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
@@ -279,7 +308,7 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
     <div class="red stoynost${r.prodaden ? ' mahnata' : ''}" translate="no">
       <span class="kletka"><b>${ekraniraj(r.obekt)}</b>${
         r.terasi_kvsm ? `<span>тераса ${kvSmVM2(r.terasi_kvsm)} м²</span>` : ''
-      }</span>
+      }${tochkiteNaReda(r)}</span>
       <span class="kletka"><span>${ekraniraj(r.etazh) || '—'}</span><span>${IMENA_NA_VIDOVETE_OBEKT[r.vid]}${
         r.stai ? ` · ${r.stai} стаи` : ''
       }</span></span>
@@ -346,6 +375,54 @@ export function zakachiStoynost(
   prerisuvay: () => Promise<void>,
 ): void {
   /**
+   * ТРИТЕ ТОЧКИ · „Там избираш продаден и го праща от цени в таб Продажби."
+   *
+   * ЕДНО СЪБИТИЕ, не две: сделката се отваря в състояние „не е зададено" и
+   * стои ЧЕРВЕНА в Продажби, докато човек не ѝ каже какво е (ADR-078 §6).
+   * Купувачът и числата още не се знаят — измислени тук, те щяха да влязат в
+   * книгата като факт.
+   *
+   * ОТКАЗЪТ СЕ КАЗВА: обект, чието име не се връзва с имот (вид + номер), няма
+   * какво да продаде — и екранът го обяснява, вместо да мълчи (правило 15).
+   */
+  for (const b of koren.querySelectorAll<HTMLElement>('[data-prodaden]')) {
+    b.addEventListener('click', async () => {
+      const obekt = b.dataset['prodaden'] ?? '';
+      const kazhi = koren.querySelector<HTMLElement>('#greshka-prodaden');
+      if (kazhi) kazhi.textContent = '';
+      const imotId = imotatNaObekta(obekt, imotiPoObekt);
+      if (imotId === undefined) {
+        if (kazhi) {
+          kazhi.textContent =
+            `„${obekt}" не се връзва с имот по вид и номер. Сделката иска имот — ` +
+            'от него се четат „Обект" и „Място".';
+        }
+        return;
+      }
+      try {
+        await k.deystviya.zapishiProdazhba(
+          {
+            prodazhbaId: `PR:${crypto.randomUUID()}`,
+            imotId,
+            kupuvach: '',
+            telefon: '',
+            tsena_st: 0,
+            prodazhba_st: 0,
+            smr_st: 0,
+            pd_st: 0,
+            sastoyanie: 'nezadadeno',
+          },
+          { opId: `prodazhba-ot-kalkulatora:${crypto.randomUUID()}` },
+        );
+        k.vest('dobre', `${obekt} е продаден · сделката чака да ѝ се зададе състояние.`);
+        await prerisuvay();
+      } catch (err) {
+        if (kazhi) kazhi.textContent = dumiZaGreshka(err);
+      }
+    });
+  }
+
+  /**
    * ЛИСТАТА СЕ СМЯТА С НАСТРОЙКИТЕ ОТ СЕКЦИЯ „КАЛКУЛАТОР".
    *
    * Това е връзката между двете секции и целият смисъл на разделянето: смени
@@ -365,6 +442,7 @@ export function zakachiStoynost(
       otLista,
       matritsaOtNastroyki(nastroykiteNaKalkulatora()),
       naemiOtZhurnala,
+      prodadeniOtZhurnala,
     );
     const parvi = smetnato.redove.find((r) => !r.prodaden) ?? smetnato.redove[0];
     if (parvi) {
@@ -384,9 +462,24 @@ export function zakachiStoynost(
     const og = await k.deystviya.ogledalo();
     const imoti = [...og.imoti.values()].map((i) => {
       const naem = [...og.naemi.values()].find((n) => n.imotId === i.id && !n.prekraten);
-      return { edinitsa: i.edinitsa, naem_mesechen_st: naem?.naem_st ?? 0 };
+      return { id: i.id, edinitsa: i.edinitsa, naem_mesechen_st: naem?.naem_st ?? 0 };
     });
     naemiOtZhurnala = kartaNaNaemite(imoti);
+    imotiPoObekt = kartaNaImotite(imoti);
+    /**
+     * ПРОДАДЕНОТО СЕ ЧЕТЕ И ОТ ЖУРНАЛА, не само от неговия файл (29.08).
+     *
+     * Негово: „Там избираш продаден и го праща от цени в таб Продажби."
+     * Значи щом за един имот вече има сделка, Калкулаторът трябва да го знае —
+     * инак изборът щеше да е бутон без последица на екрана, от който тръгва.
+     */
+    const sImot = new Map<string, string>();
+    for (const [obekt, imotId] of imotiPoObekt) sImot.set(imotId, obekt);
+    prodadeniOtZhurnala = new Set(
+      [...og.prodazhbi.values()]
+        .map((pr) => sImot.get(pr.imotId))
+        .filter((x): x is string => x !== undefined),
+    );
   };
 
   // Секция „Калкулатор" · всяка промяна горе преизчислява листата долу.

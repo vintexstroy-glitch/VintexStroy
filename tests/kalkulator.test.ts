@@ -203,6 +203,28 @@ describe('стойността на състоянието', () => {
     expect(s.broy).toBe(2); // в сбора влизат Ап. 2 и Гараж 1
   });
 
+  it('ПРОДАДЕНОТО се чете И ОТ ЖУРНАЛА, не само от неговия файл (29.08)', () => {
+    // Негово: „Там избираш продаден и го праща от цени в таб Продажби."
+    // Значи щом за един обект вече има сделка, Калкулаторът трябва да го знае —
+    // инак изборът щеше да е бутон без последица на екрана, от който тръгва.
+    const { obekti } = prochetiPloshti(ploshti());
+    const bez = stoynostNaSastoyanie(obekti, otLista());
+    const zhiv = bez.redove.find((r) => !r.prodaden)!;
+
+    const sav = stoynostNaSastoyanie(
+      obekti,
+      otLista(),
+      undefined,
+      new Map(),
+      new Set([zhiv.obekt]),
+    );
+    expect(sav.prodadeni).toBe(bez.prodadeni + 1);
+    expect(sav.broy).toBe(bez.broy - 1);
+    expect(sav.redove.find((r) => r.obekt === zhiv.obekt)!.prodaden).toBe(true);
+    // и стойността ПАДА с неговата · продаденото не влиза в сбора
+    expect(sav.obshto_st).toBeLessThan(bez.obshto_st);
+  });
+
   it('цената е НАГОРЕ до стотица · сборът се смята от ТОЧНИТЕ', () => {
     const { obekti } = prochetiPloshti(ploshti());
     const s = stoynostNaSastoyanie(obekti, otLista());
@@ -352,8 +374,8 @@ describe('свързването · „Апартамент 1" ↔ „АП. № 
 
   it('прекратеният наем не влиза в картата', () => {
     const karta = kartaNaNaemite([
-      { edinitsa: 'АП. № 1', naem_mesechen_st: 550_00 },
-      { edinitsa: 'АП. № 2', naem_mesechen_st: 0 }, // прекратен
+      { id: 'IM-1', edinitsa: 'АП. № 1', naem_mesechen_st: 550_00 },
+      { id: 'IM-2', edinitsa: 'АП. № 2', naem_mesechen_st: 0 }, // прекратен
     ]);
     expect(deystvitelenNaem_st('Апартамент 1', karta)).toBe(550_00);
     expect(deystvitelenNaem_st('Апартамент 2', karta)).toBeUndefined();
@@ -391,7 +413,7 @@ describe('двете колони, една до друга', () => {
 
   it('НАЕМЪТ ОТ ЖУРНАЛА бие очаквания — и редът го казва', () => {
     const { obekti } = prochetiPloshti(ploshtiSDve());
-    const karta = kartaNaNaemite([{ edinitsa: 'АП. № 2', naem_mesechen_st: 700_00 }]);
+    const karta = kartaNaNaemite([{ id: 'IM-2', edinitsa: 'АП. № 2', naem_mesechen_st: 700_00 }]);
     const s = stoynostNaSastoyanie(obekti, prochetiTsenovaLista(tseni()), undefined, karta);
 
     const ap2 = s.redove.find((r) => r.obekt === 'Апартамент 2')!;

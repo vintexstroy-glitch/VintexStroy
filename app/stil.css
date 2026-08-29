@@ -926,6 +926,19 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   grid-template-columns: 120px 120px 90px 100px 120px minmax(0, 280px);
   min-width: 830px;
 }
+/* ТРИТЕ ВЕРТИКАЛНИ ТОЧКИ на ред в Калкулатора (29.08) · дръжка, не бутон с
+   дума: редът е тесен, а функциите ще станат повече. */
+.tochki {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--mastilo2);
+}
+.tochki:hover { color: var(--aktsent); }
+
 /* ЕТАПИТЕ · номенклатурата в Настройки (29.08 · „да може всеки да рзвие своя бизнес"). */
 .glava.etapred, .red.etapred {
   grid-template-columns: minmax(0, 240px) 130px 160px;
