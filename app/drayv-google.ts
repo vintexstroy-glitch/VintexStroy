@@ -30,6 +30,7 @@
  */
 
 import type { Drayv, FaylVDrayva } from '../src/nositel/drayv.js';
+import type { KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { GreshkaDrayv } from '../src/nositel/drayv.js';
 import { pitayGoogle, vzemiZhetonZaObhvat } from './gis-skript.js';
 
@@ -37,6 +38,16 @@ const OBHVAT = 'https://www.googleapis.com/auth/drive.file';
 
 const SPISAK = 'https://www.googleapis.com/drive/v3/files';
 const KACHVANE = 'https://www.googleapis.com/upload/drive/v3/files';
+/**
+ * КВОТАТА · `about.get`, и той работи с обхвата, който вече имаме.
+ *
+ * Google изброява `drive.file` сред обхватите на `about.get`; затова честната
+ * спирачка не струва НИТО ЕДНО ново разрешение. Ако някой ден откаже с 403,
+ * това ще е сигурно ЗНАНИЕ, не догадка — и екранът вече знае да го КАЖЕ с
+ * думи, вместо да замълчи (същият похват като при схемата на НАП, ADR-047:
+ * истинската проверка е ЖИВОТО повикване).
+ */
+const ZA_MEN = 'https://www.googleapis.com/drive/v3/about';
 
 /**
  * ИСКА СЪГЛАСИЕ за ДРАЙВА · механиката е обща, ДУМИТЕ са тукашни.
@@ -92,6 +103,26 @@ export class DrayvNaGoogle implements Drayv {
       body: sadarzhanie,
       headers: { 'Content-Type': 'application/json' },
     });
+  }
+
+  /**
+   * ТАВАНЪТ И ЗАЕТОТО · питаме доставчика, не човека (правило 14).
+   *
+   * `limit` липсва при акаунт БЕЗ ограничение (фирмен). Липсата се превежда на
+   * `-1` ТУК, при мястото ѝ, а домейнът я чете като „платено": прочетена като
+   * нула, тя щеше да обяви най-скъпия клиент за препълнен.
+   */
+  async kvota(): Promise<KvotaNaDrayva> {
+    const adres = `${ZA_MEN}?fields=${encodeURIComponent('storageQuota')}`;
+    const otgovor = await this.#pitay(adres, { method: 'GET' });
+    const danni = (await otgovor.json()) as {
+      storageQuota?: { limit?: string; usage?: string };
+    };
+    const k = danni.storageQuota ?? {};
+    return {
+      limit: k.limit === undefined ? -1 : Number(k.limit),
+      zaeto: Number(k.usage ?? 0),
+    };
   }
 
   /**

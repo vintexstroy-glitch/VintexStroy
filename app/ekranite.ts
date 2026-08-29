@@ -136,6 +136,8 @@ interface ZaRisuvane {
   readonly lichnoOgledalo: Ogledalo | null;
   readonly lichenAkaunt: string;
   readonly broyLichni: number;
+  /** колко заема Журналът · МЕРЕНО от браузъра (резен Д · честната спирачка) */
+  readonly zaetoNaUstroystvoto: number;
   /**
    * КОИ ЕКРАНА СА ДОСТЪПНИ на този човек · СМЯТА се в `main.ts` (правило 17).
    *
@@ -407,6 +409,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
           })),
           moyatRedEPipnat: moyatRed().length > 0,
         },
+        r.zaetoNaUstroystvoto,
       ),
     zakachi: (z) => z.zakachiTabloto(),
   },

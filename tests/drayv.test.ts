@@ -24,6 +24,7 @@ import {
   type FaylVDrayva,
 } from '../src/nositel/drayv.js';
 import { NASTAVKA_PISACH } from '../src/domein/akaunt.js';
+import type { KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { SHA } from './pomoshtni.js';
 
 const KNIGA = 'kniga';
@@ -36,6 +37,13 @@ class DrayvVPametta implements Drayv {
   presazdadeni = 0;
   sazdadeni = 0;
   #nomer = 0;
+
+  /** Кваотата се ЗАДАВА от теста · драйвът в паметта не измисля числа. */
+  kvotata: KvotaNaDrayva = { limit: 15 * 1024 * 1024 * 1024, zaeto: 0 };
+
+  async kvota(): Promise<KvotaNaDrayva> {
+    return this.kvotata;
+  }
 
   slozhi(ime: string, sadarzhanie: string): string {
     const id = `f-${(this.#nomer += 1)}`;

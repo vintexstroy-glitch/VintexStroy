@@ -113,6 +113,7 @@ async function main(): Promise<void> {
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
     await tablo.blok2(ctx);
+    await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);
     await infrastruktura.blok4(ctx);
     await mnogotoVerigi.blok2(ctx);

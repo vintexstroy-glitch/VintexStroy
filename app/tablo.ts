@@ -44,6 +44,10 @@ import {
 } from '../src/domein/planove.js';
 import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
 import { ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { butonSIkona } from './ikoni.js';
+import { kolkoMyasto } from '../src/nositel/hranilishte.js';
+import { presmetni, sDumi, type KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
 
 const KLYUCH = 'masterbook:izbor';
@@ -128,7 +132,13 @@ function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya:
         </div>
         <div class="plochka">
           <div class="etiket">Хранилище</div>
-          <div class="chislo malak" translate="no">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
+          <div class="chislo malak" translate="no" data-hranilishte="${ekraniraj(koj.hranilishte)}">${
+            koj.hranilishte === 'платено'
+              ? 'Платено'
+              : koj.hranilishte === 'безплатно'
+                ? 'Безплатно'
+                : 'Не е питано'
+          }</div>
           <div class="pod">при ${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}, не при нас</div>
         </div>
         <div class="plochka">
@@ -528,6 +538,23 @@ function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
     </section>`;
 }
 
+/**
+ * КВОТАТА · ПОГЛЕД, не запис (ADR-022 · ADR-064).
+ *
+ * Живее в паметта на модула и умира с раздела. Отговорът на Google е ЧУЖД
+ * факт — той се пита наново, не се помни като наш. Записан в Журнала, той
+ * щеше да остарее мълчаливо в деня, в който човек си купи място.
+ */
+let kvotata: KvotaNaDrayva | null = null;
+let greshkaSpiratchka = '';
+
+/** Питането минава ОТТУК · подава се от `main.ts`, за да няма мрежа в екрана. */
+let pitayDrayvaZaKvota: (() => Promise<KvotaNaDrayva>) | null = null;
+
+export function svarzhiPitanetoNaDrayva(f: () => Promise<KvotaNaDrayva>): void {
+  pitayDrayvaZaKvota = f;
+}
+
 export function narisuvayTablo(
   koj: Samolichnost,
   izbor: Izbor,
@@ -551,6 +578,13 @@ export function narisuvayTablo(
     readonly punktove: readonly { readonly klyuch: string; readonly ime: string; readonly skrit: boolean }[];
     readonly moyatRedEPipnat: boolean;
   } = { punktove: [], moyatRedEPipnat: false },
+  /**
+   * КОЛКО ЗАЕМА ЖУРНАЛЪТ · МЕРЕНО от браузъра, не питано (резен Д).
+   *
+   * Подава се, защото мярката идва от `navigator.storage.estimate()`, а тя
+   * живее в `main.ts` заедно с останалото за носителя.
+   */
+  nuzhnoZaZhurnala = 0,
 ): string {
   const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
@@ -561,6 +595,7 @@ export function narisuvayTablo(
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
     kartaLenta(lenta.punktove, negov, lenta.moyatRedEPipnat) +
     kartaOtmetki(izbor) +
+    kartaSpiratchka(izbor, koj, nuzhnoZaZhurnala) +
     kartaSravnenie(izbor, koj)
   );
 }
@@ -616,6 +651,34 @@ export function zakachiTablo(
   sloji: (izbor: Izbor) => void,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * ПИТАЙ ДРАЙВА · единственото действие на честната спирачка (резен Д).
+   *
+   * Пита и ПОКАЗВА. Нищо не записва в Журнала и нищо не забранява — отговорът
+   * е чужд факт и живее в паметта на раздела (ADR-064).
+   *
+   * Липсващата връзка НЕ е грешка: офлайн изданието няма свързваща част, и
+   * тогава бутонът казва защо, вместо да мълчи (правило 15).
+   */
+  koren.querySelector<HTMLButtonElement>('#pitay-drayva')?.addEventListener('click', async () => {
+    const buton = koren.querySelector<HTMLButtonElement>('#pitay-drayva')!;
+    buton.disabled = true;
+    try {
+      if (!pitayDrayvaZaKvota) {
+        throw new Error(
+          'Това издание няма свързваща част към Драйва — то работи изцяло офлайн. ' +
+            'Спирачката остава непитана, и това е състояние, не повреда.',
+        );
+      }
+      kvotata = await pitayDrayvaZaKvota();
+      greshkaSpiratchka = '';
+    } catch (err) {
+      kvotata = null;
+      greshkaSpiratchka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
   for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-vazmozhnost]')) {
     kutiya.addEventListener('change', async () => {
       const v = kutiya.dataset['vazmozhnost'] as Vazmozhnost;
@@ -647,4 +710,94 @@ export function zakachiTablo(
       await prerisuvay();
     });
   }
+}
+
+/**
+ * ДРАЙВЪТ И ПЛАНЪТ · ЧЕСТНАТА СПИРАЧКА (резен Д · ADR-076).
+ *
+ * `CLAUDE.md`: „Защитата е честна спирачка, не ключалка. Заявка за плана +
+ * проверка на драйва ловят НЕВОЛНАТА грешка. Нарочна измама иска сървър."
+ *
+ * Затова тази карта има ЕДИН бутон, който ПИТА, и нула бутона, които
+ * забраняват. Онова, което тя прави, е да покаже числата и да каже какво
+ * значат — включително когато не са питани.
+ */
+function kartaSpiratchka(izbor: Izbor, koj: Samolichnost, nuzhno: number): string {
+  const p = presmetni({
+    plan: izbor.plan,
+    kvota: kvotata,
+    nuzhno,
+    vidOtSamolichnostta: koj.hranilishte,
+  });
+  const znachka =
+    p.otsenka === 'stiga' ? 'dobre' : p.otsenka === 'ne e pitano' ? 'tiha' : 'trevoga';
+
+  return `
+    <section class="karta" data-sektsiya="tablo-spiratchka">
+      <div class="dyalglava">
+        <h2>Драйвът и планът</h2>
+        <span>спирачка, не ключалка · нищо тук не забранява нищо</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <div class="etiket">Акаунтът при ${ekraniraj(IMENA_NA_DOSTAVCHITSITE[koj.dostavchik])}</div>
+          <div class="chislo malak" translate="no" data-vid-hranilishte="${ekraniraj(p.vid)}">${ekraniraj(
+            p.vid === 'не е питано' ? 'Не е питано' : p.vid === 'платено' ? 'Платено' : 'Безплатно',
+          )}</div>
+          <div class="pod">${p.vid === 'не е питано' ? 'докато не питаме, не твърдим' : 'МЕРИ се от тавана'}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Свободно в Драйва</div>
+          <div class="chislo malak" translate="no" data-svobodno="${p.svobodno}">${
+            p.svobodno < 0 ? '—' : kolkoMyasto(p.svobodno)
+          }</div>
+          <div class="pod">${p.svobodno < 0 ? 'няма число, защото не е питано' : 'таван минус заето'}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Нужно за Журнала</div>
+          <div class="chislo malak" translate="no" data-nuzhno="${nuzhno}">${kolkoMyasto(nuzhno)}</div>
+          <div class="pod">МЕРЕНО от браузъра, не питано</div>
+        </div>
+      </div>
+
+      <p class="drebno">
+        <span class="znachka ${znachka}" data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(
+          p.otsenka === 'ne e pitano'
+            ? 'не е питано'
+            : p.otsenka === 'stiga'
+              ? 'стига'
+              : p.otsenka === 'tyasno'
+                ? 'тясно'
+                : 'не стига',
+        )}</span>
+        ${ekraniraj(sDumi(p))}
+      </p>
+
+      ${
+        greshkaSpiratchka === ''
+          ? ''
+          : `<p class="greshka" id="greshka-spiratchka">${ekraniraj(greshkaSpiratchka)}</p>`
+      }
+
+      ${butonSIkona({
+        ikona: 'veriga',
+        tekst: kvotata === null ? 'Питай Драйва' : 'Питай пак',
+        title: 'Пита доставчика за тавана и заетото · нищо не се качва и нищо не се записва',
+        klas: 'glaven',
+        id: 'pitay-drayva',
+      })}
+
+      <p class="drebno">Питането иска СЪГЛАСИЕ за Драйва — второ разрешение, не
+      второ влизане. Използва се обхватът, който вече имаме
+      (<code translate="no">drive.file</code>): честната спирачка не струва нито
+      едно ново разрешение. Отговорът НЕ влиза в Журнала — той е чужд факт и се
+      пита наново (същото решение като при отговора на Google, ADR-064).</p>
+
+      <p class="drebno"><b>И нищо не се заключва.</b> Приложението е в браузъра;
+      който иска да заобиколи това число, отваря конзолата и го заобикаля.
+      Спирачката лови НЕВОЛНАТА грешка — човек, който тръгва да пренася повече,
+      отколкото има къде да се събере. Нарочната измама иска сървър, и това е
+      казано, вместо да се прави, че не е така.</p>
+    </section>`;
 }

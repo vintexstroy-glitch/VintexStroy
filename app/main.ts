@@ -76,7 +76,7 @@ import { zakachiVisochinata } from './visochina.js';
 import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
-import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
+import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
 import { narisuvayTabove, zakachiTabove } from './tabove.js';
@@ -759,6 +759,10 @@ async function trugvay(): Promise<void> {
             lichnoOgledalo,
             lichenAkaunt: lichen.akaunt,
             broyLichni: lichniteSabitiya.length,
+            // МЕРЕНО, не питано (правило от `CLAUDE.md`: „Размерът се МЕРИ").
+            // `-1` значи „браузърът не казва" и екранът го чете като нула
+            // нужно място — по-честно от измислено число.
+            zaetoNaUstroystvoto: Math.max(0, hranilishte.zaeto),
             dostapniEkrani: dostapniteEkrani({
               rolya: rolyataNa(kojSam.imeyl, ogledalo),
               lichnoVklyucheno,
@@ -777,6 +781,15 @@ async function trugvay(): Promise<void> {
       prerisuvay,
       prevklyuchiLichnoto: (znak, vklyucheno) => zakachiPrevklyuchvaneto(koren, znak, vklyucheno),
       zakachiTabloto: () => {
+        /**
+         * СВЪРЗВАЩАТА ЧАСТ · ТУК, не в екрана (ADR-021 · ADR-055).
+         *
+         * Таблото не знае за мрежа и не бива да научава: офлайн изданието НЕ
+         * носи `drayv-google.js`, и екран, който го внася направо, би го
+         * издърпал в пакета. Затова питането се ПОДАВА, а липсата му е
+         * състояние, което картата казва с думи.
+         */
+        svarzhiPitanetoNaDrayva(async () => new DrayvNaGoogle(await vzemiZheton()).kvota());
         zakachiTablo(
           koren,
           () => izbor,

@@ -134,7 +134,9 @@ export class VhodSGoogle implements VhodBezParola {
       dostavchik: 'google',
       imeyl: svediImeyl(tvardeniya.email),
       ime: tvardeniya.name?.trim() || svediImeyl(tvardeniya.email),
-      hranilishte: 'безплатно',
+      // НЕ ЗАКОВАВАМЕ вида: влизането дава САМОЛИЧНОСТ, не квота. Питането
+      // на Драйва е отделно съгласие и става с натискане (резен Д · ADR-076).
+      hranilishte: 'не е питано',
       nachin: 'dostavchik',
       // Влезлият е собственик на СВОЯ Журнал — ключът е неговият имейл
       // (ADR-020). Служителят при чужд акаунт идва със споделянето на папката.
