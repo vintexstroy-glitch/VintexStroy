@@ -41,6 +41,7 @@
  * със закръгляне на половинката, както при ДДС-то.
  */
 
+import { obshtOstatak, obshtoObezpechenie } from './krediti.js';
 import { deliZakragleno } from '../yadro/pari.js';
 import { razhodiZaPerioda, smetki } from './smetki.js';
 import { saldoNa, sumiZaObhvat } from './otcheti.js';
@@ -55,11 +56,19 @@ export class GreshkaKoefitsient extends Error {
   }
 }
 
-/** Четирите вида · изброени ПОИМЕННО, защото от тях зависи приравняването. */
+/**
+ * ПЕТТЕ вида · изброени ПОИМЕННО, защото от тях зависи приравняването.
+ *
+ * Петият (`zapas-kam-potok`) дойде с Дълг/доход (резен 19): дълг ÷ доход е
+ * ЗАПАС върху ПОТОК, и приравняването му към година не умножава, а ДЕЛИ.
+ * Без свой вид той щеше да мине като „поток към запас" и „на годишна база"
+ * щеше да умножи и запаса — число, което изглежда вярно и не е.
+ */
 export const VIDOVE = [
   'suma-potok',
   'otnoshenie-potoci',
   'potok-kam-zapas',
+  'zapas-kam-potok',
   'otnoshenie-zapasi',
 ] as const;
 
@@ -69,22 +78,25 @@ export const IMENA_NA_VIDOVETE: Readonly<Record<Vid, string>> = Object.freeze({
   'suma-potok': 'сума · натрупва се през периода',
   'otnoshenie-potoci': 'отношение на два потока',
   'potok-kam-zapas': 'поток към запас',
+  'zapas-kam-potok': 'запас към поток',
   'otnoshenie-zapasi': 'отношение на два запаса',
 });
 
-/** Трите отговора на въпроса „а на годишна база?" */
-type Priravnyavane = 'mnozhi' | 'nenuzhno' | 'nevazmozhno';
+/** Четирите отговора на въпроса „а на годишна база?" */
+type Priravnyavane = 'mnozhi' | 'deli' | 'nenuzhno' | 'nevazmozhno';
 
 export const PRIRAVNYAVANETO: Readonly<Record<Vid, Priravnyavane>> = Object.freeze({
   'suma-potok': 'mnozhi',
   'otnoshenie-potoci': 'nenuzhno',
   'potok-kam-zapas': 'mnozhi',
+  'zapas-kam-potok': 'deli',
   'otnoshenie-zapasi': 'nevazmozhno',
 });
 
 /** Защо · с думи. Отказът трябва да УЧИ, не само да спира. */
 export const ZASHTO_PRIRAVNYAVANE: Readonly<Record<Priravnyavane, string>> = Object.freeze({
   mnozhi: 'умножава се по 12 ÷ месеците — сумата се натрупва през периода',
+  deli: 'дели се на 12 ÷ месеците — запасът стои, приравнява се ПОТОКЪТ под чертата',
   nenuzhno:
     'вече НЕ зависи от периода — двете числа са от един и същ период и се съкращават. Умножено по 12, то би дало число без смисъл.',
   nevazmozhno:
@@ -212,6 +224,26 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     samoMesechen: false,
     kakvo: 'Стигат ли парите за онова, което се дължи сега.',
     obichayno: 'над 1,00',
+  }),
+  Object.freeze({
+    klyuch: 'ltv',
+    ime: 'Кредит към обезпечение',
+    formula: 'LTV = остатъчна главница ÷ стойност на обезпечението',
+    vid: 'otnoshenie-zapasi' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kakvo: 'Каква част от обезпечението е още на банката.',
+    obichayno: 'банките дават до 80 %',
+  }),
+  Object.freeze({
+    klyuch: 'dalg-kam-ebitda',
+    ime: 'Дълг към доход',
+    formula: 'Дълг/доход = остатъчна главница ÷ NOI за периода',
+    vid: 'zapas-kam-potok' as const,
+    merka: 'pati' as const,
+    samoMesechen: false,
+    kakvo: 'За колко периода доходът изплаща целия дълг.',
+    obichayno: 'под 3,50 при имоти',
   }),
   Object.freeze({
     klyuch: 'dso',
@@ -354,6 +386,8 @@ export interface DanniZaPerioda {
   readonly sredstva_st: number;
   readonly vzemaniya_st: number;
   readonly zadalzheniya_st: number;
+  /** сборът на обезпеченията по кредитите · знаменателят на LTV */
+  readonly obezpechenie_st: number;
   readonly zaeti: number;
   readonly vsichki_obekti: number;
   readonly dni: number;
@@ -406,7 +440,11 @@ export function danniZaPerioda(o: Ogledalo, ot: string, doo: string): DanniZaPer
     dds_za_vnasyane_st,
     sredstva_st: saldoNa(o, 'banka') + saldoNa(o, 'trezor'),
     vzemaniya_st,
-    zadalzheniya_st: 0,
+    // ДОТУК СТОЕШЕ ЗАКОВАНА НУЛА, защото нямаше откъде да дойде число:
+    // Ликвидността мълчеше „няма записани текущи задължения" при всеки Журнал.
+    // Резен 19 ѝ даде източник — остатъчната главница по кредитите, СМЕТНАТА.
+    zadalzheniya_st: obshtOstatak(o),
+    obezpechenie_st: obshtoObezpechenie(o),
     zaeti,
     vsichki_obekti: o.imoti.size,
     dni: razlikaDni,
@@ -498,6 +536,31 @@ export function smetniKoefitsient(k: Koefitsient, d: DanniZaPerioda): SmetnatKoe
         ? bez('Няма приход за периода — дните до плащане нямат делител.', par)
         : sas(deliZakragleno(d.vzemaniya_st * d.dni, d.prihod_st), par);
     }
+    case 'ltv': {
+      const par = [
+        p('остатъчна главница', d.zadalzheniya_st, 'pari'),
+        p('обезпечение', d.obezpechenie_st, 'pari'),
+      ];
+      return d.obezpechenie_st === 0
+        ? bez(
+            'Няма записано обезпечението по нито един кредит. LTV без стойност на ' +
+              'обезпечението е дроб без знаменател — нула тук би значела „нищо не ' +
+              'дължим", а е точно обратното.',
+            par,
+          )
+        : sas(deliZakragleno(d.zadalzheniya_st * 10_000, d.obezpechenie_st), par);
+    }
+    case 'dalg-kam-ebitda': {
+      const noi = d.prihod_st - d.operativni_st;
+      const par = [p('остатъчна главница', d.zadalzheniya_st, 'pari'), p('NOI', noi, 'pari')];
+      return noi <= 0
+        ? bez(
+            'NOI за периода не е положителен — дълг, разделен на нула или на ' +
+              'загуба, не казва „за колко периода се изплаща".',
+            par,
+          )
+        : sas(deliZakragleno(d.zadalzheniya_st * 100, noi), par);
+    }
     default:
       throw new GreshkaKoefitsient(`Няма сметка за коефициент „${k.klyuch}".`);
   }
@@ -512,7 +575,7 @@ export function smetniKoefitsient(k: Koefitsient, d: DanniZaPerioda): SmetnatKoe
  */
 export function priravniKamGodina(s: SmetnatKoefitsient, mesetsi: number): number {
   const kak = PRIRAVNYAVANETO[s.koefitsient.vid];
-  if (kak !== 'mnozhi') {
+  if (kak !== 'mnozhi' && kak !== 'deli') {
     throw new GreshkaKoefitsient(
       `„${s.koefitsient.ime}" не се приравнява към година: ${ZASHTO_PRIRAVNYAVANE[kak]}`,
     );
@@ -523,12 +586,18 @@ export function priravniKamGodina(s: SmetnatKoefitsient, mesetsi: number): numbe
   if (!Number.isInteger(mesetsi) || mesetsi < 1) {
     throw new GreshkaKoefitsient('Месеците в периода са цяло число, не по-малко от едно.');
   }
-  return deliZakragleno(s.stoynost * 12, mesetsi);
+  // ДВЕ ПОСОКИ, ЕДНА ДРОБ. Потокът в ЧИСЛИТЕЛЯ се умножава по 12 ÷ месеците;
+  // потокът в ЗНАМЕНАТЕЛЯ — дели се на същото, тоест умножава се по месеците
+  // ÷ 12. Обърнеш ли ги, тримесечен дълг/доход става четири пъти по-малък.
+  return kak === 'mnozhi'
+    ? deliZakragleno(s.stoynost * 12, mesetsi)
+    : deliZakragleno(s.stoynost * mesetsi, 12);
 }
 
 /** Може ли изобщо · за екрана, без да се хвърля. */
 export function mozheDaSePriravni(k: Koefitsient): boolean {
-  return PRIRAVNYAVANETO[k.vid] === 'mnozhi';
+  const kak = PRIRAVNYAVANETO[k.vid];
+  return kak === 'mnozhi' || kak === 'deli';
 }
 
 /**

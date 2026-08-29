@@ -27,6 +27,7 @@
  * Всичко е цели стотинки (правило 3). Нула float, нула `toFixed`.
  */
 
+import { obshtOstatak } from './krediti.js';
 import type { Ogledalo, Plashtane, Razhod } from '../ogledalo/ogledalo.js';
 import { duljimo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
@@ -198,13 +199,14 @@ export function sredstva(o: Ogledalo, period: Period, kogato: string): Pole {
 export interface VanshniZaKapitala {
   /** сборът от Стойност на Състояние, ако екранът го е смятал в тази сесия */
   readonly stoynostNaSastoyanie_st?: number;
-  /** остатъчна главница по кредити · чака M04 */
-  readonly kredititeOstatak_st?: number;
 }
 
 export function kapital(o: Ogledalo, vanshni: VanshniZaKapitala = {}): Pole {
   const stoynost_st = vanshni.stoynostNaSastoyanie_st ?? 0;
-  const krediti_st = vanshni.kredititeOstatak_st ?? 0;
+  // ДОТУК ТОВА ЧИСЛО СЕ ПОДАВАШЕ ОТВЪН и никой не го подаваше: полето казваше
+  // „чака таблица Кредити", а таблица Кредити я нямаше. Резен 19 я построи, и
+  // остатъкът вече се СМЯТА от Журнала — параметърът без източник отпадна.
+  const krediti_st = obshtOstatak(o);
   const lik = likvidnost(o);
   const vze = vzemaniya(o);
 
@@ -212,15 +214,19 @@ export function kapital(o: Ogledalo, vanshni: VanshniZaKapitala = {}): Pole {
     { ime: 'Стойност на Състояние', suma_st: stoynost_st, otkade: 'Калкулаторът' },
     { ime: 'Ликвидност', suma_st: lik.sbor_st, otkade: 'поле ЛИКВИДНОСТ' },
     { ime: 'Вземания', suma_st: vze.sbor_st, otkade: 'поле ВЗЕМАНИЯ' },
-    { ime: 'Кредити · остатъчна главница', suma_st: -krediti_st, otkade: 'таблица Кредити' },
+    {
+      ime: 'Кредити · остатъчна главница',
+      // `-0` е истинско число в JavaScript и се ИЗПИСВА като „-0,00 €".
+      // Дотук не се виждаше, защото параметърът никога не идваше; щом остатъкът
+      // тръгна от Журнала, нулевият дълг щеше да застане на екрана със знак.
+      suma_st: krediti_st === 0 ? 0 : -krediti_st,
+      otkade: 'таблица Кредити',
+    },
   ];
 
   const chaka: string[] = [];
   if (vanshni.stoynostNaSastoyanie_st === undefined) {
     chaka.push('Стойност на Състояние · смята се в Калкулатора');
-  }
-  if (vanshni.kredititeOstatak_st === undefined) {
-    chaka.push('остатъчната главница по кредитите · таблица Кредити');
   }
 
   return {
@@ -279,7 +285,7 @@ export function otcheti(
     vlyazlo_st -
     izlyazlo_st +
     vzemaniya_st;
-  const zadalzheniya_st = vanshni.kredititeOstatak_st ?? 0;
+  const zadalzheniya_st = obshtOstatak(o);
 
   return {
     period,

@@ -15,6 +15,7 @@
  * живеят в Журнала и се четат от Огледалото при всяко показване.
  */
 
+import { blokNaKredititeVNastroyki, zakachiKreditite } from './krediti.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   OPISI,
@@ -210,6 +211,8 @@ export function narisuvayNastroyki(
     ${blokNaRedaktora(modeli)}
     ${blokNaParametrite(o)}
     ${blokNaEtapite(o)}
+
+    ${blokNaKredititeVNastroyki()}
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
     ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
@@ -1195,6 +1198,9 @@ export function zakachiNastroyki(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  // ОТМЕТКАТА ЗА ТАБЛИЦАТА КРЕДИТИ · същата дръжка, втори екран (резен 19).
+  zakachiKreditite(koren, k, prerisuvay);
+
   /**
    * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.
    *

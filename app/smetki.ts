@@ -76,6 +76,7 @@ import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
+import { blokNaKreditite, redPodRazhodite, zakachiKreditite } from './krediti.js';
 import { butonSIkona } from './ikoni.js';
 import { safT } from '../src/iznos/saf-t.js';
 import { SHEMA } from '../src/iznos/saf-t-shema.js';
@@ -351,6 +352,10 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
     </section>`
     }
+
+    ${redPodRazhodite(o, mesets, dnes)}
+
+    ${blokNaKreditite(o, dnes)}
 
     ${kalkulator()}
   `;
@@ -1017,6 +1022,8 @@ export function zakachiSmetki(
   slozhiShirinite(koren);
 
   zakachiKoefitsientite(koren, prerisuvay);
+  // КРЕДИТИТЕ · таблицата, планът по дати и плащането (резен 19 · ADR-079).
+  zakachiKreditite(koren, k, prerisuvay);
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
   zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
 

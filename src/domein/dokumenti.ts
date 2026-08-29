@@ -54,7 +54,7 @@ export class GreshkaDokument extends Error {
 }
 
 /** Към какво се закача · изброено поименно, не се открива от данните. */
-const KAM_KAKVO = ['razhod', 'delo', 'imot', 'prodazhba'] as const;
+const KAM_KAKVO = ['razhod', 'delo', 'imot', 'prodazhba', 'kredit'] as const;
 
 export type KamKakvo = (typeof KAM_KAKVO)[number];
 
@@ -66,6 +66,10 @@ export const IMENA_NA_KAM: Readonly<Record<KamKakvo, string>> = Object.freeze({
   // ще е в фолдър който ще се чете от ПДФ или друго, където ще пише какви са
   // вноските името и друга нужна информация."
   prodazhba: 'продажба',
+  // ПЕТИЯТ · договорът и погасителният план на кредита (резен 19). Същият
+  // механизъм, пети адрес: влиза ОТПЕЧАТЪКЪТ, не байтовете — файлът остава в
+  // Драйва (ADR-073, двете му правила за файлове).
+  kredit: 'кредит',
 });
 
 /**

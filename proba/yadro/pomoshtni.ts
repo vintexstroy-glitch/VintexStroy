@@ -83,10 +83,27 @@ async function chakayPrerisuvane(p: Page, deystvie: () => Promise<unknown>): Pro
     if (shapka) shapka.dataset['beleg'] = 'staro';
   });
   await deystvie();
-  await p.waitForFunction(() => {
-    const shapka = document.querySelector('.shapka') as HTMLElement | null;
-    return Boolean(shapka) && !shapka!.dataset['beleg'];
-  });
+  try {
+    await p.waitForFunction(() => {
+      const shapka = document.querySelector('.shapka') as HTMLElement | null;
+      return Boolean(shapka) && !shapka!.dataset['beleg'];
+    });
+  } catch {
+    // ДИАГНОЗА С ЧИСЛО, НЕ С ТАЙМАУТ (ADR-071).
+    //
+    // Дотук провалът тук се четеше само като „Timeout 30000ms exceeded" и не
+    // казваше НИЩО: изчезнала ли е шапката, или белегът е още там, тоест
+    // прерисуване изобщо не е тръгнало. Двете искат различни поправки, а
+    // съобщението беше едно и също.
+    const sastoyanie = await p.evaluate(() => {
+      const shapka = document.querySelector('.shapka') as HTMLElement | null;
+      if (!shapka) return 'шапката я НЯМА в страницата';
+      return shapka.dataset['beleg'] === 'staro'
+        ? 'белегът „staro" стои — прерисуване НЕ е тръгнало'
+        : `белегът е „${String(shapka.dataset['beleg'])}"`;
+    });
+    throw new Error(`Прерисуването не стигна до екрана · ${sastoyanie}`);
+  }
 }
 
 /**

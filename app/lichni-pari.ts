@@ -31,20 +31,22 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
-  IMENA_NA_VIDOVETE_KREDIT,
-  VIDOVE_KREDIT,
   obshtoPari,
   ostatakNaKredita,
   pogasenLiE,
   predlaganiTemi,
-  predlozhiVnoska,
   razhodnaChast,
   sborovePoTemi,
   type LichnaTema,
   type LichenKredit,
   type LichnoDvizhenie,
-  type VidKredit,
 } from '../src/domein/lichni-pari.js';
+import {
+  IMENA_NA_VIDOVETE_KREDIT,
+  predlozhiVnoska,
+  VIDOVE_KREDIT,
+  type VidKredit,
+} from '../src/domein/kredit-matematika.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { bezPrazni } from '../src/iztochnik/tablitsa.js';

@@ -129,6 +129,26 @@ export const VID = {
    * добавен веднъж, той важи за всички редове и за всяка бъдеща сделка.
    */
   etapProdazhba: 'etap-prodazhba',
+  /**
+   * КРЕДИТЪТ · договорните данни на ФИРМЕНИЯ кредит (резен 19 · ADR-079).
+   *
+   * Своя същност, не поле на проекта: един проект носи няколко кредита, а един
+   * кредит преживява проекта си. Адресът е `KRD:<id>`, и последният запис бие —
+   * поправка на лихвата е нов запис, не редакция.
+   *
+   * НЕ Е `lichenKredit`: онзи живее в ЛИЧНИЯ Журнал на Стопанина и не се вижда
+   * от никого другиго (ADR-038). Аритметиката им е обща
+   * (`kredit-matematika.ts`), Журналите — не.
+   */
+  kredit: 'kredit',
+  /**
+   * ПЛАЩАНЕТО ПО КРЕДИТ · вноската, разделена на главница · лихва · такса.
+   *
+   * ОТДЕЛНА същност от кредита, защото плащанията се ДОБАВЯТ, а договорът се
+   * ПРЕПИСВА при поправка. Слети, поправката на лихвения процент щеше да
+   * пренапише и историята на вноските.
+   */
+  plashtaneKredit: 'plashtane-kredit',
   lichno: 'lichno',
   prenos: 'prenos',
   dostap: 'dostap',
@@ -207,6 +227,8 @@ export type TipSabitie =
   | 'ПродажбаЗаписана'
   | 'ДвижениеПоПродажба'
   | 'ЕтапНаПродажбаЗаписан'
+  | 'КредитЗаписан'
+  | 'ПлащанеПоКредит'
   /** вече не се пише — стои, за да се четат старите Журнали */
   | 'ВалутаИзбрана'
   | 'Сторно';
@@ -647,6 +669,47 @@ export interface PayloadEtapNaProdazhbaZapisan {
   readonly klyuch: string;
   /** влиза ли сумата му в „проверка" */
   readonly vnoska: boolean;
+}
+
+/**
+ * КРЕДИТЪТ · договорните данни (резен 19).
+ *
+ * `ostatak_st` е остатъкът В ДЕНЯ `ot` — кредитът се вписва по средата, не от
+ * първия си ден. Оттам нататък остатъкът се СМЯТА от платените главници и
+ * няма поле (`krediti.ts`).
+ */
+export interface PayloadKreditZapisan {
+  readonly kreditId: string;
+  readonly ime: string;
+  readonly vid: string;
+  /** „започвайки от името на проекта" · празно е позволено и се КАЗВА */
+  readonly proektId: string;
+  readonly ostatak_st: number;
+  readonly ot: string;
+  readonly lihva_bp: number;
+  readonly vnoska_st: number;
+  readonly den: number;
+  /** отговорникът за вноската · „Избира се при кредита" */
+  readonly otgovornik: string;
+  /** обезпечението · за LTV; нула значи „няма число", не „нула стойност" */
+  readonly obezpechenie_st: number;
+}
+
+/**
+ * ПЛАЩАНЕТО ПО КРЕДИТ · трите части СЪБИРАТ вноската, точно.
+ *
+ * Главницата НЕ е разход — тя е движение между два джоба. Разделянето живее в
+ * товара, не в екрана, защото на него се опира и остатъкът, и Дълг/EBITDA.
+ */
+export interface PayloadPlashtanePoKredit {
+  readonly plashtaneId: string;
+  readonly kreditId: string;
+  readonly data: string;
+  readonly suma_st: number;
+  readonly glavnitsa_st: number;
+  readonly lihva_st: number;
+  readonly taksa_st: number;
+  readonly belezhka: string;
 }
 
 /**

@@ -120,6 +120,82 @@ async function danni(): Promise<DanniZaPerioda> {
   return danniZaPerioda(await deystviya.ogledalo(), OT, DO);
 }
 
+/**
+ * КРЕДИТЪТ СТИГА ЛИ ДО КОЕФИЦИЕНТИТЕ · резен 19.
+ *
+ * ═══ ЗАЩО ГО ИМА ═══
+ *
+ * `danniZaPerioda` дълго връщаше `zadalzheniya_st: 0` — закована нула, защото
+ * нямаше откъде да дойде число. Резен 19 ѝ даде източник, и СЧУПВАНЕТО НА
+ * ТОЗИ ИЗТОЧНИК МИНА: върнах нулата, цялата порта остана зелена.
+ *
+ * Значи нищо не пазеше половината от резена. Тези четири проверки я пазят, и
+ * падат с ЧИСЛА, не с „нещо не е наред".
+ */
+describe('кредитът стига до коефициентите · счупването МИНА, преди да го има', () => {
+  const KREDIT = {
+    kreditId: 'KR-1',
+    ime: 'Ипотека',
+    vid: 'ipoteka',
+    proektId: '',
+    ostatak_st: 50_000_00,
+    ot: '2026-01-15',
+    lihva_bp: 345,
+    vnoska_st: 612_34,
+    den: 15,
+    otgovornik: 'vintexstroy@gmail.com',
+    obezpechenie_st: 100_000_00,
+  };
+
+  async function sKredit(): Promise<DanniZaPerioda> {
+    const { deystviya } = stend();
+    await mesetsSChisla(deystviya);
+    await deystviya.zapishiKredit(KREDIT, { opId: 'op-kredit' });
+    return danniZaPerioda(await deystviya.ogledalo(), OT, DO);
+  }
+
+  it('ЗАДЪЛЖЕНИЯТА вече НЕ са закована нула · те са остатъчната главница', async () => {
+    expect((await danni()).zadalzheniya_st).toBe(0);
+    const d = await sKredit();
+    expect(d.zadalzheniya_st).toBe(50_000_00);
+    expect(d.obezpechenie_st).toBe(100_000_00);
+  });
+
+  it('ЛИКВИДНОСТТА спира да мълчи · тя иска и двете страни', async () => {
+    expect(smetniKoefitsient(koefitsient('likvidnost'), await danni()).zashto).toContain(
+      'Няма записани текущи задължения',
+    );
+    const s = smetniKoefitsient(koefitsient('likvidnost'), await sKredit());
+    expect(s.stoynost).toBeDefined();
+    expect(s.zashto).toBe('');
+  });
+
+  it('LTV е остатък ÷ обезпечение · и без обезпечение КАЗВА защо', async () => {
+    const s = smetniKoefitsient(koefitsient('ltv'), await sKredit());
+    // ВТОРИЯТ ПЪТ, на ръка: 50 000 ÷ 100 000 = 50,00 % = 5 000 базисни пункта.
+    expect(s.stoynost).toBe(5_000);
+    const bez = smetniKoefitsient(koefitsient('ltv'), await danni());
+    expect(bez.stoynost).toBeUndefined();
+    expect(bez.zashto).toContain('обезпечението');
+  });
+
+  it('Дълг/доход е ЗАПАС към ПОТОК · и на година се ДЕЛИ, не се умножава', async () => {
+    const d = await sKredit();
+    const s = smetniKoefitsient(koefitsient('dalg-kam-ebitda'), d);
+    const noi = d.prihod_st - d.operativni_st;
+    expect(noi).toBeGreaterThan(0);
+    // ВТОРИЯТ ПЪТ: остатък ÷ NOI, в стотни от „пъти".
+    expect(s.stoynost).toBe(Math.round((50_000_00 * 100) / noi));
+
+    expect(koefitsient('dalg-kam-ebitda').vid).toBe('zapas-kam-potok');
+    expect(mozheDaSePriravni(koefitsient('dalg-kam-ebitda'))).toBe(true);
+    // ЕДИН месец в периода → делене на 12 ÷ 1, тоест стойност × 1 ÷ 12.
+    expect(priravniKamGodina(s, 1)).toBe(Math.round(s.stoynost! / 12));
+    // И НЕ е умножение · обратната посока би дала 144 пъти по-голямо число.
+    expect(priravniKamGodina(s, 1)).not.toBe(s.stoynost! * 12);
+  });
+});
+
 describe('изборът · най-основните, без бройка', () => {
   it('всеки носи формулата НА ЕДИН РЕД (негово т.5)', () => {
     for (const k of KOEFITSIENTI) {
@@ -256,6 +332,7 @@ describe('делител нула дава ЛИПСА, не нула', () => {
     sredstva_st: 0,
     vzemaniya_st: 0,
     zadalzheniya_st: 0,
+    obezpechenie_st: 0,
     zaeti: 0,
     vsichki_obekti: 0,
     dni: 31,

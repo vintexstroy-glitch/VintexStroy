@@ -29,6 +29,7 @@ import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
 import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
+import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
@@ -70,6 +71,8 @@ import type {
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
+  PayloadKreditZapisan,
+  PayloadPlashtanePoKredit,
   PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
@@ -291,6 +294,18 @@ export interface Ogledalo {
    * (`VIDOVE_DVIZHENIE`); тази карта носи само РАСТЕЖА.
    */
   readonly etapiNaProdazhbite: ReadonlyMap<string, PayloadEtapNaProdazhbaZapisan>;
+
+  /**
+   * КРЕДИТИТЕ · договорните данни (резен 19 · ADR-079).
+   *
+   * Остатъкът НЕ е тук — той се СМЯТА от платените главници (`krediti.ts`).
+   * Записан като поле, той щеше да се разминава точно в деня, в който някой
+   * сторнира плащане.
+   */
+  readonly krediti: ReadonlyMap<string, Kredit>;
+
+  /** Плащанията по кредити · ДОБАВЯТ се; сторнираното вече го няма тук. */
+  readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -490,6 +505,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
    * СЪЩОТО, не преписано: правило 17 важи и за разсъждението.
    */
   const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
+  /**
+   * И ЧЕТВЪРТИЯТ СЪС СЪЩАТА ДУПКА · кредитът (резен 19).
+   *
+   * `КредитЗаписан` е и създаването, и поправката — точно устройството, заради
+   * което сделката възкръсваше от собствената си поправка (18б). Викането е
+   * СЪЩОТО, не преписано.
+   */
+  const stornianiKrediti = storniranite('КредитЗаписан');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -514,6 +537,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prodazhbi = new Map<string, Prodazhba>();
   const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
+  const krediti = new Map<string, Kredit>();
+  const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -949,6 +974,47 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       }
 
 
+      case 'КредитЗаписан': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · договорът идва наведнъж. `seq` се пази от
+        // ПЪРВИЯ запис, за да не мести сторното целта си (както при сделката).
+        const p = s.payload as unknown as PayloadKreditZapisan;
+        if (stornianiKrediti.has(s.sashtnost.id)) break;
+        const predishen = krediti.get(p.kreditId);
+        krediti.set(p.kreditId, {
+          id: p.kreditId,
+          seq: predishen ? predishen.seq : s.seq,
+          ime: p.ime,
+          vid: p.vid as Kredit['vid'],
+          proektId: p.proektId,
+          ostatak_st: p.ostatak_st,
+          ot: p.ot,
+          lihva_bp: p.lihva_bp,
+          vnoska_st: p.vnoska_st,
+          den: p.den,
+          otgovornik: p.otgovornik,
+          obezpechenie_st: p.obezpechenie_st,
+        });
+        break;
+      }
+
+      case 'ПлащанеПоКредит': {
+        // ДОБАВЯ СЕ · нищо не се заменя. Сторното го сваля оттук по `seq`, и
+        // остатъкът се вдига обратно САМ — той се смята от този списък.
+        const p = s.payload as unknown as PayloadPlashtanePoKredit;
+        plashtaniyaPoKrediti.push({
+          id: p.plashtaneId,
+          seq: s.seq,
+          kreditId: p.kreditId,
+          data: p.data,
+          suma_st: p.suma_st,
+          glavnitsa_st: p.glavnitsa_st,
+          lihva_st: p.lihva_st,
+          taksa_st: p.taksa_st,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
       case 'ЕтапНаПродажбаЗаписан': {
         // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · преименуване е нов запис, не втори
         // етап. Базовите седем не идват насам — те не се пишат в Журнала.
@@ -1162,6 +1228,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prodazhbi,
     dvizheniyaNaProdazhbi,
     etapiNaProdazhbite,
+    krediti,
+    plashtaniyaPoKrediti,
     pototsi,
     salda,
     dela,

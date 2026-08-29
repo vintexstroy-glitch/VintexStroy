@@ -32,6 +32,32 @@ const NAEMATEL = 'vintexstroy';
 const KOGATO = '2026-08-22T09:00:00.000Z';
 const PERIOD = '2026-08';
 
+/**
+ * ЗАПИСВА КРЕДИТ · 50 000 € остатък.
+ *
+ * Дотук числото се ПОДАВАШЕ като параметър, който никой не пълнеше. Резен 19
+ * му даде източник: остатъкът се смята от Журнала, значи и тестът минава през
+ * Вратата, вместо да си го измисли.
+ */
+async function sKredit(deystviya: Deystviya, opId = 'op-kredit'): Promise<void> {
+  await deystviya.zapishiKredit(
+    {
+      kreditId: 'k1',
+      ime: 'Ипотека · Пощенска',
+      vid: 'ipoteka',
+      proektId: '',
+      ostatak_st: 50_000_00,
+      ot: '2026-01-15',
+      lihva_bp: 345,
+      vnoska_st: 612_34,
+      den: 15,
+      otgovornik: 'vintexstroy@gmail.com',
+      obezpechenie_st: 100_000_00,
+    },
+    { opId },
+  );
+}
+
 function stend() {
   const dnevnik = new DnevnikVPametta();
   const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
@@ -253,7 +279,7 @@ describe('СРЕДСТВА · и защо не е Капитал', () => {
     );
     const o = await deystviya.ogledalo();
 
-    const kap = kapital(o, { stoynostNaSastoyanie_st: 160_700_00, kredititeOstatak_st: 50_000_00 });
+    const kap = kapital(o, { stoynostNaSastoyanie_st: 160_700_00 });
     const sre = sredstva(o, PERIOD, KOGATO);
 
     expect(kap.sbor_st).not.toBe(sre.sbor_st);
@@ -274,12 +300,10 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
       { kade: 'trezor', saldo_st: stotinki(500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
     );
+    await sKredit(deystviya);
     const o = await deystviya.ogledalo();
 
-    const p = kapital(o, {
-      stoynostNaSastoyanie_st: 160_700_00,
-      kredititeOstatak_st: 50_000_00,
-    });
+    const p = kapital(o, { stoynostNaSastoyanie_st: 160_700_00 });
 
     // ВТОРИЯТ ПЪТ, на ръка:
     //   активи      160 700 + (10 000 + 500) + 1 700
@@ -295,14 +319,50 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
     const p = kapital(await deystviya.ogledalo());
     expect(p.sastavki.find((c) => c.ime === 'Стойност на Състояние')!.suma_st).toBe(0);
     expect(p.chaka.some((c) => c.includes('Калкулатора'))).toBe(true);
-    expect(p.chaka.some((c) => c.includes('кредит'))).toBe(true);
+    // КРЕДИТИТЕ ВЕЧЕ НЕ ЧАКАТ · остатъкът се смята от Журнала (резен 19), и
+    // нула кредита значи НУЛА дълг — истинско число, не липсващо.
+    expect(p.chaka.some((c) => c.includes('кредит'))).toBe(false);
+    expect(p.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(0);
   });
 
   it('кредитът се ВАДИ — знакът е в съставката, не в сбирача', async () => {
     const { deystviya } = stend();
-    const p = kapital(await deystviya.ogledalo(), { kredititeOstatak_st: 50_000_00 });
+    await sKredit(deystviya);
+    const p = kapital(await deystviya.ogledalo());
     expect(p.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(-50_000_00);
     expect(p.sbor_st).toBe(-50_000_00);
+  });
+
+  it('платената ГЛАВНИЦА сваля дълга · сторното го вдига обратно', async () => {
+    const { deystviya } = stend();
+    await sKredit(deystviya);
+    await deystviya.zapishiPlashtanePoKredit(
+      {
+        plashtaneId: 'p1',
+        kreditId: 'k1',
+        data: '2026-02-15',
+        suma_st: 612_34,
+        glavnitsa_st: 468_59,
+        lihva_st: 143_75,
+        taksa_st: 0,
+        belezhka: '',
+      },
+      { opId: 'op-pl' },
+    );
+    const predi = await deystviya.ogledalo();
+    expect(kapital(predi).sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(
+      -(50_000_00 - 468_59),
+    );
+
+    await deystviya.storniraj(
+      'ST-K1',
+      { pogasyavaSeq: predi.plashtaniyaPoKrediti[0]!.seq, prichina: 'сгрешена дата' },
+      { opId: 'op-st' },
+    );
+    const podir = kapital(await deystviya.ogledalo());
+    // ОСТАТЪКЪТ СЕ СМЯТА · нито един ред код не го „връща" — сторнираното
+    // плащане просто вече не е в Огледалото.
+    expect(podir.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(-50_000_00);
   });
 });
 
@@ -381,10 +441,7 @@ describe('сверката вход↔изход на Капитала (прав
     );
     const o = await deystviya.ogledalo();
 
-    const r = otcheti(o, PERIOD, KOGATO, {
-      stoynostNaSastoyanie_st: 160_700_00,
-      kredititeOstatak_st: 50_000_00,
-    });
+    const r = otcheti(o, PERIOD, KOGATO, { stoynostNaSastoyanie_st: 160_700_00 });
 
     expect(r.sverka.razlika_st).toBe(0);
     expect(r.sverka.ot_sastavki_st).toBe(r.sverka.aktivi_st - r.sverka.zadalzheniya_st);

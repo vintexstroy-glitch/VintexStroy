@@ -31,8 +31,8 @@
  * важи тук ПО КОНСТРУКЦИЯ, а не защото някой го е изключил.
  */
 
-import { deliZakragleno } from '../yadro/pari.js';
 import { podravni } from './padashti-menyuta.js';
+import { proveriTriteChasti, type VidKredit } from './kredit-matematika.js';
 import type { PayloadLichnoDvizhenieZapisano } from './sabitiya.js';
 
 export class GreshkaLichniPari extends Error {
@@ -167,47 +167,20 @@ export function prihodnaChast(d: LichnoDvizhenie): number {
 /**
  * ИНВАРИАНТЪТ НА ВНОСКАТА · трите части СЪБИРАТ вноската, точно.
  *
- * Проверява се в ДОМЕЙНА, не във Вратата: Вратата знае, че числото е цяло —
- * че трите се събират до четвъртото е знание за смисъла, не за формата.
+ * Смятането живее в общия дом (`kredit-matematika.ts`) — фирменият кредит пита
+ * същото. Тук стои само разопаковането на ЛИЧНИЯ товар.
  */
 export function proveriChastite(d: PayloadLichnoDvizhenieZapisano): void {
-  const eVnoska = (d.kreditId ?? '') !== '';
-  const g = d.glavnitsa_st ?? 0;
-  const l = d.lihva_st ?? 0;
-  const t = d.taksa_st ?? 0;
-  if (!eVnoska) {
-    if (g !== 0 || l !== 0 || t !== 0) {
-      throw new GreshkaLichniPari(
-        'Главница, лихва и такса имат смисъл САМО при вноска по кредит. ' +
-          'Посочи кой кредит, или махни трите числа.',
-      );
-    }
-    return;
-  }
-  if (g < 0 || l < 0 || t < 0) {
-    throw new GreshkaLichniPari('Главница, лихва и такса не може да са отрицателни.');
-  }
-  if (g + l + t !== d.suma_st) {
-    throw new GreshkaLichniPari(
-      `Трите части не събират вноската: ${g} + ${l} + ${t} = ${g + l + t}, ` +
-        `а вноската е ${d.suma_st} (в цели центове). Вноска, чиито части не се ` +
-        'събират, поправя остатъка по кредита с грешно число.',
-    );
-  }
+  proveriTriteChasti(
+    d.suma_st,
+    d.glavnitsa_st ?? 0,
+    d.lihva_st ?? 0,
+    d.taksa_st ?? 0,
+    (d.kreditId ?? '') !== '',
+  );
 }
 
 // ── КРЕДИТЪТ ───────────────────────────────────────────────────────────────
-
-export const VIDOVE_KREDIT = ['ipoteka', 'potrebitelski', 'lizing', 'zaem'] as const;
-
-export type VidKredit = (typeof VIDOVE_KREDIT)[number];
-
-export const IMENA_NA_VIDOVETE_KREDIT: Readonly<Record<VidKredit, string>> = Object.freeze({
-  ipoteka: 'ипотечен',
-  potrebitelski: 'потребителски',
-  lizing: 'лизинг',
-  zaem: 'заем',
-});
 
 export interface LichenKredit {
   readonly kreditId: string;
@@ -220,51 +193,6 @@ export interface LichenKredit {
   readonly vnoska_st: number;
   readonly den: number;
   readonly temaId: string;
-}
-
-/** 100 % = 10 000 базисни пункта; на месец се дели на 12 → 120 000. */
-export const BAZISNI_ZA_MESETS = 120_000;
-
-/**
- * ЛИХВАТА ЗА ЕДИН МЕСЕЦ · целочислено, от остатъка.
- *
- * `остатък × годишни базисни пунктове ÷ (10 000 × 12)`
- *
- * Степенуването на анюитетната формула ИЗОБЩО не влиза тук, и това е ключът
- * към целите центове: вноската се ВЪВЕЖДА от договора — банката вече я е
- * сметнала и погасителният план е в него. Тогава месец по месец всичко е
- * цяло: лихвата от остатъка, главницата като разлика, новият остатък.
- *
- * Най-лошият реален случай не прелива: остатък 10 000 000 00 ц. (10 млн. €)
- * по 5 000 б.п. дава 5 × 10¹² — далеч под 2⁵³.
- */
-export function lihvaZaMesetsa(ostatak_st: number, lihva_bp: number): number {
-  if (!Number.isSafeInteger(ostatak_st) || !Number.isSafeInteger(lihva_bp)) {
-    throw new GreshkaLichniPari('Остатъкът е в цели центове, а лихвата — в цели базисни пунктове.');
-  }
-  if (lihva_bp < 0) throw new GreshkaLichniPari('Лихвата не може да е отрицателна.');
-  return deliZakragleno(ostatak_st * lihva_bp, BAZISNI_ZA_MESETS);
-}
-
-/**
- * КАК СЕ ДЕЛИ ЕДНА ВНОСКА · предложение, не запис (правило 18).
- *
- * Смята се от остатъка към днес; човекът вижда двете числа и записва. Ако
- * вноската е по-малка от лихвата (случва се при просрочие), главницата би
- * излязла отрицателна — вместо това цялата вноска отива в лихва и се КАЗВА.
- */
-export function predlozhiVnoska(
-  ostatak_st: number,
-  lihva_bp: number,
-  vnoska_st: number,
-): { readonly lihva_st: number; readonly glavnitsa_st: number; readonly stiga: boolean } {
-  const lihva_st = lihvaZaMesetsa(ostatak_st, lihva_bp);
-  if (lihva_st >= vnoska_st) {
-    return Object.freeze({ lihva_st: vnoska_st, glavnitsa_st: 0, stiga: false });
-  }
-  // Главницата не бива да надхвърли остатъка — последната вноска е по-малка.
-  const glavnitsa_st = Math.min(vnoska_st - lihva_st, ostatak_st);
-  return Object.freeze({ lihva_st: vnoska_st - glavnitsa_st, glavnitsa_st, stiga: true });
 }
 
 /**

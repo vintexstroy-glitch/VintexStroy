@@ -35,12 +35,9 @@ import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
-import {
-  GreshkaLichniPari,
-  napraviTema,
-  proveriChastite,
-  VIDOVE_KREDIT,
-} from './lichni-pari.js';
+import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.js';
+import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
+import { ostatakNa } from './krediti.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
@@ -89,6 +86,8 @@ import type {
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
+  PayloadKreditZapisan,
+  PayloadPlashtanePoKredit,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
@@ -1010,6 +1009,101 @@ export class Deystviya {
       'ДвижениеПоПродажба',
       VID.dvizhenieProdazhba,
       sashtnostNaDvizhenie(danni.dvizhenieId),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА КРЕДИТ · договорните данни (резен 19 · ADR-079).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата:
+   *
+   *   1. ИМЕТО не е празно · кредит без име не се различава от втори кредит
+   *      при същата банка, а вноската му отива в чужд ред;
+   *   2. ВИДЪТ е един от четирите изброени · свободна стойност би паднала ТИХО
+   *      извън всяка групировка (същият капан като при „карта", ADR-074);
+   *   3. ОСТАТЪКЪТ и ВНОСКАТА са над нула · нулева вноска дава безкраен план,
+   *      а нулев остатък — таблица от погасени договори;
+   *   4. ДЕНЯТ е между 1 и 31 · 31-ви СЪЩЕСТВУВА като падеж и се свива до
+   *      последния ден на месеца (`denNaVnoskata`). Отказ при 29–31 щеше да е
+   *      по-лесен за кода и невъзможен за човека с такъв договор.
+   *
+   * НЕ иска отключен период, и това се казва на глас: договорът не е
+   * счетоводен запис в месец. Парите влизат през ПЛАЩАНИЯТА, всяко със своята
+   * дата — там е мястото на замразяването.
+   */
+  async zapishiKredit(danni: PayloadKreditZapisan, z: Zayavka): Promise<Rezultat> {
+    if (danni.ime.trim() === '') {
+      throw new GreshkaKredit('Кредитът иска име — „Ипотека · Пощенска", за да се различава.');
+    }
+    if (!VIDOVE_KREDIT.includes(danni.vid as (typeof VIDOVE_KREDIT)[number])) {
+      throw new GreshkaKredit(
+        `Непознат вид кредит „${String(danni.vid)}". Изброените са: ${VIDOVE_KREDIT.join(' · ')}.`,
+      );
+    }
+    if (danni.ostatak_st <= 0) {
+      throw new GreshkaKredit('Остатъкът по кредита трябва да е повече от нула.');
+    }
+    if (danni.vnoska_st <= 0) {
+      throw new GreshkaKredit(
+        'Вноската трябва да е повече от нула — нулева вноска не гони остатъка ' +
+          'надолу и планът по дати няма край.',
+      );
+    }
+    if (!Number.isInteger(danni.den) || danni.den < 1 || danni.den > 31) {
+      throw new GreshkaKredit('Денят на вноската е между 1 и 31.');
+    }
+    return this.#pusni('КредитЗаписан', VID.kredit, `KRD:${danni.kreditId}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ПЛАЩАНЕ ПО КРЕДИТ · вноската, разделена на три.
+   *
+   * ТРИ ПРОВЕРКИ:
+   *
+   *   1. КРЕДИТЪТ СЪЩЕСТВУВА · плащане без кредит виси в Журнала и не сваля
+   *      ничий остатък — тиха загуба на пари от книгата;
+   *   2. ТРИТЕ ЧАСТИ СЪБИРАТ вноската · общата `proveriTriteChasti`, същата,
+   *      която пази и личния кредит (правило 17);
+   *   3. МЕСЕЦЪТ НЕ Е ЗАМРАЗЕН · за разлика от договора, плащането Е
+   *      счетоводен запис с дата и мени числата на месеца (правило 9).
+   *
+   * ГЛАВНИЦАТА НЕ БИВА да надхвърля остатъка: погасен кредит, „платен" още
+   * веднъж, би дал отрицателен дълг и Дълг/EBITDA с обърнат знак.
+   */
+  async zapishiPlashtanePoKredit(
+    danni: PayloadPlashtanePoKredit,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const kredit = o.krediti.get(danni.kreditId);
+    if (!kredit) {
+      throw new GreshkaKredit(
+        'Няма такъв кредит. Плащане без кредит не сваля ничий остатък — то е в ' +
+          'Журнала, но никъде в сметките.',
+      );
+    }
+    proveriTriteChasti(
+      danni.suma_st,
+      danni.glavnitsa_st,
+      danni.lihva_st,
+      danni.taksa_st,
+      true,
+    );
+    const ostava = ostatakNa(kredit, o.plashtaniyaPoKrediti);
+    if (danni.glavnitsa_st > ostava) {
+      throw new GreshkaKredit(
+        `Главницата ${danni.glavnitsa_st} надхвърля остатъка ${ostava} (в цели ` +
+          'центове). Кредит, платен над остатъка си, дава отрицателен дълг.',
+      );
+    }
+    proveriZamrazen(o, danni.data.slice(0, 7), z.svereno);
+    return this.#pusni(
+      'ПлащанеПоКредит',
+      VID.plashtaneKredit,
+      `PLK:${danni.plashtaneId}`,
       danni,
       z,
     );
