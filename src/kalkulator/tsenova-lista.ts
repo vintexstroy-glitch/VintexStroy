@@ -117,12 +117,25 @@ function bezopasnaPlosht(surovo: string): number {
  *
  * Затова по подразбиране излизат ДВЕТЕ, а свиването до една е действие.
  */
-export type KoyaTsena = 'dvete' | 'plosht' | 'sastoyanie';
+export type KoyaTsena = 'dvete' | 'plosht' | 'sastoyanie' | 'razhod' | 'saglasuvana';
 
+/**
+ * НАДПИСЪТ НА ПЪРВИЯ СМЕНИ СЕ, ПОВЕДЕНИЕТО МУ — НЕ (резен 16б).
+ *
+ * Дотук пишеше „и двете", когато числата бяха две. Днес са ЧЕТИРИ, и „и двете"
+ * стана лъжа по премълчаване: човек чете „двете" и мисли, че вижда всичко.
+ * Затова надписът казва КОИ две.
+ *
+ * КЛЮЧЪТ обаче остава `dvete` — той живее в паметта на екрана и смяната му би
+ * изтрила запомнения избор на всеки. Ключът е адрес, надписът е дума; те не се
+ * менят заедно.
+ */
 export const IMENA_NA_IZBORA: Readonly<Record<KoyaTsena, string>> = Object.freeze({
-  dvete: 'и двете — за сравнение',
+  dvete: 'А и Б · за сравнение',
   plosht: 'само по площ · за продажба',
   sastoyanie: 'само по състояние · оценката',
+  razhod: 'само по разход · себестойността',
+  saglasuvana: 'съгласуваната · трите, претеглени',
 });
 
 /** Двете колони, които се долепят отдясно при избор „и двете". */
@@ -163,9 +176,24 @@ export function listNaTsenite(
     redove: redove.map((r) => {
       // При „само по състояние" оценката влиза в НЕГОВАТА колона „Цена с ДДС" —
       // тя е мястото за цената, каквато и да е тя.
-      const tsena_st = koya === 'sastoyanie' ? r.sastoyanie_st : r.tsena_st;
+      // Всеки единичен избор влиза в НЕГОВАТА колона „Цена с ДДС" — тя е
+      // мястото за цената, каквато и да е тя. Хедърът му не се разширява.
+      const tsena_st =
+        koya === 'sastoyanie'
+          ? r.sastoyanie_st
+          : koya === 'razhod'
+            ? r.razhod_st
+            : koya === 'saglasuvana'
+              ? r.saglasuvana_st
+              : r.tsena_st;
       const naKvadrat_st =
-        koya === 'sastoyanie' ? r.sastoyanieNaKvadrat_st : r.evroNaKvadrat_st;
+        koya === 'sastoyanie'
+          ? r.sastoyanieNaKvadrat_st
+          : koya === 'razhod'
+            ? r.razhodNaKvadrat_st
+            : koya === 'saglasuvana'
+              ? r.saglasuvanaNaKvadrat_st
+              : r.evroNaKvadrat_st;
 
       const negovite: (string | number)[] = [
         r.obekt,

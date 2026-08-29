@@ -40,8 +40,12 @@ import {
   koefitsient,
   MATRITSA_ZA_RAZRABOTKA,
   ochakvanNaem_st,
+  ostavashti_bt,
+  saglasuvana,
+  tsenaPoRazhod,
   tsenaPoSastoyanie,
   tsenaTochno,
+  type Matritsa,
 } from '../src/kalkulator/matritsa.js';
 import {
   deystvitelenNaem_st,
@@ -449,6 +453,200 @@ describe('износът · трите избора', () => {
       const list = listNaTsenite(redove(), 'ЦЕНИ', koya);
       const ap1 = list.redove.find((r) => r[0] === 'Апартамент 1')!;
       expect(ap1[9]).toBe(PRODADEN);
+    }
+  });
+});
+
+/**
+ * ═══ В · РАЗХОДНИЯТ ПОДХОД · и съгласуването с тегла (резен 16б) ═══
+ *
+ * Инвариантите СА ПЪРВИ (умението `matematika` §6): какво трябва да е вярно
+ * ВИНАГИ, преди която и да е сметка. Пример проверява един случай; инвариант
+ * проверява правилото.
+ */
+describe('В · разходният подход', () => {
+  /** Матрица с назовани числа, за да е сметката проверима на ръка. */
+  function sVazrast(vazrast_g: number, polezen_zhivot_g = 50): Matritsa {
+    return Object.freeze({
+      ...MATRITSA_ZA_RAZRABOTKA,
+      zemya_st_kvm: Object.freeze({
+        apartament: 100_00, // 100 €/м²
+        garazh: 0,
+        parkomyasto: 0,
+        sklad: 0,
+        drug: 0,
+      }),
+      stroitelna_st_kvm: Object.freeze({
+        apartament: 900_00, // 900 €/м²
+        garazh: 0,
+        parkomyasto: 0,
+        sklad: 0,
+        drug: 0,
+      }),
+      polezen_zhivot_g,
+      vazrast_g,
+    });
+  }
+  const STO_KVM = 1_000_000; // 100 м² в кв.см
+
+  it('нова сграда · пълна строителна стойност + земята', () => {
+    // 100 м² × (100 + 900) €/м² = 100 000 €
+    expect(tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(0) }))
+      .toBe(100_000_00);
+  });
+
+  it('на ПОЛОВИН живот сградата е наполовина · земята е ЦЯЛА', () => {
+    // 100 м² × (100 + 450) = 55 000 €, не 50 000 — земята не овехтява
+    expect(tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(25) }))
+      .toBe(55_000_00);
+  });
+
+  it('ЗЕМЯТА НЕ ОВЕХТЯВА · разликата между две възрасти е точно сградата', () => {
+    const nova = tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(0) });
+    const stara = tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(50) });
+    // Цялата строителна част: 100 м² × 900 € = 90 000 €
+    expect(nova - stara).toBe(90_000_00);
+    // А останалото Е земята, до последната стотинка.
+    expect(stara).toBe(10_000_00);
+  });
+
+  it('възраст НАД полезния живот не прави сградата отрицателна · остава земята', () => {
+    expect(tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(999) }))
+      .toBe(10_000_00);
+  });
+
+  it('нулева площ дава нула · това е отговор, не грешка', () => {
+    expect(tsenaPoRazhod({ obshta_kvsm: 0, vid: 'apartament', matritsa: sVazrast(0) })).toBe(0);
+  });
+
+  it('полезен живот нула се ОТКАЗВА гласно · нула не дели', () => {
+    expect(() =>
+      tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(0, 0) }),
+    ).toThrow();
+  });
+
+  it('резултатът е ЦЕЛИ центове · нито един float', () => {
+    for (const kvsm of [1, 7, 333, 784_000, 1_234_567]) {
+      const st = tsenaPoRazhod({ obshta_kvsm: kvsm, vid: 'apartament', matritsa: sVazrast(17) });
+      expect(Number.isSafeInteger(st), `${kvsm} кв.см`).toBe(true);
+    }
+  });
+
+  it('останалото от сградата се БРОИ и от екрана · един дом', () => {
+    expect(ostavashti_bt(sVazrast(0))).toBe(EDINITSA_BT);
+    expect(ostavashti_bt(sVazrast(25))).toBe(EDINITSA_BT / 2);
+    expect(ostavashti_bt(sVazrast(50))).toBe(0);
+    expect(ostavashti_bt(sVazrast(999))).toBe(0);
+  });
+});
+
+describe('съгласуването · претеглената цена от трите', () => {
+  const RAVNI = Object.freeze({ pazaren_bt: 3_000, dohoden_bt: 4_000, razhoden_bt: 3_000 });
+
+  it('ТРИ РАВНИ стойности дават ТОЧНО същата стойност · каквито и да са теглата', () => {
+    for (const tegla of [
+      RAVNI,
+      { pazaren_bt: 7_000, dohoden_bt: 2_000, razhoden_bt: 1_000 },
+      { pazaren_bt: 10_000, dohoden_bt: 0, razhoden_bt: 0 },
+    ]) {
+      const r = saglasuvana({
+        pazaren_st: 123_456_78,
+        dohoden_st: 123_456_78,
+        razhoden_st: 123_456_78,
+        tegla,
+      });
+      expect(r.tochno_st).toBe(123_456_78);
+    }
+  });
+
+  it('тегло 100 % на един подход връща ТОЧНО него', () => {
+    const r = saglasuvana({
+      pazaren_st: 200_000_00,
+      dohoden_st: 50_000_00,
+      razhoden_st: 90_000_00,
+      tegla: { pazaren_bt: 10_000, dohoden_bt: 0, razhoden_bt: 0 },
+    });
+    expect(r.tochno_st).toBe(200_000_00);
+  });
+
+  it('сбор на теглата, различен от 100 %, се ОТКАЗВА · не се пренормира тихо', () => {
+    expect(() =>
+      saglasuvana({
+        pazaren_st: 100_00,
+        dohoden_st: 100_00,
+        razhoden_st: 100_00,
+        tegla: { pazaren_bt: 5_000, dohoden_bt: 4_000, razhoden_bt: 2_000 },
+      }),
+    ).toThrow();
+  });
+
+  it('НУЛЕВИЯТ подход отпада и теглата се ПРЕНОРМИРАТ · не се яде мълчаливо', () => {
+    // Обект без наем: Б е нула. Ако нулата влезеше с теглото си, цената щеше да
+    // падне с 20 % без никой да е решавал.
+    const r = saglasuvana({
+      pazaren_st: 100_000_00,
+      dohoden_st: 0,
+      razhoden_st: 100_000_00,
+      tegla: { pazaren_bt: 7_000, dohoden_bt: 2_000, razhoden_bt: 1_000 },
+    });
+    expect(r.tochno_st).toBe(100_000_00);
+    expect(r.otpadnali).toEqual(['доходен']);
+  });
+
+  it('пренормираните тегла пак затварят на 100 % · до последната точка', () => {
+    // 7 000 и 1 000 към сбор 8 000 дават 8 750 и 1 250 — остатъкът е назован.
+    const r = saglasuvana({
+      pazaren_st: 100_000_00,
+      dohoden_st: 0,
+      razhoden_st: 50_000_00,
+      tegla: { pazaren_bt: 7_000, dohoden_bt: 2_000, razhoden_bt: 1_000 },
+    });
+    const d = r.deystvashti;
+    expect(d.pazaren_bt + d.dohoden_bt + d.razhoden_bt).toBe(EDINITSA_BT);
+    expect(d.dohoden_bt).toBe(0);
+    expect(r.tochno_st).toBe(93_750_00);
+  });
+
+  it('остатъкът от пренормирането отива на НАЙ-ГОЛЯМОТО тегло, а не се губи', () => {
+    // Три равни тегла върху два оцелели: 5 000 и 5 000 затварят точно.
+    // Тук: 3 333 · 3 333 · 3 334 върху три оцелели.
+    const r = saglasuvana({
+      pazaren_st: 1_00,
+      dohoden_st: 1_00,
+      razhoden_st: 1_00,
+      tegla: { pazaren_bt: 3_333, dohoden_bt: 3_333, razhoden_bt: 3_334 },
+    });
+    const d = r.deystvashti;
+    expect(d.pazaren_bt + d.dohoden_bt + d.razhoden_bt).toBe(EDINITSA_BT);
+  });
+
+  it('ВСИЧКИ нули дават нула и празни тегла · не гърми', () => {
+    const r = saglasuvana({ pazaren_st: 0, dohoden_st: 0, razhoden_st: 0, tegla: RAVNI });
+    expect(r.tochno_st).toBe(0);
+    expect(r.otpadnali).toEqual(['пазарен', 'доходен', 'разходен']);
+  });
+
+  it('съгласуваната стои МЕЖДУ най-малката и най-голямата · претегляне не излиза вън', () => {
+    const st = [80_000_00, 120_000_00, 95_000_00];
+    const r = saglasuvana({
+      pazaren_st: st[0]!,
+      dohoden_st: st[1]!,
+      razhoden_st: st[2]!,
+      tegla: RAVNI,
+    });
+    expect(r.tochno_st).toBeGreaterThanOrEqual(Math.min(...st));
+    expect(r.tochno_st).toBeLessThanOrEqual(Math.max(...st));
+  });
+
+  it('резултатът е ЦЕЛИ центове · нито един float', () => {
+    for (const p of [1, 7, 12_345_67, 999_999_99]) {
+      const r = saglasuvana({
+        pazaren_st: p,
+        dohoden_st: p * 2,
+        razhoden_st: p + 13,
+        tegla: { pazaren_bt: 3_333, dohoden_bt: 3_333, razhoden_bt: 3_334 },
+      });
+      expect(Number.isSafeInteger(r.tochno_st), String(p)).toBe(true);
     }
   });
 });

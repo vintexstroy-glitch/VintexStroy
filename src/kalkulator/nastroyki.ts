@@ -320,6 +320,87 @@ export function klas(klyuch: string): Klas {
   return KLASOVE.find((k) => k.klyuch === klyuch) ?? KLASOVE[0]!;
 }
 
+// ── СЪГЛАСУВАНЕТО · трите подхода се ПРЕТЕГЛЯТ, не се избира един ──────────
+
+/**
+ * СЛУЧАЯТ · кой набор тегла важи за тази партида.
+ *
+ * От методологията (`docs/otcheti/kalkulator-metodologii.md` §2.4):
+ * „Професионалната практика не избира един подход, а ги ПРЕТЕГЛЯ."
+ *
+ * ЗАЩО ЕДИН СЛУЧАЙ ЗА ЦЯЛАТА ПАРТИДА, а не по обект. Негово решение (28.08).
+ * Приложението може да ПОЗНАЕ по данните — обект с наем в Журнала прилича на
+ * „под наем" — но гадането по данните вече се счупи веднъж (ADR-014), а тук
+ * сгрешеният случай мени ЦЕНАТА с десетки проценти. Един избор на човек за
+ * цялата сграда е по-честен от три познати.
+ *
+ * ЧИСЛАТА СА НА ЗАНАЯТА, не негови. Той ги мени с трите полета до менюто, и
+ * §6 на отчета го казва изрично: „теглата при съгласуването · негова преценка
+ * кой подход води". Затова изборът СЕМЕНИ теглата, а не ги заковава.
+ */
+interface Sluchay {
+  readonly klyuch: string;
+  readonly ime: string;
+  /** пазарен · доходен · разходен, в базисни точки · сборът им е 10 000 */
+  readonly pazaren_bt: number;
+  readonly dohoden_bt: number;
+  readonly razhoden_bt: number;
+  readonly zashto: string;
+}
+
+export const SLUCHAI: readonly Sluchay[] = Object.freeze([
+  Object.freeze({
+    klyuch: 'prodazhba',
+    ime: 'жилище за продажба',
+    pazaren_bt: 7_000,
+    dohoden_bt: 2_000,
+    razhoden_bt: 1_000,
+    zashto: 'Купувачът плаща пазарна цена; доходът и себестойността само подпират.',
+  }),
+  Object.freeze({
+    klyuch: 'naem',
+    ime: 'обект под наем',
+    pazaren_bt: 3_000,
+    dohoden_bt: 6_000,
+    razhoden_bt: 1_000,
+    zashto: 'Доходът води: обектът се държи за наема, не за препродажба.',
+  }),
+  Object.freeze({
+    klyuch: 'novo',
+    ime: 'ново строителство',
+    pazaren_bt: 4_000,
+    dohoden_bt: 1_000,
+    razhoden_bt: 5_000,
+    zashto: 'Себестойността е известна и прясна; доход още няма.',
+  }),
+]);
+
+export function sluchay(klyuch: string): Sluchay {
+  return SLUCHAI.find((s) => s.klyuch === klyuch) ?? SLUCHAI[0]!;
+}
+
+/** Трите тегла, в реда на подходите. Сборът им е ЗАКОН, не пожелание. */
+export interface Tegla {
+  readonly pazaren_bt: number;
+  readonly dohoden_bt: number;
+  readonly razhoden_bt: number;
+}
+
+/** Теглата на един случай — за семенето при смяна на менюто. */
+function teglaNaSluchaya(klyuch: string): Tegla {
+  const s = sluchay(klyuch);
+  return Object.freeze({
+    pazaren_bt: s.pazaren_bt,
+    dohoden_bt: s.dohoden_bt,
+    razhoden_bt: s.razhoden_bt,
+  });
+}
+
+/** Сборът на трите · един дом, за да не се смята на четири места. */
+export function sboratNaTeglata(t: Tegla): number {
+  return t.pazaren_bt + t.dohoden_bt + t.razhoden_bt;
+}
+
 // ── НАСТРОЙКИТЕ · всичко, което сметката иска, на едно място ───────────────
 
 export interface Nastroyki {
@@ -339,6 +420,24 @@ export interface Nastroyki {
   readonly operativni_bt: number;
   /** очакван наем в центове на кв.м на месец · ползва се само без Журнал */
   readonly naem_st_kvm: Readonly<Record<VidObekt, number>>;
+  /**
+   * В · РАЗХОДНИЯТ подход · земята в центове за квадратен метър ОБЩА площ.
+   *
+   * Земята се отнася КЪМ ПЛОЩТА на обекта, а не се дели на брой апартаменти:
+   * така един голям и един малък апартамент носят различна част от парцела,
+   * каквото и е. ЗЕМЯТА НЕ ОВЕХТЯВА — вж. `tsenaPoRazhod`.
+   */
+  readonly zemya_st_kvm: Readonly<Record<VidObekt, number>>;
+  /** В · себестойността на СТРОИТЕЛСТВОТО в центове за кв.м · тя овехтява */
+  readonly stroitelna_st_kvm: Readonly<Record<VidObekt, number>>;
+  /** В · полезният живот на сградата в цели години · занаятът дава 60–80 */
+  readonly polezen_zhivot_g: number;
+  /** В · възрастта на СГРАДАТА в цели години · свойство на партидата, не на обекта */
+  readonly vazrast_g: number;
+  /** кой набор тегла важи · семени `tegla`, после то се редактира */
+  readonly sluchay: string;
+  /** трите тегла на съгласуването · сборът им е точно 10 000 б.т. */
+  readonly tegla: Tegla;
 }
 
 /**
@@ -384,6 +483,28 @@ export function bazataENegova(vid: VidObekt): boolean {
 }
 
 /**
+ * КОИ ПАРАМЕТРИ НА РАЗХОДНИЯ ПОДХОД СА НЕГОВИ · днес НИТО ЕДИН.
+ *
+ * Празният списък не е пропуск, а СЪСТОЯНИЕ, и то се БРОИ: земята, строителната
+ * себестойност, полезният живот и възрастта на сградата са пазарно и техническо
+ * знание за НЕГОВИЯ обект, и не стоят в нито едно негово изречение.
+ *
+ * Същият похват като `NEGOVI_BAZI` (ADR-067) и по същата причина: изречение в
+ * коментар не пада на червено, когато някой го надживее. Екранът чете оттук и
+ * пише статуса до всяко поле; тестът сверява двете. **Ново негово число значи
+ * ЕДИН ред тук** — и екранът го казва сам, без да се пипа разметка.
+ *
+ * Теглата НЕ са в този списък и това е нарочно: те са в `SLUCHAI` с думите на
+ * занаята, а отчетът §6 ги брои сред „какво остава негово" отделно.
+ */
+const NEGOVI_PARAMETRI: readonly string[] = Object.freeze([]);
+
+/** Негово ли е това число · за екрана и за теста, с ЕДНА дума. */
+export function parametaraENegov(klyuch: string): boolean {
+  return NEGOVI_PARAMETRI.includes(klyuch);
+}
+
+/**
  * НАСТРОЙКИТЕ, С КОИТО ТРЪГВА ЕКРАНЪТ · и те НЕ са от една кофа.
  *
  * Базата за АПАРТАМЕНТ е **3 000 €/м²** — НЕГОВО число (И53 · И55), проверено
@@ -420,6 +541,26 @@ export const PO_PODRAZBIRANE: Nastroyki = Object.freeze({
     sklad: 100,
     drug: 850,
   }),
+  // В · РАЗХОДНИЯТ подход · шест числа, и ВСИЧКИТЕ са наши за разработка.
+  // Кои са негови, казва `NEGOVI_CHISLA` — списък, който се брои.
+  zemya_st_kvm: Object.freeze({
+    apartament: 60_000, // 600 €/м² · парцелът, отнесен към площта
+    garazh: 20_000,
+    parkomyasto: 30_000,
+    sklad: 25_000,
+    drug: 60_000,
+  }),
+  stroitelna_st_kvm: Object.freeze({
+    apartament: 120_000, // 1 200 €/м² · груб строеж + довършване
+    garazh: 60_000,
+    parkomyasto: 40_000,
+    sklad: 70_000,
+    drug: 120_000,
+  }),
+  polezen_zhivot_g: 70,
+  vazrast_g: 0, // „Малинова Долина" е нова — сградата не е овехтяла
+  sluchay: 'novo',
+  tegla: Object.freeze({ pazaren_bt: 4_000, dohoden_bt: 1_000, razhoden_bt: 5_000 }),
 });
 
 // ── РЕДАКЦИЯТА · и границите, които пазят сметката ─────────────────────────
@@ -453,6 +594,48 @@ export function proveriNastroyki(n: Nastroyki): readonly string[] {
   if (n.operativni_bt < 0 || n.operativni_bt >= EDINITSA_BT) {
     nahodki.push('Оперативните разходи са дял от наема — между 0 и 100 %.');
   }
+  // В · РАЗХОДНИЯТ подход. Нулева земя и нулево строителство са допустими —
+  // тогава подходът просто дава нула и се изключва от съгласуването. Полезен
+  // живот нула обаче дели на нула.
+  for (const [vid, st] of Object.entries(n.zemya_st_kvm)) {
+    if (!Number.isSafeInteger(st) || st < 0) {
+      nahodki.push(`Земята за „${vid}" трябва да е цяло число от нула нагоре; получено: ${st}`);
+    }
+  }
+  for (const [vid, st] of Object.entries(n.stroitelna_st_kvm)) {
+    if (!Number.isSafeInteger(st) || st < 0) {
+      nahodki.push(
+        `Строителната стойност за „${vid}" трябва да е цяло число от нула нагоре; получено: ${st}`,
+      );
+    }
+  }
+  if (!Number.isSafeInteger(n.polezen_zhivot_g) || n.polezen_zhivot_g <= 0) {
+    nahodki.push('Полезният живот е в цели години над нула — нула не дели.');
+  }
+  if (!Number.isSafeInteger(n.vazrast_g) || n.vazrast_g < 0) {
+    nahodki.push('Възрастта на сградата е в цели години от нула нагоре.');
+  }
+
+  // СЪГЛАСУВАНЕТО · сборът на теглата е ЗАКОН, не пожелание (`matematika` §2).
+  // Тегло, което не затваря, е тихо изгубено число — а тук изгубеното тегло е
+  // изгубени проценти от цената.
+  const sbor = sboratNaTeglata(n.tegla);
+  for (const [ime, bt] of [
+    ['пазарен', n.tegla.pazaren_bt],
+    ['доходен', n.tegla.dohoden_bt],
+    ['разходен', n.tegla.razhoden_bt],
+  ] as const) {
+    if (!Number.isSafeInteger(bt) || bt < 0 || bt > EDINITSA_BT) {
+      nahodki.push(`Теглото „${ime}" е дял — между 0 и 100 %; получено: ${vProtsent(bt)}`);
+    }
+  }
+  if (sbor !== EDINITSA_BT) {
+    nahodki.push(
+      `Трите тегла дават ${vProtsent(sbor)}, а трябва точно 100 %. ` +
+        `Разликата е ${vProtsent(sbor - EDINITSA_BT)} и тя няма къде да отиде.`,
+    );
+  }
+
   for (const k of KOEFITSIENTI) {
     const s = stapka(k, n.izbrani[k.klyuch]);
     if (s.bt < NAY_MALAK_BT || s.bt > NAY_GOLYAM_BT) {
@@ -498,6 +681,54 @@ export function sBaza(n: Nastroyki, vid: VidObekt, baza_st: number): Nastroyki {
     throw new GreshkaNastroyki(`Базата се дава в цели центове над нула; получено: ${baza_st}`);
   }
   return Object.freeze({ ...n, baza_st: Object.freeze({ ...n.baza_st, [vid]: baza_st }) });
+}
+
+/** Сменя земята или строителната стойност за един вид обект (В · разходният). */
+export function sRazhodnoChislo(
+  n: Nastroyki,
+  koe: 'zemya' | 'stroitelna',
+  vid: VidObekt,
+  st: number,
+): Nastroyki {
+  if (!Number.isSafeInteger(st) || st < 0) {
+    throw new GreshkaNastroyki(`Числото се дава в цели центове от нула нагоре; получено: ${st}`);
+  }
+  const pole = koe === 'zemya' ? 'zemya_st_kvm' : 'stroitelna_st_kvm';
+  return Object.freeze({ ...n, [pole]: Object.freeze({ ...n[pole], [vid]: st }) });
+}
+
+/**
+ * СМЕНЯ СЛУЧАЯ · и СЕМЕНИ трите тегла с неговите (резен 16б).
+ *
+ * Същият похват като `sKlas`: изборът на дума носи готови числа, а човекът ги
+ * мени после. Инак менюто щеше да е надпис — избор, който нищо не прави.
+ */
+export function sSluchay(n: Nastroyki, klyuch: string): Nastroyki {
+  const s = sluchay(klyuch);
+  return Object.freeze({ ...n, sluchay: s.klyuch, tegla: teglaNaSluchaya(s.klyuch) });
+}
+
+/**
+ * СМЕНЯ ЕДНО тегло · и НЕ пипа другите две.
+ *
+ * Сборът НАРОЧНО не се пренормира тук. Човек, който вдига пазарното от 40 на
+ * 50, минава през състояние, в което трите дават 110 % — и екранът го КАЗВА,
+ * вместо да отнеме мълчаливо от другите. Тихото пренормиране би сменило число,
+ * което човекът не е пипал, и той никога няма да разбере къде е отишло.
+ */
+export function sTeglo(n: Nastroyki, koe: keyof Tegla, bt: number): Nastroyki {
+  if (!Number.isSafeInteger(bt) || bt < 0 || bt > EDINITSA_BT) {
+    throw new GreshkaNastroyki(`Теглото е дял между 0 и 100 %; получено: ${bt} б.т.`);
+  }
+  return Object.freeze({ ...n, tegla: Object.freeze({ ...n.tegla, [koe]: bt }) });
+}
+
+/** Сменя цяло число години (полезен живот · възраст на сградата). */
+export function sGodini(n: Nastroyki, koe: 'polezen_zhivot_g' | 'vazrast_g', g: number): Nastroyki {
+  if (!Number.isSafeInteger(g) || g < 0) {
+    throw new GreshkaNastroyki(`Годините са цяло число от нула нагоре; получено: ${g}`);
+  }
+  return Object.freeze({ ...n, [koe]: g });
 }
 
 // ── МОСТЪТ КЪМ ДВИГАТЕЛЯ ───────────────────────────────────────────────────
@@ -584,6 +815,12 @@ export function matritsaOtNastroyki(n: Nastroyki): Matritsa {
     // Какво важи, когато файлът мълчи · думата на човека от менюто.
     podrazbiran_etazh_bt: stapka(koefitsient('etazh'), n.izbrani.etazh).bt,
     podrazbirano_izlozhenie_bt: stapka(koefitsient('izlozhenie'), n.izbrani.izlozhenie).bt,
+    // В · разходният подход и съгласуването · пренасят се както са.
+    zemya_st_kvm: n.zemya_st_kvm,
+    stroitelna_st_kvm: n.stroitelna_st_kvm,
+    polezen_zhivot_g: n.polezen_zhivot_g,
+    vazrast_g: n.vazrast_g,
+    tegla: n.tegla,
   });
 }
 

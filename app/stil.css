@@ -1065,9 +1065,12 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   min-width: 700px;
 }
 /* Стойност на Състояние · Калкулаторът */
+/* ЕДИНАЙСЕТ КОЛОНИ от резен 16б: трите подхода плюс съгласуваната. Решетката
+   се брои с колоните в `koloniNaObektite` — разминат брой оставя клетки да
+   преливат на втори ред, а сборът долу да се измести с една колона. */
 .glava.stoynost, .red.stoynost {
-  grid-template-columns: minmax(0, 320px) 130px 84px 84px 96px 118px 128px 128px 78px;
-  min-width: 1040px;
+  grid-template-columns: minmax(0, 320px) 130px 84px 84px 96px 118px 128px 128px 78px 128px 140px;
+  min-width: 1320px;
 }
 
 /* ── Личният таб · преносът и достъпите (И98 · И99) ─────────────────── */

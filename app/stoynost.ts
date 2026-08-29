@@ -59,7 +59,7 @@ import {
   sektsiyaKalkulator,
   zakachiKalkulator,
 } from './kalkulator.js';
-import { matritsaOtNastroyki } from '../src/kalkulator/nastroyki.js';
+import { matritsaOtNastroyki, sluchay } from '../src/kalkulator/nastroyki.js';
 import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -143,6 +143,26 @@ export function narisuvayStoynost(): string {
             : 'оценката · годишен наем ÷ доходност'
         }</span>
       </div>
+      <div class="plochka golyama" data-pole="stoynost-v">
+        <span class="etiket">В · по разход</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.razhod_st) : '—'}</span>
+        <span class="pod">${
+          smetnato
+            ? `земя + строителство − овехтяване · закръглено ${sZnak(smetnato.razlika_razhod_st)}`
+            : 'себестойността · земята НЕ овехтява'
+        }</span>
+      </div>
+      <div class="plochka golyama" data-pole="stoynost-saglasuvana">
+        <span class="etiket">Съгласуваната</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.saglasuvana_st) : '—'}</span>
+        <span class="pod">${
+          smetnato
+            ? `${ekraniraj(sluchay(n.sluchay).ime)} · ${vProtsent(n.tegla.pazaren_bt)} / ${vProtsent(
+                n.tegla.dohoden_bt,
+              )} / ${vProtsent(n.tegla.razhoden_bt)} · закръглено ${sZnak(smetnato.razlika_saglasuvana_st)}`
+            : 'трите подхода, претеглени'
+        }</span>
+      </div>
       <div class="plochka">
         <span class="etiket">Матрица</span>
         <span class="chislo malka" translate="no">${ekraniraj(n.rayon)}</span>
@@ -164,7 +184,7 @@ export function narisuvayStoynost(): string {
         <label class="pole tyasno">
           <span>Кои цени се пускат</span>
           <select translate="no" id="koya-tsena">
-            ${(['dvete', 'plosht', 'sastoyanie'] as const)
+            ${(['dvete', 'plosht', 'sastoyanie', 'razhod', 'saglasuvana'] as const)
               .map(
                 (k) =>
                   `<option value="${k}"${k === koyaTsena ? ' selected' : ''}>${IMENA_NA_IZBORA[k]}</option>`,
@@ -182,7 +202,11 @@ export function narisuvayStoynost(): string {
       <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
       <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
-      <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
+      <p class="drebno"><b>А продава, Б оценява, В казва колко струва да се построи.</b>
+      Съгласуваната ги ПРЕТЕГЛЯ по избрания случай — „професионалната практика не избира
+      един подход, а ги претегля". Подход с нулева стойност отпада и теглото му се
+      пренормира; редът го КАЗВА, вместо цената да падне мълчаливо.</p>
+    <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
     </section>
 
     ${smetnato ? tablitsaNaStoynostta(smetnato) : ''}`;
@@ -205,6 +229,13 @@ export function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove']
     { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
     { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
     { klyuch: 'delta', ime: 'Разлика', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+    { klyuch: 'v', ime: 'В · по разход', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.razhod_st) },
+    {
+      klyuch: 'saglasuvana',
+      ime: 'Съгласувана',
+      vid: 'evro',
+      vzemi: (r) => (r.prodaden ? '' : r.saglasuvana_st),
+    },
   ];
 }
 
@@ -234,6 +265,8 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
           <span class="suma plateno" data-st="${s.obshto_st}">${pishi(s.obshto_st)}</span>
           <span class="suma plateno" data-st="${s.sastoyanie_st}">${pishi(s.sastoyanie_st)}</span>
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
+          <span class="suma plateno" data-st="${s.razhod_st}">${pishi(s.razhod_st)}</span>
+          <span class="suma plateno" data-st="${s.saglasuvana_st}">${pishi(s.saglasuvana_st)}</span>
         </div>
       </div>
       ${redZaSkritoto(f, 'stoynost')}
@@ -263,6 +296,20 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
         r.prodaden ? '' : pishi(r.sastoyanie_st)
       }</span>
       <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.razhod_st}"`}>${
+        r.prodaden ? '' : pishi(r.razhod_st)
+      }</span>
+      <span class="kletka suma"${r.prodaden ? '' : ` data-st="${r.saglasuvana_st}"`}>${
+        r.prodaden
+          ? ''
+          : `<span>${pishi(r.saglasuvana_st)}</span>${
+              // ОТПАДНАЛИЯТ ПОДХОД СЕ КАЗВА НА РЕДА · инак теглото му се яде и
+              // цената пада, без нищо на екрана да го обяснява (правило 15).
+              r.otpadnali.length
+                ? `<span class="znachka tiha" data-otpadnali>без ${ekraniraj(r.otpadnali.join(' · '))}</span>`
+                : ''
+            }`
+      }</span>
     </div>`;
 }
 

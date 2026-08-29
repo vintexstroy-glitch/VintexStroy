@@ -160,15 +160,16 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.red.kalk-koef select[data-koef] option',
         (o) => o.every((x) => /[А-Яа-я]/.test(x.textContent))), true);
 
-    // КАК СЕ СМЯТА · двете графи, ред по ред
-    proveri('двете графи стоят една до друга',
-      await p.$$eval('.dve-grafi .grafa', (r) => r.length), 2);
-    const grafaA = await p.$eval('.dve-grafi .grafa:first-child', (e) => e.textContent);
+    // КАК СЕ СМЯТА · графите, ред по ред. От резен 16б са ЧЕТИРИ: трите
+    // подхода на занаята плюс съгласуването между тях.
+    proveri('четирите графи стоят една до друга',
+      await p.$$eval('.dve-grafi .grafa', (r) => r.length), 4);
+    const grafaA = await p.$eval('.dve-grafi .grafa:nth-child(1)', (e) => e.textContent);
     proveri('Графа А тръгва от площ × база', grafaA.includes('площ × база'), true);
     proveri('и всеки от петте коефициента е СВОЙ ред',
       ['етаж', 'състояние', 'изложение', 'възраст', 'асансьор']
         .every((d) => grafaA.includes(d)), true);
-    const grafaB = await p.$eval('.dve-grafi .grafa:last-child', (e) => e.textContent);
+    const grafaB = await p.$eval('.dve-grafi .grafa:nth-child(2)', (e) => e.textContent);
     proveri('Графа Б показва четирите си стъпки',
       ['годишен наем', 'заетост', 'нетен оперативен доход', 'доходност']
         .every((d) => grafaB.includes(d)), true);
@@ -269,6 +270,106 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('новата база на гаража се помни',
       (await p.$eval('[data-baza=garazh]', (e) => (e as HTMLInputElement).value.replace(/\s/g, ''))).startsWith('1200'),
       true);
+
+    // ══ 89 · В · РАЗХОДНИЯТ подход и СЪГЛАСУВАНЕТО (резен 16б) ═══════════════
+    //
+    // Методологията от 23.08 описва ТРИ подхода и претеглената сметка; кодът
+    // правеше два. Отчетът обещаваше нещо, което кодът не изпълняваше.
+    razdel = '89 · В · разходният подход';
+    proveri('всеки вид има поле за земя и за строителна стойност',
+      await p.$$eval('[data-razhod]', (e) => e.length), 10);
+    proveri('и до всяко пише, че числото чака него',
+      (await tekstNa(p, '[data-sektsiya=kalk-razhod]')).includes('чака него'), true);
+    proveri('плочката В показва число',
+      (await chisloNaPoleto(p, 'stoynost-v')) > 0, true);
+    proveri('и КАЗВА закръглянето си, както А и Б',
+      (await tekstNa(p, '[data-pole=stoynost-v] .pod')).includes('закръглено'), true);
+
+    // ЗЕМЯТА НЕ ОВЕХТЯВА · мери се на живо, не се чете от надпис.
+    const predVazrastta = await chisloNaPoleto(p, 'stoynost-v');
+    await deystvieSPrerisuvane(p, async () => {
+      await p.fill('#kalk-vazrast', '35');
+      await p.dispatchEvent('#kalk-vazrast', 'change');
+    });
+    const sledVazrastta = await chisloNaPoleto(p, 'stoynost-v');
+    proveri('по-стара сграда дава по-ниска разходна стойност',
+      sledVazrastta < predVazrastta, true);
+    proveri('и екранът казва колко от сградата остава',
+      (await tekstNa(p, '[data-ostavashti]')).includes('%'), true);
+
+    // ЗЕМЯТА НЕ ОВЕХТЯВА · и това се мери при ИЗЧЕРПАН живот, не при среден.
+    //
+    // ПЛАТЕНО С ФАЛШИВА ЗЕЛЕНА: първата версия питаше „по-ниско, но не нула" на
+    // средна възраст. Счупих сметката да яде и земята — и проходът МИНА, защото
+    // на 35 от 70 години и двете формули дават нещо между нулата и цялото.
+    // „По-малко, но не нула" не различава оцеляла земя от свита земя.
+    //
+    // Тук животът се изчерпва НАПЪЛНО: сградата отива на нула и остава САМО
+    // земята. Изяде ли я множителят, числото пада на нула и проверката го
+    // хваща с число, не с усещане.
+    await deystvieSPrerisuvane(p, async () => {
+      await p.fill('#kalk-vazrast', '70');
+      await p.dispatchEvent('#kalk-vazrast', 'change');
+    });
+    proveri('при ИЗЧЕРПАН полезен живот от сградата не остава нищо',
+      (await tekstNa(p, '[data-ostavashti]')).includes('0,00 %'), true);
+    proveri('но В пак е НАД нулата · земята не овехтява',
+      (await chisloNaPoleto(p, 'stoynost-v')) > 0, true);
+    // ЧАКА СЕ САМАТА СТОЙНОСТ, не прерисуването · същият капан като при базите
+    // в §84: полето се пренаписва СЛЕД записа в паметта, и попълване веднага
+    // след предишното прерисуване пише в възел, който вече е сменен.
+    await p.fill('#kalk-vazrast', '0');
+    await p.dispatchEvent('#kalk-vazrast', 'change');
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-ostavashti]')?.textContent ?? '').includes('100,00'));
+    proveri('връщането връща същото число',
+      await chisloNaPoleto(p, 'stoynost-v'), predVazrastta);
+
+    razdel = '89 · съгласуването · трите тегла';
+    proveri('трите тегла имат поле', await p.$$eval('[data-teglo]', (e) => e.length), 3);
+    proveri('сборът им се ПОКАЗВА и затваря',
+      (await tekstNa(p, '[data-sbor-tegla]')).includes('затваря'), true);
+    const predSluchaya = await p.$eval('[data-teglo=razhoden_bt]', (e) => (e as HTMLInputElement).value);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#kalk-sluchay', 'naem'));
+    proveri('смяната на СЛУЧАЯ сменя теглата',
+      (await p.$eval('[data-teglo=razhoden_bt]', (e) => (e as HTMLInputElement).value)) !== predSluchaya,
+      true);
+    proveri('и съгласуваната плочка показва избрания случай',
+      (await tekstNa(p, '[data-pole=stoynost-saglasuvana] .pod')).includes('под наем'), true);
+
+    // СБОР, РАЗЛИЧЕН ОТ 100 %, се КАЗВА · не се пренормира мълчаливо.
+    await deystvieSPrerisuvane(p, async () => {
+      await p.fill('[data-teglo=pazaren_bt]', '80');
+      await p.dispatchEvent('[data-teglo=pazaren_bt]', 'change');
+    });
+    proveri('сбор над 100 % се казва на глас',
+      (await tekstNa(p, '[data-sbor-tegla]')).includes('НЕ затваря'), true);
+    proveri('и находката излиза при проверката на настройките',
+      (await tekstNa(p, '[data-sektsiya=kalkulator] .vest.zle')).includes('точно 100 %'), true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#kalk-sluchay', 'novo'));
+    proveri('изборът на случай ВРЪЩА сбора на 100 %',
+      (await tekstNa(p, '[data-sbor-tegla]')).includes('затваря'), true);
+
+    razdel = '89 · съгласуването · четвъртата колона и износът';
+    proveri('съгласуваната плочка показва число',
+      (await chisloNaPoleto(p, 'stoynost-saglasuvana')) > 0, true);
+    // СТОИ МЕЖДУ ТРИТЕ · претегляне не излиза вън от обхвата им.
+    const a89 = await chisloNaPoleto(p, 'stoynost-a');
+    const b89 = await chisloNaPoleto(p, 'stoynost-b');
+    const v89 = await chisloNaPoleto(p, 'stoynost-v');
+    const sag89 = await chisloNaPoleto(p, 'stoynost-saglasuvana');
+    proveri('съгласуваната стои МЕЖДУ най-малката и най-голямата от трите',
+      sag89 >= Math.min(a89, b89, v89) && sag89 <= Math.max(a89, b89, v89), true);
+    proveri('изборът при износа вече е ПЕТ',
+      await p.$$eval('#koya-tsena option', (e) => e.length), 5);
+    proveri('и първият вече не се преструва, че двете са всичко',
+      (await p.$eval('#koya-tsena option', (e) => e.textContent ?? '')).includes('А и Б'), true);
+    // ЧЕТИРИТЕ КОЛОНИ СА В ТАБЛИЦАТА · не само в плочките.
+    // Хедърът минава през `text-transform: uppercase` — сверява се БЕЗ регистър,
+    // както §22 вече го прави. Проверка по главна буква сравнява CSS, не текст.
+    const glava89 = (await tekstNa(p, '[data-sektsiya=stoynost-obektite] .glava')).toLowerCase();
+    proveri('таблицата носи и В, и Съгласувана',
+      glava89.includes('по разход') && glava89.includes('съгласувана'), true);
 
     // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
     //

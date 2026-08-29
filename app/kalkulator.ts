@@ -43,17 +43,28 @@ import {
   KLASOVE,
   KOEFITSIENTI,
   PO_PODRAZBIRANE,
+  SLUCHAI,
   klas,
+  matritsaOtNastroyki,
+  parametaraENegov,
   proveriNastroyki,
   sBaza,
+  sGodini,
   sIzbranaStapka,
   sKlas,
+  sRazhodnoChislo,
+  sSluchay,
+  sTeglo,
+  sboratNaTeglata,
+  sluchay,
   stapka,
   vKoefitsient,
   vProtsent,
   type KlyuchKoefitsient,
   type Nastroyki,
+  type Tegla,
 } from '../src/kalkulator/nastroyki.js';
+import { ostavashti_bt } from '../src/kalkulator/matritsa.js';
 import {
   PRIMEREN_OBEKT,
   ZNATSI,
@@ -82,6 +93,26 @@ let nastroyki: Nastroyki = Object.freeze({
       VIDOVE_OBEKT.map((vid) => [vid, chetiEkranno(klyuchNaBazata(vid), PO_PODRAZBIRANE.baza_st[vid])]),
     ) as Record<VidObekt, number>,
   ),
+  zemya_st_kvm: Object.freeze(
+    Object.fromEntries(
+      VIDOVE_OBEKT.map((vid) => [
+        vid,
+        chetiEkranno(`kalk.zemya.${vid}`, PO_PODRAZBIRANE.zemya_st_kvm[vid]),
+      ]),
+    ) as Record<VidObekt, number>,
+  ),
+  stroitelna_st_kvm: Object.freeze(
+    Object.fromEntries(
+      VIDOVE_OBEKT.map((vid) => [
+        vid,
+        chetiEkranno(`kalk.stroitelna.${vid}`, PO_PODRAZBIRANE.stroitelna_st_kvm[vid]),
+      ]),
+    ) as Record<VidObekt, number>,
+  ),
+  polezen_zhivot_g: chetiEkranno('kalk.polezen_zhivot_g', PO_PODRAZBIRANE.polezen_zhivot_g),
+  vazrast_g: chetiEkranno('kalk.vazrast_g', PO_PODRAZBIRANE.vazrast_g),
+  sluchay: chetiEkranno('kalk.sluchay', PO_PODRAZBIRANE.sluchay),
+  tegla: chetiEkranno('kalk.tegla', PO_PODRAZBIRANE.tegla),
 });
 
 /**
@@ -183,6 +214,89 @@ export function sektsiyaKalkulator(): string {
       <p class="drebno" translate="no">${ekraniraj(k.zashto)} Скалата на занаята върви от ${vProtsent(KLASOVE[1]!.ot_bt)} до ${vProtsent(KLASOVE[3]!.do_bt)}; ${ekraniraj(KLASOVE[0]!.ime)} стои под нея, и това е информация, не грешка.</p>
 
       <div class="dyalglava">
+        <h3>В · разходният подход · колко струва да се построи</h3>
+        <span>земя + строителна стойност − овехтяване · трети подход на занаята</span>
+      </div>
+      <p class="drebno"><b>Земята НЕ овехтява.</b> Овехтява само сградата — приложено върху
+      сбора, овехтяването щеше да яде и парцела, и старите сгради в центъра щяха да клонят
+      към нула, каквото никога не става.</p>
+      <div class="poleta" data-sektsiya="kalk-razhod">
+        ${VIDOVE_OBEKT.map(
+          (vid) => `
+        <label class="pole${parametaraENegov(`zemya.${vid}`) ? ' negovo' : ''}">
+          <span>${ekraniraj(IMENA_NA_VIDOVETE_OBEKT[vid])} · земя €/м²</span>
+          <input translate="no" type="text" data-razhod="zemya" data-vid="${vid}"${
+            vid === 'apartament' ? ' id="kalk-zemya"' : ''
+          } value="${pishiCyalo(nastroyki.zemya_st_kvm[vid])}" inputmode="decimal">
+          <span class="drebno">${
+            parametaraENegov(`zemya.${vid}`) ? 'НЕГОВО число' : 'за разработка · чака него'
+          }</span>
+        </label>
+        <label class="pole${parametaraENegov(`stroitelna.${vid}`) ? ' negovo' : ''}">
+          <span>${ekraniraj(IMENA_NA_VIDOVETE_OBEKT[vid])} · строителна €/м²</span>
+          <input translate="no" type="text" data-razhod="stroitelna" data-vid="${vid}"${
+            vid === 'apartament' ? ' id="kalk-stroitelna"' : ''
+          } value="${pishiCyalo(nastroyki.stroitelna_st_kvm[vid])}" inputmode="decimal">
+          <span class="drebno">${
+            parametaraENegov(`stroitelna.${vid}`) ? 'НЕГОВО число' : 'за разработка · чака него'
+          }</span>
+        </label>`,
+        ).join('')}
+      </div>
+      <div class="poleta">
+        <label class="pole tyasno">
+          <span>Полезен живот · години</span>
+          <input translate="no" type="text" id="kalk-zhivot" value="${nastroyki.polezen_zhivot_g}" inputmode="numeric">
+          <span class="drebno">занаятът дава 60–80 за жилище</span>
+        </label>
+        <label class="pole tyasno">
+          <span>Възраст на сградата · години</span>
+          <input translate="no" type="text" id="kalk-vazrast" value="${nastroyki.vazrast_g}" inputmode="numeric">
+          <span class="drebno" data-ostavashti>остават <b>${vProtsent(ostavashti_bt(matritsaOtNastroyki(nastroyki)))}</b> от сградата</span>
+        </label>
+      </div>
+
+      <div class="dyalglava">
+        <h3>Съгласуването · трите подхода се ПРЕТЕГЛЯТ</h3>
+        <span>„професионалната практика не избира един подход, а ги претегля"</span>
+      </div>
+      <div class="poleta">
+        <label class="pole">
+          <span>Случай</span>
+          <select translate="no" id="kalk-sluchay">
+            ${SLUCHAI.map(
+              (x) =>
+                `<option value="${x.klyuch}"${x.klyuch === nastroyki.sluchay ? ' selected' : ''}>${ekraniraj(x.ime)}</option>`,
+            ).join('')}
+          </select>
+        </label>
+        ${(
+          [
+            ['pazaren_bt', 'А · пазарен'],
+            ['dohoden_bt', 'Б · доходен'],
+            ['razhoden_bt', 'В · разходен'],
+          ] as const
+        )
+          .map(
+            ([koe, ime]) => `
+        <label class="pole tyasno">
+          <span>${ime} · %</span>
+          <input translate="no" type="text" data-teglo="${koe}" value="${vProtsent(nastroyki.tegla[koe]).replace(' %', '')}" inputmode="decimal">
+        </label>`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno" data-sbor-tegla>Сборът е <b>${vProtsent(sboratNaTeglata(nastroyki.tegla))}</b>${
+        sboratNaTeglata(nastroyki.tegla) === 10_000
+          ? ' — затваря.'
+          : ' и НЕ затваря. Тегло, което не затваря, е тихо изгубено число: сметката се отказва, докато не стане 100 %.'
+      } ${ekraniraj(sluchay(nastroyki.sluchay).zashto)}</p>
+      <p class="drebno"><b>Нулевият подход отпада, вместо да изяде теглото си.</b> Обект без
+      наем няма доходна стойност; влезе ли тази нула с теглото си, цената пада с толкова
+      процента, колкото е било то — без някой да е решавал. Затова теглата се пренормират и
+      отпадналият се КАЗВА.</p>
+
+      <div class="dyalglava">
         <h3>Петте коефициента</h3>
         <span>меню от думи, не свободно число · натисни „примерът", за да видиш какво прави всяка стъпка</span>
       </div>
@@ -208,6 +322,27 @@ export function sektsiyaKalkulator(): string {
             ? grafa('Б · колко СТРУВА като актив', r.b, r.b_st, 'Оценката: годишен наем, изчистен от незаетост и разходи, разделен на доходността.')
             : `<div class="grafa"><div class="grafaglava"><b>Б · колко СТРУВА като актив</b></div>
                <p class="drebno">Този обект няма наем — нито в Журнала, нито очакван. Обект без доход не се оценява доходно, и това е ОТГОВОР, не липса на данни.</p></div>`
+        }
+        ${
+          r.v.length
+            ? grafa('В · колко СТРУВА да се построи', r.v, r.v_st, 'Себестойността: земя плюс строителство, минус изхабеното от сградата. Земята не овехтява.')
+            : `<div class="grafa"><div class="grafaglava"><b>В · колко СТРУВА да се построи</b></div>
+               <p class="drebno">За този вид няма нито земя, нито строителна стойност — разходният подход мълчи, и това е ОТГОВОР.</p></div>`
+        }
+        ${
+          r.saglasuvaneto.length
+            ? grafa(
+                'Съгласуваната · трите, претеглени',
+                r.saglasuvaneto,
+                r.saglasuvana_st,
+                r.otpadnali.length
+                  ? `Отпаднали заради нулева стойност: ${r.otpadnali.join(' · ')}. Теглата им са пренормирани към останалите.`
+                  : 'Всеки подход участва с теглото си. Съгласуваната стои между най-малката и най-голямата от трите.',
+              )
+            : `<div class="grafa"><div class="grafaglava"><b>Съгласуваната · трите, претеглени</b></div>
+               <p class="drebno" data-tegla-ne-zatvaryat">Трите тегла не дават 100 %, значи
+               съгласуваната цена е невъзможна и НЕ се показва измислена. Поправи ги горе —
+               или избери случай, който ги връща наведнъж.</p></div>`
         }
       </div>
 
@@ -420,6 +555,58 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
       if (st === undefined || st <= 0) return;
       nastroyki = sBaza(nastroyki, vid, st);
       zapomniEkranno(klyuchNaBazata(vid), st);
+      await prerisuvay();
+    });
+  }
+
+  // ── В · РАЗХОДНИЯТ ПОДХОД · шест числа, всичките за разработка ──────────
+  for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-razhod]')) {
+    pole.addEventListener('change', async (e) => {
+      const koe = pole.dataset['razhod'] as 'zemya' | 'stroitelna';
+      const vid = pole.dataset['vid'] as VidObekt;
+      const st = stotinkiOtPole((e.target as HTMLInputElement).value);
+      // НУЛАТА Е ДОПУСТИМА · тогава подходът мълчи за този вид, а това е
+      // отговор. Само неразчетеното се отхвърля.
+      if (st === undefined || st < 0) return;
+      nastroyki = sRazhodnoChislo(nastroyki, koe, vid, st);
+      zapomniEkranno(`kalk.${koe}.${vid}`, st);
+      await prerisuvay();
+    });
+  }
+
+  for (const [id, koe] of [
+    ['#kalk-zhivot', 'polezen_zhivot_g'],
+    ['#kalk-vazrast', 'vazrast_g'],
+  ] as const) {
+    koren.querySelector<HTMLInputElement>(id)?.addEventListener('change', async (e) => {
+      const g = Number((e.target as HTMLInputElement).value.trim().replace(',', '.'));
+      if (!Number.isSafeInteger(g) || g < 0) return;
+      // Полезен живот нула не дели — отказва се тук, преди сметката.
+      if (koe === 'polezen_zhivot_g' && g === 0) return;
+      nastroyki = sGodini(nastroyki, koe, g);
+      zapomniEkranno(`kalk.${koe}`, g);
+      await prerisuvay();
+    });
+  }
+
+  // ── СЪГЛАСУВАНЕТО · случаят СЕМЕНИ теглата, после те се менят ───────────
+  koren.querySelector<HTMLSelectElement>('#kalk-sluchay')?.addEventListener('change', async (e) => {
+    nastroyki = sSluchay(nastroyki, (e.target as HTMLSelectElement).value);
+    zapomniEkranno('kalk.sluchay', nastroyki.sluchay);
+    zapomniEkranno('kalk.tegla', nastroyki.tegla);
+    await prerisuvay();
+  });
+
+  for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-teglo]')) {
+    pole.addEventListener('change', async (e) => {
+      const koe = pole.dataset['teglo'] as keyof Tegla;
+      const bt = stotinkiOtPole((e.target as HTMLInputElement).value);
+      if (bt === undefined || bt < 0 || bt > 10_000) return;
+      // СБОРЪТ НЕ СЕ ПРЕНОРМИРА ТИХО · човек, който вдига едно тегло, минава
+      // през 110 % и екранът го КАЗВА. Тихата поправка би сменила число, което
+      // той не е пипал.
+      nastroyki = sTeglo(nastroyki, koe, bt);
+      zapomniEkranno('kalk.tegla', nastroyki.tegla);
       await prerisuvay();
     });
   }
