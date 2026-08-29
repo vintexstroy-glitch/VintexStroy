@@ -1041,3 +1041,99 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await zatvoriProzoretsa(p);
   await naEkran(p, 'imoti', '#forma-imot');
 }
+
+/**
+ * 91 · СВЕРКАТА С ИЗВЛЕЧЕНИЕТО · книгата срещу банката (резен 17в · ADR-074)
+ *
+ * Мери с ЧИСЛА: колко находки, колко реда, колко събития. Файлът е истински
+ * CSV — същият път, по който минава и банковото извлечение на човека.
+ */
+export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  razdel = '91 · Сверката с извлечението · трите начина';
+  await naEkran(p, 'smetki', '#forma-period');
+  await p.fill('#smetki-period', '2026-09');
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+  // ТРИ разхода, по един на начин · и СВОИ имена, за да не зависят от чужд блок
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Банка ООД',
+    opis: 'по банка', suma: '100,00', nachin: 'банка', data: '2026-09-10', dokument: 'B-1',
+  });
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Карта ООД',
+    opis: 'с карта', suma: '200,00', nachin: 'карта', data: '2026-09-11', dokument: 'K-1',
+  });
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Кеш ООД',
+    opis: 'в брой', suma: '300,00', nachin: 'в брой', data: '2026-09-12', dokument: 'V-1',
+  });
+  proveri('и трите начина се предлагат в падащото меню',
+    await p.$$eval('#razhod-nachin option', (e) => e.length), 3);
+
+  proveri('преди файла секцията КАЗВА какво прави',
+    (await tekstNa(p, '[data-sektsiya=smetki-izvlechenie]')).includes('не влиза в Журнала'), true);
+
+  razdel = '91 · Сверката с извлечението · банката и картата се намират';
+  // Банката носи ДВАТА · кешът НЕ е в нея, и това е нормално, не находка.
+  // Редът на картата е с ДЕН по-късно — прозорецът от три дни го лови.
+  const IZVLECHENIE =
+    'Дата;Описание;Сума;Референция;Салдо\n' +
+    '10.09.2026;БАНКА ООД;-100,00;R-1;900,00\n' +
+    '12.09.2026;КАРТА ООД;-200,00;R-2;700,00\n' +
+    '20.09.2026;НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00';
+  const predSverkata = await broySabitiya(p);
+  await p.setInputFiles('#fayl-izvlechenie', {
+    name: 'izvlechenie-septemvri.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(IZVLECHENIE, 'utf8'),
+  });
+  await p.waitForSelector('[data-tablitsa=izvlechenie]');
+  proveri('четенето НЕ пише в Журнала · машината предлага, човек записва',
+    await broySabitiya(p), predSverkata);
+
+  const sadbi = await p.$$eval('[data-tablitsa=izvlechenie] .red.izvlechenie',
+    (e) => e.map((x) => (x as HTMLElement).dataset['sadba']));
+  proveri('трите записа са на екрана', sadbi.length, 3);
+  proveri('по банка · СВЕРЕН', sadbi.filter((x) => x === 'nameren').length, 2);
+  proveri('в брой · НЕ се търси и НЕ свети', sadbi.filter((x) => x === 'bezBanka').length, 1);
+  proveri('и нищо не липсва', sadbi.filter((x) => x === 'lipsva').length, 0);
+
+  razdel = '91 · Сверката с извлечението · находката СВЕТИ';
+  proveri('редът от банката без запис в книгата се БРОИ',
+    Number(await p.$eval('[data-samo-v-bankata]', (e) => e.textContent)), 1);
+  proveri('и находките са ЕДНА', Number(await p.$eval('[data-nahodki]', (e) => e.textContent)), 1);
+
+  razdel = '91 · Сверката с извлечението · двата списъка за счетоводството';
+  proveri('платено на ръка · ЕДИН ред',
+    await p.$eval('[data-plateno-na-raka]', (e) => (e as HTMLElement).dataset['platenoNaRaka']), '1');
+  proveri('приход на ръка · НУЛА реда, и нулата се вижда',
+    await p.$eval('[data-prihod-na-raka]', (e) => (e as HTMLElement).dataset['prihodNaRaka']), '0');
+  proveri('кешът стои в сумата на списъка',
+    (await tekstNa(p, '[data-plateno-na-raka]')).replace(/[\s\u202f\u00a0]/g, '').includes('300,00'), true);
+
+  razdel = '91 · Сверката с извлечението · записът е на ЧОВЕК';
+  const predZapisa = await broySabitiya(p);
+  await deystvieSPrerisuvane(p, () => p.click('#zapishi-sverka-izvlechenie'));
+  proveri('едно събитие, не две', await broySabitiya(p), predZapisa + 1);
+
+  razdel = '91 · Сверката с извлечението · затварянето маха ЕКРАНА, не записа';
+  await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
+  proveri('таблицата си отива', await p.$$eval('[data-tablitsa=izvlechenie]', (e) => e.length), 0);
+  proveri('и затварянето НЕ пише нищо', await broySabitiya(p), predZapisa + 1);
+
+  // ЗАПИСАНИТЕ сверки живеят в Настройки, не в таблицата на Сметки: онази е
+  // СМЕТНАТА за текущия изглед, тази чете Журнала. Проверката отива при
+  // истинския им дом — инак тя щеше да мери грешната таблица и да мълчи,
+  // когато записът изчезне.
+  await naEkran(p, 'nastroyki', '[data-sektsiya=sverki]');
+  proveri('записаната сверка стои в Журнала и се вижда',
+    (await tekstNa(p, '[data-sektsiya=sverki]')).includes('Сверка с извлечението'), true);
+  proveri('и носи СВОЯ период',
+    (await tekstNa(p, '[data-sektsiya=sverki]')).includes('2026-09'), true);
+  await naEkran(p, 'imoti', '#forma-imot');
+}

@@ -49,6 +49,7 @@ import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { bezPrazni } from '../src/iztochnik/tablitsa.js';
 import { prochetiKarta, sleiIzvlecheniya, saldoNaFayla, type SnimkaNaKarta } from '../src/iztochnik/karta.js';
+import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
 import {
   sravniLichno,
   sverkaNaVnos,
@@ -596,18 +597,7 @@ export function zakachiLichniPari(
     const faylove = [...(vhod.files ?? [])];
     if (faylove.length === 0) return;
     try {
-      const snimki: SnimkaNaKarta[] = [];
-      for (const f of faylove) {
-        const danni = new Uint8Array(await f.arrayBuffer());
-        const otp = await otpechatak(danni, sha256Web);
-        for (const t of await tablitsiOtFayl(danni, f.name)) {
-          snimki.push(prochetiKarta({ tablitsa: t, ime: f.name, otpechatak: otp }));
-        }
-      }
-      const slyata = sleiIzvlecheniya(snimki);
-      if (slyata.redove.length === 0) {
-        throw new Error('Нито един ред не се разчете. Провери дали листът е извлечението.');
-      }
+      const slyata = (await prochetiIzvlecheniyata(faylove)).slyata;
       planat = sravniLichno(await lichen.deystviya.ogledalo(), slyata);
       temiNaPlana.clear();
       greshka = '';

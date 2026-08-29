@@ -893,6 +893,11 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   grid-template-columns: minmax(0, 440px) 110px minmax(0, 280px) 130px 110px 108px;
   min-width: 900px;
 }
+/* СВЕРКАТА С ИЗВЛЕЧЕНИЕТО (резен 17в) · пет колони, петата носи ДУМИТЕ. */
+.glava.izvlechenie, .red.izvlechenie {
+  grid-template-columns: minmax(0, 320px) 110px 110px 130px minmax(0, 260px);
+  min-width: 860px;
+}
 .glava.sverka, .red.sverka {
   grid-template-columns: minmax(0, 480px) 100px 100px 100px 128px;
   min-width: 700px;
