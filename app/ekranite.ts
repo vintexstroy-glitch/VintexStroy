@@ -23,6 +23,7 @@ import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
 import { narisuvayNAP, zakachiNAP } from './nap.js';
 import { narisuvayProdazhbi, zakachiProdazhbite } from './prodazhbi.js';
+import { narisuvayPlashtaniyaArhiv, zakachiPlashtaniyaArhiv } from './plashtaniya-arhiv.js';
 import { narisuvayTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
@@ -49,6 +50,7 @@ export type KoyEkran =
   | 'sluzhiteli'
   | 'nap'
   | 'prodazhbi'
+  | 'plashtaniya'
   | 'tablo';
 
 /**
@@ -387,6 +389,18 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      */
     narisuvay: (r) => narisuvayProdazhbi(r.ogledalo),
     zakachi: (z) => zakachiProdazhbite(z.koren, z.k, z.prerisuvay),
+  },
+  plashtaniya: {
+    ime: 'Плащания Архив',
+    podnaslov: 'седмицата в три листа · Заплати · Фактури Кеш · Фактури Карта',
+    ikona: 'ekran-plashtaniya',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`, и този път по НАЙ-силната причина:
+     * екранът няма НИТО ЕДИН път към Вратата. Роля над чист поглед би била
+     * втора врата към достъпа — точно онова, което правило 23 забранява.
+     */
+    narisuvay: (r) => narisuvayPlashtaniyaArhiv(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiPlashtaniyaArhiv(z.koren, z.k, z.prerisuvay),
   },
   tablo: {
     ime: 'Табло',

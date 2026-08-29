@@ -1981,3 +1981,13 @@ table.razbivka .drebno { font-size: 0.75rem; }
   min-width: 840px;
 }
 .red.po-imot.sbor { font-weight: 600; border-top: 2px solid var(--liniya); }
+
+/* ── ПЛАЩАНИЯ АРХИВ (резен 22 · ADR-082) · неговите тринайсет колони ──────
+   Таблицата се СКРОЛИРА, а не се свива: тринайсет колони, стиснати до
+   нечетимост, са по-лоши от тринайсет, до които се стига с плъзгане. */
+.glava.plashtred, .red.plashtred {
+  grid-template-columns:
+    112px minmax(0, 200px) minmax(0, 150px) minmax(0, 190px) 116px 96px
+    82px minmax(0, 220px) 110px 62px 124px 118px 118px;
+  min-width: 1620px;
+}

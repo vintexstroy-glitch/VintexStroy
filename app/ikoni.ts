@@ -92,6 +92,8 @@ export const IKONI: Readonly<Record<string, string>> = Object.freeze({
   'ekran-pari': '<rect x="2.5" y="6" width="19" height="12" rx="1.5"></rect><path d="M2.5 10h19"></path><path d="M6 14.5h4"></path>',
   // ПРОДАЖБИ · къща с етикет · станцията, след която движението спира.
   'ekran-prodazhbi': '<path d="M3 10.5 12 4l9 6.5V20a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"></path><path d="M8 13.5h8"></path><path d="M8 17h5"></path>',
+  // ПЛАЩАНИЯ АРХИВ · три листа един над друг · седмицата, събрана за сваляне.
+  'ekran-plashtaniya': '<rect x="3" y="7.5" width="14" height="13" rx="1.5"></rect><path d="M6.5 4.5h14v13"></path><path d="M6.5 12h7"></path><path d="M6.5 16h4"></path>',
   'ekran-smetki': '<path d="M5 3.5h14a1 1 0 0 1 1 1v15a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1v-15a1 1 0 0 1 1-1z"></path><path d="M7.5 8h9"></path><path d="M7.5 12h4"></path><path d="M7.5 16h4"></path><path d="M15 12v4.5"></path><path d="M12.75 14.25h4.5"></path>',
   'ekran-stoynost': '<path d="M4 20V9"></path><path d="M9.5 20V4"></path><path d="M15 20v-7"></path><path d="M20.5 20V7"></path><path d="M2.5 20h19"></path>',
   'ekran-gant': '<path d="M3 5.5h18"></path><path d="M3 12h11"></path><path d="M3 18.5h7"></path><path d="M17.5 10v4.5"></path><path d="M15.25 12.25h4.5"></path>',
