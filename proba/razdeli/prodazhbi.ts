@@ -1,5 +1,22 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { deystvieSPrerisuvane, naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import type { Page } from 'playwright-core';
+
+/**
+ * СМЯНА НА ЕКРАН, КОЯТО ЧАКА ЕКРАНА · не белега на шапката.
+ *
+ * `naEkran` е по-строгата: тя ДОКАЗВА, че е имало прерисуване. Тук трябва
+ * другото — да се СТИГНЕ до екрана, и то от състояние, в което отворен падащ
+ * ред може да стои над лентата. Двете не се заменят взаимно; тази се ползва
+ * само в този раздел и затова живее тук, а не в общите помощници (поуката на
+ * ADR-075 §6.3: обобщение без мярка е по-скъпо от повторението).
+ */
+async function naEkranPryako(p: Page, koy: string, znak: string): Promise<void> {
+  if ((await p.$(znak)) === null) {
+    await p.locator(`[data-ekran=${koy}]`).first().click();
+  }
+  await p.waitForSelector(znak);
+}
 
 /**
  * 94 · ПРОДАЖБИТЕ · сделката, вноските ѝ и терминалът (резен 18б).
@@ -49,10 +66,21 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     ),
     'Обект · Място · проверка',
   );
+  // НУЛАТА ЧАКАЩИ СЕ КАЗВА · трите въпроса получиха негов отговор на 29.08.
   proveri(
-    'какво ЧАКА негова дума се БРОИ, не се твърди',
+    'нищо не чака · и нулата се БРОИ, не се преглъща',
     await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']),
+    '0',
+  );
+  proveri(
+    'а отговорите му стоят с НЕГОВИТЕ думи',
+    await p.$eval('[data-otgovoreni]', (e) => (e as HTMLElement).dataset['otgovoreni']),
     '3',
+  );
+  proveri(
+    'включително правописа му · цитат се пренася ДОСЛОВНО (правило 21)',
+    (await tekstNa(p, '[data-sektsiya=prodazhbi-chakat]')).includes('да рзвие своя бизнес'),
+    true,
   );
 
   razdel = '94 · Продажби · новата сделка е ЧЕРВЕНА';
@@ -95,6 +123,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   proveri('и без вноски проверката е цялата сделка', razlikaPredi, 24_000_00);
 
   await p.selectOption('#dvizhenie-vid', 'Капаро');
+  await p.selectOption('#dvizhenie-nachin', 'банка');
   await p.fill('#dvizhenie-suma', '2000,00');
   await p.fill('#dvizhenie-data', '2026-03-01');
   await p.fill('#dvizhenie-belezhka', 'капаро при предварителния');
@@ -117,6 +146,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   razdel = '94 · Продажби · НИКАКВО НЕТИРАНЕ';
   const razlikaSledVnoska = await chislo('[data-razlika]', 'razlika');
   await p.selectOption('#dvizhenie-vid', 'неустойка');
+  // „Тях ги получаваме ние на ръка и са кеш." · начинът е ИЗБОР, не подразбиране
+  await p.selectOption('#dvizhenie-nachin', 'в брой');
   await p.fill('#dvizhenie-suma', '500,00');
   await p.fill('#dvizhenie-data', '2026-05-01');
   await p.fill('#dvizhenie-belezhka', 'по чл. 8');
@@ -132,6 +163,20 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     razlikaSledVnoska,
   );
   proveri('но си има СВОЕ число', await chislo('[data-neustoyka]', 'neustoyka'), 500_00);
+  proveri(
+    'и НАЧИНЪТ е този, който човек е избрал · не подразбиране',
+    (
+      await p.$$eval(DVIZHENIE, (e) =>
+        e.map((x) => (x as HTMLElement).dataset['nachin']),
+      )
+    ).join(' · '),
+    'банка · в брой',
+  );
+  proveri(
+    'екранът КАЗВА, че ПД и СМР са двата пътя ПО БАНКА',
+    (await tekstNa(p, '[data-sektsiya=prodazhbi-dvizheniya]')).includes('двата пътя на парите ПО БАНКА'),
+    true,
+  );
   proveri(
     'и екранът КАЗВА защо двете не се събират',
     (await tekstNa(p, '[data-sektsiya=prodazhbi-dvizheniya]')).includes('никакво'),
@@ -177,13 +222,148 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // ОТКАЗЪТ СЕ КАЗВА · сделка без имот не може да се отвори от този екран,
   // защото менюто предлага само съществуващи. Затова тук се проверява другото
   // му лице: празната таблица също говори.
-  await deystvieSPrerisuvane(p, () => p.click('[data-ekran=imoti]'));
-  await naEkran(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
+  /**
+   * ЧАКА СЕ ЦЕЛТА, НЕ ПРЕРИСУВАНЕТО · находка на резен 18в.
+   *
+   * `naEkran` чака белега на шапката. Когато отворен падащ ред стои над
+   * лентата, кликът не стига до пункта и чакането виси трийсет секунди с
+   * „на екрана: Имоти" — без да казва ЗАЩО. Чакането на самия екран минава и
+   * когато вече сме на него, и когато трябва да се стигне до него.
+   */
+  razdel = '94 · Продажби · изборът оцелява смяната на екрана';
+  await naEkranPryako(p, 'imoti', '#forma-imot');
+  await naEkranPryako(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
   proveri(
     'изборът на сделка ОЦЕЛЯВА смяната на екрана · той е ПОГЛЕД',
     await p.$$eval('.red.prodazhbared.izbran', (e) => e.length),
     1,
   );
 
-  await naEkran(p, 'imoti', '#forma-imot');
+  await naEkranPryako(p, 'imoti', '#forma-imot');
+}
+
+/**
+ * 95 · ЕТАПИТЕ РАСТАТ · негова дума от 29.08.
+ *
+ *   „Етапа след акт 15 е в таблицата продажби и какъвто и да е той може да се
+ *    добави като колона и да се вкара в функционалност по плана, да може всеки
+ *    да рзвие своя бизнес."
+ *
+ * Стои СЛЕД §94, защото добавя колона: блок, който мести състояние под
+ * следващия, е по-скъп от липсващ.
+ */
+export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '95 · Етапите растат · от Настройки, не от таблицата';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  /**
+   * НАСТРОЙКИ НЕ Е ГОЛ БУТОН, А ПАДАЩ РЕД (ADR-066 · проход §63).
+   *
+   * Кликът върху пункта ОТВАРЯ менюто; екранът се сменя чак когато се натисне
+   * ТЕМАТА. Затова `naEkran` тук виси трийсет секунди и казва „на екрана: Имоти" —
+   * платено с два таймаута, преди да се погледне как го прави §63.
+   */
+  /**
+   * РЕДЪТ СЕ ОТВАРЯ САМО АКО Е ЗАТВОРЕН · находка, платена с ЧЕТИРИ таймаута.
+   *
+   * §63 го оставя ОТВОРЕН. Безусловният клик го ЗАТВАРЯ, и чакането „да стане
+   * отворен" виси трийсет секунди. А докладът сочеше ЧУЖД раздел: броячът
+   * помни последната МИНАЛА проверка, значи спъване преди първата проверка на
+   * блока се приписва на предишния. Затова тук се проверява СЪСТОЯНИЕТО, преди
+   * да се пипа — както го прави и §63.
+   */
+  if (await p.$eval('#nastroyki-red', (e) => (e as HTMLElement).hidden)) {
+    await p.click('#nastroyki-vhod');
+    await p.waitForFunction(
+      () => (document.querySelector('#nastroyki-red') as HTMLElement | null)?.hidden === false,
+      undefined,
+      { timeout: 5_000 },
+    );
+  }
+  await p.click('#nastroyki-red [data-tema="etapi-prodazhbi"]');
+  await p.waitForSelector('[data-sektsiya=etapi-prodazhbi]');
+  proveri(
+    'седемте му етапа стоят · и всичките са „негов от начало"',
+    await p.$eval('[data-etapi]', (e) => (e as HTMLElement).dataset['etapi']),
+    '7',
+  );
+  proveri(
+    'добавени още няма · и нулата се КАЗВА',
+    await p.$eval('[data-dobaveni]', (e) => (e as HTMLElement).dataset['dobaveni']),
+    '0',
+  );
+
+  await p.fill('#etap-ime', 'Акт 17');
+  await p.selectOption('#etap-vnoska', 'da');
+  await p.click('#forma-etap button[type=submit]');
+  /**
+   * ЧАКА СЕ ЕДНО ОТ ДВЕТЕ · новият ред ИЛИ отказът.
+   *
+   * Отказаният запис НЕ прерисува екрана — той пише в полето за грешка и спира.
+   * Затова чакане само на прерисуване тук виси трийсет секунди и казва
+   * „Timeout", вместо ЗАЩО (поуката на ADR-071).
+   */
+  await p.waitForFunction(
+    () =>
+      document.querySelector('[data-etap="Акт 17"]') !== null ||
+      (document.querySelector('#greshka-etap')?.textContent ?? '') !== '',
+    undefined,
+    { timeout: 5_000 },
+  );
+  proveri('записът НЕ е отказан', await tekstNa(p, '#greshka-etap'), '');
+
+  proveri(
+    'етапите станаха ОСЕМ',
+    await p.$eval('[data-etapi]', (e) => (e as HTMLElement).dataset['etapi']),
+    '8',
+  );
+  proveri(
+    'и новият е обявен за ВНОСКА',
+    await p.$eval('[data-etap="Акт 17"]', (e) => (e as HTMLElement).dataset['vnoska']),
+    'da',
+  );
+
+  razdel = '95 · Етапите растат · НЕГОВИТЕ седем не се презаписват';
+  await p.fill('#etap-ime', 'Капаро');
+  // ОТКАЗАНИЯТ ЗАПИС НЕ ПРЕРИСУВА · той пише в полето за грешка и спира.
+  // Затова се чака ТЕКСТЪТ, не прерисуването — вторият път, в който същият
+  // капан хваща този блок.
+  await p.click('#forma-etap button[type=submit]');
+  await p.waitForFunction(
+    () => (document.querySelector('#greshka-etap')?.textContent ?? '') !== '',
+    undefined,
+    { timeout: 5_000 },
+  );
+  proveri(
+    'отказът се КАЗВА с думи, не мълчи',
+    (await tekstNa(p, '#greshka-etap')).includes('не се презаписва'),
+    true,
+  );
+  proveri(
+    'и етапите СИ ОСТАВАТ осем',
+    await p.$eval('[data-etapi]', (e) => (e as HTMLElement).dataset['etapi']),
+    '8',
+  );
+
+  razdel = '95 · Етапите растат · новата КОЛОНА стои в таблицата';
+  await naEkran(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
+  const glavi = await p.$$eval('[data-tablitsa=prodazhbi] .glava .kletka', (e) =>
+    e.map((x) => (x as HTMLElement).dataset['kolona']),
+  );
+  proveri('главата стана ШЕСТНАЙСЕТ колони', glavi.length, 16);
+  proveri(
+    'и „Акт 17" застава ПРЕДИ „проверка"',
+    glavi.indexOf('Акт 17') === glavi.indexOf('проверка') - 1,
+    true,
+  );
+  proveri(
+    'а неговите петнайсет пазят реда си помежду си',
+    glavi.filter((k) => k !== 'Акт 17').join(' · '),
+    'Обект · Място · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
+      'Капаро · НС · НС кеш · Акт 15 · Акт 16 · проверка · Състояние',
+  );
+
+  await naEkranPryako(p, 'imoti', '#forma-imot');
 }

@@ -1622,10 +1622,21 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('хедърите са ГРУПИРАНИ по табове', grupi.length >= 3, true);
     const vLentata = await p.$$eval('.nav > [data-ekran]', (e) =>
       e.map((x) => x.getAttribute('data-ekran') ?? ''));
-    const nazvani = grupi.filter((g) => g !== '');
+    // САМО ОНЕЗИ, КОИТО ГИ ИМА В ЛЕНТАТА · находка на резен 18в.
+    //
+    // Дотук се сравняваха ВСИЧКИ групи, а онези без пункт в лентата дават −1.
+    // Минус едно се сортира ПРЕДИ нулата, значи проверката настояваше групите
+    // БЕЗ пункт да стоят най-отпред — нещо, което никой не е решавал. Новият
+    // екран Продажби го изкара наяве: „-1,-1,-1,0,-1" срещу „-1,-1,-1,-1,0".
+    //
+    // Инвариантът е за ПОДРЕДБАТА на онези, които лентата познава.
+    const vRedaNaLentata = grupi
+      .filter((g) => g !== '')
+      .map((g) => vLentata.indexOf(g))
+      .filter((i) => i >= 0);
     proveri('и редът на групите е редът на ЛЕНТАТА',
-      nazvani.map((g) => vLentata.indexOf(g)),
-      [...nazvani.map((g) => vLentata.indexOf(g))].sort((a, b) => a - b));
+      vRedaNaLentata,
+      [...vRedaNaLentata].sort((a, b) => a - b));
 
     // ГРУПАТА „ОЩЕ НЕ Е СЛОЖЕН НА ТАБ" се БРОИ · вносният още няма таб.
     proveri('нямащите таб се БРОЯТ и се казват',

@@ -33,18 +33,22 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { otLeva, pishi } from '../src/yadro/pari.js';
 import {
   CHAKAT_NEGOVA_DUMA,
+  etapite,
   imeNaSastoyanieto,
+  koloni,
   KOLONI,
+  OTGOVORENITE,
   podredeni,
   posokata,
   redovete,
   SASTOYANIYA,
   sveri,
   vArhiva,
-  VIDOVE_DVIZHENIE,
-  ZATVORENI,
+  zatvoreniteKoloni,
+  type Etap,
   type RedNaProdazhbite,
 } from '../src/domein/prodazhbi.js';
+import { NACHINI_NA_PLASHTANE } from '../src/domein/sabitiya.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
@@ -54,19 +58,22 @@ function izbranata(): string {
   return chetiEkranno('prodazhbi.izbrana', '');
 }
 
-/** Колоните, които носят ПАРИ · само те се пишат с валутен знак (ADR-014). */
-const PARICHNI = new Set([
-  'Цена €',
-  'Продажба €',
-  'СМР €',
-  'ПД',
-  'Капаро',
-  'НС',
-  'НС кеш',
-  'Акт 15',
-  'Акт 16',
-  'проверка',
-]);
+/**
+ * Колоните, които носят ПАРИ · само те се пишат с валутен знак (ADR-014).
+ *
+ * Смятат се от ЖИВИЯ списък: добавеният етап също е пари, и преписан тук ръчно
+ * щеше да остане текст в деня, в който Стопанинът го добави (правило 17).
+ */
+function parichni(etapi: readonly Etap[]): ReadonlySet<string> {
+  return new Set([
+    'Цена €',
+    'Продажба €',
+    'СМР €',
+    'ПД',
+    'проверка',
+    ...etapi.filter((e) => e.vnoska).map((e) => e.klyuch),
+  ]);
+}
 
 /** Стойността на една клетка · един дом за „кое къде е" (правило 17). */
 function kletkata(r: RedNaProdazhbite, kolona: string): string {
@@ -99,29 +106,39 @@ function kletkata(r: RedNaProdazhbite, kolona: string): string {
 }
 
 /** Числото в центове · за сортиране и за сверка от прохода. */
-function vTsentove(r: RedNaProdazhbite, kolona: string): number | undefined {
+function vTsentove(
+  r: RedNaProdazhbite,
+  kolona: string,
+  pari: ReadonlySet<string>,
+): number | undefined {
   const p = r.prodazhba;
   if (kolona === 'Цена €') return p.tsena_st;
   if (kolona === 'Продажба €') return p.prodazhba_st;
   if (kolona === 'СМР €') return p.smr_st;
   if (kolona === 'ПД') return p.pd_st;
   if (kolona === 'проверка') return r.proverka.razlika_st;
-  if (PARICHNI.has(kolona)) return r.vnoski[kolona] ?? 0;
+  if (pari.has(kolona)) return r.vnoski[kolona] ?? 0;
   return undefined;
 }
 
-function glavata(): string {
+function glavata(zhivi: readonly string[], zatvoreni: readonly number[]): string {
   return `
       <div class="red glava prodazhbared" translate="no">
-        ${KOLONI.map(
-          (k, i) =>
-            `<span class="kletka${ZATVORENI.includes(i) ? ' zatvorena' : ''}"
+        ${zhivi
+          .map(
+            (k, i) =>
+              `<span class="kletka${zatvoreni.includes(i) ? ' zatvorena' : ''}"
                    data-kolona="${ekraniraj(k)}">${ekraniraj(k)}</span>`,
-        ).join('')}
+          )
+          .join('')}
       </div>`;
 }
 
-function redNaTablitsata(r: RedNaProdazhbite): string {
+function redNaTablitsata(
+  r: RedNaProdazhbite,
+  zhivi: readonly string[],
+  pari: ReadonlySet<string>,
+): string {
   const p = r.prodazhba;
   const nezadadeno = p.sastoyanie === 'nezadadeno';
   const izbran = izbranata() === p.id;
@@ -130,13 +147,15 @@ function redNaTablitsata(r: RedNaProdazhbite): string {
            translate="no" data-prodazhba="${ekraniraj(p.id)}"
            data-sastoyanie="${ekraniraj(p.sastoyanie)}"
            data-proverka="${r.proverka.razlika_st}">
-        ${KOLONI.map((k) => {
-          const tsentove = vTsentove(r, k);
-          const st = tsentove === undefined ? '' : ` data-st="${tsentove}"`;
-          return `<span class="kletka${PARICHNI.has(k) ? ' suma' : ''}"${st}>${ekraniraj(
-            kletkata(r, k),
-          )}</span>`;
-        }).join('')}
+        ${zhivi
+          .map((k) => {
+            const tsentove = vTsentove(r, k, pari);
+            const st = tsentove === undefined ? '' : ` data-st="${tsentove}"`;
+            return `<span class="kletka${pari.has(k) ? ' suma' : ''}"${st}>${ekraniraj(
+              kletkata(r, k),
+            )}</span>`;
+          })
+          .join('')}
       </div>`;
 }
 
@@ -149,6 +168,7 @@ function redNaTablitsata(r: RedNaProdazhbite): string {
 function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
   const moite = o.dvizheniyaNaProdazhbi.filter((d) => d.prodazhbaId === r.prodazhba.id);
   const zaklyuchena = vArhiva(r.prodazhba.sastoyanie);
+  const etapi = etapite(o);
   return `
     <section data-sektsiya="prodazhbi-dvizheniya">
       <div class="dyalglava">
@@ -178,6 +198,11 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
         </div>
       </div>
 
+      <p class="drebno"><b>ПД и СМР са двата пътя на парите ПО БАНКА</b> — негово,
+      29.08: „Пд и СМР е двата пътя на парите по банка за покупка с ПД(Предварителен
+      Договор и) и СМР(Строително монтажнио работи(. Тях ги получаваме ние на ръка и
+      са кеш." Затова всяко движение носи СВОЙ начин, а не се подразбира от вида.</p>
+
       <p class="drebno">Връщането и неустойката стоят ОТДЕЛНО и НЕ влизат в
       проверката — негово: „Неустойките се превеждат <b>отделно</b>, никакво
       нетиране." Затова тук са две числа, а не едно:
@@ -195,11 +220,21 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
           <label class="pole">
             <span>Вид</span>
             <select name="vid" id="dvizhenie-vid">
-              ${VIDOVE_DVIZHENIE.map(
-                (v) =>
-                  `<option value="${ekraniraj(v.klyuch)}">${ekraniraj(v.klyuch)}${
-                    v.vnoska ? '' : ' · извън проверката'
-                  }</option>`,
+              ${etapi
+                .map(
+                  (v) =>
+                    `<option value="${ekraniraj(v.klyuch)}">${ekraniraj(v.klyuch)}${
+                      v.vnoska ? '' : ' · извън проверката'
+                    }${v.bazov ? '' : ' · добавен'}</option>`,
+                )
+                .join('')}
+            </select>
+          </label>
+          <label class="pole">
+            <span>Начин</span>
+            <select name="nachin" id="dvizhenie-nachin">
+              ${NACHINI_NA_PLASHTANE.map(
+                (n) => `<option value="${ekraniraj(n.klyuch)}">${ekraniraj(n.ime)}</option>`,
               ).join('')}
             </select>
           </label>
@@ -224,6 +259,7 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
         <div class="red glava dvizhenieprodazhba" translate="no">
           <span class="kletka">Вид</span>
           <span class="kletka">Сума</span>
+          <span class="kletka">Начин</span>
           <span class="kletka">Посока</span>
           <span class="kletka">Дата</span>
           <span class="kletka">Бележка</span>
@@ -235,9 +271,10 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
                 .map(
                   (d) => `
         <div class="red dvizhenieprodazhba" translate="no" data-vid="${ekraniraj(d.vid)}"
-             data-posoka="${posokata(d.suma_st)}">
+             data-posoka="${posokata(d.suma_st)}" data-nachin="${ekraniraj(d.nachin)}">
           <span class="kletka">${ekraniraj(d.vid)}</span>
           <span class="suma" data-st="${d.suma_st}">${pishi(d.suma_st)}</span>
+          <span class="kletka">${ekraniraj(d.nachin)}</span>
           <span class="kletka">${posokata(d.suma_st) === 'razhod' ? 'Разходи' : 'Приходи'}</span>
           <span class="kletka">${ekraniraj(d.data)}</span>
           <span class="kletka">${ekraniraj(d.belezhka)}</span>
@@ -250,6 +287,9 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
 }
 
 export function narisuvayProdazhbi(o: Ogledalo): string {
+  const zhivi = koloni(o);
+  const zatvoreni = zatvoreniteKoloni(o);
+  const pari = parichni(etapite(o));
   const vsichki = podredeni(redovete(o));
   const tekushti = vsichki.filter((r) => !vArhiva(r.prodazhba.sastoyanie));
   const arhiv = vsichki.filter((r) => vArhiva(r.prodazhba.sastoyanie));
@@ -331,11 +371,11 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
       <b>червена</b>, докато не ѝ се смени състоянието — негово решение, дословно.</p>
 
       <div class="tablitsa" data-tablitsa="prodazhbi">
-        ${glavata()}
+        ${glavata(zhivi, zatvoreni)}
         ${
           tekushti.length === 0
             ? '<p class="drebno">Няма нито една текуща сделка.</p>'
-            : tekushti.map(redNaTablitsata).join('')
+            : tekushti.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
         }
       </div>
     </section>
@@ -383,11 +423,11 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
         <span>терминалът · оттук няма връщане</span>
       </div>
       <div class="tablitsa" data-tablitsa="prodazhbi-arhiv">
-        ${glavata()}
+        ${glavata(zhivi, zatvoreni)}
         ${
           arhiv.length === 0
             ? '<p class="drebno">Архивът е празен · нито една сделка не е стигнала до нотариус.</p>'
-            : arhiv.map(redNaTablitsata).join('')
+            : arhiv.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
         }
       </div>
     </section>
@@ -397,11 +437,24 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
         <h2>Какво ЧАКА негова дума</h2>
         <span>броено, не твърдяно</span>
       </div>
-      <p class="drebno" data-chakat="${CHAKAT_NEGOVA_DUMA.length}">Тези
-      ${CHAKAT_NEGOVA_DUMA.length} неща нямат негов отговор и затова не се
-      измислят тук (правило 18):</p>
+      ${
+        CHAKAT_NEGOVA_DUMA.length === 0
+          ? `<p class="drebno" data-chakat="0">Нищо не чака. И тази нула се КАЗВА:
+             празно поле не различава „всичко е отговорено" от „никой не е питал".</p>`
+          : `<p class="drebno" data-chakat="${CHAKAT_NEGOVA_DUMA.length}">Тези
+             ${CHAKAT_NEGOVA_DUMA.length} неща нямат негов отговор и затова не се
+             измислят тук (правило 18):</p>
+           <ul class="drebno">
+             ${CHAKAT_NEGOVA_DUMA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}
+           </ul>`
+      }
+      <p class="drebno" data-otgovoreni="${OTGOVORENITE.length}">С негови думи,
+      29.08:</p>
       <ul class="drebno">
-        ${CHAKAT_NEGOVA_DUMA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}
+        ${OTGOVORENITE.map(
+          (x) =>
+            `<li><b>${ekraniraj(x.vapros)}</b> — „${ekraniraj(x.dumite)}"</li>`,
+        ).join('')}
       </ul>
     </section>`;
 }
@@ -464,6 +517,7 @@ export function zakachiProdazhbite(
           suma_st: otLeva(String(danni.get('suma') || '0')),
           data: String(danni.get('data') ?? ''),
           belezhka: String(danni.get('belezhka') ?? '').trim(),
+          nachin: String(danni.get('nachin') ?? ''),
         },
         { opId: `dvizhenie:${crypto.randomUUID()}` },
       );
@@ -515,7 +569,13 @@ export function zakachiProdazhbite(
   });
 }
 
-/** Колоните за регистъра на таблиците · колонното право ги чете оттук. */
-export function koloniNaProdazhbite(): readonly { ime: string }[] {
-  return KOLONI.map((ime) => ({ ime }));
+/**
+ * Колоните за регистъра на таблиците · колонното право ги чете оттук.
+ *
+ * ЖИВИТЕ, не закованите петнайсет: добавеният етап е колона като всяка друга и
+ * правото върху него се раздава по същия начин. Инак Стопанинът щеше да добави
+ * колона, която матрицата не вижда — тоест право, което никой не може да стесни.
+ */
+export function koloniNaProdazhbite(o: Ogledalo): readonly { ime: string }[] {
+  return koloni(o).map((ime) => ({ ime }));
 }

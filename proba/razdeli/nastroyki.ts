@@ -594,7 +594,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const temiVGrupi = await p.$$eval('#nastroyki-red [role=group] [data-tema]', (e) => e.length);
     proveri('всички теми стоят под някое заглавие',
       await p.$$eval('#nastroyki-red [data-tema]', (e) => e.length), temiVGrupi);
-    proveri('и са шестнайсет · Стопанинът вижда всичко', temiVGrupi, 16);
+    proveri('и са СЕДЕМНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 17);
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════

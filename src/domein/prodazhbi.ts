@@ -99,6 +99,35 @@ export const KOLONI: readonly string[] = Object.freeze([
 ]);
 
 /**
+ * КОЛОНИТЕ НА ЖИВАТА ТАБЛИЦА · петнайсетте му плюс добавените етапи.
+ *
+ * НОВИЯТ ЕТАП ЗАСТАВА ПРЕДИ „проверка", не най-отдясно, и това е решение с
+ * причина: „проверка" е СБОР върху вноските, а колона след сбора се чете като
+ * „не влиза в него". Неговите петнайсет запазват реда си помежду си — мести се
+ * само мястото на сбора, който по устройство стои след слаганите.
+ */
+export function koloni(o: Ogledalo): readonly string[] {
+  // САМО ВНОСКИТЕ СТАВАТ КОЛОНИ, и това е следствие, не ограничение: колона
+  // ПРЕДИ сбора, която не влиза в него, се чете грешно от всеки. Добавеното
+  // „извън проверката" се държи като неустойката — движение със свой ред, без
+  // своя колона. Двете места, където това се вижда, са ЕДНО (правило 17).
+  const dobaveni = etapite(o)
+    .filter((e) => !e.bazov && e.vnoska)
+    .map((e) => e.klyuch);
+  if (dobaveni.length === 0) return KOLONI;
+  const kade = KOLONI.indexOf('проверка');
+  return Object.freeze([...KOLONI.slice(0, kade), ...dobaveni, ...KOLONI.slice(kade)]);
+}
+
+/** Кои от ЖИВИТЕ колони са затворени · номерата се местят с добавените. */
+export function zatvoreniteKoloni(o: Ogledalo): readonly number[] {
+  const zhivi = koloni(o);
+  return Object.freeze(
+    ZATVORENI.map((i) => zhivi.indexOf(KOLONI[i]!)).filter((i) => i >= 0),
+  );
+}
+
+/**
  * ЗАТВОРЕНИТЕ · колони, които никой не редактира (правило 23).
  *
  * Позиции в `KOLONI`: 0 „Обект" и 1 „Място" идват от имота; 13 „проверка" е
@@ -115,6 +144,16 @@ export const ZATVORENI: readonly number[] = Object.freeze([0, 1, 13]);
  * ИЗБРОЕНИ, не свободен текст — по същата причина, по която „карта" беше
  * изброен при начините на плащане (ADR-074): свободна стойност би паднала
  * ТИХО в чужда графа, и то точно в графата, която решава проверката.
+ *
+ * ═══ И ТЕ СА БАЗАТА, НЕ ЦЕЛИЯТ СПИСЪК (29.08) ═══
+ *
+ * Негови думи: „Етапа след акт 15 е в таблицата продажби и какъвто и да е той
+ * може да се добави като колона и да се вкара в функционалност по плана, да
+ * може всеки да рзвие своя бизнес."
+ *
+ * Затова етапите РАСТАТ: `etapite(o)` слепва тези седем с онези, които
+ * Стопанинът е записал. Тук стои само НЕГОВОТО начало — то не се пипа и не се
+ * презаписва, а новото се ДОБАВЯ (`ЕтапНаПродажбаЗаписан`).
  */
 export const VIDOVE_DVIZHENIE = [
   { klyuch: 'Капаро', vnoska: true },
@@ -126,17 +165,53 @@ export const VIDOVE_DVIZHENIE = [
   { klyuch: 'неустойка', vnoska: false },
 ] as const;
 
+/** Един етап, както го носи списъкът · базов или добавен. */
+export interface Etap {
+  readonly klyuch: string;
+  readonly vnoska: boolean;
+  /** негов ли е от начало, или е добавен от Стопанина */
+  readonly bazov: boolean;
+}
+
+/**
+ * ВСИЧКИТЕ ЕТАПИ · седемте негови плюс добавените, В ТОЗИ РЕД.
+ *
+ * Базовите СТОЯТ отпред и не се презаписват: те са негови думи, а добавеното
+ * е разширение на бизнеса, не поправка на казаното. Дубликат по ключ Вратата
+ * не пуска, но и тук се пази — книга може да дойде отвън (правило 1).
+ */
+export function etapite(o: Ogledalo): readonly Etap[] {
+  const bazovi: Etap[] = VIDOVE_DVIZHENIE.map((v) => ({
+    klyuch: v.klyuch,
+    vnoska: v.vnoska,
+    bazov: true,
+  }));
+  const dobaveni: Etap[] = [];
+  for (const e of o.etapiNaProdazhbite.values()) {
+    if (bazovi.some((b) => b.klyuch === e.klyuch)) continue;
+    if (dobaveni.some((d) => d.klyuch === e.klyuch)) continue;
+    dobaveni.push({ klyuch: e.klyuch, vnoska: e.vnoska, bazov: false });
+  }
+  return Object.freeze([...bazovi, ...dobaveni]);
+}
+
 /**
  * Вноска ли е · тоест влиза ли в проверката.
  *
  * ПРИЕМА `string`, не тесен съюз, и това е нарочно: видът идва от ЖУРНАЛА, а
  * той може да носи стойност, писана от по-стара версия или от чужда верига.
  * Тесен тип тук би значел, че четенето се доверява на писането — точно
- * обратното на онова, за което Огледалото съществува. Затова и съюзен тип
- * `VidDvizhenie` няма: изведен, той нямаше да има нито един викащ (ADR-041).
+ * обратното на онова, за което Огледалото съществува.
+ *
+ * ВТОРИЯТ довод дойде с добавените етапи: списъкът вече НЕ е известен при
+ * компилация. Съюзен тип щеше да излъже, че е.
  */
-export function eVnoska(vid: string): boolean {
-  return VIDOVE_DVIZHENIE.some((v) => v.klyuch === vid && v.vnoska);
+export function eVnoska(vid: string, etapi: readonly Etap[] = VIDOVE_DVIZHENIE.map((v) => ({
+  klyuch: v.klyuch,
+  vnoska: v.vnoska,
+  bazov: true,
+}))): boolean {
+  return etapi.some((e) => e.klyuch === vid && e.vnoska);
 }
 
 /**
@@ -179,17 +254,44 @@ export function vArhiva(sastoyanie: string): boolean {
 /**
  * КАКВОТО ЧАКА НЕГОВАТА ДУМА · изброено поименно, БРОЕНО от екрана.
  *
- * Празен списък би значел „всичко е решено". Този не е празен — и точно
- * затова стои като списък, а не като изречение в коментар, което никой обход
- * не проверява (ADR-067 · ADR-072 · ADR-075).
+ * ДНЕС Е ПРАЗЕН, и това е СЪСТОЯНИЕ, не пропуск: трите въпроса, с които този
+ * резен беше предаден, получиха отговор на 29.08 — виж `OTGOVORENITE`. Празният
+ * списък се КАЗВА на екрана (правило 15), вместо да мълчи.
+ *
+ * Списъкът остава, защото механизмът важи занапред: следващият въпрос без
+ * негов отговор влиза ТУК, а не в изречение, което никой обход не проверява
+ * (ADR-067 · ADR-072 · ADR-075).
  */
-export const CHAKAT_NEGOVA_DUMA: readonly string[] = Object.freeze([
-  'етапите след Акт 15 — колко са, как се казват и кой ги мени (ADR-033 §7, ' +
-    'отложен ИМЕННО за този резен)',
-  'лихвата при просрочие на вноска — има ли я и как се смята (ADR-033 §7)',
-  'разминаването „Продажба €" срещу „ПД + СМР" — находка ли е, или двете числа ' +
-    'значат различни неща; проверката, която ТОЙ поръча, е само срещу вноските',
-]);
+export const CHAKAT_NEGOVA_DUMA: readonly string[] = Object.freeze([]);
+
+/**
+ * КОЕТО ВЕЧЕ ИМА НЕГОВ ОТГОВОР · с дословните му думи (29.08).
+ *
+ * Стои като СПИСЪК, а не в шапка, по същата причина, по която чакащото стои
+ * като списък: така се БРОИ и се показва, вместо да се твърди. Отговор, скрит
+ * в коментар, не се вижда от онзи, който утре пита същото.
+ */
+export const OTGOVORENITE: readonly { readonly vapros: string; readonly dumite: string }[] =
+  Object.freeze([
+    Object.freeze({
+      vapros: 'етапите след Акт 15',
+      dumite:
+        'Етапа след акт 15 е в таблицата продажби и какъвто и да е той може да се ' +
+        'добави като колона и да се вкара в функционалност по плана, да може всеки ' +
+        'да рзвие своя бизнес. Акт 16 е след Акт 15.',
+    }),
+    Object.freeze({
+      vapros: 'лихвата при просрочие на вноска',
+      dumite: 'Няма лихва.',
+    }),
+    Object.freeze({
+      vapros: '„Продажба €" срещу „ПД + СМР"',
+      dumite:
+        'Пд и СМР е двата пътя на парите по банка за покупка с ПД(Предварителен ' +
+        'Договор и) и СМР(Строително монтажнио работи(. Тях ги получаваме ние на ' +
+        'ръка и са кеш. Даа има избор.',
+    }),
+  ]);
 
 /** Едно движение, както Огледалото го пази. */
 export interface DvizhenieNaProdazhba {
@@ -200,6 +302,8 @@ export interface DvizhenieNaProdazhba {
   readonly suma_st: number;
   readonly data: string;
   readonly belezhka: string;
+  /** банка · карта · в брой — „Даа има избор." (29.08) */
+  readonly nachin: string;
 }
 
 /** Една сделка, както Огледалото я пази. */
@@ -248,10 +352,14 @@ export interface Proverka {
   readonly duma: string;
 }
 
-export function proverkata(p: Prodazhba, dvizheniya: readonly DvizhenieNaProdazhba[]): Proverka {
+export function proverkata(
+  p: Prodazhba,
+  dvizheniya: readonly DvizhenieNaProdazhba[],
+  etapi?: readonly Etap[],
+): Proverka {
   const sdelka_st = p.pd_st + p.smr_st;
   const vnoski_st = dvizheniya
-    .filter((d) => d.prodazhbaId === p.id && eVnoska(d.vid))
+    .filter((d) => d.prodazhbaId === p.id && (etapi ? eVnoska(d.vid, etapi) : eVnoska(d.vid)))
     .reduce((s, d) => s + d.suma_st, 0);
   const razlika_st = sdelka_st - vnoski_st;
   return Object.freeze({
@@ -340,12 +448,13 @@ export interface RedNaProdazhbite {
 
 export function redovete(o: Ogledalo): readonly RedNaProdazhbite[] {
   const dvizheniya = [...o.dvizheniyaNaProdazhbi];
+  const etapi = etapite(o);
   return Object.freeze(
     [...o.prodazhbi.values()].map((p) => {
       const moite = dvizheniya.filter((d) => d.prodazhbaId === p.id);
       const vnoski: Record<string, number> = {};
       const dati: Record<string, string> = {};
-      for (const v of VIDOVE_DVIZHENIE) {
+      for (const v of etapi) {
         if (!v.vnoska) continue;
         const negovite = moite.filter((d) => d.vid === v.klyuch);
         vnoski[v.klyuch] = negovite.reduce((s, d) => s + d.suma_st, 0);
@@ -359,7 +468,7 @@ export function redovete(o: Ogledalo): readonly RedNaProdazhbite[] {
         myasto,
         vnoski: Object.freeze(vnoski),
         dati: Object.freeze(dati),
-        proverka: proverkata(p, moite),
+        proverka: proverkata(p, moite, etapi),
         izvan: izvanProverkata(p.id, moite),
       });
     }),

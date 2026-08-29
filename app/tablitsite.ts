@@ -122,7 +122,7 @@ const VGRADENI: readonly VgradenaTablitsa[] = Object.freeze<VgradenaTablitsa[]>(
     // „Обект" и „Място" идват от имота · „проверка" е сметка (`prodazhbi.ts`).
     // Числата са ЕДНИ И СЪЩИ с `ZATVORENI` там — оттам ги чете и екранът.
     zatvoreni: [0, 1, 13],
-    koloni: () => koloniNaProdazhbite(),
+    koloni: (o) => koloniNaProdazhbite(o),
   },
   {
     klyuch: 'vgraden:obekti',

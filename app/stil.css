@@ -923,8 +923,13 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 .red.prodazhbared { cursor: pointer; }
 .red.prodazhbared.izbran { background: var(--toplo); }
 .glava.dvizhenieprodazhba, .red.dvizhenieprodazhba {
-  grid-template-columns: 120px 120px 100px 120px minmax(0, 320px);
-  min-width: 780px;
+  grid-template-columns: 120px 120px 90px 100px 120px minmax(0, 280px);
+  min-width: 830px;
+}
+/* ЕТАПИТЕ · номенклатурата в Настройки (29.08 · „да може всеки да рзвие своя бизнес"). */
+.glava.etapred, .red.etapred {
+  grid-template-columns: minmax(0, 240px) 130px 160px;
+  min-width: 530px;
 }
 
 /* Одитният файл (И96 т.11) · оборотната ведомост под секцията SAF-T. */

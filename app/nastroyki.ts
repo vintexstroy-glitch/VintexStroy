@@ -32,6 +32,7 @@ import {
   VIDOVE_KONTRAGENT,
   type Kontragent,
 } from '../src/domein/kontragenti.js';
+import { etapite } from '../src/domein/prodazhbi.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
@@ -208,6 +209,7 @@ export function narisuvayNastroyki(
     }
     ${blokNaRedaktora(modeli)}
     ${blokNaParametrite(o)}
+    ${blokNaEtapite(o)}
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
     ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
@@ -901,6 +903,82 @@ function redNaParametar(opis: OpisNaProblem, n: NastroykaNaProblem): string {
  * тук се вписва СЪЩОТО име, а сведеното му изписване ги слива. Нов ключ щеше
  * да иска втора връзка, която никой не поддържа.
  */
+/**
+ * ЕТАПИТЕ НА ПРОДАЖБАТА · новите колони на таблицата (29.08).
+ *
+ * Негови думи: „Етапа след акт 15 е в таблицата продажби и какъвто и да е той
+ * може да се добави като колона и да се вкара в функционалност по плана, да
+ * може всеки да рзвие своя бизнес."
+ *
+ * ЗАЩО ТУК, А НЕ НА ЕКРАНА ПРОДАЖБИ. Етапът решава дали сумата влиза в
+ * колоната „проверка" — тоест системата СМЯТА върху него. Негов закон (И97):
+ * „Меню, което ОПИСВА → расте свободно. Меню, върху което системата СМЯТА →
+ * расте само от Настройки." А Настройки се вижда само от Стопанина, значи и
+ * правото е тукашно, без втора врата към достъпа (правило 23).
+ */
+function blokNaEtapite(o: Ogledalo): string {
+  const spisak = etapite(o);
+  const dobaveni = spisak.filter((e) => !e.bazov);
+  return `
+    <section data-sektsiya="etapi-prodazhbi">
+      <div class="dyalglava">
+        <h2>Етапите на продажбата</h2>
+        <span>всеки нов етап става КОЛОНА в таблица Продажби</span>
+      </div>
+
+      <p class="drebno">Негово, 29.08: „Етапа след акт 15 е в таблицата продажби
+      и какъвто и да е той <b>може да се добави като колона</b> и да се вкара в
+      функционалност по плана, <b>да може всеки да рзвие своя бизнес</b>."</p>
+
+      <form id="forma-etap" class="redditsa">
+        <label class="pole">
+          <span>Име на етапа</span>
+          <input translate="no" name="etap" id="etap-ime" placeholder="както ще стои в главата">
+        </label>
+        <label class="pole">
+          <span>Влиза ли в „проверка"</span>
+          <select translate="no" name="vnoska" id="etap-vnoska">
+            <option value="da">да · сумата му се брои като вноска</option>
+            <option value="ne">не · стои отделно, като неустойката</option>
+          </select>
+        </label>
+        <button type="submit">Добави етап</button>
+      </form>
+      <p class="greshka" id="greshka-etap"></p>
+
+      <p class="drebno" data-etapi="${spisak.length}" data-dobaveni="${dobaveni.length}">
+      ${spisak.length} етапа общо · ${dobaveni.length} добавени.
+      ${
+        dobaveni.length === 0
+          ? 'Нито един още — таблицата стои с неговите седем.'
+          : 'Новата колона застава ПРЕДИ „проверка", защото проверката е СБОР върху вноските.'
+      }</p>
+
+      <div class="tablitsa" data-tablitsa="etapi-prodazhbi">
+        <div class="red glava etapred" translate="no">
+          <span class="kletka">Етап</span>
+          <span class="kletka">В проверката</span>
+          <span class="kletka">Откъде</span>
+        </div>
+        ${spisak
+          .map(
+            (e) => `
+        <div class="red etapred" translate="no" data-etap="${ekraniraj(e.klyuch)}"
+             data-vnoska="${e.vnoska ? 'da' : 'ne'}">
+          <span class="kletka">${ekraniraj(e.klyuch)}</span>
+          <span class="kletka">${e.vnoska ? 'да' : 'не'}</span>
+          <span class="kletka">${e.bazov ? 'негов от начало' : 'добавен'}</span>
+        </div>`,
+          )
+          .join('')}
+      </div>
+
+      <p class="drebno"><b>Неговите седем не се презаписват.</b> Те са дума, не
+      настройка: кръщаване на нов етап с тяхното име би сменило смисъла на вече
+      записани движения — мълчаливо, и назад във времето.</p>
+    </section>`;
+}
+
 function blokNaKontragentite(o: Ogledalo): string {
   const spisak = [...o.kontragenti.values()].sort(
     (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
@@ -1174,6 +1252,27 @@ export function zakachiNastroyki(
    * точно онова, което човекът трябва да поправи веднага, докато номерът му
    * е още пред очите му.
    */
+  const formaEtap = koren.querySelector<HTMLFormElement>('#forma-etap');
+  formaEtap?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const izhod = koren.querySelector<HTMLElement>('#greshka-etap')!;
+    izhod.textContent = '';
+    const danni = new FormData(formaEtap);
+    try {
+      await k.deystviya.zapishiEtapNaProdazhba(
+        {
+          klyuch: String(danni.get('etap') ?? ''),
+          vnoska: String(danni.get('vnoska') ?? '') === 'da',
+        },
+        { opId: `etap-prodazhba:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Етапът е добавен · колоната вече стои в Продажби.');
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = dumiZaGreshka(err);
+    }
+  });
+
   const formaKontragent = koren.querySelector<HTMLFormElement>('#forma-kontragent');
   formaKontragent?.addEventListener('submit', async (e) => {
     e.preventDefault();

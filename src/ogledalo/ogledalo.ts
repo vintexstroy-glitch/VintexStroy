@@ -69,6 +69,7 @@ import type {
   PayloadLentaPodredena,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
+  PayloadEtapNaProdazhbaZapisan,
   PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
@@ -282,6 +283,14 @@ export interface Ogledalo {
    * да слее втората вноска с първата и да изяде датата ѝ.
    */
   readonly dvizheniyaNaProdazhbi: readonly DvizhenieNaProdazhba[];
+  /**
+   * `klyuch` → етапът, добавен от Стопанина (29.08).
+   *
+   * Последният запис за ключа бие — преименуване е нов запис, не втори етап.
+   * Базовите седем НЕ са тук: те са негови от начало и живеят в кода
+   * (`VIDOVE_DVIZHENIE`); тази карта носи само РАСТЕЖА.
+   */
+  readonly etapiNaProdazhbite: ReadonlyMap<string, PayloadEtapNaProdazhbaZapisan>;
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -504,6 +513,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const dokumenti = new Map<string, ZakacheniDokumenti>();
   const prodazhbi = new Map<string, Prodazhba>();
   const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
+  const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -931,10 +941,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           suma_st: p.suma_st,
           data: p.data,
           belezhka: p.belezhka,
+          // Записите отпреди 29.08 нямат начин · тогава той не се е питал, и
+          // празното е ЧЕСТНО (правило 1: старият Журнал не се преписва).
+          nachin: p.nachin ?? '',
         });
         break;
       }
 
+
+      case 'ЕтапНаПродажбаЗаписан': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · преименуване е нов запис, не втори
+        // етап. Базовите седем не идват насам — те не се пишат в Журнала.
+        const p = s.payload as unknown as PayloadEtapNaProdazhbaZapisan;
+        etapiNaProdazhbite.set(p.klyuch, p);
+        break;
+      }
 
       case 'СверкаЗаписана': {
         const p = s.payload as unknown as PayloadSverkaZapisana;
@@ -1140,6 +1161,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     dokumenti,
     prodazhbi,
     dvizheniyaNaProdazhbi,
+    etapiNaProdazhbite,
     pototsi,
     salda,
     dela,

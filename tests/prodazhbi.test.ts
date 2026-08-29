@@ -19,12 +19,15 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import {
   CHAKAT_NEGOVA_DUMA,
+  etapite,
   eVnoska,
   GreshkaProdazhba,
   imeNaSastoyanieto,
   izvanProverkata,
+  koloni,
   KOLONI,
   obektIMyasto,
+  OTGOVORENITE,
   podredeni,
   posokata,
   proverkata,
@@ -114,11 +117,15 @@ describe('петнайсетте колони са НЕГОВИ', () => {
     expect(imeNaSastoyanieto('nezadadeno')).toBe('не е зададено');
   });
 
-  it('етапите след Акт 15 ЧАКАТ него · и това се БРОИ, не се твърди', () => {
-    // ADR-033 §7 ги отложи ИМЕННО за този резен. Празен списък би значел
-    // „всичко е решено" — затова числото стои, а не изречение в коментар.
-    expect(CHAKAT_NEGOVA_DUMA.length).toBe(3);
-    expect(CHAKAT_NEGOVA_DUMA.join(' ')).toContain('Акт 15');
+  it('трите въпроса имат негов ОТГОВОР · и нулата чакащи се БРОИ', () => {
+    // На 29.08 и трите получиха отговор. Празният списък е СЪСТОЯНИЕ, не
+    // пропуск — и точно затова насреща стои `OTGOVORENITE`: отговор, скрит в
+    // коментар, не се вижда от онзи, който утре пита същото.
+    expect(CHAKAT_NEGOVA_DUMA).toEqual([]);
+    expect(OTGOVORENITE).toHaveLength(3);
+    // и думите са НЕГОВИ, дословно · включително правописа му
+    expect(OTGOVORENITE.map((x) => x.dumite).join(' ')).toContain('да рзвие своя бизнес');
+    expect(OTGOVORENITE.map((x) => x.dumite).join(' ')).toContain('Няма лихва');
   });
 
   it('Обект и Място се ЧЕТАТ от имота · не се преписват', async () => {
@@ -145,6 +152,7 @@ describe('проверката · неговата формула', () => {
         suma_st: 2_000_00,
         data: '2026-03-01',
         belezhka: 'капаро при предварителния',
+        nachin: 'банка',
       },
       { opId: 'op-1' },
     );
@@ -156,6 +164,7 @@ describe('проверката · неговата формула', () => {
         suma_st: 8_000_00,
         data: '2026-06-15',
         belezhka: '',
+        nachin: 'банка',
       },
       { opId: 'op-2' },
     );
@@ -170,7 +179,7 @@ describe('проверката · неговата формула', () => {
   it('изплатената дава НУЛА · и нулата си има дума', async () => {
     const { dnevnik, deystviya } = await sasSdelka();
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'НС', suma_st: 24_000_00, data: '2026-07-01', belezhka: '' },
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'НС', suma_st: 24_000_00, data: '2026-07-01', belezhka: '', nachin: 'банка' },
       { opId: 'op-1' },
     );
     const o = await ogledaloto(dnevnik);
@@ -180,15 +189,15 @@ describe('проверката · неговата формула', () => {
   it('3 · връщането и неустойката НЕ влизат · „никакво нетиране"', async () => {
     const { dnevnik, deystviya } = await sasSdelka();
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 2_000_00, data: '2026-03-01', belezhka: '' },
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 2_000_00, data: '2026-03-01', belezhka: '', nachin: 'банка' },
       { opId: 'op-1' },
     );
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-2', prodazhbaId: 'PR-1', vid: 'връщане', suma_st: -1_500_00, data: '2026-05-01', belezhka: 'върнато капаро' },
+      { dvizhenieId: 'DV-2', prodazhbaId: 'PR-1', vid: 'връщане', suma_st: -1_500_00, data: '2026-05-01', belezhka: 'върнато капаро', nachin: 'банка' },
       { opId: 'op-2' },
     );
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-3', prodazhbaId: 'PR-1', vid: 'неустойка', suma_st: 500_00, data: '2026-05-01', belezhka: 'по чл. 8' },
+      { dvizhenieId: 'DV-3', prodazhbaId: 'PR-1', vid: 'неустойка', suma_st: 500_00, data: '2026-05-01', belezhka: 'по чл. 8', nachin: 'банка' },
       { opId: 'op-3' },
     );
     const o = await ogledaloto(dnevnik);
@@ -243,7 +252,7 @@ describe('терминалът · Продажби Архив', () => {
     const { deystviya } = await sasSdelka('prodadena');
     await expect(
       deystviya.zapishiDvizhenieNaProdazhba(
-        { dvizhenieId: 'DV-9', prodazhbaId: 'PR-1', vid: 'Акт 16', suma_st: 100_00, data: '2026-09-01', belezhka: '' },
+        { dvizhenieId: 'DV-9', prodazhbaId: 'PR-1', vid: 'Акт 16', suma_st: 100_00, data: '2026-09-01', belezhka: '', nachin: 'банка' },
         { opId: 'op-late' },
       ),
     ).rejects.toThrow(GreshkaProdazhba);
@@ -273,7 +282,7 @@ describe('терминалът · Продажби Архив', () => {
     );
     await hvani(() =>
       deystviya.zapishiDvizhenieNaProdazhba(
-        { dvizhenieId: 'DV-X', prodazhbaId: 'PR-1', vid: 'бакшиш', suma_st: 1, data: '2026-01-01', belezhka: '' },
+        { dvizhenieId: 'DV-X', prodazhbaId: 'PR-1', vid: 'бакшиш', suma_st: 1, data: '2026-01-01', belezhka: '', nachin: 'банка' },
         { opId: 'o3' },
       ),
     );
@@ -289,7 +298,7 @@ describe('сторното · добавя, не отменя', () => {
   it('6 · сторнирана вноска излиза от проверката · но остава в Журнала', async () => {
     const { dnevnik, deystviya } = await sasSdelka();
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 2_000_00, data: '2026-03-01', belezhka: '' },
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 2_000_00, data: '2026-03-01', belezhka: '', nachin: 'банка' },
       { opId: 'op-1' },
     );
     const predi = await ogledaloto(dnevnik);
@@ -346,11 +355,11 @@ describe('таблицата · редовете, подредбата и све
   it('редът носи вноските ПО ВИД и последната им дата', async () => {
     const { dnevnik, deystviya } = await sasSdelka();
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 1_000_00, data: '2026-03-01', belezhka: '' },
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 1_000_00, data: '2026-03-01', belezhka: '', nachin: 'банка' },
       { opId: 'op-1' },
     );
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-2', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 1_000_00, data: '2026-04-01', belezhka: 'втора вноска' },
+      { dvizhenieId: 'DV-2', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 1_000_00, data: '2026-04-01', belezhka: 'втора вноска', nachin: 'банка' },
       { opId: 'op-2' },
     );
     const r = redovete(await ogledaloto(dnevnik));
@@ -384,7 +393,7 @@ describe('таблицата · редовете, подредбата и све
   it('8 · сверка вход↔изход · и увисналото движение се БРОИ', async () => {
     const { dnevnik, deystviya } = await sasSdelka();
     await deystviya.zapishiDvizhenieNaProdazhba(
-      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'НС', suma_st: 500_00, data: '2026-03-01', belezhka: '' },
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'НС', suma_st: 500_00, data: '2026-03-01', belezhka: '', nachin: 'банка' },
       { opId: 'op-1' },
     );
     const o = await ogledaloto(dnevnik);
@@ -405,5 +414,93 @@ describe('таблицата · редовете, подредбата и све
 
   it('адресът на сделката е ЕДИН · и започва с PRD:', () => {
     expect(sashtnostNaProdazhba('PR-1')).toBe('PRD:PR-1');
+  });
+});
+
+describe('етапите РАСТАТ · негова дума от 29.08', () => {
+  it('нов етап става КОЛОНА · и застава ПРЕДИ „проверка"', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    expect(koloni(await ogledaloto(dnevnik))).toEqual(KOLONI);
+
+    await deystviya.zapishiEtapNaProdazhba(
+      { klyuch: 'Акт 17', vnoska: true },
+      { opId: 'op-etap' },
+    );
+    const zhivi = koloni(await ogledaloto(dnevnik));
+    expect(zhivi).toHaveLength(16);
+    // ПРЕДИ проверката, защото тя е СБОР върху вноските
+    expect(zhivi.indexOf('Акт 17')).toBe(zhivi.indexOf('проверка') - 1);
+    // и НЕГОВИТЕ петнайсет пазят реда си помежду си
+    expect(zhivi.filter((k) => KOLONI.includes(k))).toEqual(KOLONI);
+  });
+
+  it('добавеният етап ВЛИЗА в проверката, когато е обявен за вноска', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'Акт 17', vnoska: true }, { opId: 'e1' });
+    await deystviya.zapishiDvizhenieNaProdazhba(
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'Акт 17', suma_st: 3_000_00, data: '2026-08-01', belezhka: '', nachin: 'банка' },
+      { opId: 'op-1' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect(proverkata(o.prodazhbi.get('PR-1')!, o.dvizheniyaNaProdazhbi, etapite(o)).vnoski_st)
+      .toBe(3_000_00);
+  });
+
+  it('а обявеният ИЗВЪН проверката НЕ влиза в нея', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'бонус', vnoska: false }, { opId: 'e1' });
+    await deystviya.zapishiDvizhenieNaProdazhba(
+      { dvizhenieId: 'DV-1', prodazhbaId: 'PR-1', vid: 'бонус', suma_st: 3_000_00, data: '2026-08-01', belezhka: '', nachin: 'в брой' },
+      { opId: 'op-1' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect(proverkata(o.prodazhbi.get('PR-1')!, o.dvizheniyaNaProdazhbi, etapite(o)).vnoski_st)
+      .toBe(0);
+    // и колоната ѝ я НЯМА в главата · само вноските стават колони
+    expect(koloni(o)).not.toContain('бонус');
+  });
+
+  it('НЕГОВИТЕ седем не се презаписват · дори с друго „вноска"', async () => {
+    const { deystviya } = await sasSdelka();
+    await expect(
+      deystviya.zapishiEtapNaProdazhba({ klyuch: 'Капаро', vnoska: false }, { opId: 'e1' }),
+    ).rejects.toThrow(GreshkaProdazhba);
+    await expect(
+      deystviya.zapishiEtapNaProdazhba({ klyuch: '   ', vnoska: true }, { opId: 'e2' }),
+    ).rejects.toThrow(GreshkaProdazhba);
+  });
+
+  it('преименуването е НОВ запис за същия ключ · не втори етап', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'Акт 17', vnoska: true }, { opId: 'e1' });
+    await deystviya.zapishiEtapNaProdazhba({ klyuch: 'Акт 17', vnoska: false }, { opId: 'e2' });
+    const etapi = etapite(await ogledaloto(dnevnik));
+    expect(etapi.filter((e) => e.klyuch === 'Акт 17')).toHaveLength(1);
+    expect(etapi.find((e) => e.klyuch === 'Акт 17')!.vnoska).toBe(false);
+  });
+});
+
+describe('начинът е ИЗБОР · „Даа има избор." (29.08)', () => {
+  it('непознат начин се отказва ГЛАСНО', async () => {
+    const { deystviya } = await sasSdelka();
+    await expect(
+      deystviya.zapishiDvizhenieNaProdazhba(
+        { dvizhenieId: 'DV-X', prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 1, data: '2026-01-01', belezhka: '', nachin: 'бартер' },
+        { opId: 'o1' },
+      ),
+    ).rejects.toThrow(GreshkaProdazhba);
+  });
+
+  it('и трите изброени минават · банка · карта · в брой', async () => {
+    const { dnevnik, deystviya } = await sasSdelka();
+    const nachini = ['банка', 'карта', 'в брой'];
+    for (const [i, n] of nachini.entries()) {
+      await deystviya.zapishiDvizhenieNaProdazhba(
+        { dvizhenieId: `DV-${i}`, prodazhbaId: 'PR-1', vid: 'Капаро', suma_st: 100_00, data: '2026-03-01', belezhka: '', nachin: n },
+        { opId: `o${i}` },
+      );
+    }
+    const o = await ogledaloto(dnevnik);
+    expect(o.dvizheniyaNaProdazhbi.map((d) => d.nachin)).toEqual(nachini);
   });
 });

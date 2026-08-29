@@ -223,6 +223,15 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     za: SAMO_STOPANINAT,
   },
   {
+    klyuch: 'etapi-prodazhbi',
+    ime: 'Етапите на продажбата',
+    opis: 'всеки нов етап става КОЛОНА · „да може всеки да рзвие своя бизнес"',
+    ikona: 'ekran-prodazhbi',
+    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'etapi-prodazhbi' },
+    grupa: 'biznesat',
+    za: SAMO_STOPANINAT,
+  },
+  {
     klyuch: 'kontragenti',
     ime: 'Контрагенти',
     opis: 'моята фирма · клиенти · доставчици · ЕИК и адрес за одитния файл',

@@ -113,6 +113,19 @@ async function main(): Promise<void> {
     await smetki.blok12(ctx);
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
+    /**
+     * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
+     *
+     * §95 иска НАСТРОЙКИ, а те не са гол бутон, а ПАДАЩ РЕД (ADR-066): пунктът
+     * отваря менюто, екранът се сменя чак от ТЕМАТА. Освен това редът не е
+     * достъпен навсякъде в прохода — по-късните блокове менят лентата, и
+     * чакането там виси трийсет секунди с „на екрана: Имоти".
+     *
+     * `nastroyki.blok6` (§63) току-що е доказал, че редът се отваря — затова
+     * мястото е точно след него. Редът на блоковете е ЧАСТ ОТ ДОГОВОРА им.
+     */
+    await prodazhbi.blok1(ctx);
+    await prodazhbi.blok2(ctx);
     await tablo.blok2(ctx);
     await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);
@@ -124,9 +137,6 @@ async function main(): Promise<void> {
     // състояние под следващия, е по-скъп от липсващ.
     await menyuta.blok4(ctx);
     await udobstvoto.blok5(ctx);
-    // §94 стои СЛЕД §71: той обхожда лентата и мени екрана, а Продажби отваря
-    // сделка и я праща в терминала — състояние, което не се връща.
-    await prodazhbi.blok1(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

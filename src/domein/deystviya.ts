@@ -19,9 +19,10 @@ import {
   napraviOtgovor,
 } from './zadachi-kam-hora.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
-import { sashtnost, VID, type Vid } from './sabitiya.js';
+import { NACHINI_NA_PLASHTANE, sashtnost, VID, type Vid } from './sabitiya.js';
 import { sashtnostNaDokumenti } from './dokumenti.js';
 import {
+  etapite,
   GreshkaProdazhba,
   SASTOYANIYA,
   sashtnostNaDvizhenie,
@@ -87,6 +88,7 @@ import type {
   PayloadSluzhitelZapisan,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
+  PayloadEtapNaProdazhbaZapisan,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
@@ -867,6 +869,45 @@ export class Deystviya {
   }
 
   /**
+   * ДОБАВЯ ЕТАП НА ПРОДАЖБАТА · нова колона в таблицата (29.08).
+   *
+   * Негово: „какъвто и да е той може да се добави като колона и да се вкара в
+   * функционалност по плана, да може всеки да рзвие своя бизнес."
+   *
+   * ДВЕ ПРОВЕРКИ:
+   *   1. НЕГОВИТЕ седем НЕ се презаписват · те са дума, не настройка. Кръщаване
+   *      на нов етап „Капаро" щеше да смени смисъла на вече записани движения;
+   *   2. името не е празно · колона без глава не се чете.
+   *
+   * КОЙ може, решава МЯСТОТО: секцията живее в Настройки и се вижда само от
+   * Стопанина (`temi-nastroyki.ts`) — „меню, върху което системата СМЯТА, расте
+   * само от Настройки" (И97). Втора проверка тук би била втора врата към
+   * достъпа, а достъпът има един дом (правило 23).
+   */
+  async zapishiEtapNaProdazhba(
+    danni: PayloadEtapNaProdazhbaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const ime = danni.klyuch.trim();
+    if (ime === '') {
+      throw new GreshkaProdazhba('Етапът иска име — колона без глава не се чете.');
+    }
+    if (VIDOVE_DVIZHENIE.some((v) => v.klyuch === ime)) {
+      throw new GreshkaProdazhba(
+        `„${ime}" е негов етап от начало и не се презаписва. Вече записаните ` +
+          'движения по него биха сменили смисъла си мълчаливо.',
+      );
+    }
+    return this.#pusni(
+      'ЕтапНаПродажбаЗаписан',
+      VID.etapProdazhba,
+      `ETAP:${ime}`,
+      { ...danni, klyuch: ime },
+      z,
+    );
+  }
+
+  /**
    * ЗАПИСВА ПРОДАЖБА · сделката с петнайсетте му колони (резен 18б).
    *
    * ТРИ ПРОВЕРКИ СТОЯТ ТУК, не на екрана — екран без бутон се заобикаля с
@@ -943,10 +984,20 @@ export class Deystviya {
           'то е в Журнала, но никъде на екрана.',
       );
     }
-    if (!VIDOVE_DVIZHENIE.some((v) => v.klyuch === danni.vid)) {
+    const etapi = etapite(o);
+    if (!etapi.some((e) => e.klyuch === danni.vid)) {
       throw new GreshkaProdazhba(
         `Непознат вид движение „${danni.vid}". Изброените са: ` +
-          `${VIDOVE_DVIZHENIE.map((v) => v.klyuch).join(' · ')}.`,
+          `${etapi.map((e) => e.klyuch).join(' · ')}.`,
+      );
+    }
+    // НАЧИНЪТ Е ИЗБОР, не подразбиране (негово, 29.08: „Даа има избор.").
+    // Изброен е по същата причина като при разхода: свободна стойност би
+    // паднала ТИХО в БАНКА и би разминала кеша от банковия път (ADR-074).
+    if (!NACHINI_NA_PLASHTANE.some((n) => n.klyuch === danni.nachin)) {
+      throw new GreshkaProdazhba(
+        `Непознат начин „${danni.nachin}". Изброените са: ` +
+          `${NACHINI_NA_PLASHTANE.map((n) => n.ime).join(' · ')}.`,
       );
     }
     if (vArhiva(prodazhba.sastoyanie)) {
