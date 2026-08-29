@@ -37,6 +37,14 @@ import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
 import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.js';
 import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
+import {
+  dnitteNaSedmitsata,
+  GreshkaZaplata,
+  proveriZahranvane,
+  redoveNaSedmitsata,
+  sboraNaSedmitsata,
+  zashtoNeMozhe,
+} from './zaplati.js';
 import { ostatakNa } from './krediti.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
@@ -88,6 +96,8 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadKeshZahranen,
+  PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
@@ -1104,6 +1114,123 @@ export class Deystviya {
       'ПлащанеПоКредит',
       VID.plashtaneKredit,
       `PLK:${danni.plashtaneId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ЗАПЛАТА · един ред от седмичния списък (резен 20 · ADR-080).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана:
+   *
+   *   1. ИМЕТО не е празно · заплата без име не се плаща на никого;
+   *   2. ДНЕВНАТА СТАВКА е над нула · нулева заплата е или грешка, или
+   *      решение, което иска думи, не празно поле;
+   *   3. ДНИТЕ са 1–7 · седмицата има седем дни, и осмият ден мълчаливо би
+   *      надул сбора, който после отива в Разходи;
+   *   4. СЕДМИЦАТА НЕ Е ЗАМРАЗЕНА · „Замрази седмицата" значи точно това, и
+   *      отказът носи седмицата С ДАТИТЕ ѝ.
+   *
+   * НЕ иска отключен МЕСЕЦ, и това се казва на глас: заплатата още не е
+   * счетоводен запис. Тя става такъв при ПРЕХВЪРЛЯНЕТО, и там месецът се пита.
+   */
+  async zapishiZaplata(danni: PayloadZaplataZapisana, z: Zayavka): Promise<Rezultat> {
+    if (danni.ime.trim() === '') {
+      throw new GreshkaZaplata('Заплатата иска име — без него не се плаща на никого.');
+    }
+    if (!Number.isSafeInteger(danni.dnevna_st) || danni.dnevna_st <= 0) {
+      throw new GreshkaZaplata('Дневната ставка е цели центове, повече от нула.');
+    }
+    if (!Number.isInteger(danni.dni) || danni.dni < 1 || danni.dni > 7) {
+      throw new GreshkaZaplata('Дните в седмицата са между 1 и 7.');
+    }
+    const o = await this.ogledalo();
+    const zashto = zashtoNeMozhe(o, danni.sedmitsa);
+    if (zashto !== '') throw new GreshkaZaplata(zashto);
+    return this.#pusni('ЗаплатаЗаписана', VID.zaplata, `ZPL:${danni.zaplataId}`, danni, z);
+  }
+
+  /**
+   * ПРЕХВЪРЛЯ СЕДМИЦАТА В РАЗХОДИ · РЪЧНО, с архив и следа.
+   *
+   * Негово *(р48·[83])*: „да се прави РЪЧНО, когато се актуализира в Петък
+   * обикновенно, трябва да се пази архив на това и да оставя следа в таба
+   * ЗАПЛАТИ". По-ранното „автоматично" *(р48·[81])* е от СЪЩИЯ разговор и е
+   * надживяно (правило 28).
+   *
+   * ДВЕ СЪБИТИЯ, не едно: първо разходът, после следата. Ако второто падне,
+   * разходът стои сам и се вижда — по-добре от следа, която сочи нищо.
+   *
+   * ПОВТОРНО НАТИСКАНЕ НЕ УДВОЯВА: седмицата вече има следа и Вратата отказва
+   * с числото на вече прехвърленото. Идемпотентността през `opId` пази
+   * ПОВТОРЕНОТО НАТИСКАНЕ; тази проверка пази ВТОРОТО решение на човека — те
+   * са различни неща (правило 20).
+   */
+  async prehvarliSedmitsata(
+    sedmitsa: string,
+    zamrazi: boolean,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const veche = o.prehvarleniSedmitsi.get(sedmitsa);
+    if (veche) {
+      throw new GreshkaZaplata(
+        `Седмица ${sedmitsa} вече е прехвърлена в Разходи за ${veche.suma_st} ` +
+          '(в цели центове). Второ прехвърляне би удвоило разхода за същите дни.',
+      );
+    }
+    const redove = redoveNaSedmitsata(o, sedmitsa);
+    if (redove.length === 0) {
+      throw new GreshkaZaplata(
+        `Седмица ${sedmitsa} няма нито един ред. Празно прехвърляне ражда разход ` +
+          'от нула, който после никой не може да обясни.',
+      );
+    }
+    const suma_st = sboraNaSedmitsata(o, sedmitsa);
+    const { do_ } = dnitteNaSedmitsata(sedmitsa);
+    const razhodId = `RZ-ZPL-${sedmitsa}`;
+    // РАЗХОДЪТ Е ПРЪВ · датата му е НЕДЕЛЯТА на седмицата, за да падне в
+    // месеца, в който седмицата свършва. Тук се пита и замразеният месец.
+    await this.zapishiRazhod(
+      razhodId,
+      {
+        potok: 'zaplati',
+        dostavchik: 'Заплати',
+        opis: `Седмица ${sedmitsa} · ${redove.length} ${redove.length === 1 ? 'ред' : 'реда'}`,
+        suma_st,
+        sektor: 'zaplati',
+        nachin: 'в брой',
+        data: do_,
+        dokument: '',
+        stavka: 0,
+      },
+      { ...z, opId: `${z.opId}:razhod` },
+    );
+    return this.#pusni(
+      'СедмицаПрехвърлена',
+      VID.sedmitsaZaplati,
+      `SED:${sedmitsa}`,
+      { sedmitsa, razhodId, suma_st, zamrazena: zamrazi },
+      z,
+    );
+  }
+
+  /**
+   * ЗАХРАНВА КЕША · „бутон за вкарване ма пари" *(р75·[32])*.
+   *
+   * Джобът е ЕДИН и е обявен (`DZHOBAT_NA_ZAPLATITE` = трезорът): „Един общ
+   * кеш-джоб за фирмата" плюс „Кеш = Трезор". Затова тук няма избор на джоб —
+   * избор, който има един вариант, е поле, което лъже, че има решение.
+   *
+   * Захранването е ПРИХОД по кеша, не разход: парите ВЛИЗАТ в джоба.
+   */
+  async zahraniKesha(danni: PayloadKeshZahranen, z: Zayavka): Promise<Rezultat> {
+    proveriZahranvane(danni);
+    return this.#pusni(
+      'КешЗахранен',
+      VID.keshZahranen,
+      `KSH:${danni.zahranvaneId}`,
       danni,
       z,
     );

@@ -30,6 +30,11 @@ import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
+import type {
+  PrehvarlenaSedmitsa,
+  RedNaZaplata,
+  ZahranvaneNaKesha,
+} from '../domein/zaplati.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
@@ -73,6 +78,9 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadKeshZahranen,
+  PayloadSedmitsaPrehvarlena,
+  PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
@@ -306,6 +314,19 @@ export interface Ogledalo {
 
   /** Плащанията по кредити · ДОБАВЯТ се; сторнираното вече го няма тук. */
   readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
+
+  /**
+   * ЗАПЛАТИТЕ · редовете по седмици (резен 20 · ADR-080).
+   *
+   * Седмичната заплата НЕ е тук — тя е ставка × дни и се СМЯТА (`zaplati.ts`).
+   */
+  readonly zaplati: ReadonlyMap<string, RedNaZaplata>;
+
+  /** Прехвърлените седмици · следата „коя, кога, кой разход роди". */
+  readonly prehvarleniSedmitsi: ReadonlyMap<string, PrehvarlenaSedmitsa>;
+
+  /** Захранванията на общия кеш-джоб · ДОБАВЯТ се; сторнираното го няма тук. */
+  readonly zahranvaniyaNaKesha: readonly ZahranvaneNaKesha[];
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -513,6 +534,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
    * СЪЩОТО, не преписано.
    */
   const stornianiKrediti = storniranite('КредитЗаписан');
+  /**
+   * И ПЕТИЯТ · заплатата (резен 20). `ЗаплатаЗаписана` е и създаването, и
+   * поправката, значи носи същата дупка. Викането е СЪЩОТО, не преписано.
+   */
+  const stornianiZaplati = storniranite('ЗаплатаЗаписана');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -539,6 +565,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
+  const zaplati = new Map<string, RedNaZaplata>();
+  const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
+  const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -1015,6 +1044,56 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ЗаплатаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · редът идва наведнъж. `seq` се пази от ПЪРВИЯ
+        // запис, за да не мести сторното целта си (както при сделката).
+        const p = s.payload as unknown as PayloadZaplataZapisana;
+        if (stornianiZaplati.has(s.sashtnost.id)) break;
+        const predishna = zaplati.get(p.zaplataId);
+        zaplati.set(p.zaplataId, {
+          id: p.zaplataId,
+          seq: predishna ? predishna.seq : s.seq,
+          sedmitsa: p.sedmitsa,
+          proektId: p.proektId,
+          ime: p.ime,
+          dlazhnost: p.dlazhnost,
+          obekt: p.obekt,
+          dnevna_st: p.dnevna_st,
+          dni: p.dni,
+        });
+        break;
+      }
+
+      case 'СедмицаПрехвърлена': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА СЕДМИЦАТА БИЕ · замразяването е ВТОРИ запис
+        // върху същата същност, не трето събитие. „Прехвърлих" и „замразих"
+        // са едно решение на човек, взето на два пъти.
+        const p = s.payload as unknown as PayloadSedmitsaPrehvarlena;
+        prehvarleniSedmitsi.set(p.sedmitsa, {
+          sedmitsa: p.sedmitsa,
+          razhodId: p.razhodId,
+          suma_st: p.suma_st,
+          kogato: s.ts,
+          koy: s.actor,
+          zamrazena: p.zamrazena,
+        });
+        break;
+      }
+
+      case 'КешЗахранен': {
+        // ДОБАВЯ СЕ · салдото на джоба е СБОР, не поле. Сторното го сваля
+        // оттук по `seq`, и кешът пада обратно сам.
+        const p = s.payload as unknown as PayloadKeshZahranen;
+        zahranvaniyaNaKesha.push({
+          id: p.zahranvaneId,
+          seq: s.seq,
+          suma_st: p.suma_st,
+          data: p.data,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
       case 'ЕтапНаПродажбаЗаписан': {
         // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · преименуване е нов запис, не втори
         // етап. Базовите седем не идват насам — те не се пишат в Журнала.
@@ -1230,6 +1309,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     etapiNaProdazhbite,
     krediti,
     plashtaniyaPoKrediti,
+    zaplati,
+    prehvarleniSedmitsi,
+    zahranvaniyaNaKesha,
     pototsi,
     salda,
     dela,
