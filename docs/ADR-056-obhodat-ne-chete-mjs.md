@@ -14,7 +14,7 @@ Error [ERR_MODULE_NOT_FOUND]: Cannot find package 'playwright'
     imported from stroezh/risuvai-ikoni.mjs
 ```
 
-В пакета стои само `playwright-core` (правило 10). Съседът `proba/prohod.mjs`
+В пакета стои само `playwright-core` (правило 10). Съседът (тогавашният prohod.mjs, днес `proba/prohod.ts`)
 внасяше правилния; рисувачът — не. Командата е обявена в `package.json` и
 никой не я беше пускал.
 

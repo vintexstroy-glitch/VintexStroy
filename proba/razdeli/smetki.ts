@@ -1157,6 +1157,14 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
    * Обхватът се СМЕНЯ през полетата, като човек — и в РЕДА, в който човек го
    * прави: напред се мести първо краят, назад — първо началото. Инак средното
    * състояние е обърнат обхват, екранът отказва (с право) и плочките ги няма.
+   *
+   * ═══ И НАКРАЯ СЕ ЧАКА ПОКАЗАНОТО, НЕ ПОИСКАНОТО ═══
+   *
+   * `smeniPoleto` чака СТОЙНОСТТА на полето — а тя се появява от самото писане,
+   * преди прерисуването изобщо да е почнало. Затова броенето на редовете хващаше
+   * през път екрана със СТАРИЯ обхват: 22 реда вместо 4. Тук се чака надписът,
+   * който секцията слага за себе си — той се появява само СЛЕД като редовете са
+   * пресметнати с този обхват.
    */
   const obhvat = async (ot: string, do_: string): Promise<void> => {
     const segashnoDo = await p.$eval('#spravki-do', (e) => (e as HTMLInputElement).value);
@@ -1166,6 +1174,20 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
     } else {
       await smeniPoleto(p, '#spravki-ot', ot);
       await smeniPoleto(p, '#spravki-do', do_);
+    }
+    const iskan = `${ot}·${do_}`;
+    try {
+      await p.waitForSelector(`[data-sektsiya=nap-spravki][data-obhvat="${iskan}"]`, {
+        timeout: 5_000,
+      });
+    } catch {
+      // ДИАГНОЗА С ЧИСЛО, НЕ С ТАЙМАУТ (поуката на ADR-071). Гол таймаут казва
+      // „нещо не стана"; тези два надписа казват КОЕ не е стигнало до екрана.
+      const pokazan = await p.$eval(
+        '[data-sektsiya=nap-spravki]',
+        (e) => (e as HTMLElement).dataset['obhvat'],
+      );
+      throw new Error(`Обхватът не стигна до екрана · искан: ${iskan} · показан: ${pokazan}`);
     }
   };
 
@@ -1200,6 +1222,11 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   // МЕРИ СЕ ПРЕДИ И СЛЕД · абсолютните числа зависят от чужди блокове, а
   // разликата — не (същата поука като в §90).
   await obhvat('2026-10', '2026-10');
+  // И екранът КАЗВА с какъв обхват е нарисуван · инак броенето отдолу мери
+  // предишното състояние и пада ПРЕЗ ПЪТ (резен 18).
+  proveri('секцията казва с какъв обхват е нарисувана',
+    await p.$eval('[data-sektsiya=nap-spravki]', (e) => (e as HTMLElement).dataset['obhvat']),
+    '2026-10·2026-10');
   const predRedove = await p.$$eval('.red.spravkared', (e) => e.length);
   const predNedeklarirani = await plochkaNaSpravka('nedeklariraniNoPlateni');
   const predPlateni = await plochkaNaSpravka('plateni');

@@ -563,6 +563,18 @@ export function zakachiNAP(koren: HTMLElement, k: Konteks, prerisuvay: () => Pro
  * Тези справки са за РАБОТА: счетоводителят гледа тримесечие назад, за да види
  * какво е останало неподадено. Затова тук има свои две полета, а не месецът от
  * горния блок.
+ *
+ * ═══ И СЕКЦИЯТА КАЗВА С КАКЪВ ОБХВАТ Е НАРИСУВАНА (резен 18) ═══
+ *
+ * `data-obhvat` носи двата месеца, с които редовете СА пресметнати. Полетата
+ * казват какво е ПОИСКАНО; този надпис — какво е ПОКАЗАНО, и двете се разминават
+ * точно в мига между смяната и прерисуването.
+ *
+ * Платено с находка: §92 падаше през път — веднъж мина, веднъж не. Броенето на
+ * редовете хващаше екрана, нарисуван още със СТАРИЯ обхват, защото чакането
+ * гледаше стойността на полето, а тя се появява от писането, преди изобщо да е
+ * почнало прерисуване. Проверка, която веднъж минава и веднъж пада, е по-лоша
+ * от липсваща: тя учи да се пуска повторно, вместо да се търси причина.
  */
 function blokNaSpravkiteZaSchetovodstvoto(o: Ogledalo, dnes: string): string {
   const { ot, do_ } = obhvatatNaSpravkite(dnes);
@@ -571,7 +583,7 @@ function blokNaSpravkiteZaSchetovodstvoto(o: Ogledalo, dnes: string): string {
     redove = redoveteZaSchetovodstvoto(o, ot, do_);
   } catch (err) {
     return `
-    <section data-sektsiya="nap-spravki">
+    <section data-sektsiya="nap-spravki" data-obhvat="${ekraniraj(ot)}·${ekraniraj(do_)}">
       ${glavataNaSpravkite(ot, do_)}
       <p class="greshka">${ekraniraj(dumiZaGreshka(err))}</p>
     </section>`;
@@ -582,7 +594,7 @@ function blokNaSpravkiteZaSchetovodstvoto(o: Ogledalo, dnes: string): string {
   const chakat = mesetsiteZaPodavane(s);
 
   return `
-    <section data-sektsiya="nap-spravki">
+    <section data-sektsiya="nap-spravki" data-obhvat="${ekraniraj(ot)}·${ekraniraj(do_)}">
       ${glavataNaSpravkite(ot, do_)}
 
       <p class="drebno">Четирите справки са ДВЕ ДУМИ, зададени на всеки ред:
