@@ -554,9 +554,17 @@ describe('В · разходният подход', () => {
     }
   });
 
+  it('единицата е ДЕСЕТ ХИЛЯДИ базисни точки · числото се твърди, не се чете', () => {
+    // Без този ред всяко очакване отдолу може да се пише като `EDINITSA_BT / 2`
+    // и да се мести ЗАЕДНО с нея: удвоена, тя оставя всички проверки зелени.
+    expect(EDINITSA_BT).toBe(10_000);
+  });
+
   it('останалото от сградата се БРОИ и от екрана · един дом', () => {
-    expect(ostavashti_bt(sVazrast(0))).toBe(EDINITSA_BT);
-    expect(ostavashti_bt(sVazrast(25))).toBe(EDINITSA_BT / 2);
+    // ЧИСЛАТА СА С РЪКА. „Половината" се пише 5 000, не `EDINITSA_BT / 2`:
+    // второто е същата константа от двете страни на равенството.
+    expect(ostavashti_bt(sVazrast(0))).toBe(10_000);
+    expect(ostavashti_bt(sVazrast(25))).toBe(5_000);
     expect(ostavashti_bt(sVazrast(50))).toBe(0);
     expect(ostavashti_bt(sVazrast(999))).toBe(0);
   });

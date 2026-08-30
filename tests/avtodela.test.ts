@@ -396,7 +396,11 @@ describe('пропуснатото', () => {
     const { deystviya } = stend();
     await deystviya.zapishiSreshta(
       'sr-1',
-      { kontakt: 'Мария', adres: '', data: sled(NAPRED_DNI + 30), sastoyanie: 'чака' },
+      // СЕДЕМДЕСЕТ И ПЕТ · написано с РЪКА, не `NAPRED_DNI + 30`. Смятано от
+      // самата константа, „далечното" се мести ЗАЕДНО с хоризонта: разтегнат
+      // на 90, той пак би оставил тази среща зад него и тестът пак би минал —
+      // тоест не мери нищо. Хоризонтът се твърди отделно (там: 45).
+      { kontakt: 'Мария', adres: '', data: sled(75), sastoyanie: 'чака' },
       { opId: 'op-1' },
     );
     await deystviya.zapishiKredit(
