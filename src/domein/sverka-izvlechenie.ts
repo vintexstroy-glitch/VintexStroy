@@ -92,6 +92,17 @@ export interface ZapisZaSverka {
   readonly nachin: NachinNaPlashtane;
   /** кой е насреща · наемател или доставчик, за окото */
   readonly koy: string;
+  /**
+   * ДОГОВОРЪТ · `naemId` на наема, през който е дошло плащането (резен 36).
+   *
+   * Негова дума *(р84·[28])*: „в извлечения да се сверява с филтър за
+   * КОНКРЕТЕН ИЗБОР НА ДОГОВОРИ по филтруте и филттите."
+   *
+   * ПРАЗНО е ЧЕСТНО и значи „този запис не принадлежи на договор": разходите
+   * нямат наем, а плащане с изгубена връзка също. Слети с „всички", те щяха да
+   * се появяват под всеки избран договор.
+   */
+  readonly dogovor: string;
 }
 
 /** Какво е станало с един запис при срещата с извлечението. */
@@ -159,6 +170,7 @@ export function zapisiteNaKnigata(o: Ogledalo, period: string): readonly ZapisZa
       suma_st: p.suma_st,
       nachin: p.nachin as NachinNaPlashtane,
       koy: koyPlashta(o, p),
+      dogovor: o.vzemaniya.get(p.vzemaneId)?.naemId ?? '',
     });
   }
   for (const r of o.razhodi.values()) {
@@ -170,6 +182,8 @@ export function zapisiteNaKnigata(o: Ogledalo, period: string): readonly ZapisZa
       suma_st: r.suma_st,
       nachin: r.nachin as NachinNaPlashtane,
       koy: r.dostavchik,
+      // РАЗХОДЪТ НЯМА ДОГОВОР · празното тук не е пропуск, а факт.
+      dogovor: '',
     });
   }
   return Object.freeze(redove);
@@ -394,5 +408,130 @@ export function sverkaPoMesetsi(n: {
       ot: n.ot,
       do: n.do,
     }),
+  );
+}
+
+/* ══ ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР (резен 36 · M02 · ADR-096) ═══════════════
+ *
+ * Негова дума *(р84·[28])*: „в извлечения да се сверява с филтър за КОНКРЕТЕН
+ * ИЗБОР НА ДОГОВОРИ по филтруте и филттите."
+ *
+ * ═══ СТЕСНЯВАНЕ, НЕ ВТОРА СВЕРКА ═══
+ *
+ * Филтърът НЕ пуска сверката наново върху отсято извлечение. Ако книгата се
+ * стесни, а банката не, всеки чужд ред щеше да стане „само в банката" — и един
+ * договор от три би родил двойно повече фалшиви находки, отколкото истински.
+ *
+ * Затова се стеснява РЕЗУЛТАТЪТ: същата среща, гледана през един договор.
+ *
+ * ═══ ЧАСТИТЕ СЕ СЪБИРАТ ДО ЦЯЛОТО ═══
+ *
+ * Това е проверката, която прави филтъра честен: сборът на всички договори плюс
+ * онова БЕЗ договор дава ТОЧНО целия вход. Изгубен или преброен два пъти ред се
+ * вижда като число, не като усещане (правило 7 · умение `matematika`).
+ */
+
+/** Един договор, както се предлага за избор · с броя си, за да не е сляп изборът. */
+export interface DogovorVSverkata {
+  readonly id: string;
+  /** името на наемателя · празно, ако наемът вече го няма */
+  readonly ime: string;
+  readonly broy: number;
+}
+
+export const BEZ_DOGOVOR = '';
+
+/**
+ * КОИ ДОГОВОРИ УЧАСТВАТ · четат се от самата сверка, не от Огледалото.
+ *
+ * Списък от всички наеми щеше да предлага договори с НУЛА реда за месеца —
+ * избор, който води до празен екран и нищо не казва.
+ */
+export function dogovoriteVSverkata(
+  r: RezultatNaSverkata,
+  imeNa: (id: string) => string,
+): readonly DogovorVSverkata[] {
+  const broy = new Map<string, number>();
+  for (const x of r.redove) {
+    if (x.zapis.dogovor === BEZ_DOGOVOR) continue;
+    broy.set(x.zapis.dogovor, (broy.get(x.zapis.dogovor) ?? 0) + 1);
+  }
+  return Object.freeze(
+    [...broy.entries()]
+      .map(([id, n]) => Object.freeze({ id, ime: imeNa(id), broy: n }))
+      .sort((a, b) => a.ime.localeCompare(b.ime, 'bg') || a.id.localeCompare(b.id)),
+  );
+}
+
+export interface StesnenaSverka {
+  /** избраният договор · празно значи „всички" */
+  readonly dogovor: string;
+  readonly redove: readonly RedNaSverkata[];
+  readonly vhod_st: number;
+  readonly izhod_st: number;
+  /**
+   * Колко реда от извлечението са СКРИТИ · те нямат договор по определение.
+   *
+   * Числото се КАЗВА, вместо редовете просто да изчезнат (правило 15): иначе
+   * човек с избран договор би решил, че находките от банката са свършили.
+   */
+  readonly skritiOtBankata: number;
+}
+
+/**
+ * СТЕСНЯВА сверката до един договор · празният избор връща всичко.
+ *
+ * „Само в банката" се СКРИВА при избран договор, защото банков ред без насрещен
+ * запис няма договор — той е находка на цялата книга, не на този наем. Броят
+ * му обаче се казва.
+ */
+export function stesniPoDogovor(r: RezultatNaSverkata, dogovor: string): StesnenaSverka {
+  if (dogovor === BEZ_DOGOVOR) {
+    return Object.freeze({
+      dogovor,
+      redove: r.redove,
+      vhod_st: r.vhod_st,
+      izhod_st: r.izhod_st,
+      skritiOtBankata: 0,
+    });
+  }
+  const redove = r.redove.filter((x) => x.zapis.dogovor === dogovor);
+  return Object.freeze({
+    dogovor,
+    redove: Object.freeze(redove),
+    vhod_st: redove.reduce((s, x) => s + x.zapis.suma_st, 0),
+    // ИЗХОДЪТ е онова, което се е ОБЯСНИЛО · сверено плюс в брой, както при
+    // целия месец. Един дом за правилото няма как да има, защото там то се
+    // смята върху друг вход — затова тук се повтаря сметката, не числото.
+    izhod_st: redove
+      .filter((x) => x.sadba === 'nameren' || x.sadba === 'bezBanka')
+      .reduce((s, x) => s + x.zapis.suma_st, 0),
+    skritiOtBankata: r.samoVBankata.length,
+  });
+}
+
+/**
+ * СВЕРКАТА НА ФИЛТЪРА · частите се събират до цялото (правило 7).
+ *
+ * Входът е сборът на КНИГАТА за месеца; изходът — сборът на всички стеснявания
+ * по договор ПЛЮС онова без договор. Разлика значи, че филтърът е изгубил ред
+ * или го е преброил два пъти — най-тихата възможна повреда, защото стеснен
+ * списък и без това изглежда по-къс.
+ */
+export function sveriStesnyavaneto(
+  r: RezultatNaSverkata,
+  dogovori: readonly DogovorVSverkata[],
+  kogato: string,
+): Sverka {
+  const poDogovori = dogovori.reduce((s, d) => s + stesniPoDogovor(r, d.id).vhod_st, 0);
+  const bezDogovor = r.redove
+    .filter((x) => x.zapis.dogovor === BEZ_DOGOVOR)
+    .reduce((s, x) => s + x.zapis.suma_st, 0);
+  return sverka(
+    'филтър по договор · частите ↔ цялото',
+    r.vhod_st,
+    poDogovori + bezDogovor,
+    kogato,
+    MERKA.pari,
   );
 }

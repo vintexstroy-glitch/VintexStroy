@@ -1234,6 +1234,18 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('кешът стои в сумата на списъка',
     (await tekstNa(p, '[data-plateno-na-raka]')).replace(/[\s\u202f\u00a0]/g, '').includes('300,00'), true);
 
+  // ФИЛТЪРЪТ ПО ДОГОВОР ГО НЯМА ТУК · септемврийското извлечение носи САМО
+  // разходи, а разходът няма договор. Филтър без какво да филтрира е надпис
+  // (ADR-041).
+  //
+  // ПЛАТЕНО С ТАВТОЛОГИЯ: първата версия питаше същото СЛЕД „Забрави
+  // извлечението" — тоест когато сверка изобщо няма и падащо меню няма как да
+  // има. Счупих условието да рисува винаги и проверката пак мина.
+  razdel = '114 · Филтърът по договор · без договори го НЯМА';
+  proveri('сверката е на екрана', await p.$$eval('[data-tablitsa=izvlechenie]', (e) => e.length), 1);
+  proveri('но падащото меню за договор НЕ се рисува · няма какво да филтрира',
+    await p.$$eval('#izvlechenie-dogovor', (e) => e.length), 0);
+
   razdel = '91 · Сверката с извлечението · записът е на ЧОВЕК';
   const predZapisa = await broySabitiya(p);
   await deystvieSPrerisuvane(p, () => p.click('#zapishi-sverka-izvlechenie'));
@@ -1243,6 +1255,77 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
   proveri('таблицата си отива', await p.$$eval('[data-tablitsa=izvlechenie]', (e) => e.length), 0);
   proveri('и затварянето НЕ пише нищо', await broySabitiya(p), predZapisa + 1);
+
+  // ══ 114 · ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР (резен 36 · ADR-096) ══════════════
+  //
+  // „в извлечения да се сверява с филтър за конкретен избор на договори по
+  // филтруте и филттите." *(р84·[28])*
+  //
+  // ДВА ВИДА РЕДОВЕ В ЕДИН МЕСЕЦ · плащане ПО ДОГОВОР и разход БЕЗ договор.
+  // Точно тази смес прави филтъра проверим: без нея стеснението няма какво да
+  // махне, а сверката на частите няма „без договор" половина.
+  await naEkran(p, 'pari', '.red.vzemane');
+  await plati(p, 'Домакинство', '500,00', 'банка', '2026-02-20');
+  await naEkran(p, 'smetki', '#razhod-dostavchik');
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Февруари ООД',
+    opis: 'разход без договор', suma: '400,00', nachin: 'банка', data: '2026-02-18', dokument: 'F-9',
+  });
+
+  razdel = '114 · Филтърът по договор · появява се, щом има какво да филтрира';
+  await naEkran(p, 'smetki', '#forma-period');
+  await p.fill('#smetki-period', '2026-02');
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+  const FEVRUARI =
+    'Дата;Описание;Сума;Референция;Салдо\n' +
+    '20.02.2026;ДОМАКИНСТВО;500,00;F-2;500,00\n' +
+    '18.02.2026;ФЕВРУАРИ ООД;-400,00;F-4;100,00\n' +
+    '25.02.2026;НЕПОЗНАТ ЕООД;999,00;F-3;1 099,00';
+  await p.setInputFiles('#fayl-izvlechenie', {
+    name: 'izvlechenie-fevruari.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(FEVRUARI, 'utf8'),
+  });
+  await p.waitForSelector('#izvlechenie-dogovor');
+  const broyDogovori = Number(
+    await p.$eval('#izvlechenie-dogovor', (e) => (e as any).dataset.broyDogovori),
+  );
+  // ЕДИН договор, защото един наемател е платил този месец. Разходът НЕ става
+  // избор: той няма договор, а липсата не е стойност (правило 15).
+  proveri('договорите се четат от САМАТА сверка · само платилите този месец', broyDogovori, 1);
+  proveri('и „всички" стои НАД тях, като първи избор',
+    await p.$eval('#izvlechenie-dogovor option', (e) => (e as any).value), '');
+
+  razdel = '114 · Филтърът по договор · частите се събират до ЦЯЛОТО';
+  proveri('сверката на филтъра стои на екрана и е нула',
+    (await tekstNa(p, '[data-chasti-sverka]')).replace(/[\s  ]/g, '').includes('разлика0,00'),
+    true);
+
+  razdel = '114 · Филтърът по договор · стеснява ПОГЛЕДА, не сверката';
+  const predFiltar = await broySabitiya(p);
+  const vsichkiRedove = await p.$$eval('[data-tablitsa=izvlechenie] .red.izvlechenie', (e) => e.length);
+  const edinstveniyat = await p.$$eval('#izvlechenie-dogovor option', (e) => (e[1] as any).value);
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izvlechenie-dogovor', edinstveniyat));
+  const sledFiltar = await p.$$eval('[data-tablitsa=izvlechenie] .red.izvlechenie', (e) => e.length);
+  proveri('редовете стават по-малко · разходът отпада', sledFiltar < vsichkiRedove, true);
+  proveri('и остава ТОЧНО плащането по договора', sledFiltar, 1);
+  proveri('разходът НЕ се появява под договор · той няма наем',
+    (await tekstNa(p, '[data-tablitsa=izvlechenie]')).includes('Февруари ООД'), false);
+  proveri('екранът КАЗВА, че показва само един договор',
+    (await tekstNa(p, '[data-stesneno]')).includes('Показан е САМО договорът'), true);
+  proveri('и КАЗВА колко реда само в банката са скрити',
+    Number(await p.$eval('[data-skriti-ot-bankata]', (e) => (e as any).dataset.skritiOtBankata)) > 0,
+    true);
+  proveri('филтърът НЕ пише нищо в Журнала · той е ПОГЛЕД',
+    await broySabitiya(p), predFiltar);
+
+  razdel = '114 · Филтърът по договор · „всички" връща всичко';
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izvlechenie-dogovor', ''));
+  proveri('редовете се връщат до един',
+    await p.$$eval('[data-tablitsa=izvlechenie] .red.izvlechenie', (e) => e.length), vsichkiRedove);
+  proveri('и обяснението за стеснението си отива',
+    await p.$$eval('[data-stesneno]', (e) => e.length), 0);
+  await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
 
   // ЗАПИСАНИТЕ сверки живеят в Настройки, не в таблицата на Сметки: онази е
   // СМЕТНАТА за текущия изглед, тази чете Журнала. Проверката отива при

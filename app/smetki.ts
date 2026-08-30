@@ -16,6 +16,10 @@ import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
 import {
   broyNahodki,
+  BEZ_DOGOVOR,
+  dogovoriteVSverkata,
+  stesniPoDogovor,
+  sveriStesnyavaneto,
   IMENA_NA_SADBITE,
   spisatsiteZaSchetovodstvoto,
   mesetsiSvetene,
@@ -164,6 +168,14 @@ let smyatane: RedNaSmyatane[] = [];
  * месеца свети" един и същ ненамерен запис — негови думи, 11.08.
  */
 let sverkiteNaIzvlechenieto: readonly RezultatNaSverkata[] = [];
+/**
+ * ИЗБРАНИЯТ ДОГОВОР при сверката · ПАМЕТ НА ЕКРАНА, нула събития (резен 36).
+ *
+ * Филтърът е ПОГЛЕД — кой ред гледам сега — а не решение за данните. Записан,
+ * той щеше да значи, че сверката е направена „за този договор", а тя е за
+ * целия месец (правило 23 · ADR-022).
+ */
+let dogovorNaSverkata = chetiEkranno('izvlechenie.dogovor', '');
 let greshkaIzvlechenie = '';
 let opIdSverkaIzvlechenie = crypto.randomUUID();
 /** отпечатъците на прочетените файлове · влизат в записаната сверка */
@@ -1195,6 +1207,15 @@ export function zakachiSmetki(
     await prerisuvay();
   });
 
+  // ФИЛТЪРЪТ ПО ДОГОВОР · ПОГЛЕД, не решение: нула събития (правило 23).
+  koren
+    .querySelector<HTMLSelectElement>('#izvlechenie-dogovor')
+    ?.addEventListener('change', async (e) => {
+      dogovorNaSverkata = (e.target as HTMLSelectElement).value;
+      zapomniEkranno('izvlechenie.dogovor', dogovorNaSverkata);
+      await prerisuvay();
+    });
+
   koren.querySelector<HTMLInputElement>('#klyuch-tsifrite')?.addEventListener('change', async (e) => {
     sTsifrite = (e.target as HTMLInputElement).checked;
     zapomniEkranno('smetki.tsifrite', sTsifrite);
@@ -1457,6 +1478,14 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
   const spisatsi = spisatsiteZaSchetovodstvoto(r);
   const s = sverkataNaIzvlechenieto(r, new Date().toISOString());
 
+  // ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР *(р84·[28])* · стеснява ПОГЛЕДА, не сверката.
+  const dogovori = dogovoriteVSverkata(r, (id) => o.naemi.get(id)?.naemetel ?? '');
+  // Изборът може да сочи договор, който този месец го няма — тогава пада на
+  // „всички", вместо да остави празен екран без обяснение.
+  const izbran = dogovori.some((d) => d.id === dogovorNaSverkata) ? dogovorNaSverkata : BEZ_DOGOVOR;
+  const stesnena = stesniPoDogovor(r, izbran);
+  const svChasti = sveriStesnyavaneto(r, dogovori, new Date().toISOString());
+
   return `
     <section data-sektsiya="smetki-izvlechenie" class="karta${nahodki === 0 ? '' : ' izbrana'}">
       <div class="dyalglava">
@@ -1489,6 +1518,30 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
 
       <p class="drebno">${ekraniraj(ZASHTO_I_NULATA)}</p>
 
+      ${
+        dogovori.length === 0
+          ? ''
+          : `<div class="poleta tesni">
+              <div class="pole">
+                <label for="izvlechenie-dogovor">Договор</label>
+                <select translate="no" id="izvlechenie-dogovor" data-broy-dogovori="${dogovori.length}">
+                  <option value=""${izbran === BEZ_DOGOVOR ? ' selected' : ''}>всички</option>
+                  ${dogovori
+                    .map(
+                      (d) =>
+                        `<option value="${ekraniraj(d.id)}"${d.id === izbran ? ' selected' : ''}>${ekraniraj(
+                          d.ime || d.id,
+                        )} · ${d.broy}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+            </div>
+            <p class="drebno" data-chasti-sverka>Сверка вход↔изход: частите по договор плюс онова
+            БЕЗ договор дават ${pishi(svChasti.izhod)} срещу ${pishi(svChasti.vhod)} в книгата,
+            разлика ${pishi(svChasti.razlika)}.</p>`
+      }
+
       <div class="tablitsa" data-tablitsa="izvlechenie">
         <div class="glava izvlechenie">
           <span data-kolona="koy" data-ime="Кой">Кой</span>
@@ -1497,8 +1550,24 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
           <span data-kolona="suma" data-ime="Сума">Сума</span>
           <span data-kolona="sadba" data-ime="Какво казва извлечението">Какво казва извлечението</span>
         </div>
-        ${r.redove.map((x) => redNaSverkataSIzvlechenie(x, mesetsiSvetene(sverkiteNaIzvlechenieto, x.zapis.klyuch))).join('')}
+        ${stesnena.redove.map((x) => redNaSverkataSIzvlechenie(x, mesetsiSvetene(sverkiteNaIzvlechenieto, x.zapis.klyuch))).join('')}
       </div>
+
+      ${
+        izbran === BEZ_DOGOVOR
+          ? ''
+          : `<p class="drebno" data-stesneno>Показан е САМО договорът
+             „${ekraniraj(o.naemi.get(izbran)?.naemetel ?? izbran)}" ·
+             <b data-stesnen-vhod="${stesnena.vhod_st}">${pishi(stesnena.vhod_st)}</b> от
+             <b>${pishi(r.vhod_st)}</b>${
+               stesnena.skritiOtBankata === 0
+                 ? ''
+                 : ` · <b data-skriti-ot-bankata="${stesnena.skritiOtBankata}">${stesnena.skritiOtBankata}</b>
+                    ${stesnena.skritiOtBankata === 1 ? 'ред' : 'реда'} само в банката ${
+                      stesnena.skritiOtBankata === 1 ? 'е скрит' : 'са скрити'
+                    }: банков ред без насрещен запис няма договор`
+             }.</p>`
+      }
 
       ${
         r.samoVBankata.length === 0

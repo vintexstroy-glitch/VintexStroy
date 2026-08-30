@@ -59,6 +59,7 @@ function zapis(n: Partial<ZapisZaSverka> & { klyuch: string; suma_st: number }):
     data: '2026-05-12',
     nachin: 'банка',
     koy: 'Материали ООД',
+    dogovor: '',
     ...n,
   };
 }
@@ -339,6 +340,14 @@ describe('записите на книгата · от Журнала, не от
     expect(razhod.posoka).toBe('razhod');
     expect(razhod.nachin).toBe('карта');
     expect(razhod.koy).toBe('Материали ООД');
+
+    // ДОГОВОРЪТ · плащането го носи през вземането, разходът НЯМА такъв (резен 36).
+    //
+    // ПЛАТЕНО СЪС СЧУПВАНЕ, КОЕТО МИНА: тестовете на филтъра строят записите
+    // на ръка и затова не виждаха мястото, което ги СЪЗДАВА. Сложих договор на
+    // разхода в `zapisiteNaKnigata` и дванайсетте теста минаха.
+    expect(plashtane.dogovor).toBe('N-1');
+    expect(razhod.dogovor).toBe('');
 
     // ДРУГ месец не влиза
     expect(zapisiteNaKnigata(o, '2026-04')).toHaveLength(0);
