@@ -120,3 +120,13 @@ describe('ставката идва от РЕДА, не от сектора', ()
     expect(STAVKI).toEqual([0, 9, 20]);
   });
 });
+
+describe('пиновете · числата се твърдят с ръка (резен 46 · група В)', () => {
+  it('акумулаторите са СЕДЕМ', () => {
+    expect(AKUMULATORI).toHaveLength(7);
+  });
+
+  it('секторът по подразбиране е жилищният наем', () => {
+    expect(SEKTOR_PO_PODRAZBIRANE).toBe('naem-zhilishten');
+  });
+});

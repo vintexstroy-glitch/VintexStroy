@@ -309,3 +309,9 @@ describe('целият път · файл → предложение', () => {
     expect(p.sverkaNaFormulite.razlika).toBe(0);
   });
 });
+
+describe('пинът · числото се твърди с ръка (резен 46 · група В)', () => {
+  it('за сверка се показват ДВАЙСЕТ реда', () => {
+    expect(REDOVE_ZA_SVERKA).toBe(20);
+  });
+});

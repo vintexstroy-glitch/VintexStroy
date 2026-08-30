@@ -255,37 +255,86 @@ function obhodA() {
  * ПИН СРЕЩУ ДРУГА КОНСТАНТА НЕ Е ПИН — то е същият дефект, само на един завой
  * по-навътре. Затова дясната страна се проверява да НЕ е име с главни букви.
  *
- * ЗАЩО С ХРАПОВ ПРАГ, а не с нула. Днес местата са 29 и всяко иска ПРЕЦЕНКА:
- * при изброимите (седемте акумулатора, трите състояния) пинът е броят и се пише
- * веднага; при други той е име или наредба. Обход с праг нула, чиято поправка не
- * е една, тласка към грешната — уроците на Ж2. Прагът пази броя да не расте,
- * докато резенът му дойде.
+ * ПРАГЪТ Е НУЛА ОТ РЕЗЕН 46. Роди се храпов (29), защото всяко място иска
+ * ПРЕЦЕНКА: при изброимите пинът е броят и се пише веднага; при други е име или
+ * наредба. Резенът мина всичките и прагът падна — оттук нататък нула значи нула.
+ *
+ * И ЕДНО ИМЕ ЖИВЕЕ В ДВА ДОМА: `KOEFITSIENTI` е ПЕТ в Калкулатора и ДВАНАЙСЕТ в
+ * Сметки. Затова пинът се помни по МОДУЛ и име, не по голо име — инак единият
+ * пин би замълчал за другия.
  */
 function obhodV() {
   const faylove = [...faylove_t(), ...faylove_p()];
-  const vsichko = faylove.map(([, izvor]) => izvor).join('\n');
-  const pinnati = new Set();
-  for (const m of vsichko.matchAll(
-    /expect\(\s*([A-Z][A-Z_0-9]{3,})(?:\.\w+)?\s*\)\s*\.\s*(?:not\s*\.\s*)?(?:toBe|toEqual|toHaveLength|toContain)\(\s*([^)]*)\)/g,
-  )) {
-    // ПИН СРЕЩУ ДРУГА КОНСТАНТА не е пин · числото пак не е написано никъде.
-    if (/^[A-Z][A-Z_0-9]{3,}$/.test(m[2].trim())) continue;
-    pinnati.add(m[1]);
-  }
-  const nam = [];
-  for (const [f, izvor] of faylove) {
-    const vneseni = new Set();
+  // ПИНЪТ може да е ОБВИТ · `Object.keys(K)`, `[...K]`, `K.pole` са същото
+  // твърдение върху същата константа. Първата мярка искаше ГОЛОТО име и обяви
+  // за непинати ЧЕТИРИ места, които СА пинати — намерено, докато ги пишех.
+  const PIN =
+    /expect\(\s*(?:Object\.\w+\(\s*|\[\s*\.\.\.\s*)?([A-Z][A-Z_0-9]{3,})(?:\.\w+)?\s*[\])\s]*\)\s*\.\s*(?:not\s*\.\s*)?(?:toBe|toEqual|toHaveLength|toContain)\(\s*([^)]*)\)/g;
+
+  /**
+   * ДОМЪТ на едно име · и той се търси до ОБЯВЯВАНЕТО, не до вратата.
+   *
+   * `matritsa.ts` пре-изнася `EDINITSA_BT` от `nastroyki.ts`: една и съща
+   * константа, два пътя до нея. Ключ по пътя обяви пина за чужд и роди находка,
+   * каквато няма. Затова се върви по веригата, докато се стигне `export const`.
+   */
+  const kadeEObyavena = (modul, ime, dalbochina = 0) => {
+    if (dalbochina > 5) return modul;
+    let izvor;
+    try {
+      izvor = chети(`${modul}.ts`);
+    } catch {
+      return modul;
+    }
+    if (new RegExp(`export\\s+const\\s+${ime}\\b`).test(izvor)) return modul;
+    for (const m of izvor.matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']*)'/gs)) {
+      const imena = m[1].split(',').map((x) => x.trim().split(/\s+as\s+/)[0].trim());
+      if (!imena.includes(ime)) continue;
+      const kam = `${modul}/..\/${m[2]}`.replace(/\.js$/, '');
+      const chist = kam.split('/').reduce((p, ch) => {
+        if (ch === '.' || ch === '') return p;
+        if (ch === '..') { p.pop(); return p; }
+        p.push(ch);
+        return p;
+      }, []).join('/');
+      return kadeEObyavena(chist, ime, dalbochina + 1);
+    }
+    return modul;
+  };
+
+  /** Кой модул носи всяко внесено ИМЕ в този файл · `src/domein/dds` → AKUMULATORI. */
+  const domovete = (izvor) => {
+    const po = new Map();
     for (const m of izvor.matchAll(/import\s*\{([^}]*)\}\s*from\s*'([^']*)'/gs)) {
       if (!m[2].includes('src/')) continue;
+      const modul = m[2].replace(/^.*?(src\/)/, '$1').replace(/\.js$/, '');
       for (const ime of m[1].split(',')) {
         const t = ime.trim().split(/\s+as\s+/).pop().trim();
-        if (/^[A-Z][A-Z_0-9]{3,}$/.test(t)) vneseni.add(t);
+        if (/^[A-Z][A-Z_0-9]{3,}$/.test(t)) po.set(t, kadeEObyavena(modul, t));
       }
     }
-    for (const k of vneseni) {
-      if (pinnati.has(k)) continue;
+    return po;
+  };
+
+  // ПИНОВЕТЕ се помнят по МОДУЛ и име. `KOEFITSIENTI` е ПЕТ в Калкулатора и
+  // ДВАНАЙСЕТ в Сметки: голо име би позволило единият пин да замълчи за другия.
+  const pinnati = new Set();
+  for (const [, izvor] of faylove) {
+    const po = domovete(izvor);
+    for (const m of izvor.matchAll(PIN)) {
+      // ПИН СРЕЩУ ДРУГА КОНСТАНТА не е пин · числото пак не е написано никъде.
+      if (/^[A-Z][A-Z_0-9]{3,}$/.test(m[2].trim())) continue;
+      const modul = po.get(m[1]);
+      if (modul !== undefined) pinnati.add(`${modul}#${m[1]}`);
+    }
+  }
+
+  const nam = [];
+  for (const [f, izvor] of faylove) {
+    for (const [k, modul] of domovete(izvor)) {
+      if (pinnati.has(`${modul}#${k}`)) continue;
       if (new RegExp(`\\.\\s*(?:toBe|toEqual|toHaveLength)\\([^)]*\\b${k}\\b`).test(izvor)) {
-        nam.push(`${f} — ${k} · сверява се, но никъде не е закована с ръка`);
+        nam.push(`${f} — ${k} (${modul}) · сверява се, но никъде не е закована с ръка`);
       }
     }
   }
@@ -311,7 +360,7 @@ const OBHODI = [
   { ime: 'Е · четене без изчакване след действие', prag: 0, kart: obhodE },
   { ime: 'Ж · пише след прерисуване и подава, без проверка', prag: 0, kart: obhodZh },
   { ime: 'А · тестът се мести заедно с кода', prag: 0, kart: obhodA },
-  { ime: 'В · константа без нито един пин с ръка', prag: 29, kart: obhodV },
+  { ime: 'В · константа без нито един пин с ръка', prag: 0, kart: obhodV },
 ];
 
 // ПУСКА СЕ САМО КАТО КОМАНДА. Изнесеното (`rabotni`) трябва да може да се внесе

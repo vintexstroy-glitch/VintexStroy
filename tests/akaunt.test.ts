@@ -172,3 +172,9 @@ describe('изолацията между два акаунта на един н
     expect((await vtoriyat.ogledalo()).naemi.size).toBe(0);
   });
 });
+
+describe('пинът · ключът се твърди с ръка (резен 46 · група В)', () => {
+  it('ключът от Алфа е „vintexstroy"', () => {
+    expect(KLYUCH_OT_ALFA).toBe('vintexstroy');
+  });
+});

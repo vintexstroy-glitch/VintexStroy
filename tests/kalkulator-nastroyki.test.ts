@@ -491,3 +491,18 @@ describe('дадено срещу чакащо · базите на Калкул
     expect(readFileSync('app/kalkulator.ts', 'utf8')).toContain('data-parkomyasto-dvete');
   });
 });
+
+describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
+  it('настройките по подразбиране носят ЧЕТИРИНАЙСЕТ полета', () => {
+    expect(Object.keys(PO_PODRAZBIRANE)).toHaveLength(14);
+  });
+
+  it('примерният обект носи ШЕСТ полета', () => {
+    expect(Object.keys(PRIMEREN_OBEKT)).toHaveLength(6);
+  });
+
+  it('коефициентите на Калкулатора са ПЕТ', () => {
+    // ПЕТ, не дванайсет: съименникът в Сметки е ДРУГА константа, със свой пин.
+    expect(KOEFITSIENTI).toHaveLength(5);
+  });
+});

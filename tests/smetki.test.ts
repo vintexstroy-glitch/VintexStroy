@@ -281,3 +281,11 @@ describe('сторно и стари събития', () => {
     expect(s.nared).toBe(true);
   });
 });
+
+describe('пинът · мярката се твърди с ръка (резен 46 · група В)', () => {
+  it('мерките са ДВЕ · стотинки и брой', () => {
+    expect(Object.keys(MERKA)).toEqual(['pari', 'broy']);
+    expect(MERKA.pari).toBe('стотинки');
+    expect(MERKA.broy).toBe('брой');
+  });
+});

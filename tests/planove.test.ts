@@ -213,3 +213,9 @@ describe('всяка възможност има ОТМЕТКА на Табло�
     expect([...vRed].sort()).toEqual(Object.keys(OPISANIE).sort());
   });
 });
+
+describe('пинът · броят се твърди с ръка (резен 46 · група В)', () => {
+  it('описанията са ПЕТНАЙСЕТ · по едно на всяка възможност', () => {
+    expect(Object.keys(OPISANIE)).toHaveLength(15);
+  });
+});

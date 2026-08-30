@@ -274,3 +274,10 @@ describe('темите · възможността живее на ТЕМАТА'
     expect(blok).not.toMatch(/^\s*iska: /m);
   });
 });
+
+describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
+  it('групите са ПЕТ, а темите — ОСЕМНАЙСЕТ', () => {
+    expect(GRUPI).toHaveLength(5);
+    expect(TEMI).toHaveLength(18);
+  });
+});

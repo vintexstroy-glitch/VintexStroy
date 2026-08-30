@@ -330,3 +330,10 @@ describe('сверките затварят, когато в периода им
     expect(sled.sverki.every((sv) => sv.razlika === 0)).toBe(true);
   });
 });
+
+describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
+  it('потоците са СЕДЕМ и акумулаторите са СЕДЕМ', () => {
+    expect(POTOTSI).toHaveLength(7);
+    expect(AKUMULATORI).toHaveLength(7);
+  });
+});
