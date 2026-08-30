@@ -22,7 +22,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // клас щеше да чете чуждото празно. Същата спънка като `data-myasto` в
     // резен 34 — селекторът лъже мълчаливо, а не пада.
     proveri('празният екран го КАЗВА',
-      (await p.$eval('[data-prazno=dela]', (e) => e.textContent)).includes('Място · Обект · Дело'), true);
+      // ЧЕТИРИТЕ имена, написани с РЪКА (група А): те идват от `koloniNaDelata`,
+      // и точно затова очакването тук НЕ бива да се смята от него — инак се
+      // мести заедно с кода. Отговорникът е новият: редът винаги го е показвал,
+      // а старата глава го премълчаваше (резен 48).
+      (await p.$eval('[data-prazno=dela]', (e) => e.textContent))
+        .includes('Място · Дело · Обект · Отговорник'), true);
     proveri('и се представя, вместо да мълчи',
       (await p.$eval('[data-prazno=dela]', (e) => (e.closest('section') as any).textContent)).includes('Времевия Ред'), true);
 

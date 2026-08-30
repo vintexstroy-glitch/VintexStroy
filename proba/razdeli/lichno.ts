@@ -39,7 +39,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ broy: number } | u
     razdel = '53 · Личното · същата таблица';
     const lichnoTekst = await p.evaluate(() => document.body.textContent);
     proveri('таблицата е СЪЩАТА, с лични надписи',
-      lichnoTekst.includes('Моето време') && lichnoTekst.includes('Тема · Обект · Дело'), true);
+      lichnoTekst.includes('Моето време') && lichnoTekst.includes('Тема · Дело · Обект · Отговорник'), true);
     proveri('и почва ПРАЗНА — служебните дела не се виждат тук',
       await p.$$eval('.gant-delo', (r) => r.length), 0);
     proveri('формата носи СВОЯ представка · две „#forma-delo" се бият',

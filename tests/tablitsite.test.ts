@@ -14,17 +14,19 @@ import { describe, expect, it } from 'vitest';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import { eVgradena, tablitsiteNaProgramata } from '../app/tablitsite.js';
 import { vidNaKolona } from '../src/domein/kolonno.js';
+import { glavataNaDelata, NADPISI_LICHNI, NADPISI_SLUZHEBNI } from '../app/gant.js';
 
 const PRAZNO = fold([]);
 
 describe('регистърът на таблиците', () => {
   const vsichki = tablitsiteNaProgramata(PRAZNO);
 
-  it('вградените са СЕДЕМ и всяка носи име, таб и глави', () => {
-    // Седмата дойде с резен 18б · Продажби. Числото е ТУК, за да падне на
-    // червено, ако някой добави таблица и забрави да я обяви (ADR-041).
+  it('вградените са ОСЕМ и всяка носи име, таб и глави', () => {
+    // Седмата дойде с резен 18б · Продажби; ОСМАТА — с резен 48 · Управление,
+    // и с нея падна последната граница в тази матрица. Числото е ТУК, за да
+    // падне на червено, ако някой добави таблица и забрави да я обяви (ADR-041).
     const vgradeni = vsichki.filter((t) => eVgradena(t.klyuch));
-    expect(vgradeni).toHaveLength(7);
+    expect(vgradeni).toHaveLength(8);
     for (const t of vgradeni) {
       expect(t.ime).not.toBe('');
       expect(t.ekran).not.toBe('');
@@ -70,9 +72,33 @@ describe('регистърът на таблиците', () => {
     }
   });
 
-  it('таблицата на УПРАВЛЕНИЕ още НЕ влиза · границата се брои, не се премълчава', () => {
-    // Тя не е построена върху колонния описател (`app/gant.ts` рисува своя
-    // глава). Падне ли този тест, значи е влязла — и редът в `docs/10` пада с него.
-    expect(vsichki.some((t) => t.ekran === 'gant')).toBe(false);
+  it('таблицата на УПРАВЛЕНИЕ ВЛИЗА · и главите ѝ се ЧЕТАТ, не се преписват', () => {
+    // Дотук тук стоеше обратното и границата се броеше като дълг (`docs/10`).
+    // Резен 48 ѝ даде колонен описател (`koloniNaDelata`), от който четат И
+    // Гантът, И матрицата — тъй че имената вече имат ЕДИН дом (правило 17).
+    const dela = vsichki.find((t) => t.ekran === 'gant');
+    expect(dela, 'Управление липсва от матрицата').toBeDefined();
+    expect(dela!.klyuch).toBe('vgraden:dela');
+    // ЧЕТИРИ, не три: редът показва и отговорника, а старата глава го премълчаваше.
+    expect(dela!.glavi).toEqual(['Място', 'Дело', 'Обект', 'Отговорник']);
+  });
+
+  it('главата на Ганта е СЪЩАТА като в матрицата · един дом, два четеца', () => {
+    const dela = vsichki.find((t) => t.ekran === 'gant')!;
+    expect(glavataNaDelata('Място')).toBe(dela.glavi.join(' · '));
+    // и при личните дела първата дума се СМЕНЯ, а останалите не (И98)
+    expect(glavataNaDelata('Тема')).toBe('Тема · Дело · Обект · Отговорник');
+  });
+
+  it('и ЕКРАНЪТ чете описателя, вместо да преписва низ', () => {
+    // НАМЕРЕНО СЪС СЧУПВАНЕ, не с четене: върнах `glavaNaImenata` на твърд низ
+    // („Място · Обект · Дело") и НИТО ЕДИН тест не падна. Тоест описателят си
+    // стоеше на мястото, а екранът пак говореше свои думи — точно разминаването,
+    // заради което този ред беше дълг. Домът е един само ако ВСИЧКИ четат от него.
+    expect(NADPISI_SLUZHEBNI.glavaNaImenata).toBe(glavataNaDelata('Място'));
+    expect(NADPISI_LICHNI.glavaNaImenata).toBe(glavataNaDelata('Тема'));
+    // и подзаглавието на формата · то също изброяваше колоните на ръка
+    expect(NADPISI_SLUZHEBNI.podnaslovNaFormata).toContain(glavataNaDelata('Място'));
+    expect(NADPISI_LICHNI.podnaslovNaFormata).toContain(glavataNaDelata('Тема'));
   });
 });

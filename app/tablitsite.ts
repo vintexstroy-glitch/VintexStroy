@@ -35,13 +35,6 @@
  * вече раздадените права биха се откачили от таблицата си. Вградените получават
  * `vgraden:` отпред, за да не може ръчно кръстен хедър да им отнеме правата.
  *
- * ═══ ГРАНИЦАТА, КАЗАНА НА ГЛАС ═══
- *
- * Таблицата на УПРАВЛЕНИЕ (Делата) НЕ влиза. Тя не е построена върху колонния
- * описател — `app/gant.ts` рисува своя глава с три твърди селекта, значи няма
- * откъде да се прочетат имената на колоните ѝ, без те да се препишат. Преписани,
- * те щяха да се разминат при първата промяна. Границата стои в `docs/10` като
- * дълг с адрес, и екранът я КАЗВА (правило 15: изключено ≠ липсващо).
  */
 
 import { koloniNaImotite, koloniNaNaemite } from './imoti.js';
@@ -49,6 +42,7 @@ import { koloniNaVzemaniyata, koloniNaPlashtaniyata } from './pari.js';
 import { KOLONI_RAZHODI } from './smetki.js';
 import { koloniNaObektite } from './stoynost.js';
 import { koloniNaProdazhbite } from './prodazhbi.js';
+import { koloniNaDelata } from './gant.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { TablitsaSHedar } from '../src/domein/hedari-po-tabove.js';
 
@@ -123,6 +117,15 @@ const VGRADENI: readonly VgradenaTablitsa[] = Object.freeze<VgradenaTablitsa[]>(
     // Числата са ЕДНИ И СЪЩИ с `ZATVORENI` там — оттам ги чете и екранът.
     zatvoreni: [0, 1, 13],
     koloni: (o) => koloniNaProdazhbite(o),
+  },
+  {
+    klyuch: 'vgraden:dela',
+    ime: 'Дела · Управление',
+    ekran: 'gant',
+    // НИТО ЕДНА затворена: мястото, делото, обектът и отговорникът са полета на
+    // самото дело — човек ги пише, нищо не се смята и нищо не се пренася.
+    zatvoreni: [],
+    koloni: () => koloniNaDelata(),
   },
   {
     klyuch: 'vgraden:obekti',

@@ -29,6 +29,7 @@ import { narisuvayAvtoDelata } from './avtodela.js';
 import { otData } from '../src/yadro/data.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
+import type { KolonaSFiltar } from './filtri.js';
 import { pishi } from '../src/yadro/pari.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import {
@@ -210,19 +211,56 @@ interface NadpisiNaGanta {
   readonly imeNaFormata: string;
 }
 
-const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
+// ГЛАВАТА СЕ СМЯТА от описателя (`glavataNaDelata`), вече не се пише като низ:
+// той е ЕДИНСТВЕНИЯТ ѝ дом и матрицата чете същото (правило 17 · резен 48).
+export const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
   zaglavie: 'Управление на Времевия Ред в Делата',
-  glavaNaImenata: 'Място · Обект · Дело',
-  podnaslovNaFormata: 'Място · Обект · Дело — трите колони',
+  glavaNaImenata: glavataNaDelata('Място'),
+  podnaslovNaFormata: `${glavataNaDelata('Място')} — колоните на делото`,
   imeNaFormata: 'Ново дело',
 });
 
 export const NADPISI_LICHNI: NadpisiNaGanta = Object.freeze({
   zaglavie: 'Моето време · личните дела',
-  glavaNaImenata: 'Тема · Обект · Дело',
-  podnaslovNaFormata: 'Тема · Обект · Дело — същите три колони',
+  glavaNaImenata: glavataNaDelata('Тема'),
+  podnaslovNaFormata: `${glavataNaDelata('Тема')} — същите колони`,
   imeNaFormata: 'Ново лично дело',
 });
+
+/**
+ * КОЛОНИТЕ НА ДЕЛАТА · ЕДИН ДОМ, четен и от Ганта, и от матрицата (резен 48).
+ *
+ * Дотук главата на имената беше НИЗ (`glavaNaImenata: 'Място · Обект · Дело'`),
+ * а матрицата „Кой какво вижда" изобщо не познаваше тази таблица: `docs/10`
+ * носеше реда като дълг с адрес, а `app/tablitsite.ts` — граница, казана на глас.
+ * Причината беше вярна: нямаше откъде да се прочетат имената, без да се препишат,
+ * а преписаните се разминават при първата промяна (правило 17).
+ *
+ * Оттук нататък имената живеят ТУК и се четат на двете места. Първата колона е
+ * ПОДАДЕНА, защото същата таблица говори с различни думи: „Място" при
+ * служебните дела, „Тема" при личните (И98) — надпис, не втора структура.
+ *
+ * ═══ И ГЛАВАТА БЕШЕ НЕПЪЛНА ═══
+ *
+ * Низът изброяваше ТРИ колони, а редът показва ЧЕТИРИ: под името стои
+ * „обект · отговорник". Отговорникът се виждаше на екрана и го нямаше в главата
+ * му — точно разминаването, което един дом премахва.
+ */
+export function koloniNaDelata(parvata = 'Място'): KolonaSFiltar<Delo>[] {
+  return [
+    { klyuch: 'myasto', ime: parvata, vid: 'tekst', vzemi: (d) => d.myasto },
+    { klyuch: 'ime', ime: 'Дело', vid: 'tekst', vzemi: (d) => d.ime },
+    { klyuch: 'obekt', ime: 'Обект', vid: 'tekst', vzemi: (d) => d.obekt },
+    { klyuch: 'otgovornik', ime: 'Отговорник', vid: 'tekst', vzemi: (d) => d.otgovornik },
+  ];
+}
+
+/** Главата на имената · СМЯТА се от описателя, вече не се пише като низ. */
+export function glavataNaDelata(parvata = 'Място'): string {
+  return koloniNaDelata(parvata)
+    .map((k) => k.ime)
+    .join(' · ');
+}
 
 export function narisuvayGant(
   o: Ogledalo,
