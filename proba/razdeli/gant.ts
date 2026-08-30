@@ -133,6 +133,103 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('връщането ги показва пак',
       await p.$$eval('[data-tablitsa=otpadnali-dela] [data-otpadnalo]', (e) => e.length), 1);
 
+    // ══ 112 · РЪЧНИЯТ РЕД ПОБЕЖДАВА (резен 34 · ADR-094) ══════════════════
+    //
+    // „★ Ръчният ред побеждава (колона „поредност"; Състоянието е бутон
+    // „подреди")" *(ред 1496)*; „да може от редактора да местиш РЕДОВЕТЕ, като
+    // задържаш на полето и го движиш… както е в MS Project" *(ред 1982)*.
+
+    razdel = '112 · Ръчният ред · преди да е местено, го НЯМА';
+    // Отпадналите пак са скрити от §108 — връщаме ги, за да е екранът същият.
+    proveri('колоната „поредност" я няма · празна колона от тирета е шум',
+      await p.$$eval('.porednost', (e) => e.length), 0);
+    proveri('и бутонът „Подреди" го няма · бутон, който не мени нищо, е надпис',
+      await p.$$eval('#podredi-avtomatichno', (e) => e.length), 0);
+    proveri('но дръжка има на ВСЕКИ ред · пътят се вижда, не се налучква',
+      await p.$$eval('.drazhka-red', (e) => e.length),
+      await p.$$eval('.gant-delo', (e) => e.length));
+
+    razdel = '112 · Ръчният ред · стрелката мести реда и ПОБЕЖДАВА';
+    const redPredi = await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime));
+    // Двете дела на „Малинова" са първите два реда: „Акт 15" е спешно-важно и
+    // затова сметнатата подредба го вдига пред „Кофраж".
+    const prediPodrezhdane = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, async () => {
+      await p.focus('.gant-delo[data-grupa="Малинова"] .drazhka-red');
+      await p.keyboard.press('ArrowDown');
+    });
+    const redSled = await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime));
+    proveri('първите два реда си РАЗМЕНИХА местата',
+      [redSled[0], redSled[1]], [redPredi[1], redPredi[0]]);
+    proveri('и това е ЕДНО събитие · целият ред, не движението',
+      await broySabitiya(p), prediPodrezhdane + 1);
+
+    razdel = '112 · Ръчният ред · колоната „поредност" се ЯВЯВА';
+    proveri('номерът стои до всеки ръчно подреден ред',
+      await p.$eval('.gant-delo .porednost', (e) => (e as any).innerText), '1');
+    proveri('и брои от ЕДНО · чете го човек, не масив',
+      await p.$$eval('.porednost', (e) => e.map((x) => (x as any).dataset.porednost).slice(0, 2)),
+      ['1', '2']);
+    proveri('а бутонът „Подреди" вече ИМА какво да отмени',
+      await p.$$eval('#podredi-avtomatichno', (e) => e.length), 1);
+
+    razdel = '112 · Ръчният ред · краят на списъка се КАЗВА ПРЕДИ натискането';
+    // Границата е СВОЙСТВО на реда, не отказ след действие: първата версия
+    // отговаряше с вест, тоест с цяло прерисуване за движение, което не се е
+    // случило. Проходът го хвана — прерисуване не тръгваше, и не биваше.
+    proveri('горният ред КАЗВА, че нагоре няма накъде',
+      await p.$eval('.gant-delo[data-grupa="Малинова"] .drazhka-red',
+        (e) => (e as any).dataset.nagore), 'ne');
+    proveri('но надолу има',
+      await p.$eval('.gant-delo[data-grupa="Малинова"] .drazhka-red',
+        (e) => (e as any).dataset.nadolu), 'da');
+    const prediKraya = await broySabitiya(p);
+    const redPrediKraya = await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime));
+    await p.focus('.gant-delo[data-grupa="Малинова"] .drazhka-red');
+    await p.keyboard.press('ArrowUp');
+    proveri('и натиснато нагоре, НЕ пише нищо в Журнала',
+      await broySabitiya(p), prediKraya);
+    proveri('нито мени реда · снимката ПРЕДИ и СЛЕД е една и съща',
+      await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime)), redPrediKraya);
+
+    razdel = '112 · Ръчният ред · влаченето с мишка мести СЪЩОТО';
+    const prediVlachene = await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime));
+    // РЕДЪТ СЕ ДОКАРВА В ПОЛЕЗРЕНИЕТО ПРЕДИ ДА СЕ МЕРИ. `getBoundingClientRect`
+    // дава координати спрямо ПРОЗОРЕЦА: ред под сгъвката има y извън него, и
+    // мишката тръгва към място, където няма нищо. Клавиатурата не го показа,
+    // защото `focus` сама скролва — затова счупването изплува само при мишката.
+    await p.$eval('.gant-delo[data-grupa="Малинова"]', (e) =>
+      (e as HTMLElement).scrollIntoView({ block: 'center' }));
+    const dvete = await p.$$eval('.gant-delo[data-grupa="Малинова"]', (e) =>
+      e.slice(0, 2).map((x) => {
+        const r = x.getBoundingClientRect();
+        const d = x.querySelector('.drazhka-red')!.getBoundingClientRect();
+        return { drazhkaX: d.x + d.width / 2, drazhkaY: d.y + d.height / 2,
+                 tselX: r.x + r.width / 2, tselY: r.y + r.height / 2 };
+      }),
+    );
+    await deystvieSPrerisuvane(p, async () => {
+      await p.mouse.move(dvete[0]!.drazhkaX, dvete[0]!.drazhkaY);
+      await p.mouse.down();
+      await p.mouse.move(dvete[1]!.tselX, dvete[1]!.tselY, { steps: 6 });
+      await p.mouse.up();
+    });
+    const sledVlachene = await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime));
+    proveri('редът, който беше първи, вече е втори',
+      [sledVlachene[0], sledVlachene[1]], [prediVlachene[1], prediVlachene[0]]);
+
+    razdel = '112 · Ръчният ред · „Подреди" го връща, и отмяната е СЪБИТИЕ';
+    const prediOtmyana = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#podredi-avtomatichno'));
+    proveri('колоната „поредност" изчезва · няма какво да брои',
+      await p.$$eval('.porednost', (e) => e.length), 0);
+    proveri('и подредбата се връща на СМЕТНАТАТА',
+      await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).dataset.ime)), redPredi);
+    proveri('но отмяната е ЗАПИС · Журналът не се трие (правило 1)',
+      await broySabitiya(p), prediOtmyana + 1);
+    proveri('и самият бутон си отива · вече няма какво да отменя',
+      await p.$$eval('#podredi-avtomatichno', (e) => e.length), 0);
+
     // ══ 57 · ЗАКОНЪТ ЗА МЕНЮТАТА · живите речници (И97 · ADR-040) ══════════
     //
     // Речникът НЕ се пази отделно — той Е онова, което вече стои в делата.

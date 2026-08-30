@@ -57,6 +57,7 @@ import { ostatakNa } from './krediti.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
+import { napraviRachniyaRed } from './porednost.js';
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
@@ -93,6 +94,7 @@ import type {
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
+  PayloadDelaPodredeni,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -722,6 +724,37 @@ export class Deystviya {
       VID.lenta,
       'LENTA',
       { red: napraviRedNaLentata(danni.red) },
+      z,
+    );
+  }
+
+  /**
+   * ПОДРЕЖДА ДЕЛАТА РЪЧНО · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34).
+   *
+   * ЗАПИСВА СЕ ЦЕЛИЯТ РЕД, не движението. Дословно същата сметка като при
+   * лентата: разлика („мести Х с една нагоре") зависи от състоянието в мига на
+   * записа, а при много вериги (ADR-055) две едновременни размествания дават
+   * различен резултат според реда на прочитане. Цял списък е самодостатъчен.
+   *
+   * ПРАЗЕН РЕД Е ВАЛИДЕН и значи „върни сметнатата подредба" — това е неговият
+   * бутон „подреди" от същото изречение. Отмяна без триене (правило 1).
+   *
+   * НЯМА ПРОВЕРКА ЗА СТОПАНИН, и това е разликата с лентата. Лентата е поглед и
+   * има личен слой отгоре; редът на делата е самият план — кое се прави преди
+   * кое. Който има право да пише дело, има право и да каже кое е първо.
+   *
+   * `opId` е на ВИКАЩИЯ (правило 20): всяко пускане е ново решение, а ключ от
+   * съдържанието би върнал стария резултат при връщане към предишен ред — и
+   * поправката би изчезнала мълчаливо.
+   */
+  async podrediDelata(danni: PayloadDelaPodredeni, z: Zayavka): Promise<Rezultat> {
+    // СТРОГОСТТА Е ПРИ ВХОДА · дубликат, записан веднъж, рисува делото два пъти
+    // ЗАВИНАГИ (правило 1 · `porednost.ts`).
+    return this.#pusni(
+      'ДелаПодредени',
+      VID.porednost,
+      'POREDNOST',
+      { red: napraviRachniyaRed(danni.red) },
       z,
     );
   }

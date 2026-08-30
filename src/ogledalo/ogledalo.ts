@@ -38,6 +38,7 @@ import type {
   ZahranvaneNaKesha,
 } from '../domein/zaplati.js';
 import { redOtZhurnala } from '../domein/lenta.js';
+import { rachniyatRedOtZhurnala } from '../domein/porednost.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
@@ -75,6 +76,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
+  PayloadDelaPodredeni,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
@@ -421,6 +423,14 @@ export interface Ogledalo {
   readonly napVklyuchena: boolean;
   readonly napSaglasieto: string;
   readonly redNaLentata: readonly string[];
+  /**
+   * РЪЧНИЯТ РЕД НА ДЕЛАТА · идентификаторите, в реда на човека (резен 34).
+   *
+   * Празно значи „никой не е местил" — и тогава подредбата е изцяло сметната.
+   * Тук НЕ се сверява срещу живите дела: Огледалото не знае кои дела ще стигнат
+   * до екрана след филтрите (дословният прецедент на `redNaLentata`).
+   */
+  readonly rachniyatRedNaDelata: readonly string[];
   readonly lichnoVklyucheno: boolean;
   /**
    * МЯСТОТО в личния драйв, с което личното е активирано (И99).
@@ -701,6 +711,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let napVklyuchena = false;
   let napSaglasieto = '';
   let redNaLentata: readonly string[] = [];
+  let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
@@ -899,6 +910,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Съгласието се ПАЗИ и след прибиране: то е следа кой е чел границата,
         // а не превключвател. Прибраното не е изтрито (ADR-036).
         if (p.saglasieto) napSaglasieto = p.saglasieto;
+        break;
+      }
+
+      case 'ДелаПодредени': {
+        const p = s.payload as unknown as PayloadDelaPodredeni;
+        // ПОСЛЕДНАТА ДУМА БИЕ · целият ред идва наведнъж (същата сметка като при
+        // лентата: разлика зависи от мига, цял списък е самодостатъчен). Празен
+        // ред е ВАЛИДЕН и значи „върни сметнатата подредба" — бутонът „Подреди".
+        rachniyatRedNaDelata = rachniyatRedOtZhurnala(p.red);
         break;
       }
 
@@ -1540,6 +1560,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     napVklyuchena,
     napSaglasieto,
     redNaLentata,
+    rachniyatRedNaDelata,
     lichnoVklyucheno,
     lichnoMyasto,
     lichniDostapi,

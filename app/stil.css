@@ -1682,6 +1682,22 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 0.714rem;
 }
 .sgavach.prazen { cursor: default; }
+/* ДРЪЖКАТА НА РЕДА · „задръж на полето и го движи" *(ред 1982)* (резен 34).
+   Стои ВИНАГИ видима, не на hover като копчето за задача: тя е път, който
+   човек трябва да намери, а не второстепенно действие върху вече намерен ред. */
+.drazhka-red {
+  width: 14px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1;
+  background: none; border: none; cursor: grab;
+  color: var(--mastilo2); font-size: 0.714rem;
+}
+.drazhka-red:hover, .drazhka-red:focus { color: var(--aktsent); }
+.gant-delo.vlacha-se { opacity: 0.5; }
+.gant-delo.vlacha-se .drazhka-red { cursor: grabbing; }
+/* КОЛОНАТА „ПОРЕДНОСТ" *(ред 1496)* · само когато ръчен ред ИМА. */
+.porednost {
+  min-width: 14px; text-align: right; flex-shrink: 0;
+  color: var(--aktsent); font-size: 0.714rem; font-variant-numeric: tabular-nums;
+}
 /* КОПЧЕТО НА ВСЯКО ДЕЛО (резен 14а · р57·[160] „копче за всяко дело… ръчно").
    Стои свито като степенките: три бутона на всеки ред е шум, а редът, върху
    който е ръката, е точно онзи, който се праща. */

@@ -202,6 +202,35 @@ export function podredi(dela: readonly Delo[], dnes: string): Delo[] {
 }
 
 /**
+ * ПОДРЕДБАТА С РЪЧЕН РЕД · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34).
+ *
+ * Дело с ръчно място стои ТОЧНО там, където е пуснато. Дело БЕЗ такова —
+ * родено след последното подреждане или дошло от чужда верига — пада СЛЕД
+ * ръчните, в сметнатата подредба.
+ *
+ * Новото дело НЕ се вмъква между ръчните, защото никой не е казал къде.
+ * „Най-отдолу и се вижда" е честният отговор; познато място, което човек не е
+ * избрал, е тихо решение вместо него.
+ *
+ * Празен ръчен ред връща ТОЧНО `podredi` — това е неговият бутон „подреди".
+ *
+ * Живее ТУК, а не при списъка (`porednost.ts`), защото е подредба на ДЕЛА и
+ * стои до правилото, което побеждава. Обратното даваше кръгов внос.
+ */
+export function podrediSRachen(
+  dela: readonly Delo[],
+  dnes: string,
+  rachen: readonly string[],
+): Delo[] {
+  const myasto = new Map(rachen.map((id, i) => [id, i]));
+  const rachni: Delo[] = [];
+  const ostanali: Delo[] = [];
+  for (const d of dela) (myasto.has(d.id) ? rachni : ostanali).push(d);
+  rachni.sort((a, b) => myasto.get(a.id)! - myasto.get(b.id)!);
+  return [...rachni, ...podredi(ostanali, dnes)];
+}
+
+/**
  * СГЪВАНЕТО · само дела и поддела.
  *
  * Негови думи, 23.08 (И88): „**Имотите не се сгъват, сгъват се само делата и
@@ -351,7 +380,18 @@ export function stepenNa(dela: readonly Delo[], id: string): number {
  * Сираците вървят като самостоятелни, накрая на своя ред: дело, чийто родител
  * го няма, не бива да изчезне от екрана заради счупена връзка.
  */
-export function podredeniPoDarvo(dela: readonly Delo[], dnes: string): Delo[] {
+export function podredeniPoDarvo(
+  dela: readonly Delo[],
+  dnes: string,
+  /**
+   * РЪЧНИЯТ РЕД · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34).
+   *
+   * Прилага се ВЪТРЕ в едно ниво, не върху целия списък: дървото е по-силно —
+   * дете, изкарано пред родителя си, престава да е дете и рисуването се къса.
+   * Празен ръчен ред връща точно сметнатата подредба.
+   */
+  rachen: readonly string[] = [],
+): Delo[] {
   const po = kartaNaDelata(dela);
   const deca = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -364,7 +404,7 @@ export function podredeniPoDarvo(dela: readonly Delo[], dnes: string): Delo[] {
   const red: Delo[] = [];
   const slez = (roditel: string, dalbochina: number): void => {
     if (dalbochina > NAY_DALBOKO) return;
-    for (const d of podredi(deca.get(roditel) ?? [], dnes)) {
+    for (const d of podrediSRachen(deca.get(roditel) ?? [], dnes, rachen)) {
       if (izlezli.has(d.id)) continue; // предпазител срещу цикъл
       izlezli.add(d.id);
       red.push(d);

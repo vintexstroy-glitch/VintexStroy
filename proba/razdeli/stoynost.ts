@@ -366,10 +366,10 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
 
     // ЗЕМЯТА НЕ ОВЕХТЯВА · мери се на живо, не се чете от надпис.
     const predVazrastta = await chisloNaPoleto(p, 'stoynost-v');
-    await deystvieSPrerisuvane(p, async () => {
-      await p.fill('#kalk-vazrast', '35');
-      await p.dispatchEvent('#kalk-vazrast', 'change');
-    });
+    // FILL + РЪЧЕН `change` пуска ДВЕ събития · пише се и се излиза от полето
+    // (резен 27 · `napishiVPoleto`). Второто прерисуване гонеше първото и §89
+    // пропадаше през едно пускане.
+    await deystvieSPrerisuvane(p, () => napishiVPoleto(p, '#kalk-vazrast', '35'));
     const sledVazrastta = await chisloNaPoleto(p, 'stoynost-v');
     proveri('по-стара сграда дава по-ниска разходна стойност',
       sledVazrastta < predVazrastta, true);
@@ -386,10 +386,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // Тук животът се изчерпва НАПЪЛНО: сградата отива на нула и остава САМО
     // земята. Изяде ли я множителят, числото пада на нула и проверката го
     // хваща с число, не с усещане.
-    await deystvieSPrerisuvane(p, async () => {
-      await p.fill('#kalk-vazrast', '70');
-      await p.dispatchEvent('#kalk-vazrast', 'change');
-    });
+    await deystvieSPrerisuvane(p, () => napishiVPoleto(p, '#kalk-vazrast', '70'));
     proveri('при ИЗЧЕРПАН полезен живот от сградата не остава нищо',
       (await tekstNa(p, '[data-ostavashti]')).includes('0,00 %'), true);
     proveri('но В пак е НАД нулата · земята не овехтява',
@@ -397,8 +394,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // ЧАКА СЕ САМАТА СТОЙНОСТ, не прерисуването · същият капан като при базите
     // в §84: полето се пренаписва СЛЕД записа в паметта, и попълване веднага
     // след предишното прерисуване пише в възел, който вече е сменен.
-    await p.fill('#kalk-vazrast', '0');
-    await p.dispatchEvent('#kalk-vazrast', 'change');
+    await napishiVPoleto(p, '#kalk-vazrast', '0');
     await p.waitForFunction(() =>
       (document.querySelector('[data-ostavashti]')?.textContent ?? '').includes('100,00'));
     proveri('връщането връща същото число',

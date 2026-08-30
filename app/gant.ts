@@ -1,3 +1,4 @@
+import { imaRachenRed, nomeratNa, sledPremestvane } from '../src/domein/porednost.js';
 /**
  * УПРАВЛЕНИЕ НА ВРЕМЕВИЯ РЕД В ДЕЛАТА · седмият екран.
  *
@@ -240,7 +241,11 @@ export function narisuvayGant(
   // ПОДРЕДБАТА Е ДЪРВОВИДНА (резен 12б): детето винаги СЛЕД родителя си, а
   // вътре в едно ниво важи неговата подредба (спешност → Оценка → завършените
   // долу). Правилото му не се мени — прилага се на всяко ниво поотделно.
-  const podredeni = podredeniPoDarvo(vsichki, dnes);
+  // РЪЧНИЯТ РЕД ПОБЕЖДАВА · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34).
+  // Прилага се ВЪТРЕ в едно ниво: дървото е по-силно, защото дете, изкарано
+  // пред родителя си, престава да е дете.
+  const rachen = o.rachniyatRedNaDelata;
+  const podredeni = podredeniPoDarvo(vsichki, dnes, rachen);
   const filtrirani = podredeni.filter(
     (d) =>
       (!filtarMyasto || d.myasto === filtarMyasto) &&
@@ -322,6 +327,17 @@ export function narisuvayGant(
             : ''
         }
         <button type="button" id="sega" class="vtorichen">СЕГА</button>
+        ${
+          /*
+           * „Състоянието е бутон «подреди»" *(ред 1496)* · връща СМЕТНАТАТА
+           * подредба. Появява се само когато има какво да се отменя: бутон,
+           * който не мени нищо, е надпис (ADR-041).
+           */
+          imaRachenRed(rachen)
+            ? `<button type="button" id="podredi-avtomatichno" class="vtorichen"
+                title="Върни подредбата по спешност и Оценка">Подреди</button>`
+            : ''
+        }
         <button type="button" id="kam-diagrama" class="vtorichen">${
           diagrama ? 'Скрий диаграмата' : 'Покажи диаграмата'
         }</button>
@@ -380,7 +396,7 @@ export function narisuvayGant(
           // подредбата на човека се губи в мига, в който първото дело влезе.
           `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
             <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
-              broyDokumenti(o, 'delo', id),
+              broyDokumenti(o, 'delo', id), rachen,
             )}</div>
             ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
           </div>`
@@ -632,6 +648,14 @@ export function tablitsataSOcveteniPoleta(
    * него е лъжа (същата причина като при сгъвачите отгоре).
    */
   dokumentiNa?: (deloId: string) => number,
+  /**
+   * РЪЧНИЯТ РЕД · само за КОЛОНАТА „поредност" и за дръжките (резен 34).
+   *
+   * Подредбата вече е приложена от викащия — тук се рисува само номерът, който
+   * човекът вижда. Празно значи „никой не е местил": тогава колоната я няма,
+   * защото празна колона от тирета е шум, не сведение.
+   */
+  rachen: readonly string[] = [],
 ): string {
   const poMyasto = new Map<string, Delo[]>();
   for (const d of dela) {
@@ -658,7 +682,7 @@ export function tablitsataSOcveteniPoleta(
             .map(
               ([myasto, spisak]) => `
             <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
-            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi, dokumentiNa)).join('')}`,
+            ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi, dokumentiNa, nomeratNa(rachen, d.id))).join('')}`,
             )
             .join('')}
           ${
@@ -759,6 +783,8 @@ function imeNaDeloto(
   nomer: string,
   sgavaemi: ReadonlySet<string>,
   dokumentiNa: ((deloId: string) => number) | undefined,
+  /** РЪЧНАТА поредност · 0 значи „няма", и тогава нищо не се рисува */
+  porednost = 0,
 ): string {
   // В копието (Сметки) сгъвач не се рисува: бутон без ръка зад него е лъжа.
   const sgavaemo = sasSgavachi && sgavaemi.has(d.id);
@@ -773,13 +799,27 @@ function imeNaDeloto(
   // през CSSOM в `gant-izgled.ts` — там, където живеят и другите променливи на
   // решетката. Проходът го хвана през конзолата.
   return `<div class="gant-delo ${svetofar(d, dnes)}${stepen > 0 ? ' poddelo' : ''}"
-    data-stepen="${stepen}" data-ime="${ekraniraj(d.id)}">
+    data-stepen="${stepen}" data-ime="${ekraniraj(d.id)}"
+    data-grupa="${ekraniraj(d.myasto)}" data-nad="${ekraniraj(d.nadDelo)}">
     ${
       sgavaemo
         ? `<button type="button" class="sgavach" data-sgavi="${ekraniraj(d.id)}" aria-label="сгъни">${
             sgunati.has(d.id) ? '▸' : '▾'
           }</button>`
         : '<span class="sgavach prazen"></span>'
+    }
+    ${
+      sasSgavachi
+        ? `<button type="button" class="drazhka-red" data-vlachi="${ekraniraj(d.id)}"
+            title="Задръж и движи, за да преместиш реда · ↑ ↓ с клавиатурата"
+            aria-label="Премести реда">⠿</button>`
+        : ''
+    }
+    ${
+      porednost > 0
+        ? `<span class="porednost" translate="no" data-porednost="${porednost}"
+            title="Ръчна поредност">${porednost}</span>`
+        : ''
     }
     <span class="nomer-stepen" translate="no">${ekraniraj(nomer)}</span>
     <b>${ekraniraj(d.ime)}</b>
@@ -954,6 +994,16 @@ export function zakachiGant(
       await prerisuvay();
     });
 
+  // ═══ РЪЧНИЯТ РЕД · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34) ═══
+  //
+  // „да може от редактора да местиш РЕДОВЕТЕ, като задържаш на полето и го
+  // движиш, за да го преместиш, както е в MS Project" *(ред 1982)*.
+  //
+  // Двата лоста са ЕДИН път: и влаченето, и клавишите смятат СЪЩОТО
+  // преместване и минават през СЪЩОТО действие. Втори път щеше да се
+  // разсинхронизира при първата поправка (правило 17).
+  zakachiPodrezhdaneto(koren, k, prerisuvay);
+
   // СКРИВАНЕТО НА ОТПАДНАЛИТЕ Е ЛИЧНО · памет на екрана, нула събития
   // (правило 23 · ADR-022). Отпадналото дело не се мени от това, че някой не
   // иска да го гледа.
@@ -1125,6 +1175,133 @@ export function zakachiGant(
  * Изнесено: същият submit работи и в Сметки (И95). Записът минава през
  * СЪЩИЯ zapishiDelo — един път, два екрана.
  */
+/**
+ * ПРЕМЕСТВАНЕТО НА РЕД · дръжка с мишка и стрелки с клавиатура (резен 34).
+ *
+ * ═══ РЕДЪТ ИДВА ОТ ЕКРАНА ═══
+ *
+ * Кой е „следващият" се чете от нарисуваните редове, а не от Огледалото —
+ * дословният прецедент на „навътре/навън" (ADR-059): човекът мести реда, който
+ * ВИЖДА, а видимото минава през филтри и сгъване.
+ *
+ * ═══ СЪСЕДИ ЗНАЧИ СЪЩОТО МЯСТО И СЪЩОТО НИВО ═══
+ *
+ * Ред, пуснат в чуждо място, щеше да се върне при своето при следващото
+ * рисуване (мястото е КОЛОНА, а не позиция) — тоест движение, което изглежда
+ * направено и не е. Затова целите се стесняват до съседите и отказът се КАЗВА
+ * (правило 15), вместо да се преглътне.
+ *
+ * ═══ ЗАПИСВА СЕ ЦЕЛИЯТ ВИДИМ РЕД ═══
+ *
+ * Не разлика, а списък: при много вериги (ADR-055) две едновременни
+ * размествания дават различен резултат според реда на прочитане.
+ */
+function zakachiPodrezhdaneto(
+  koren: HTMLElement,
+  k: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
+  const redovete = (): HTMLElement[] => [...koren.querySelectorAll<HTMLElement>('.gant-delo')];
+
+  /** СЪСЕДИТЕ на един ред · същото място, същото ниво. */
+  const sasedite = (el: HTMLElement): HTMLElement[] =>
+    redovete().filter(
+      (x) =>
+        x.dataset.grupa === el.dataset.grupa &&
+        x.dataset.stepen === el.dataset.stepen &&
+        x.dataset.nad === el.dataset.nad,
+    );
+
+  const zapishi = async (vsichki: HTMLElement[], ot: number, do_: number): Promise<void> => {
+    const red = vsichki.map((x) => x.dataset.ime ?? '');
+    try {
+      await k.deystviya.podrediDelata(
+        { red: [...sledPremestvane(red, ot, do_)] },
+        { opId: `porednost:${crypto.randomUUID()}` },
+      );
+    } catch (err) {
+      k.vest('zle', err instanceof Error ? err.message : String(err));
+    }
+    await prerisuvay();
+  };
+
+  for (const drazhka of koren.querySelectorAll<HTMLElement>('.drazhka-red')) {
+    const redat = drazhka.closest<HTMLElement>('.gant-delo');
+    if (!redat) continue;
+
+    /*
+     * ГРАНИЦИТЕ СЕ КАЗВАТ ПРЕДИ НАТИСКАНЕТО, не след него (правило 15).
+     *
+     * Първата версия отговаряше на „няма накъде" с вест — тоест с цяло
+     * прерисуване за движение, което НЕ се е случило. Проходът го хвана:
+     * прерисуване не тръгваше, а и не биваше да тръгва. Краят на списък не е
+     * отказ, а свойство на реда — и свойството живее НА него.
+     */
+    const bratyata = sasedite(redat);
+    const kade = bratyata.indexOf(redat);
+    drazhka.dataset['nagore'] = kade > 0 ? 'da' : 'ne';
+    drazhka.dataset['nadolu'] = kade >= 0 && kade < bratyata.length - 1 ? 'da' : 'ne';
+
+    // МИШКАТА · „задръж на полето и го движи". Целта е редът ПОД показалеца.
+    drazhka.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      drazhka.setPointerCapture(e.pointerId);
+      redat.classList.add('vlacha-se');
+      let tsel = redat;
+      const mesti = (m: PointerEvent): void => {
+        const pod = document.elementFromPoint(m.clientX, m.clientY);
+        const kandidat = pod?.closest<HTMLElement>('.gant-delo');
+        if (kandidat && sasedite(redat).includes(kandidat)) tsel = kandidat;
+      };
+      const pusni = async (): Promise<void> => {
+        drazhka.releasePointerCapture(e.pointerId);
+        drazhka.removeEventListener('pointermove', mesti);
+        drazhka.removeEventListener('pointerup', pusni);
+        drazhka.removeEventListener('pointercancel', pusni);
+        redat.classList.remove('vlacha-se');
+        if (tsel === redat) return; // никъде не е мръднал · нула събития
+        const vsichki = redovete();
+        await zapishi(vsichki, vsichki.indexOf(redat), vsichki.indexOf(tsel));
+      };
+      drazhka.addEventListener('pointermove', mesti);
+      drazhka.addEventListener('pointerup', pusni);
+      drazhka.addEventListener('pointercancel', pusni);
+    });
+
+    // КЛАВИАТУРАТА също мести · инак дръжката е лост само за мишка (ADR-066).
+    drazhka.addEventListener('keydown', async (e) => {
+      const posoka = e.key === 'ArrowUp' ? -1 : e.key === 'ArrowDown' ? 1 : 0;
+      if (posoka === 0) return;
+      e.preventDefault();
+      const bratya = sasedite(redat);
+      const tsel = bratya[bratya.indexOf(redat) + posoka];
+      // КРАЯТ НА СПИСЪКА · нищо не се случва и нищо не се пише. Че е край, се
+      // вижда още преди натискането — на `data-nagore` · `data-nadolu` горе.
+      if (!tsel) return;
+      const vsichki = redovete();
+      await zapishi(vsichki, vsichki.indexOf(redat), vsichki.indexOf(tsel));
+    });
+  }
+
+  // „СЪСТОЯНИЕТО Е БУТОН «ПОДРЕДИ»" · връща СМЕТНАТАТА подредба.
+  // Празен ред е ВАЛИДЕН запис и значи точно това — отмяна без триене.
+  koren.querySelector<HTMLButtonElement>('#podredi-avtomatichno')?.addEventListener(
+    'click',
+    async () => {
+      try {
+        await k.deystviya.podrediDelata(
+          { red: [] },
+          { opId: `porednost:${crypto.randomUUID()}` },
+        );
+        k.vest('dobre', 'Подредбата се върна на спешност → Оценка → завършените долу.');
+      } catch (err) {
+        k.vest('zle', err instanceof Error ? err.message : String(err));
+      }
+      await prerisuvay();
+    },
+  );
+}
+
 export function zakachiFormataNaDelo(
   koren: HTMLElement,
   k: Konteks,

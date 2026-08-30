@@ -31,6 +31,8 @@
  * един екран заключва подреждането завинаги.
  */
 
+import { bezPovtoreniya, proveriSpisaka } from './red-ot-klyuchove.js';
+
 export class GreshkaLenta extends Error {
   constructor(message: string) {
     super(message);
@@ -43,26 +45,17 @@ export class GreshkaLenta extends Error {
  *
  * Празният ред е ПОЗВОЛЕН и значи „връщам се към обявения в кода" — това е
  * начинът Стопанинът да отмени решението си, без да се трие нищо.
+ *
+ * Сметката живее в `red-ot-klyuchove.ts`: същата проверка потрябва втори път
+ * при ръчния ред на делата (резен 34), и два дома за нея се разминават при
+ * първата поправка (правило 17).
  */
 export function napraviRedNaLentata(red: readonly string[]): readonly string[] {
-  const chist = red.map((k) => k.trim());
-
-  for (const k of chist) {
-    if (k === '') {
-      throw new GreshkaLenta('Празно име на екран в реда — редът се пише с ключове, не с дупки.');
-    }
-  }
-
-  const vidyani = new Set<string>();
-  const dvazh = chist.filter((k) => (vidyani.has(k) ? true : (vidyani.add(k), false)));
-  if (dvazh.length > 0) {
-    throw new GreshkaLenta(
-      `Екран „${dvazh[0]}" стои два пъти в реда. Записан така, пунктът щеше да се ` +
-        'рисува два пъти — а Журналът е само за добавяне и поправката не трие лошото.',
-    );
-  }
-
-  return Object.freeze([...chist]);
+  return proveriSpisaka(
+    red,
+    { edinitsa: 'Екран', kakvo: 'име на екран', sKakvo: 'ключове', koeSeRisuva: 'пунктът' },
+    (s) => new GreshkaLenta(s),
+  );
 }
 
 /**
@@ -74,12 +67,5 @@ export function napraviRedNaLentata(red: readonly string[]): readonly string[] {
  * то е мястото, което човекът е избрал.
  */
 export function redOtZhurnala(red: readonly string[] | undefined): readonly string[] {
-  const vidyani = new Set<string>();
-  const izhod: string[] = [];
-  for (const k of red ?? []) {
-    if (k === '' || vidyani.has(k)) continue;
-    vidyani.add(k);
-    izhod.push(k);
-  }
-  return Object.freeze(izhod);
+  return bezPovtoreniya(red);
 }
