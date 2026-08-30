@@ -662,5 +662,49 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и втори бутон „Затвори" вече няма',
       await p.$$eval(`[data-zatvori="${minalata}"]`, (e) => e.length), 0);
 
+    // ══ 111 · ПЕТТЕ МОДЕЛА ПО БРАНШ (резен 33 · ADR-093) ═════════
+
+    razdel = '111 · Браншовете · петте стоят с имената си';
+    await naEkran(p, 'nastroyki', '[data-sektsiya=branshove]');
+    proveri('петте са на екрана · нито четири, нито шест',
+      await p.$$eval('[data-tablitsa=branshove] tbody tr', (e) => e.length), 5);
+    proveri('секцията ГО КАЗВА · числото е негово',
+      await p.$eval('[data-sektsiya=branshove]', (e) => (e as any).dataset.vsichki), '5');
+    proveri('и имената са НЕГОВИТЕ, в НЕГОВИЯ ред',
+      await p.$$eval('[data-tablitsa=branshove] tbody tr td:first-child',
+        (e) => e.map((x) => (x as HTMLElement).innerText).join(' · ')),
+      'Строителна фирма · Магазин · Склад · Услуги · Ресторант');
+
+    razdel = '111 · Браншовете · построеният е ЕДИН и се БРОИ';
+    proveri('екранът брои построените',
+      await p.$eval('[data-sektsiya=branshove]', (e) => (e as any).dataset.postroeni), '1');
+    proveri('и това е СТРОИТЕЛНАТА фирма · тя е днешното приложение',
+      await p.$eval('[data-bransh=stroitelna] td:nth-child(3)', (e) => (e as HTMLElement).innerText),
+      '7 сектора · 7 потока — това е днешното приложение');
+    proveri('а четирите казват ЧЕСТНО, че чакат',
+      await p.$$eval('[data-tablitsa=branshove] tbody tr.chaka', (e) => e.length), 4);
+    proveri('без да показват ЧУЖДИ числа',
+      await p.$eval('[data-bransh=magazin] td:nth-child(3)', (e) => (e as HTMLElement).innerText),
+      'името е негово · подредената база чака неговата дума');
+
+    razdel = '111 · Браншовете · адресът стои до името';
+    // Находка без адрес не се слива (правило 26) — и тук адресите са ДВА,
+    // защото двете му изречения от същия ден са ЕДНО решение на две части.
+    proveri('първите две сочат първото му изречение',
+      await p.$eval('[data-bransh=magazin] td:last-child', (e) => (e as HTMLElement).innerText), 'р83·[132]');
+    proveri('а трите останали — второто, същия ден',
+      await p.$eval('[data-bransh=restorant] td:last-child', (e) => (e as HTMLElement).innerText), 'р83·[134]');
+
+    razdel = '111 · Браншовете · празният НЕ се предлага за избор';
+    // Бутон без последица е надпис (ADR-041): избор на празен модел не би
+    // сложил нито един сектор, но човекът би останал с чувство, че е настроил нещо.
+    proveri('таблицата няма НИТО ЕДИН бутон за избор',
+      await p.$$eval('[data-tablitsa=branshove] button', (e) => e.length), 0);
+
+    razdel = '111 · Браншовете · сверката и нулата';
+    proveri('сверката вход↔изход стои на екрана · и нулата се записва',
+      (await tekstNa(p, '[data-branshove-sverka]')).replace(/\s+/g, ' ').trim(),
+      'Сверка вход↔изход: 5 → 5, разлика 0.');
+
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
 }

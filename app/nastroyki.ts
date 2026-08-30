@@ -36,6 +36,7 @@ import {
 import { etapite } from '../src/domein/prodazhbi.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
+import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
@@ -221,6 +222,7 @@ export function narisuvayNastroyki(
     ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
     ${sektsiyaZhurnalat(o, sabitiya, dnes)}
     ${sektsiyaGodinite(o, dnes, negoviyat)}
+    ${blokNaBranshovete(dnes)}
     ${blokNaDeystviyata()}
     ${blokNaKartata()}`;
 }
@@ -841,6 +843,65 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
  * ЗНАКЪТ И ЦВЕТЪТ стоят до всеки ред, за да се разпознае видът, без да се чете
  * (ADR-032: цветът намира, знакът различава, думата обяснява).
  */
+/**
+ * ПЕТТЕ МОДЕЛА ПО БРАНШ · честен статус (резен 33 · ADR-093).
+ *
+ * „Да, но да има зал8жени модели за избор, както е в МС Прочект. Строителна
+ * фирма, магазин и още 3 общо най основните 5 модела…" *(р83·[132])*, и трите
+ * останали, назовани от него същия ден: „Склад · Услуги · Ресторант"
+ * *(р83·[134])*.
+ *
+ * ═══ КАКВО КАЗВА ТОЗИ БЛОК, КОЕТО ДОСЕГА НЕ СЕ ВИЖДАШЕ ═══
+ *
+ * Че приложението е за СТРОИТЕЛНА ФИРМА — и то с ЧИСЛО: седемте сектора и
+ * седемте потока са нейни. Дотук това беше вярно, но невидимо: човек го
+ * научаваше от имената на акумулаторите, ако изобщо ги погледне.
+ *
+ * Останалите четири стоят с имената си и с честното „чака неговата дума".
+ * Празният не се предлага за избор: бутон без последица е надпис (ADR-041).
+ */
+function blokNaBranshovete(dnes: string): string {
+  const redove = branshovete();
+  const postroeni = broyPostroeni();
+  const sv = sveriBranshovete(dnes);
+
+  return `
+    <section data-sektsiya="branshove" data-postroeni="${postroeni}" data-vsichki="${redove.length}">
+      <div class="dyalglava">
+        <h2>Модели по бранш</h2>
+        <span>„както е в МС Прочект" · имената са негови, базата се БРОИ</span>
+      </div>
+
+      <div class="skrolkutiya">
+        <table class="tablitsa" data-tablitsa="branshove">
+          <thead>
+            <tr><th>Модел</th><th>Състояние</th><th>Какво носи</th><th>Извор</th></tr>
+          </thead>
+          <tbody>${redove
+            .map(
+              (r) => `
+            <tr data-bransh="${r.klyuch}"${r.postroen ? '' : ' class="chaka"'}>
+              <td translate="no">${ekraniraj(r.ime)}</td>
+              <td>${r.postroen ? 'построен' : 'чака негова дума'}</td>
+              <td>${ekraniraj(r.kakvo)}</td>
+              <td class="drebno" translate="no">${ekraniraj(r.izvor)}</td>
+            </tr>`,
+            )
+            .join('')}</tbody>
+        </table>
+      </div>
+
+      <p class="drebno"><b>${postroeni} от ${redove.length} са построени.</b>
+      Имената са НЕГОВИ и са пълни — двете от едно негово изречение, трите от
+      следващото същия ден. Чака се „подредената база" за останалите четири:
+      кои сектори и кои потоци са техни. Тя не се домисля тук, защото сектор,
+      измислен вместо него, влиза в ДДС-акумулатор и почва да смята.</p>
+
+      <p class="drebno" data-branshove-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
+      разлика ${sv.razlika}.</p>
+    </section>`;
+}
+
 function blokNaParametrite(o: Ogledalo): string {
   const n = o.parametriNaVhoda;
   return `
