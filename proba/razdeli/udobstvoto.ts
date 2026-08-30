@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -334,6 +334,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('менюто предлага скриване с името на колоната',
       (await tekstNa(p, '.kontekstno-menyu')).includes('Скрий колоната „Сектор"'), true);
     await p.click('.kontekstno-menyu button:has-text("Скрий колоната")');
+    // Изчаква се СОБСТВЕНАТА последица на клика — менюто си отива, — а НЕ
+    // онова, което проверката пита. Чакане по проверявания белег би
+    // превърнало находката в изтекло време и би скрило какво е паднало.
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
     proveri('колоната изчезна от главата',
       await p.$$eval('.glava.naem > *', (r) => r.filter((x) => !(x as any).hidden).length),
       vidimiPredi - 1);
@@ -352,6 +356,9 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('презареждането помни скритата колона',
       await p.$eval('.red.naem', (red) => [...red.children].some((x) => (x as any).hidden)), true);
     await p.click('[data-pokazhi-koloni="naemi"]');
+    // Бутонът живее В реда „Скрити колони: N“ и пада заедно с него — това е
+    // собствената последица на клика, отделна от „колоната се върна“.
+    await p.waitForSelector('[data-pokazhi-koloni="naemi"]', { state: 'detached' });
     proveri('„покажи ги" връща колоната',
       await p.$$eval('.glava.naem > *', (r) => r.filter((x) => !(x as any).hidden).length),
       vidimiPredi);
@@ -1901,7 +1908,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '117 · Срещата · БЕЗ дата се отказва с думи';
     const prediBezData = await broySabitiya(p);
-    await p.fill('#sr-kontakt', 'Мария Илиева');
+    await napishiSigurno(p, '#sr-kontakt', 'Мария Илиева');
     await p.$eval('#sr-data', (e) => { (e as HTMLInputElement).removeAttribute('required'); });
     await p.fill('#sr-data', '');
     await p.click('#forma-sreshta button[type=submit]');

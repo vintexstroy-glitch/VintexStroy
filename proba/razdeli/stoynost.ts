@@ -1,8 +1,37 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
+import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, dokatoStane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
+import type { Page } from 'playwright-core';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+
+/**
+ * СМЕНЯ ЕДНО ПОЛЕ НА КАЛКУЛАТОРА И ЧАКА ИЗХОДЪТ ДА МРЪДНЕ · §84 и §89.
+ *
+ * Двете проверки падаха по РАЗЛИЧЕН начин, но от една причина (група Ж2,
+ * `docs/11`): прерисуване, тръгнало преди писането, подменя възела и `change`
+ * се вдига върху СТАРОТО число. §84 висеше 30 s; §89 връщаше „по-стара сграда
+ * дава по-ВИСОКА стойност", тоест ЛЪЖЕШЕ, вместо да падне.
+ *
+ * Общото повтаряне живее в `dokatoStane`; тук стои само кое поле кой изход мени.
+ */
+async function smeniIChakayIzhoda(
+  p: Page,
+  znak: string,
+  stoynost: string,
+  izhod: string,
+): Promise<void> {
+  const predi = await tekstNaChisloto(p, izhod);
+  await dokatoStane(
+    p,
+    async () => {
+      await p.fill(znak, stoynost);
+      await p.dispatchEvent(znak, 'change');
+    },
+    async () => (await tekstNaChisloto(p, izhod)) !== predi,
+    `${znak} = ${stoynost} · изходът ${izhod}`,
+  );
+}
 
 /** 22 · Стойност на Състояние */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -295,57 +324,40 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '84 · Базите · смяната мени числото ДОЛУ';
     const predBazata = await chisloNaPoleto(p, 'stoynost-a');
     const predSabitiya = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, async () => {
-      await p.fill('#kalk-baza', '3500');
-      await p.dispatchEvent('#kalk-baza', 'change');
-    });
+    await smeniIChakayIzhoda(p, '#kalk-baza', '3500', 'stoynost-a');
     const sledBazata = await chisloNaPoleto(p, 'stoynost-a');
     proveri('по-висока база дава по-висока стойност', sledBazata > predBazata, true);
     proveri('и НИЩО от това не влиза в Журнала', await broySabitiya(p), predSabitiya);
     // Връщането връща числото ТОЧНО — инак закръглянето би оставило утайка.
-    //
-    /**
-     * ЧАКА СЕ ИЗХОДЪТ ДА МРЪДНЕ · и това е ВТОРАТА поправка на тази проверка.
-     *
-     * Обработчикът прави ДВЕ неща (смята и прерисува), тъй че „шапката е нова"
-     * не значи „числото е новото". Проверката падаше ПРЕЗ ПЪТ с 215 810 000
-     * срещу 190 860 000.
-     *
-     * ═══ ПЪРВАТА ПОПРАВКА (ADR-087 §8) НЕ СТИГНА ═══
-     *
-     * Тя чакаше ПОЛЕТО `#kalk-baza` да стане „3000". Но полето го написах САМ
-     * с `fill` — то е готово ПРЕДИ да е почнало пресмятането, тъй че чакането
-     * минаваше веднага и не свидетелстваше за нищо. Резен 30 я хвана пак.
-     *
-     * Сега се чака ИЗХОДЪТ да напусне 3500-състоянието — нещо, което САМО
-     * пресмятането може да направи. И чак тогава се твърди ТОЧНОТО число:
-     * „мръднало е" и „мръднало е точно дотам" са различни неща, значи
-     * твърдението пак може да падне.
-     */
+    // Как се чака смяната, и защо точно така, живее при `smeniBazata` (правило
+    // 17): „мръднало е" и „мръднало е точно дотам" са различни неща, тъй че
+    // твърдението отдолу пак може да падне.
     const izhodPri3500 = await tekstNaChisloto(p, 'stoynost-a');
-    await deystvieSPrerisuvane(p, async () => {
-      await p.fill('#kalk-baza', '3000');
-      await p.dispatchEvent('#kalk-baza', 'change');
-    });
-    await p.waitForFunction(
-      (staro) =>
-        (document.querySelector('[data-pole="stoynost-a"] .chislo')?.textContent ?? '').trim() !==
-        staro,
-      izhodPri3500,
-    );
+    await smeniIChakayIzhoda(p, '#kalk-baza', '3000', 'stoynost-a');
     proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predBazata);
 
     razdel = '84 · Базите · и ГАРАЖЪТ вече се пипа';
     // `sBaza` приемаше всеки вид от самото начало; екранът редактираше само
     // апартамента, значи гаражът се смяташе с число, недостижимо за човека.
-    await p.fill('[data-baza=garazh]', '1200');
-    await p.dispatchEvent('[data-baza=garazh]', 'change');
     // ЧАКА СЕ САМАТА СТОЙНОСТ, не прерисуването: полето се пренаписва СЛЕД
     // записа в паметта, и четене веднага след събитието хваща старото число.
-    await p.waitForFunction(() =>
-      ((document.querySelector('[data-baza=garazh]') as HTMLInputElement | null)?.value ?? '')
-        .replace(/\s/g, '')
-        .startsWith('1200'));
+    // А писането се ПОВТАРЯ (Ж2), защото едно чакане не поправя действие, което
+    // прерисуването е изяло — тогава чакането просто изтича след 30 s.
+    //
+    // Сравнява се БЕЗ разстоянията: това поле се пренаписва в свой вид („1 200"),
+    // тъй че дословно чакане тук не се сбъдва никога — уроците на §84.
+    await dokatoStane(
+      p,
+      async () => {
+        await p.fill('[data-baza=garazh]', '1200');
+        await p.dispatchEvent('[data-baza=garazh]', 'change');
+      },
+      async () =>
+        (await p.$eval('[data-baza=garazh]', (e) => (e as HTMLInputElement).value))
+          .replace(/\s/g, '')
+          .startsWith('1200'),
+      'базата на гаража = 1200',
+    );
     proveri('новата база на гаража се помни',
       (await p.$eval('[data-baza=garazh]', (e) => (e as HTMLInputElement).value.replace(/\s/g, ''))).startsWith('1200'),
       true);
@@ -366,10 +378,11 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
 
     // ЗЕМЯТА НЕ ОВЕХТЯВА · мери се на живо, не се чете от надпис.
     const predVazrastta = await chisloNaPoleto(p, 'stoynost-v');
-    // FILL + РЪЧЕН `change` пуска ДВЕ събития · пише се и се излиза от полето
-    // (резен 27 · `napishiVPoleto`). Второто прерисуване гонеше първото и §89
-    // пропадаше през едно пускане.
-    await deystvieSPrerisuvane(p, () => napishiVPoleto(p, '#kalk-vazrast', '35'));
+    // ТРЕТА поправка на този ред. Първата пускаше две събития наведнъж; втората
+    // мина на `napishiVPoleto` (пише и излиза от полето) — и пак пропадаше през
+    // пускане, защото НИТО ЕДНА от двете не чака ДЕЙСТВИЕТО да е стигнало. Това
+    // е група Ж2 и се поправя както §84: пише се пак, докато изходът не мръдне.
+    await smeniIChakayIzhoda(p, '#kalk-vazrast', '35', 'stoynost-v');
     const sledVazrastta = await chisloNaPoleto(p, 'stoynost-v');
     proveri('по-стара сграда дава по-ниска разходна стойност',
       sledVazrastta < predVazrastta, true);
@@ -386,17 +399,27 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // Тук животът се изчерпва НАПЪЛНО: сградата отива на нула и остава САМО
     // земята. Изяде ли я множителят, числото пада на нула и проверката го
     // хваща с число, не с усещане.
-    await deystvieSPrerisuvane(p, () => napishiVPoleto(p, '#kalk-vazrast', '70'));
+    // Пак Ж2 · писането се повтаря, докато надписът не каже изчерпания живот.
+    await dokatoStane(
+      p,
+      () => napishiVPoleto(p, '#kalk-vazrast', '70'),
+      async () => (await tekstNa(p, '[data-ostavashti]')).includes('0,00 %'),
+      'изчерпан полезен живот при възраст 70',
+    );
     proveri('при ИЗЧЕРПАН полезен живот от сградата не остава нищо',
       (await tekstNa(p, '[data-ostavashti]')).includes('0,00 %'), true);
     proveri('но В пак е НАД нулата · земята не овехтява',
       (await chisloNaPoleto(p, 'stoynost-v')) > 0, true);
     // ЧАКА СЕ САМАТА СТОЙНОСТ, не прерисуването · същият капан като при базите
     // в §84: полето се пренаписва СЛЕД записа в паметта, и попълване веднага
-    // след предишното прерисуване пише в възел, който вече е сменен.
-    await napishiVPoleto(p, '#kalk-vazrast', '0');
-    await p.waitForFunction(() =>
-      (document.querySelector('[data-ostavashti]')?.textContent ?? '').includes('100,00'));
+    // след предишното прерисуване пише в възел, който вече е сменен. Едно
+    // чакане обаче не поправя писане, което не е стигнало — оттам `dokatoStane`.
+    await dokatoStane(
+      p,
+      () => napishiVPoleto(p, '#kalk-vazrast', '0'),
+      async () => (await tekstNa(p, '[data-ostavashti]')).includes('100,00'),
+      'върната възраст 0',
+    );
     proveri('връщането връща същото число',
       await chisloNaPoleto(p, 'stoynost-v'), predVazrastta);
 
@@ -413,10 +436,15 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '[data-pole=stoynost-saglasuvana] .pod')).includes('под наем'), true);
 
     // СБОР, РАЗЛИЧЕН ОТ 100 %, се КАЗВА · не се пренормира мълчаливо.
-    await deystvieSPrerisuvane(p, async () => {
-      await p.fill('[data-teglo=pazaren_bt]', '80');
-      await p.dispatchEvent('[data-teglo=pazaren_bt]', 'change');
-    });
+    await dokatoStane(
+      p,
+      async () => {
+        await p.fill('[data-teglo=pazaren_bt]', '80');
+        await p.dispatchEvent('[data-teglo=pazaren_bt]', 'change');
+      },
+      async () => (await tekstNa(p, '[data-sbor-tegla]')).includes('НЕ затваря'),
+      'сборът на теглата минава 100 %',
+    );
     proveri('сбор над 100 % се казва на глас',
       (await tekstNa(p, '[data-sbor-tegla]')).includes('НЕ затваря'), true);
     proveri('и находката излиза при проверката на настройките',

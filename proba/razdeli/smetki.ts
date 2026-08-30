@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -752,7 +752,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.red.legenda', (r) => r.every((x) => x.textContent.length > 40)), true);
 
     // ЧИСТОТО не свети
-    await p.fill('#razhod-dostavchik', 'Материали ООД');
+    await napishiSigurno(p, '#razhod-dostavchik', 'Материали ООД');
     proveri('чиста кирилица не свети',
       await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-')), false);
     proveri('и не казва нищо', await p.$eval('#kazva-dostavchik', (e) => e.textContent.trim()), '');
@@ -764,7 +764,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     // покаже. §48 пази ЧЕРУПКАТА на приложението — надписи, бутони, глави — а
     // не онова, което човекът въвежда. Йероглифите нямат наш подпакет и падат
     // на системен шрифт, тъй че пробата не мърда джоба.
-    await p.fill('#razhod-dostavchik', '株式会社 ЕООД');
+    await napishiSigurno(p, '#razhod-dostavchik', '株式会社 ЕООД');
     proveri('чуждата азбука свети ЖЪЛТО',
       await p.$eval('#razhod-dostavchik', (e) => e.className.includes('problem-zhalto')), true);
     proveri('и КАЗВА кой знак е',
@@ -897,6 +897,9 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
 
     // Категориите са СПРАВКА и стоят прибрани · но се отварят и се четат.
     await p.click('[data-sektsiya=nap-napuska] details:last-of-type summary');
+    // Отварянето е ДЕЙСТВИЕ · сгънатото `<details>` няма текст, тъй че четене
+    // преди `open` би минало по празен низ (урокът от §41, вече втори път).
+    await p.waitForSelector('[data-sektsiya=nap-napuska] details:last-of-type[open]');
     proveri('изброява се и какво НЕ влиза · включително самият Журнал',
       (await tekstNa(p, '[data-sektsiya=nap-napuska]')).includes('самият Журнал'), true);
 
@@ -1409,10 +1412,10 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   // минава ПРЕЗ това състояние, и екранът трябва да го КАЖЕ, не да падне
   // (правило 15). Проходът го намери сам: първата версия на §92 нареждаше
   // полетата точно така и се спъна.
-  await deystvieSPrerisuvane(p, async () => {
-    await p.fill('#spravki-ot', '2027-06');
-    await p.dispatchEvent('#spravki-ot', 'change');
-  });
+  // ПРЕЗ `smeniPoleto`, като съседния обхват: същото поле, същият идиом. Голото
+  // `fill` + `change` тук е формата на група Ж — прерисуване, тръгнало преди
+  // писането, изяжда написаното и `change` се вдига върху старото (резен 44).
+  await smeniPoleto(p, '#spravki-ot', '2027-06');
   proveri('обърнатият обхват се КАЗВА с думи, не срива екрана',
     (await tekstNa(p, '[data-sektsiya=nap-spravki]')).includes('Краят е преди началото'), true);
 

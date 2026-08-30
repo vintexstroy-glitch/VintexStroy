@@ -20,6 +20,7 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const KOREN = new URL('..', import.meta.url).pathname;
 
@@ -87,6 +88,27 @@ function obhodB() {
 }
 
 /**
+ * ПРОЗОРЕЦЪТ БРОИ РАБОТЕЩИ РЕДОВЕ, НЕ РЕДОВЕ.
+ *
+ * Първата мярка гледаше „до три реда след", а коментарът също е ред. Тогава
+ * ТРИ реда обяснение изтикват четенето вън от прозореца и находката изчезва —
+ * тоест обходът се заобикаля с коментар, и то без никой да го иска.
+ *
+ * Намерено с нарочно счупване В САМИЯ резен 44: махнах едно изчакване, което
+ * бях сложил под три реда коментар, и обходът мълча. Машина, която мълчи пред
+ * върнатия дефект, е по-скъпа от липсваща (ADR-051).
+ */
+export function rabotni(redove, ot, kolko, posoka = 1) {
+  const iz = [];
+  for (let i = ot; i >= 0 && i < redove.length && iz.length < kolko; i += posoka) {
+    const t = redove[i].trim();
+    if (t === '' || t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) continue;
+    iz.push(redove[i]);
+  }
+  return iz;
+}
+
+/**
  * ОБХОД Е · ЧЕТЕНЕ БЕЗ ИЗЧАКВАНЕ.
  *
  * Действие, а до три реда след него — четене, без нищо, което да чака екрана.
@@ -94,19 +116,98 @@ function obhodB() {
  * като свалянето се развърже). Пада веднъж на три пускания — проход, който лъже
  * през ден, е по-скъп от липсващ (ADR-051).
  */
+/**
+ * ЧАКАЩИТЕ · всичко, което дава на екрана да догони действието.
+ *
+ * ОБВИВКИТЕ се броят и когато стоят на ПРЕДИШНИЯ ред: `deystvieSPrerisuvane(p,
+ * () =>` често е на един ред, а самият клик — на следващия. Първата версия
+ * четеше само своя ред и обяви ЕДИНАЙСЕТ безопасни места за находки. Машина,
+ * която пресмята, учи човека да я подмине — тя е по-лоша от липсваща.
+ *
+ * СВОИТЕ ЧАКАЩИ на прохода (`chakay…`) също влизат: `chakayDela(n)` е
+ * `waitForFunction` с име, и обход, който не го знае, брои шум.
+ *
+ * ═══ И ЕДИН БЕШЕ ВПИСАН НАПРАЗНО ═══
+ *
+ * `napishiVPoleto` стоеше тук, а то НЕ ЧАКА нищо: пише и излиза от полето.
+ * Вписан в списъка на чакащите, той мълчеше върху §89 — а §89 не висеше, а
+ * ЛЪЖЕШЕ („по-стара сграда дава по-ВИСОКА стойност"). Махнат в резен 44 и
+ * премерен: нула нови находки, защото всяко негово място е и в обвивка.
+ * Име в списъка на чакащите, което не чака, учи обхода да лъже.
+ *
+ * `dokatoStane` пък влиза с ПЪЛНО право: то не просто чака, а ПОВТАРЯ, докато
+ * условието не стане (група Ж2). Извади ли се, собствените му места веднага
+ * стават находки — тъй че вписването не е надпис.
+ */
+const CHAKA = /waitFor|deystvieSPrerisuvane|dokatoStane|sSabitie|sSabitiya|napishiSigurno|natisniVGrupata|\bchakay\w*\(|Promise\.all\(/;
+
 function obhodE() {
-  const deystvie = /\.(click|selectOption|fill|waitForEvent)\(/;
+  // `napishiSigurno` е ДЕЙСТВИЕ, което носи собственото си чакане. Вписва се и
+  // в двата списъка нарочно: като действие — за да не изглежда безобидно само
+  // защото се вика по име; и в `CHAKA` — защото чакането наистина е в него.
+  // Извади ли се от `CHAKA`, обходът веднага го обявява — тъй че вписването не
+  // е надпис, а се проверява с нарочно счупване.
+  const deystvie = /\.(click|selectOption|fill|waitForEvent)\(|napishiSigurno\(|napishiVPoleto\(/;
   const chete = /\$\$?eval\(|tekstNa\(/;
-  const chaka = /waitFor|deystvieSPrerisuvane|sSabitie|sSabitiya|napishiVPoleto/;
   const nam = [];
   for (const f of faylove('proba')) {
     const redove = chети(f).split('\n');
     redove.forEach((red, i) => {
-      if (!deystvie.test(red) || chaka.test(red)) return;
-      const opashka = redove.slice(i + 1, i + 4);
-      if (opashka.some((x) => chete.test(x)) && !opashka.some((x) => chaka.test(x))) {
+      // ДЕКЛАРАЦИЯТА не е викане · инак самият помощник се обявява за находка.
+      if (/^\s*(export\s+)?(async\s+)?function\b/.test(red)) return;
+      if (!deystvie.test(red) || CHAKA.test(red)) return;
+      // ОБВИВКАТА може да стои до ТРИ РАБОТЕЩИ реда НАД действието: едноредовите
+      // (`deystvieSPrerisuvane(p, () =>`) се хващат с два, но `dokatoStane` се
+      // пише на няколко — име, `p,`, `async () => {`. Мярка, която не стига до
+      // обвивката, обявява собствения си помощник за дефект.
+      if (rabotni(redove, i - 1, 3, -1).some((x) => CHAKA.test(x))) return;
+      const opashka = rabotni(redove, i + 1, 3);
+      if (opashka.some((x) => chete.test(x)) && !opashka.some((x) => CHAKA.test(x))) {
         nam.push(`${f}:${i + 1} — ${red.trim().slice(0, 62)}`);
       }
+    });
+  }
+  return nam;
+}
+
+/**
+ * ОБХОД Ж · ПИШЕ СЛЕД ПРЕРИСУВАНЕ И ПОДАВА, БЕЗ ДА ПРОВЕРИ.
+ *
+ * Втората половина на група Е, и тя има своя точна форма: действие, което
+ * прерисува (клик · презареждане) → `fill` → подаване, и никъде помежду им
+ * нещо, което да чака. Прерисуването, тръгнало преди писането, подменя възела;
+ * написаното пада; подава се ПРАЗНА форма; и Вратата отказва с „иска име" —
+ * доклад, който сочи ЗАПИСА, докато счупено е ПИСАНЕТО.
+ *
+ * Платено с §95 (резен 43): падаше веднъж на три пускания.
+ *
+ * ЗАЩО ТАКА ТЯСНО, а не „писане след действие" изобщо. Широкото четене дава 51
+ * места, и почти всички са безопасни: `fill` на Playwright сам изчаква полето
+ * да е видимо и готово, тъй че „още не се е отворило" изобщо не е наш дефект.
+ * Опасното е ДРУГО — стойност, която ВЛИЗА и после изчезва под прерисуване, —
+ * и то се вижда само когато след писането има ПОДАВАНЕ. Обход, който брои 51
+ * вместо истинските, учи човека да го подмине (урокът от първата версия на Е).
+ *
+ * Днес е НУЛА, защото §95 вече е платен. Прагът пази поправката да не се върне.
+ */
+function obhodZh() {
+  const prerisuva = /\.(click|dblclick|reload|goto)\(/;
+  // `napishiSigurno` Е писане · вписва се и тук, за да не изглежда безобидно
+  // само защото се вика по име, а не през `p.fill`.
+  const pishe = /\.fill\(|napishiSigurno\(/;
+  const podava = /type=submit|press\('Enter'/;
+  const nam = [];
+  for (const f of faylove('proba')) {
+    const redove = chети(f).split('\n');
+    redove.forEach((red, i) => {
+      if (!prerisuva.test(red) || CHAKA.test(red)) return;
+      if (rabotni(redove, i - 1, 2, -1).some((x) => CHAKA.test(x))) return;
+      const opashka = rabotni(redove, i + 1, 7);
+      const pisano = opashka.findIndex((x) => pishe.test(x));
+      const podadeno = opashka.findIndex((x) => podava.test(x));
+      if (pisano < 0 || podadeno < pisano) return;
+      if (opashka.slice(0, podadeno + 1).some((x) => CHAKA.test(x))) return;
+      nam.push(`${f}:${i + 1} — ${red.trim().slice(0, 62)}`);
     });
   }
   return nam;
@@ -148,10 +249,22 @@ function obhodA() {
  */
 const OBHODI = [
   { ime: 'Б · гол селектор върху двусмислен белег', prag: 0, kart: obhodB },
-  { ime: 'Е · четене без изчакване след действие', prag: 25, kart: obhodE },
+  { ime: 'Е · четене без изчакване след действие', prag: 0, kart: obhodE },
+  { ime: 'Ж · пише след прерисуване и подава, без проверка', prag: 0, kart: obhodZh },
   { ime: 'А · тестът се мести заедно с кода', prag: 4, kart: obhodA },
 ];
 
+// ПУСКА СЕ САМО КАТО КОМАНДА. Изнесеното (`rabotni`) трябва да може да се внесе
+// от тест, без целият обход да тръгне и без `process.exitCode` да падне върху
+// чужд процес. Прозорецът, който пази другите, се пази от свой тест (резен 44).
+// Сравнява се ВХОДНАТА ТОЧКА, не името: проверката на самото падане пуска
+// КОПИЕ под друго име, а обход, който мълчи заради името на файла, би обявил
+// поправено онова, което просто не се е пуснало.
+const kato_komanda = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (kato_komanda) prebroy();
+
+function prebroy() {
 console.log('\n═══ ЧЕСТНОСТТА НА ПРОВЕРКИТЕ ═══\n');
 console.log(`двусмислени белега (живеят в >1 екран): ${dvusmisleni.size} от ${poBeleg.size}\n`);
 let nad = 0;
@@ -169,4 +282,5 @@ if (nad === 0) {
   console.log(`\nНАХОДКИ: ${nad} обхода над прага си. Честността се БРОИ, не се оценява.\n`);
   // ПАДА С ЧЕРВЕНО · инак командата е надпис. Портата и CI я пускат.
   process.exitCode = 1;
+}
 }

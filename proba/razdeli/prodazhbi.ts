@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { dokatoStane, naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 import type { Page } from 'playwright-core';
 
 /**
@@ -295,14 +295,20 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
    * блока се приписва на предишния. Затова тук се проверява СЪСТОЯНИЕТО, преди
    * да се пипа — както го прави и §63.
    */
-  if (await p.$eval('#nastroyki-red', (e) => (e as HTMLElement).hidden)) {
-    await p.click('#nastroyki-vhod');
-    await p.waitForFunction(
-      () => (document.querySelector('#nastroyki-red') as HTMLElement | null)?.hidden === false,
-      undefined,
-      { timeout: 5_000 },
-    );
-  }
+  // И ПЕТИ таймаут, от ДРУГА причина · група Ж2 (резен 44 · `docs/11`). Кликът
+  // може да падне в възел, който прерисуването вече е сменил: тогава редът
+  // изобщо не се отваря и чакането изтича. Затова се повтаря САМОТО действие —
+  // и то се пази отвътре да не ЗАТВОРИ вече отворен ред.
+  const skrit = async (): Promise<boolean> =>
+    p.$eval('#nastroyki-red', (e) => (e as HTMLElement).hidden);
+  await dokatoStane(
+    p,
+    async () => {
+      if (await skrit()) await p.click('#nastroyki-vhod');
+    },
+    async () => !(await skrit()),
+    'падащият ред на Настройки се отваря',
+  );
   await p.click('#nastroyki-red [data-tema="etapi-prodazhbi"]');
   await p.waitForSelector('[data-sektsiya=etapi-prodazhbi]');
   proveri(
@@ -328,11 +334,17 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
    * Това е СЪЩИЯТ клас като §58 и §89 (група Е), само в нова форма: не четене
    * без изчакване, а ПИСАНЕ без потвърждение.
    */
-  await p.fill('#etap-ime', 'Акт 17');
-  await p.waitForFunction(
-    () => (document.querySelector('#etap-ime') as HTMLInputElement | null)?.value === 'Акт 17',
-    undefined,
-    { timeout: 5_000 },
+  // ═══ И ЕДНО ЧАКАНЕ НЕ СТИГНА (резен 44) ═══
+  //
+  // Резен 43 сложи тук `waitForFunction` върху стойността на полето. То пак
+  // падаше — само че вече с „Timeout 5000ms" вместо с „Етапът иска име":
+  // чакането не поправя ПИСАНЕ, което прерисуването е изяло, а само сменя
+  // думите на доклада. Затова се пише ПАК, докато полето не го задържи.
+  await dokatoStane(
+    p,
+    () => p.fill('#etap-ime', 'Акт 17'),
+    () => p.$eval('#etap-ime', (e) => (e as HTMLInputElement).value === 'Акт 17'),
+    'полето „Етап" държи „Акт 17"',
   );
   await p.selectOption('#etap-vnoska', 'da');
   await p.click('#forma-etap button[type=submit]');

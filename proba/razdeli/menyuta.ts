@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 57 · Менютата · речникът е от Журнала | 57 · Менютата · четирите състояния | 57 · Менютата · следата СЛЕД записа | 58 · Още огледала · по обект | 58 · Още огледала · по контрагент */
@@ -21,12 +21,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '57 · Менютата · четирите състояния';
     // ПРАЗНО · нито цвят, нито дума
-    await p.fill('#d-myasto', '');
+    await napishiSigurno(p, '#d-myasto', '');
     proveri('празното поле мълчи',
       await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '');
 
     // ПИСАНО НА РЪКА, ново → ЧЕРНО и „＋ нова стойност"
-    await p.fill('#d-myasto', 'Банишора');
+    await napishiSigurno(p, '#d-myasto', 'Банишора');
     proveri('писаното на ръка ПОЧЕРНЯВА',
       await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
     proveri('и ДУМАТА го казва · вторият носител до цвета',
@@ -35,7 +35,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('#d-myasto', (e) => (e as any).checkValidity()), true);
 
     // ПИСАНО НА РЪКА, СЛУЧАЙНО съвпадащо → пак ЧЕРНО, но друга дума
-    await p.fill('#d-myasto', 'Малинова');
+    await napishiSigurno(p, '#d-myasto', 'Малинова');
     proveri('случайното съвпадение ОСТАВА черно · „ти не си избирал"',
       await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
     proveri('но думата казва, че дубликат няма да се създаде',
@@ -54,7 +54,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('[data-znak-za="d-myasto"]', (e) => e.textContent.trim()), '');
 
     // РЕДАКЦИЯ СЛЕД ИЗБОР → ПОЧЕРНЯВА „в мига, в който се различи"
-    await p.fill('#d-myasto', 'Хисаря 2');
+    await napishiSigurno(p, '#d-myasto', 'Хисаря 2');
     proveri('редактираното след избор ПОЧЕРНЯВА',
       await p.$eval('#d-myasto', (e) => e.classList.contains('menyu-cherno')), true);
     proveri('и синьото си отива',
@@ -235,12 +235,12 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     const naemateliVSpisaka = await p.$$eval('#naem-naemetel-spisak option', (o) => o.map((x) => (x as any).value));
     proveri('и в него стоят ЖИВИТЕ наематели от Журнала',
       naemateliVSpisaka.length > 0, true);
-    await p.fill('#naem-naemetel', naemateliVSpisaka[0]);
+    await napishiSigurno(p, '#naem-naemetel', naemateliVSpisaka[0]);
     proveri('писаното на ръка ПОЧЕРНЯВА и тук',
       await p.$eval('#naem-naemetel', (e) => e.classList.contains('menyu-cherno')), true);
     proveri('а думата казва, че дубликат няма да се създаде',
       await p.$eval('[data-znak-za="naem-naemetel"]', (e) => e.textContent.trim()), '= съществуваща');
-    await p.fill('#naem-naemetel', 'Нов Наемател ЕООД');
+    await napishiSigurno(p, '#naem-naemetel', 'Нов Наемател ЕООД');
     proveri('нов наемател обещава НОВА стойност',
       await p.$eval('[data-znak-za="naem-naemetel"]', (e) => e.textContent.trim()), '＋ нова стойност');
 
