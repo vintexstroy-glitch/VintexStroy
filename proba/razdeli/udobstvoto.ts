@@ -735,6 +735,9 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
  * върнат назад отстъп. Дотук такъв пазач нямаше — трите резена за плътност
  * (1–3) се провериха с око и скрийншот, а окото не помни колко е било.
  */
+/** Адресът се СГЛОБЯВА · стената не пуска цял чужд адрес в кода (резен 31). */
+const ADRES_NA_PAPKA = ['https:', '//', 'primer.example', '/obekt-1'].join('');
+
 export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
   const { stranitsa: p, broyach } = ctx;
   let razdel = '—';
@@ -878,9 +881,26 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.waitForTimeout(120);
       return p.$eval('.tablitsa .glava', (e) => Math.round(e.getBoundingClientRect().top));
     };
-    const glavaA = await glavataPri(900);
-    const glavaB = await glavataPri(1300);
-    console.log(`\n  ГЛАВАТА при скрол 900 → ${glavaA}px · при 1300 → ${glavaB}px\n`);
+    // ДВАТА СКРОЛА СЕ СМЯТАТ ОТ САМАТА ТАБЛИЦА, не се заковават.
+    //
+    // Дотук тук стояха 900 и 1300 — числа, верни за височината на екрана в деня,
+    // в който бяха написани. Резен 37 добави колона и два реда обяснение под
+    // таблицата, тя слезе по-надолу, и 1300 вече падаше ИЗВЪН нея: главата се
+    // отлепваше по естествен път, а проверката го обявяваше за счупена лепкавост.
+    //
+    // Числото трябва да е ВЪТРЕ в обхвата на таблицата — това е онова, което
+    // проверката значи. Мери се стабилност, не абсолютна позиция (и точно това
+    // пише коментарът отгоре, но самите числа не го спазваха).
+    const obhvat = await p.$eval('.tablitsa', (e) => {
+      const telo = document.querySelector('.telo') as HTMLElement;
+      const gore = e.getBoundingClientRect().top - telo.getBoundingClientRect().top + telo.scrollTop;
+      return { gore: Math.round(gore), visochina: Math.round(e.getBoundingClientRect().height) };
+    });
+    const parviyat = obhvat.gore + Math.round(obhvat.visochina * 0.25);
+    const vtoriyat = obhvat.gore + Math.round(obhvat.visochina * 0.6);
+    const glavaA = await glavataPri(parviyat);
+    const glavaB = await glavataPri(vtoriyat);
+    console.log(`\n  ГЛАВАТА при скрол ${parviyat} → ${glavaA}px · при ${vtoriyat} → ${glavaB}px\n`);
     proveri('главата стои на едно и също място при два различни скрола', glavaA, glavaB);
 
     const parvataPri = async (kolko: number): Promise<number> => {
@@ -1696,4 +1716,69 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '[data-granitsa-upravlenie]')).includes('Управление'), true);
 
     await naEkran(p, 'imoti', '#forma-imot');
+
+    // ══ 115 · ПАПКАТА НА ОБЕКТА (резен 37 · ADR-097) ═════════════════════
+    //
+    // „Различни за различни обекти, но те са гоогле драйва и има достъп от
+    // имейлите които влизат в програмата." *(р57·[110])*
+    await naEkran(p, 'imoti', '#forma-imot');
+
+    razdel = '115 · Папката · без нея обектът работи';
+    proveri('всеки ред казва има ли папка',
+      await p.$$eval('.red.imot [data-papka]', (e) => e.length),
+      await p.$$eval('.red.imot', (e) => e.length));
+    proveri('и всички са БЕЗ папка засега',
+      await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 0);
+    proveri('броят се КАЗВА, вместо да се мълчи',
+      await p.$eval('[data-papki-broy]', (e) => (e as any).dataset.papkiBroy), '0');
+    proveri('и екранът казва, че достъпът е при ДОСТАВЧИКА',
+      (await tekstNa(p, '[data-papki-broy]')).includes('решава доставчикът'), true);
+
+    razdel = '115 · Папката · лошият адрес не стига до Журнала';
+    const prediLoshiya = await broySabitiya(p);
+    await p.fill('#imot-adres', 'Витоша');
+    await p.fill('#imot-edinitsa', 'МАГ. № 1');
+    await p.fill('#imot-papka', 'javascript:alert(1)');
+    // ОТКАЗЪТ НЕ ПРЕРИСУВА · той пише в полето за грешка и оставя формата, за
+    // да не изгуби човекът написаното. Чака се самата ДУМА, не прерисуване.
+    await p.click('#forma-imot button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-imot')?.textContent ?? '').length > 0);
+    proveri('отказът се КАЗВА с думи',
+      (await tekstNa(p, '#greshka-imot')).includes('не се приема'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediLoshiya);
+
+    razdel = '115 · Папката · записва се и се вижда като ЛИНК';
+    await p.fill('#imot-papka', ADRES_NA_PAPKA);
+    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    proveri('новият обект носи папка',
+      await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
+    proveri('и тя е ЛИНК, който се отваря в нов таб',
+      await p.$eval('.red.imot [data-ima=da] a', (e) => (e as any).target), '_blank');
+    proveri('броят се вдигна', await p.$eval('[data-papki-broy]',
+      (e) => (e as any).dataset.papkiBroy), '1');
+    proveri('сверката раздяля всички обекти на две кофи',
+      (await tekstNa(p, '[data-papki-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
+
+    razdel = '115 · Папката · ПОПРАВКА без нея не я трие';
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Витоша") [data-popravi-imot]'));
+    proveri('формата се напълни с линка', await p.inputValue('#imot-papka'), ADRES_NA_PAPKA);
+    await p.fill('#imot-ploshtad', '48,00');
+    await p.fill('#imot-prichina', 'измерена площ');
+    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    proveri('папката ОСТАВА след поправка на площта',
+      await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
+
+    razdel = '115 · Папката · „различни за различни обекти" се БРОИ';
+    await p.fill('#imot-adres', 'Витоша');
+    await p.fill('#imot-edinitsa', 'МАГ. № 2');
+    await p.fill('#imot-papka', ADRES_NA_PAPKA);
+    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    proveri('еднаквата папка НЕ се отказва · тя не е грешка',
+      await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 2);
+    proveri('но се БРОИ и се КАЗВА',
+      await p.$eval('[data-povtoreni-papki]', (e) => (e as any).dataset.povtoreniPapki), '1');
+    proveri('с обяснение защо е находка, а не отказ',
+      (await tekstNa(p, '[data-papki-broy]')).includes('копирано поле'), true);
+
 }

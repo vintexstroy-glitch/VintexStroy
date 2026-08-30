@@ -10,6 +10,7 @@
  */
 
 import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { broySPapka, povtoreniPapki, sveriPapkite } from '../src/domein/papki.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
@@ -113,7 +114,47 @@ export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): Kolon
         return broy > 1 ? `${broy} наема` : broy === 1 ? 'отдаден' : 'свободен';
       },
     },
+    // ПАПКАТА · филтрира се по „има/няма", не по самия адрес: адресът е дълъг
+    // низ, който никой не помни наизуст, а въпросът е „кои обекти нямат папка".
+    {
+      klyuch: 'papka',
+      ime: 'Папка',
+      vid: 'tekst',
+      vzemi: (i) => (i.papka === '' ? 'без папка' : 'има папка'),
+    },
   ];
+}
+
+/**
+ * ПАПКИТЕ НА ОБЕКТИТЕ · честен брой и находката „една и съща папка" (резен 37).
+ *
+ * „Различни за различни обекти, но те са гоогле драйва и има достъп от имейлите
+ * които влизат в програмата." *(р57·[110])*
+ *
+ * Втората половина на изречението НЕ е задача за приложението: достъпът е при
+ * доставчика (правило 14). Тук се пази адресът — и точно това се КАЗВА, за да
+ * не остане човек с чувството, че програмата раздава права.
+ */
+function blokNaPapkite(imoti: readonly Imot[], dnes: string): string {
+  if (imoti.length === 0) return '';
+  const sPapka = broySPapka(imoti);
+  const povtoreni = povtoreniPapki(imoti);
+  const sv = sveriPapkite(imoti, dnes);
+  return `
+    <p class="drebno" data-papki-broy="${sPapka}" data-papki-vsichki="${imoti.length}">
+      <b>${sPapka} от ${imoti.length}</b> ${imoti.length === 1 ? 'обект носи' : 'обекта носят'} своя папка.
+      Приложението пази АДРЕСА; кой го отваря, решава доставчикът — тук не се
+      раздава и не се отнема достъп.
+      ${
+        povtoreni.length === 0
+          ? ''
+          : `<b data-povtoreni-papki="${povtoreni.length}">${povtoreni.length}</b>
+             ${povtoreni.length === 1 ? 'папка стои' : 'папки стоят'} на повече от един обект —
+             не е грешка, но най-честата причина е копирано поле.`
+      }
+    </p>
+    <p class="drebno" data-papki-sverka>Сверка вход↔изход: ${sv.vhod} обекта → ${sv.izhod} реда,
+    разлика ${sv.razlika}.</p>`;
 }
 
 /** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
@@ -229,6 +270,14 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             <label for="imot-ploshtad">Площ в м² (по избор)</label>
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
                    value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kvSmVM2(popravyanImot.ploshtad_kvsm) : ''}">
+          </div>
+          <div class="pole">
+            <label for="imot-papka">Линк към папката (по избор)</label>
+            <input translate="no" type="url" id="imot-papka" name="papka" autocomplete="off"
+                   placeholder="адресът от бутона „Сподели" в Драйва"
+                   value="${popravyanImot ? ekraniraj(popravyanImot.papka) : ''}">
+            <span class="drebno">„Различни за различни обекти" · достъпът е при доставчика,
+            тук се пази само адресът.</span>
           </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
@@ -367,6 +416,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
+      ${blokNaPapkite(imoti, dnes)}
     </section>
 
     ${
@@ -644,6 +694,11 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
             ? '<span class="znachka dobre">отдаден</span>'
             : '<span class="znachka tiha">свободен</span>'
       }</span>
+      <span class="kletka" data-papka="${ekraniraj(imot.id)}" data-ima="${imot.papka === '' ? 'ne' : 'da'}">${
+        imot.papka === ''
+          ? '<span class="drebno">без папка</span>'
+          : `<a href="${ekraniraj(imot.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
+      }</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
@@ -731,6 +786,10 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       adres: String(danni.get('adres')).trim(),
       edinitsa: String(danni.get('edinitsa')).trim(),
       ploshtad_kvsm,
+      // ПАПКАТА ВИНАГИ СЕ ПОДАВА от формата · и празната също. Тя е ВИДИМА в
+      // полето: изтрит от човека линк е негово решение и трябва да се запише,
+      // а не да се пропусне като „не съм я пипал" (резен 37).
+      papka: String(danni.get('papka') ?? '').trim(),
     };
 
     buton.disabled = true;

@@ -58,6 +58,7 @@ import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
 import { napraviRachniyaRed } from './porednost.js';
+import { proveriPapkata } from './papki.js';
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
@@ -175,8 +176,21 @@ export class Deystviya {
     this.#kniga = n.kniga;
   }
 
+  /**
+   * ДОБАВЯ ИМОТ · с папката си, ако човек я е дал (резен 37 · р57·[110]).
+   *
+   * Линкът се проверява при ВХОДА, не при рисуването: записан веднъж, лош адрес
+   * остава ЗАВИНАГИ (правило 1) и всеки следващ четец трябва да го преживее.
+   * И отказът е ПОИМЕНЕН — `javascript:` в таблица се натиска.
+   */
   async dobaviImot(id: string, danni: PayloadImotDobaven, z: Zayavka): Promise<Rezultat> {
-    return this.#pusni('ИмотДобавен', VID.imot, id, danni, z);
+    return this.#pusni(
+      'ИмотДобавен',
+      VID.imot,
+      id,
+      { ...danni, papka: proveriPapkata(danni.papka ?? '') },
+      z,
+    );
   }
 
   async dobaviNaem(id: string, danni: PayloadNaemDobaven, z: Zayavka): Promise<Rezultat> {
@@ -190,7 +204,16 @@ export class Deystviya {
 
   /** Поправка на описанието — ново събитие върху същия имот, не сторно. */
   async popraviImot(danni: PayloadImotPopraven, z: Zayavka): Promise<Rezultat> {
-    return this.#pusni('ИмотПоправен', VID.imot, danni.imotId, danni, z);
+    return this.#pusni(
+      'ИмотПоправен',
+      VID.imot,
+      danni.imotId,
+      // ЛИПСВАЩОТО поле се подава ЛИПСВАЩО, не празно: празното значи „махни
+      // папката", а липсващото — „не пипам папката". Слети, поправка на площта
+      // щеше да трие линка мълчаливо.
+      danni.papka === undefined ? danni : { ...danni, papka: proveriPapkata(danni.papka) },
+      z,
+    );
   }
 
   async popraviNaem(danni: PayloadNaemPopraven, z: Zayavka): Promise<Rezultat> {

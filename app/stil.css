@@ -861,8 +861,8 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── редове с действия ───────────────────────────────────────────────── */
 .glava.imot, .red.imot {
-  grid-template-columns: minmax(0, 400px) minmax(0, 320px) 96px 120px 108px 168px;
-  min-width: 860px;
+  grid-template-columns: minmax(0, 360px) minmax(0, 280px) 96px 120px 108px 96px 168px;
+  min-width: 960px;
 }
 .glava.naem, .red.naem {
   grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;

@@ -315,6 +315,13 @@ export interface PayloadImotDobaven {
   readonly edinitsa: string;
   /** площ в цели квадратни сантиметри — пак без float */
   readonly ploshtad_kvsm: number;
+  /**
+   * ЛИНК КЪМ ПАПКАТА на ТОЗИ обект · по избор (резен 37 · р57·[110]).
+   *
+   * Празното е нормалното: обектът има смисъл и без папка. Записан преди това
+   * поле, имотът си остава валиден — четецът чете празно, не се чупи (правило 1).
+   */
+  readonly papka?: string;
 }
 
 export interface PayloadNaemDobaven {
@@ -356,6 +363,8 @@ export interface PayloadImotPopraven {
   readonly edinitsa: string;
   readonly ploshtad_kvsm: number;
   readonly prichina: string;
+  /** линкът към папката · поправя се като всяко друго поле (резен 37) */
+  readonly papka?: string;
 }
 
 /**

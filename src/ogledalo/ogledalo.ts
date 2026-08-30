@@ -111,6 +111,14 @@ export interface Imot {
   readonly adres: string;
   readonly edinitsa: string;
   readonly ploshtad_kvsm: number;
+  /**
+   * ЛИНК КЪМ ПАПКАТА на този обект · празно значи „още няма" (резен 37).
+   *
+   * „Различни за различни обекти, но те са гоогле драйва и има достъп от
+   * имейлите които влизат в програмата." *(р57·[110])* — пази се АДРЕСЪТ;
+   * достъпът е при доставчика (правило 14).
+   */
+  readonly papka: string;
 }
 
 export interface Naem {
@@ -778,6 +786,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           adres: p.adres,
           edinitsa: p.edinitsa,
           ploshtad_kvsm: p.ploshtad_kvsm,
+          // Имот, записан ПРЕДИ полето, чете празно · старият запис си е валиден.
+          papka: p.papka ?? '',
         });
         break;
       }
@@ -1435,6 +1445,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
             adres: p.adres,
             edinitsa: p.edinitsa,
             ploshtad_kvsm: p.ploshtad_kvsm,
+            // ЛИПСВАЩО поле НЕ трие вече записаната папка: поправка на площта
+            // не е решение за папката (същата сметка като при съгласието, ADR-036).
+            papka: p.papka ?? imot.papka,
           });
         }
         break;
