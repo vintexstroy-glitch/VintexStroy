@@ -22,7 +22,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   // ── МЯСТОТО В ЛЕНТАТА ────────────────────────────────────────────────────
-  const redut = await p.$$eval('[data-ekran]', (e) =>
+  const redut = await p.$$eval('.navred[data-ekran]', (e) =>
     e.map((x) => (x as HTMLElement).dataset['ekran'] ?? ''),
   );
   proveri(

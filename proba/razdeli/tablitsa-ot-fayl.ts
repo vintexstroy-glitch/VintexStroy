@@ -23,7 +23,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
   proveri(
     'преди четене няма предложение · нищо не се измисля',
-    await p.$$eval('[data-predlozhenie]', (e) => e.length),
+    await p.$$eval('.plochki[data-predlozhenie]', (e) => e.length),
     0,
   );
 
@@ -88,7 +88,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   );
   proveri(
     'и предложението се прибира · то беше поглед, не състояние',
-    await p.$$eval('[data-predlozhenie]', (e) => e.length),
+    await p.$$eval('.plochki[data-predlozhenie]', (e) => e.length),
     0,
   );
   proveri(

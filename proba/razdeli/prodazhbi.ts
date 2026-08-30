@@ -69,7 +69,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // НУЛАТА ЧАКАЩИ СЕ КАЗВА · трите въпроса получиха негов отговор на 29.08.
   proveri(
     'нищо не чака · и нулата се БРОИ, не се преглъща',
-    await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']),
+    await p.$eval('[data-sektsiya^=prodazhbi] [data-chakat]', (e) => (e as HTMLElement).dataset['chakat']),
     '0',
   );
   proveri(
@@ -316,7 +316,24 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     '0',
   );
 
+  /**
+   * ПИШЕ СЕ, ЧАК КОГАТО ПОЛЕТО НАИСТИНА ГО ДЪРЖИ · надпревара, хваната при
+   * чистенето на група Б (`docs/11`).
+   *
+   * `waitForSelector` на секцията се развързва при ПЪРВОТО рисуване, а следващо
+   * прерисуване подменя възела и изяжда написаното. Тогава формата тръгва
+   * ПРАЗНА и Вратата отказва с „Етапът иска име" — раздел, който падаше веднъж
+   * на три пускания и изглеждаше като счупен запис, а беше счупено писане.
+   *
+   * Това е СЪЩИЯТ клас като §58 и §89 (група Е), само в нова форма: не четене
+   * без изчакване, а ПИСАНЕ без потвърждение.
+   */
   await p.fill('#etap-ime', 'Акт 17');
+  await p.waitForFunction(
+    () => (document.querySelector('#etap-ime') as HTMLInputElement | null)?.value === 'Акт 17',
+    undefined,
+    { timeout: 5_000 },
+  );
   await p.selectOption('#etap-vnoska', 'da');
   await p.click('#forma-etap button[type=submit]');
   /**

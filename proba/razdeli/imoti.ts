@@ -169,7 +169,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
 
     const ostatakNa = async (): Promise<string> =>
       p.$eval('[data-registar=ostatak]', (e) => (e as HTMLElement).textContent!.trim());
-    const grupiNa = async (): Promise<number> => p.$$eval('[data-grupa]', (e) => e.length);
+    const grupiNa = async (): Promise<number> => p.$$eval('[data-sektsiya=naemi-registar] [data-grupa]', (e) => e.length);
     const smeniMeseca = async (m: string): Promise<void> => {
       await deystvieSPrerisuvane(p, () =>
         p.$eval('#registar-mesets', (e, stoynost) => {
@@ -209,7 +209,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('връщането дава пак първото число', await ostatakNa(), ostatakPoNaemateli);
 
     razdel = '87 · регистърът · стъпката се СМЯТА и се КАЗВА с дума';
-    const stapki = await p.$$eval('[data-stapka]', (e) =>
+    const stapki = await p.$$eval('[data-sektsiya=naemi-registar] [data-stapka]', (e) =>
       e.map((x) => (x as HTMLElement).dataset['stapka']));
     proveri('всеки ред носи стъпка', stapki.length > 0, true);
     proveri('и всяка е от четирите познати',

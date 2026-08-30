@@ -197,7 +197,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     await p.$eval('[data-vid-hranilishte]', (e) => (e as HTMLElement).dataset['vidHranilishte']),
     'не е питано');
   proveri('оценката също',
-    await p.$eval('[data-otsenka]', (e) => (e as HTMLElement).dataset['otsenka']), 'ne e pitano');
+    await p.$eval('.znachka[data-otsenka]', (e) => (e as HTMLElement).dataset['otsenka']), 'ne e pitano');
   proveri('и КАЗВА защо мълчи',
     (await tekstNa(p, '[data-sektsiya=tablo-spiratchka]')).includes('не твърдим нищо'), true);
   proveri('свободното НЯМА число · защото не е питано',

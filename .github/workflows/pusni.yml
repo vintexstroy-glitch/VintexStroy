@@ -65,6 +65,8 @@ jobs:
 
       - name: Чистотата · деветте обхода
         run: npm run chistota
+      - name: Честността на проверките
+        run: npm run chestnost
 
       # `npm run build` вече отпечатва и джоба (`stroezh/pechat-sw.mjs`) —
       # черупката се чете ОТ построеното, не се изброява на ръка.

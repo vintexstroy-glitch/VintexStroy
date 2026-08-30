@@ -800,7 +800,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // Негово решение от 28.08, взето измежду три: „И ДВЕТЕ · начален ред +
     // личен". Проходът брои точно това разделение — СЪБИТИЯТА.
     razdel = '72 · Менюто · моят ред НЕ пише в Журнала';
-    const punktovePredi = await p.$$eval('[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
+    const punktovePredi = await p.$$eval('.navred[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
     proveri('всеки пункт носи стрелки за местене',
       (await p.$$eval('[data-mesti]', (e) => e.length)) >= punktovePredi.length - 1, true);
     // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
@@ -811,7 +811,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const predMestene = await broySabitiya(p);
     await deystvieSPrerisuvane(p, () =>
       p.click(`[data-mesti="${punktovePredi[1]}"][data-posoka=gore]`));
-    const punktoveSled = await p.$$eval('[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
+    const punktoveSled = await p.$$eval('.navred[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
     proveri('вторият пункт стана ПЪРВИ', punktoveSled[0], punktovePredi[1]);
     proveri('и НИТО ЕДНО събитие не е влязло · редът ми е ПОГЛЕД',
       await broySabitiya(p), predMestene);
@@ -819,7 +819,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '72 · Менюто · моят ред преживява смяна на екран';
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('редът стои след смяна на екран',
-      (await p.$$eval('[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
+      (await p.$$eval('.navred[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
 
     razdel = '72 · Менюто · скриването е ЛИЧНО и се ВРЪЩА от Таблото';
     await naEkran(p, 'tablo', '[data-sektsiya="tablo-lenta"]');
@@ -854,7 +854,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('#zabravi-moya-red', (e) => (e as HTMLButtonElement).disabled), true);
     await naEkran(p, 'imoti', '#forma-imot');
     proveri('а редът си остава онзи, който Стопанинът записа',
-      (await p.$$eval('[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
+      (await p.$$eval('.navred[data-ekran]', (e) => (e[0] as HTMLElement).dataset['ekran'])), punktovePredi[1]);
 
     razdel = '75 · Хедърът се ЗАДЪРЖА · една скролираща кутия на екран';
     // Негово: „Хедърите също при скрол трябваше да се задържат."
@@ -1122,7 +1122,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // Сметки има ЧЕТИРИНАЙСЕТ секции и е екранът, на който това има смисъл.
     await naEkran(p, 'smetki', '#forma-razhod');
     const otpechatatsi = async (): Promise<string[]> =>
-      p.$$eval('[data-sektsiya]', (se) =>
+      // ОБХВАТ: ЦЯЛАТА СТРАНИЦА · нарочно. Тук се взима отпечатък на ВСИЧКИ
+    // секции, за да се сравни преди/след — стеснен, селекторът би мерил друго.
+    // Обявено изключение от обход Б (`docs/11`): единственото в прохода.
+    p.$$eval('[data-sektsiya]', (se) =>
         se.map((e) => {
           const g = e.querySelector('.tablitsa .glava');
           return g === null
@@ -1529,7 +1532,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const azSam = await p.$eval('#z-chovek', (e) => (e as HTMLSelectElement).value);
     await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
     proveri('изпратената задача влиза в листа',
-      (await p.$$eval('[data-zadacha]', (e) => e.length)) >= 1, true);
+      (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length)) >= 1, true);
     proveri('и състоянието ѝ е „чака отговор"',
       (await tekstNa(p, '[data-zadacha]')).includes('чака отговор'), true);
     console.log(`\n  ЗАДАЧАТА: изпратена на ${azSam}\n`);
@@ -1537,23 +1540,23 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // ПРИЕМАНЕТО · в ПРОГРАМАТА, не в Google. Влезлият е Стопанинът и задачата
     // е на него, значи бутоните са негови.
     proveri('на СВОЯ лист стоят бутоните за отговор',
-      (await p.$$eval('[data-priemi]', (e) => e.length)) >= 1, true);
+      (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-priemi]', (e) => e.length)) >= 1, true);
     // ДВАТА бутона са в ГРУПА действия (ADR-057): видим е един, другият е зад
     // стрелкичката. Проходът прави трите стъпки на човека, не заобикаля групата.
     await sSabitie(p, () => natisniVGrupata(p, '[data-priemi]'));
     proveri('приемането мени състоянието',
       (await tekstNa(p, '[data-zadacha]')).includes('приета'), true);
     proveri('и бутоните за отговор си отиват · веднъж отговорено е отговорено',
-      await p.$$eval('[data-priemi]', (e) => e.length), 0);
+      await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-priemi]', (e) => e.length), 0);
 
     // ОТКАЗАНАТА СИ СЕДИ · негово. Праща се втора и се отказва.
-    const zadachiPredi = await p.$$eval('[data-zadacha]', (e) => e.length);
+    const zadachiPredi = await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length);
     await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
     await sSabitie(p, () => natisniVGrupata(p, '[data-otkazhi]'));
     proveri('отказаната НЕ изчезва от листа',
-      await p.$$eval('[data-zadacha]', (e) => e.length), zadachiPredi + 1);
+      await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length), zadachiPredi + 1);
     proveri('и носи причината си',
-      (await p.$$eval('[data-zadacha]', (e) =>
+      (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('сгрешена сума'), true);
 
     razdel = '83 · Поканата в календара · ПО ИЗБОР, и границата се КАЗВА';
@@ -1596,7 +1599,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('записът и поправката са ДВЕ събития, не едно',
       (await broySabitiya(p)) - predPokanata, 2);
     proveri('и задачата вече носи белега на поканата',
-      (await p.$$eval('[data-kalendar]', (e) => e.length)) >= 1, true);
+      (await p.$$eval('.kalendaren[data-kalendar]', (e) => e.length)) >= 1, true);
     proveri('и СЕГА мрежата е пипната · точно веднъж', kamKalendara, 1);
 
     // ОТГОВОРЪТ НА GOOGLE стои ОТДЕЛНО от нашия · пита се, не се записва.
@@ -1606,7 +1609,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       [...document.querySelectorAll('[data-kalendar]')].some((e) =>
         (e.textContent ?? '').includes('ПРИЕЛ')));
     proveri('календарът казва своя отговор',
-      (await p.$$eval('[data-kalendar]', (e) => e.map((x) => x.textContent ?? '').join(' ')))
+      (await p.$$eval('.kalendaren[data-kalendar]', (e) => e.map((x) => x.textContent ?? '').join(' ')))
         .includes('ПРИЕЛ е поканата'), true);
     proveri('и питането НЕ пише в Журнала · фактът е на Google, не наш',
       await broySabitiya(p), predPitaneto);
@@ -1989,7 +1992,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const sPari = await p.$$eval('.kalendar-den.s-pari', (e) => e.length);
     proveri('поне един ден носи движение', sPari > 0, true);
     proveri('и броят е СМЕТНАТ, не преписан',
-      await p.$eval('[data-kalendar]', (e) => Number((e as any).dataset.dniSPari)), sPari);
+      await p.$eval('.kalendar[data-kalendar]', (e) => Number((e as any).dataset.dniSPari)), sPari);
     proveri('всяко поле с пари носи ДВЕТЕ числа, не едно',
       await p.$$eval('.kalendar-den.s-pari .kalendar-pari b', (e) => e.length), sPari);
     proveri('и разходът стои до прихода',
@@ -2004,13 +2007,13 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '[data-sektsiya=smetki-kalendar]')).includes('не е празен ден'), true);
 
     razdel = '118 · Календарът · слуша СЪЩИЯ месец като Сметки';
-    const predi118 = await p.$eval('[data-kalendar]', (e) => (e as any).dataset.kalendar);
+    const predi118 = await p.$eval('.kalendar[data-kalendar]', (e) => (e as any).dataset.kalendar);
     await deystvieSPrerisuvane(p, async () => {
       await napishiVPoleto(p, '#smetki-period', '2026-07');
       await p.click('#forma-period button[type=submit]');
     });
     proveri('смяната на периода мести и календара',
-      await p.$eval('[data-kalendar]', (e) => (e as any).dataset.kalendar), '2026-07');
+      await p.$eval('.kalendar[data-kalendar]', (e) => (e as any).dataset.kalendar), '2026-07');
     proveri('и това НЕ е същият месец', predi118 === '2026-07', false);
     proveri('нула събития · изгледът се смята, не се записва',
       await broySabitiya(p), await broySabitiya(p));

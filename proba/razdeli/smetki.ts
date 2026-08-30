@@ -1421,7 +1421,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   proveri('празният обхват го КАЗВА',
     (await tekstNa(p, '[data-tablitsa=spravki-redove]')).includes('Няма нито един ред'), true);
   proveri('и нулата чакащи месеци също се казва',
-    await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
+    await p.$eval('[data-sektsiya=nap-spravki] [data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
 
   razdel = '92 · Справките · платено и НЕдекларирано СВЕТИ';
   // МЕРИ СЕ ПРЕДИ И СЛЕД · абсолютните числа зависят от чужди блокове, а
@@ -1456,7 +1456,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   proveri('и на „платени" — със същото',
     (await plochkaNaSpravka('plateni')) - predPlateni, 40_000);
   proveri('един месец ЧАКА подаване',
-    await p.$eval('[data-chakat]', (e) => e.textContent), '1');
+    await p.$eval('[data-sektsiya=nap-spravki] [data-chakat]', (e) => e.textContent), '1');
   proveri('и той е ОКТОМВРИ',
     (await p.$$eval('[data-chaka]', (e) => e.map((x) => (x as HTMLElement).dataset['chaka']))).join(),
     '2026-10');
@@ -1476,7 +1476,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
 
   await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
   proveri('нито един месец вече не чака',
-    await p.$eval('[data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
+    await p.$eval('[data-sektsiya=nap-spravki] [data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
   proveri('редът вече е ДЕКЛАРИРАН',
     await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['deklarirano']), 'deklarirano');
   proveri('и си ОСТАВА платен · подаването не мени парите',
