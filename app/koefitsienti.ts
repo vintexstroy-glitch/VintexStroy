@@ -39,6 +39,15 @@ import {
   type SmetnatKoefitsient,
   type Stapka,
 } from '../src/domein/koefitsienti.js';
+import {
+  dumiteNaPostizhkata,
+  dyalatVSkalata,
+  orientiratNa,
+  postignat,
+  skalataNaBulleta,
+  sveriOrientirite,
+} from '../src/domein/orientiri.js';
+import { dumataNaPosokata, sparklayn } from '../src/domein/sparklayn.js';
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -104,7 +113,7 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
     ${lentata(nalichni, k, nachalo, kraj)}
     ${diagramata(redica, k)}
     ${podDiagramata(k, zaTseliya, o, nachalo, kraj)}
-    ${vsichkite(o, nachalo, kraj, nalichni)}`;
+    ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes)}`;
 }
 
 function lentata(
@@ -177,6 +186,14 @@ function lentata(
 }
 
 /** Височината на графиката · закована, за да не подскача при смяна. */
+/**
+ * СПАРКЛАЙНЪТ е МАЛЪК нарочно (резен 35) · той стои ВЪТРЕ в реда, до числото.
+ * Порасне ли, става диаграма и си иска ос, етикети и нула — а тогава вече не е
+ * спарклайн.
+ */
+const SPARK_SHIRINA = 64;
+const SPARK_VIS = 16;
+
 const VIS = 200;
 const GNEZDO = 46;
 
@@ -314,8 +331,22 @@ function vsichkite(
   nachalo: string,
   kraj: string,
   nalichni: readonly Koefitsient[],
+  /**
+   * ПАРЧЕТАТА на периода · оттук идват спарклайните (резен 35).
+   *
+   * Подават се ГОТОВИ, а не се режат втори път тук: `narisuvayKoefitsientite`
+   * вече ги е нарязал за голямата диаграма, и второ рязане би могло да се
+   * разсинхронизира с първото при първата поправка на стъпката (правило 17).
+   */
+  parcheta: readonly { readonly ot: string; readonly do: string; readonly etiket: string }[],
+  dnes: string,
 ): string {
   const d = danniZaPerioda(o, nachalo, kraj);
+  // ДАННИТЕ ЗА ВСЯКО ПАРЧЕ · веднъж за всички коефициенти, не веднъж на ред.
+  // Смятани в цикъла по коефициенти, те щяха да се прочитат 12 пъти за един
+  // и същ период — същата сметка, дванайсет пъти (ADR-084).
+  const poParcheta = parcheta.map((ch) => danniZaPerioda(o, ch.ot, ch.do));
+  const sv = sveriOrientirite(dnes);
   return `
     <section data-sektsiya="koef-vsichki">
       <div class="dyalglava">
@@ -323,15 +354,18 @@ function vsichkite(
         <span>формулата на един ред · и числото до нея</span>
       </div>
       <div class="tablitsa" data-tablitsa="koef-vsichki">
-        <div class="glava koef-red"><span>Коефициент</span><span>Формула</span><span class="suma">Стойност</span><span>На годишна база</span></div>
+        <div class="glava koef-red"><span>Коефициент</span><span>Формула</span><span>Посока</span><span class="suma">Стойност</span><span>Спрямо обичайното</span><span>На годишна база</span></div>
         ${nalichni
           .map((k) => {
             const s = smetniKoefitsient(k, d);
             const kak = PRIRAVNYAVANETO[k.vid];
+            const redica = poParcheta.map((dd) => smetniKoefitsient(k, dd).stoynost);
             return `<div class="red koef-red" data-koef="${ekraniraj(k.klyuch)}" translate="no">
             <span class="kletka"><b>${ekraniraj(k.ime)}</b><span>${ekraniraj(k.kakvo)}</span></span>
             <span class="koef-formula">${ekraniraj(k.formula)}</span>
+            <span>${sparklaynat(redica, k)}</span>
             <span class="suma">${ekraniraj(sDumiStoynost(s, pishi))}</span>
+            <span>${bulletat(k, s.stoynost)}</span>
             <span><span class="znachka ${kak === 'mnozhi' ? 'dobre' : 'tiha'}">${
               kak === 'mnozhi' ? 'да' : kak === 'nenuzhno' ? 'не трябва' : 'не може'
             }</span></span>
@@ -340,10 +374,104 @@ function vsichkite(
           .join('')}
       </div>
       <p class="drebno">Колоната „на годишна база" не е настройка, а свойство: сума се приравнява, отношение на два потока вече не зависи от периода, а отношение на два запаса е снимка в един миг.</p>
+      <p class="drebno">Линията показва ПОСОКАТА по стъпките, не числата — затова числото стои до нея.
+      Лентата отдясно мери стойността срещу обичайното за занаята; шест от ${KOEFITSIENTI.length} имат такова число,
+      а на останалите занаятът не дава едно за всички и празното е ЧЕСТНО.</p>
+      <p class="drebno" data-orientiri-sverka>Сверка вход↔изход: ${sv.vhod} изречения → ${sv.izhod} числа,
+      разлика ${sv.razlika}.</p>
     </section>`;
 }
 
+/**
+ * СПАРКЛАЙНЪТ на един ред · формата на редицата, без ос и без етикети.
+ *
+ * Ширината и височината са ЗАКОВАНИ и малки нарочно: спарклайнът стои ВЪТРЕ в
+ * реда, до числото. Порасне ли, той става диаграма и си иска ос.
+ */
+function sparklaynat(stoynosti: readonly (number | undefined)[], k: Koefitsient): string {
+  const sp = sparklayn(stoynosti, SPARK_SHIRINA, SPARK_VIS);
+  const dumi = dumataNaPosokata(sp);
+  if (sp.tochki.length === 0) {
+    return `<span class="drebno" data-spark="${ekraniraj(k.klyuch)}" data-posoka="nyama">${ekraniraj(dumi)}</span>`;
+  }
+  return `<span class="spark-kutiya" data-spark="${ekraniraj(k.klyuch)}" data-posoka="${sp.posoka}"
+    data-stapki="${sp.sChisla}" title="${ekraniraj(`${k.ime} · ${dumi}`)}">
+    <svg class="spark" viewBox="0 0 ${SPARK_SHIRINA} ${SPARK_VIS}" width="${SPARK_SHIRINA}" height="${SPARK_VIS}"
+         role="img" aria-label="${ekraniraj(`${k.ime} · ${dumi}`)}">
+      ${
+        sp.tochki.length === 1
+          ? `<circle class="spark-tochka" cx="${sp.tochki[0]!.x}" cy="${sp.tochki[0]!.y}" r="2"></circle>`
+          : `<polyline class="spark-liniya" points="${sp.patyat}"></polyline>`
+      }
+    </svg>
+    <span class="drebno">${ekraniraj(dumi)}</span>
+  </span>`;
+}
+
+/**
+ * BULLET · стойността срещу обичайното за занаята.
+ *
+ * Числото на целта идва ОБЯВЕНО (`orientiri.ts`), не разчетено от изречението:
+ * разчитане на „1,25 – 1,50" работи, докато някой не напише „около 1,3".
+ *
+ * Коефициент без обичайно число НЕ получава лента и го КАЗВА (правило 15).
+ * Празна лента щеше да значи „нула", а нулата тук е цел, каквато никой не е дал.
+ */
+function bulletat(k: Koefitsient, stoynost: number | undefined): string {
+  const o = orientiratNa(k.klyuch);
+  const p = postignat(k.klyuch, stoynost);
+  if (o === undefined || stoynost === undefined) {
+    return `<span class="drebno" data-bullet="${ekraniraj(k.klyuch)}" data-postizhka="${p}">${ekraniraj(
+      dumiteNaPostizhkata(p),
+    )}</span>`;
+  }
+  const dyal = (v: number) => dyalatVSkalata(k.klyuch, stoynost, v) * 100;
+  return `<span class="bullet-kutiya" data-bullet="${ekraniraj(k.klyuch)}" data-postizhka="${p}"
+    title="${ekraniraj(
+      `${k.obichayno} · ${dumiteNaPostizhkata(p)} · лентата стига до ${krayatNaSkalata(k, stoynost)}`,
+    )}">
+    <span class="bullet" role="img" aria-label="${ekraniraj(`${k.ime} · ${dumiteNaPostizhkata(p)}`)}">
+      <span class="bullet-tsel" data-ot="${dyal(o.ot)}" data-do="${dyal(o.do_)}"></span>
+      <span class="bullet-stoynost ${p === 'v-tsel' ? 'v-tsel' : 'vun'}" data-dyal="${dyal(stoynost)}"></span>
+    </span>
+    <span class="drebno">${ekraniraj(k.obichayno)}</span>
+  </span>`;
+}
+
+/**
+ * КРАЯТ НА СКАЛАТА · казва се, защото лента без край не се чете.
+ *
+ * Изписва се с мярката на коефициента (`sDumiStoynost`), не като голо число:
+ * „10 000" за 100 % е вярната стойност и невярното изречение.
+ */
+function krayatNaSkalata(k: Koefitsient, stoynost: number | undefined): string {
+  const skala = skalataNaBulleta(k.klyuch, stoynost);
+  return sDumiStoynost({ koefitsient: k, stoynost: skala, zashto: '', parametri: [] }, pishi);
+}
+
+/**
+ * ДЯЛОВЕТЕ НА BULLET-А СЕ СЛАГАТ ОТ JS, не с `style="…"` в разметката.
+ *
+ * Строгата политика (CSP `default-src 'self'`) блокира inline стил, и това е
+ * правилно: нищо чуждо в пакета, включително стил, дошъл от низ (правило 10).
+ * Писането през CSSOM (`style.setProperty`) НЕ е inline стил и минава.
+ *
+ * Дословно същият капан, вече платен веднъж при отстъпа на подделата —
+ * атрибутът просто не се прилагаше и никой не виждаше защо (`gant.ts` · резен 12б).
+ */
+function slozhiDyalovete(koren: HTMLElement): void {
+  for (const el of koren.querySelectorAll<HTMLElement>('.bullet-tsel')) {
+    el.style.setProperty('--ot', `${el.dataset['ot'] ?? 0}%`);
+    el.style.setProperty('--do', `${el.dataset['do'] ?? 0}%`);
+  }
+  for (const el of koren.querySelectorAll<HTMLElement>('.bullet-stoynost')) {
+    el.style.setProperty('--dyal', `${el.dataset['dyal'] ?? 0}%`);
+  }
+}
+
 export function zakachiKoefitsientite(koren: HTMLElement, prerisuvay: () => Promise<void>): void {
+  slozhiDyalovete(koren);
+
   const vrazhi = (id: string, kam: (v: string) => void) => {
     koren.querySelector<HTMLInputElement | HTMLSelectElement>(id)?.addEventListener(
       'change',

@@ -1294,10 +1294,38 @@ table.razbivka .drebno { font-size: 0.75rem; }
 }
 .red.koef-rezultat { background: var(--panel); }
 .glava.koef-red, .red.koef-red {
-  grid-template-columns: minmax(0, 300px) minmax(0, 400px) 140px 130px;
-  min-width: 820px;
+  grid-template-columns: minmax(0, 260px) minmax(0, 300px) 150px 130px minmax(0, 220px) 120px;
+  min-width: 1120px;
 }
 .red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 0.857rem; }
+
+/* ── СПАРКЛАЙН и BULLET (резен 35 · „Петте + спарклайни + bullet") ─────── */
+/* Спарклайнът стои ВЪТРЕ в реда, до числото: той дава ПОСОКАТА, а числото —
+   размера. Затова е малък, без ос и без етикети — порасне ли, си иска ос. */
+.spark-kutiya { display: flex; align-items: center; gap: 6px; }
+.spark { display: block; overflow: visible; }
+.spark-liniya { fill: none; stroke: var(--aktsent); stroke-width: 1.5; stroke-linejoin: round; }
+.spark-tochka { fill: var(--aktsent); }
+
+/* BULLET · стойността срещу обичайното за занаята. Целта е ИВИЦА, не черта:
+   „банките искат 1,25 – 1,50" е диапазон, и една черта би скрила едната му
+   половина. Дяловете се слагат от JS (CSP отказва inline стил). */
+.bullet-kutiya { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bullet {
+  position: relative; display: block; height: 10px; width: 100%;
+  background: var(--zebra); border-radius: 2px; overflow: hidden;
+}
+.bullet-tsel {
+  position: absolute; top: 0; bottom: 0;
+  left: var(--ot, 0%); width: max(2px, calc(var(--do, 0%) - var(--ot, 0%)));
+  background: var(--mastilo2); opacity: 0.35;
+}
+.bullet-stoynost {
+  position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--dyal, 0%);
+  border-radius: 2px;
+}
+.bullet-stoynost.v-tsel { background: var(--zeleno); }
+.bullet-stoynost.vun { background: var(--aktsent); }
 
 /* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
 /* ПОДВИЖНАТА ГРАНИЦА между таблицата и диаграмата (резен 12 · негова дума,

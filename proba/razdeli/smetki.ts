@@ -661,6 +661,71 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'trimesechie'));
     proveri('коефициентите не пишат нищо в Журнала', await broySabitiya(p), predKoef);
 
+    // ══ 113 · СПАРКЛАЙНИ и BULLET (резен 35 · ADR-095) ═══════════════════════
+    //
+    // „Петте + спарклайни + bullet (препоръката)" *(р59·[94])* — прието
+    // предложение за графиките на v1.
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'mesets'));
+
+    razdel = '113 · Спарклайнът · посоката СТОИ до числото';
+    proveri('всеки ред носи своя спарклайн или казва защо няма',
+      await p.$$eval('.red.koef-red [data-spark]', (e) => e.length),
+      await p.$$eval('.red.koef-red', (e) => e.length));
+    proveri('и посоката се КАЗВА с дума, не само с линия',
+      (await p.$$eval('.red.koef-red [data-spark]', (e) => e.map((x) => (x as any).innerText)))
+        .some((t) => /нагоре|надолу|без промяна|няма/.test(t)), true);
+    proveri('линията не заменя числото · то стои до нея',
+      (await p.$eval('.red.koef-red[data-koef=noi]', (e) => (e as any).innerText)).includes('€'), true);
+    proveri('и всеки ред пази ФОРМУЛАТА си · тя е негово изрично искане',
+      await p.$$eval('.red.koef-red .koef-formula',
+        (r) => r.every((x) => (x as any).textContent.includes('='))), true);
+
+    razdel = '113 · Bullet · само там, където занаятът дава число';
+    // ШЕСТТЕ БЕЗ ОРИЕНТИР се броят по ДУМАТА си, а не по липсата на лента:
+    // лента няма и когато цел ИМА, но стойност за периода липсва — две различни
+    // липси, които не се сливат.
+    const postizhki = await p.$$eval('.red.koef-red [data-bullet]',
+      (e) => e.map((x) => (x as any).dataset.postizhka));
+    proveri('шест коефициента нямат обичайно число · и го КАЗВАТ',
+      postizhki.filter((x) => x === 'nyama-orientir').length, 6);
+    proveri('а другите шест НЕ казват това · те имат цел',
+      postizhki.filter((x) => x !== 'nyama-orientir').length, 6);
+    proveri('NOI е сред първите · занаятът няма едно число за него',
+      await p.$eval('.red.koef-red[data-koef=noi] [data-bullet]',
+        (e) => (e as any).dataset.postizhka), 'nyama-orientir');
+    proveri('и го казва с ДУМИ, не с празно',
+      (await p.$eval('.red.koef-red[data-koef=noi] [data-bullet]', (e) => (e as any).innerText))
+        .includes('занаятът'), true);
+    // ЛЕНТА СЕ РИСУВА ТОЧНО за онези, които имат И цел, И стойност.
+    proveri('лентите са колкото са измеримите · нито повече, нито по-малко',
+      await p.$$eval('.red.koef-red .bullet', (e) => e.length),
+      postizhki.filter((x) => x === 'v-tsel' || x === 'vun').length);
+    proveri('и всяка носи ИЗРЕЧЕНИЕТО на занаята до себе си',
+      await p.$$eval('.bullet-kutiya',
+        (e) => e.every((x) => (x as any).innerText.trim().length > 0)), true);
+
+    razdel = '113 · Bullet · дяловете идват от JS, не от inline стил';
+    // CSP `default-src self` блокира вграден стил · капанът вече е платен
+    // веднъж при отстъпа на подделата (резен 12б).
+    proveri('целта има сложено свойство, не празно',
+      await p.$eval('.bullet-tsel',
+        (e) => (e as HTMLElement).style.getPropertyValue('--ot') !== ''), true);
+    proveri('и стойността също',
+      await p.$eval('.bullet-stoynost',
+        (e) => (e as HTMLElement).style.getPropertyValue('--dyal') !== ''), true);
+
+    razdel = '113 · Ориентирите · изречение ↔ число, и нулата се записва';
+    proveri('сверката стои на екрана',
+      (await tekstNa(p, '[data-orientiri-sverka]')).replace(/\s+/g, ' ').trim(),
+      'Сверка вход↔изход: 6 изречения → 6 числа, разлика 0.');
+
+    razdel = '113 · Спарклайните не пишат НИЩО в Журнала';
+    const predSpark = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'trimesechie'));
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'mesets'));
+    proveri('нула нови събития · всичко се СМЯТА при показване',
+      await broySabitiya(p), predSpark);
+
     // ══ 50 · цветовете при въвеждане (И96 т.1 · т.9) ═════════════════════════
     //
     // Негово: „ако има несъответствие от нея + английски и някаква друга азбука
