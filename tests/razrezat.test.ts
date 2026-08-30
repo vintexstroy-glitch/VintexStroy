@@ -87,8 +87,13 @@ async function nasadi(d: Deystviya): Promise<void> {
 }
 
 describe('речникът на разрезите', () => {
-  it('пет са · „измислената колона" отпада по негова дума (И107)', () => {
-    expect([...RAZREZI]).toEqual(['bez', 'kontragent', 'nachin', 'sektor', 'potok']);
+  it('ШЕСТ са · и всеки чете поле, което ЖУРНАЛЪТ вече носи', () => {
+    expect([...RAZREZI]).toEqual([
+      'bez', 'kontragent', 'nachin', 'sektor', 'potok', 'kategoriya',
+    ]);
+    // И107 отказа разрез по колона на МОДЕЛНА таблица — редове, които ги няма
+    // в приложението. Категорията е СЪБИТИЕ в Журнала, значи изпълнява същото
+    // условие, вместо да го заобикаля (резен 25 · ADR-085).
   });
 
   it('всеки носи ДУМА · речник без дума е ключ, не разрез', () => {
@@ -97,7 +102,7 @@ describe('речникът на разрезите', () => {
 });
 
 describe('СВЕРКАТА вход↔изход · сборът на разрезите Е неразбитият сбор', () => {
-  it('и за петте разреза, до стотинка', async () => {
+  it('и за ШЕСТТЕ разреза, до стотинка', async () => {
     const d = stend();
     await nasadi(d);
     const o = await d.ogledalo();
@@ -262,5 +267,13 @@ describe('без разбивка · днешното поведение НЕ с
     const k = koloniNaTakta('mesets', '2026-08-15');
     const dni = sumiZaObhvat(await d.ogledalo(), OT, DO);
     expect(obobshteniRedove(k, dni)[0]!.kletki).toEqual(obobshtenRed(k, dni));
+  });
+});
+
+// ── ШЕСТИЯТ РАЗРЕЗ · „По категории" (резен 25 · ADR-085) ───────────────────
+
+describe('разрезът „По категории"', () => {
+  it('носи ДУМА и стои в речника', () => {
+    expect(IMENA_NA_RAZREZITE['kategoriya']).toBe('По категории');
   });
 });

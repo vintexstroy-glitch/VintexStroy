@@ -1412,8 +1412,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // и съответно извлеченията БАНКОВИТЕ ИЛИ КЕШОВИТЕ."
     await naEkran(p, 'gant', '#d-forma-delo');
     proveri('лостът „Разбий по" е на екрана', await p.$$eval('#f-razrez', (e) => e.length), 1);
-    proveri('и предлага ПЕТ разреза · без „измислената колона" (И107)',
-      await p.$$eval('#f-razrez option', (e) => e.length), 5);
+    // ШЕСТ · и шестият („По категории") изпълнява условието на И107, вместо да
+    // го заобикаля: категорията е СЪБИТИЕ в Журнала (резен 25 · ADR-085).
+    proveri('и предлага ШЕСТ разреза · всеки от поле, което Журналът вече носи',
+      await p.$$eval('#f-razrez option', (e) => e.length), 6);
     proveri('подразбраното е БЕЗ разбивка · един ред сборове',
       await p.$$eval('.gant-red.sumi', (e) => e.length), 1);
 

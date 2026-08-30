@@ -23,10 +23,15 @@ import { fold } from '../src/ogledalo/ogledalo.js';
 import {
   IMENATA_NA_VIDOVETE,
   kletkata,
+  BEZ_KATEGORIYA,
+  kategoriyataNa,
   KOLONI_PLASHTANIYA_ARHIV,
   koloniteNaVida,
+  NEGOVITE_TRINAYSET,
+  sashtnostNaKategoriya,
   redoveNaPlashtaniyata,
   redoveNaVida,
+  sborovetePoKategoriya,
   sborovetePoVid,
   sedmitsataZaEkrana,
   sedmitsiSPlashtaniya,
@@ -106,11 +111,14 @@ async function sVsichko() {
 
 describe('тринайсетте колони · неговата наредба, не подредба при рисуване', () => {
   it('са ТРИНАЙСЕТ и в НЕГОВИЯ ред', () => {
-    expect(KOLONI_PLASHTANIYA_ARHIV).toHaveLength(13);
-    expect(KOLONI_PLASHTANIYA_ARHIV.join(' · ')).toBe(
+    // НЕГОВИТЕ тринайсет стоят на местата си · новото се ДОЛЕПЯ отдясно.
+    expect(KOLONI_PLASHTANIYA_ARHIV.slice(0, NEGOVITE_TRINAYSET).join(' · ')).toBe(
       'Дата · Място · Обект · Страна · Вид · Начин · Сметка · Бележка · Заплата · Дни · ' +
         'Фактура № · Сверка · Сума €',
     );
+    expect(NEGOVITE_TRINAYSET).toBe(13);
+    expect(KOLONI_PLASHTANIYA_ARHIV).toHaveLength(14);
+    expect(KOLONI_PLASHTANIYA_ARHIV.at(-1)).toBe('Категория');
   });
 
   it('и СМЕТНАТИТЕ са затворени · те не се редактират от никого', () => {
@@ -342,6 +350,7 @@ describe('седмичният файл · три листа, числа, едн
       faktura: '0000001234',
       svereno: 'с документ',
       suma_st: 240_00,
+      kategoriya: '',
     };
     const list = listNaVida([red], 'faktura-kesh');
     const kade = list.koloni.findIndex((k) => k.ime === 'Сума €');
@@ -359,5 +368,160 @@ describe('седмичният файл · три листа, числа, едн
     const { dnevnik } = await sVsichko();
     const redove = redoveNaPlashtaniyata(await ogledaloto(dnevnik), SEDMITSA);
     expect(redoveNaVida(redove, 'faktura-karta').map((r) => r.id)).toEqual(['RZ-karta']);
+  });
+});
+
+// ── КАТЕГОРИЯТА · четиринайсетата колона (резен 25 · ADR-085) ──────────────
+
+describe('категорията е ЗАПИС, не поле на огледалото', () => {
+  it('празната е ЧЕСТНА · плащане без категория не е грешка', async () => {
+    const { dnevnik } = await sVsichko();
+    const r = redoveNaPlashtaniyata(await ogledaloto(dnevnik), SEDMITSA);
+    expect(r.every((x) => x.kategoriya === '')).toBe(true);
+    expect(kletkata(r[0]!, 'Категория')).toBe('');
+  });
+
+  it('задава се и се ЧЕТЕ от реда', async () => {
+    const { dnevnik, deystviya } = await sVsichko();
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+      { opId: 'op-kat' },
+    );
+    const r = redoveNaPlashtaniyata(await ogledaloto(dnevnik), SEDMITSA);
+    expect(r.find((x) => x.id === 'RZ-kesh')!.kategoriya).toBe('Материали');
+    // и не се разлива по съседите
+    expect(r.find((x) => x.id === 'RZ-karta')!.kategoriya).toBe('');
+  });
+
+  it('АДРЕСЪТ е ДВОЙКА · еднакъв id при различен вид не се смесва', async () => {
+    const { dnevnik, deystviya } = stend();
+    // Заплата и разход с ЕДНО И СЪЩО id · допустимо е, картите са различни.
+    await deystviya.zapishiZaplata({ ...ZAPLATA, zaplataId: 'X-1' }, { opId: 'op-z' });
+    await deystviya.zapishiRazhod('X-1', FAKTURA, { opId: 'op-r' });
+    await deystviya.zadaydeKategoriya(
+      { vid: 'zaplata', plashtaneId: 'X-1', kategoriya: 'Труд' },
+      { opId: 'op-k1' },
+    );
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'X-1', kategoriya: 'Материали' },
+      { opId: 'op-k2' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect(kategoriyataNa(o, 'zaplata', 'X-1')).toBe('Труд');
+    expect(kategoriyataNa(o, 'faktura-kesh', 'X-1')).toBe('Материали');
+    expect(sashtnostNaKategoriya('zaplata', 'X-1')).not.toBe(
+      sashtnostNaKategoriya('faktura-kesh', 'X-1'),
+    );
+  });
+
+  it('повторното задаване е НОВО събитие · последната дума е в сила', async () => {
+    const { dnevnik, deystviya } = await sVsichko();
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+      { opId: 'op-k1' },
+    );
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Строителни материали' },
+      { opId: 'op-k2' },
+    );
+    expect(kategoriyataNa(await ogledaloto(dnevnik), 'faktura-kesh', 'RZ-kesh')).toBe(
+      'Строителни материали',
+    );
+    // ДВЕ събития, не едно поправено · историята остава цяла (правило 1)
+    expect(
+      (await dnevnik.chetiVsichki(NAEMATEL)).filter((x) => x.type === 'КатегорияЗададена'),
+    ).toHaveLength(2);
+  });
+
+  it('празната МАХА категорията · но записът остава в Журнала', async () => {
+    const { dnevnik, deystviya } = await sVsichko();
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+      { opId: 'op-k1' },
+    );
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: '' },
+      { opId: 'op-k2' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect(kategoriyataNa(o, 'faktura-kesh', 'RZ-kesh')).toBe('');
+    expect(
+      (await dnevnik.chetiVsichki(NAEMATEL)).filter((x) => x.type === 'КатегорияЗададена'),
+    ).toHaveLength(2);
+
+    // И КЛЮЧЪТ ИЗЛИЗА ОТ КАРТАТА, не остава с празна стойност.
+    //
+    // Тази проверка се роди от СЧУПВАНЕ, което МИНА: заменях `delete` със
+    // `set(id, '')` и нищо не падаше, защото `kategoriyataNa` връща `''` и в
+    // двата случая. Разликата обаче е истинска — картата е ПУБЛИЧНА
+    // (`Ogledalo.kategorii`) и празният запис е призрак в нея: расте вечно и
+    // всеки бъдещ обход по нея го брои за категория (ADR-085 §7).
+    expect(o.kategorii.has(sashtnostNaKategoriya('faktura-kesh', 'RZ-kesh'))).toBe(false);
+    expect([...o.kategorii.values()].every((v) => v !== '')).toBe(true);
+  });
+
+  it('Вратата отказва категория за НЕСЪЩЕСТВУВАЩО плащане · и за непознат вид', async () => {
+    const { deystviya } = await sVsichko();
+    await expect(
+      deystviya.zadaydeKategoriya(
+        { vid: 'faktura-kesh', plashtaneId: 'НЯМА', kategoriya: 'Материали' },
+        { opId: 'op-a' },
+      ),
+    ).rejects.toThrow(/Няма такова плащане/);
+    await expect(
+      deystviya.zadaydeKategoriya(
+        { vid: 'faktura-banka', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+        { opId: 'op-b' },
+      ),
+    ).rejects.toThrow(/Непознат вид/);
+  });
+
+  it('СТОРНИРАН разход отнася категорията си със себе си · редът пада цял', async () => {
+    const { dnevnik, deystviya } = await sVsichko();
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+      { opId: 'op-k1' },
+    );
+    const predi = await ogledaloto(dnevnik);
+    await deystviya.storniraj(
+      'ST-1',
+      { pogasyavaSeq: predi.razhodi.get('RZ-kesh')!.seq, prichina: 'сгрешен документ' },
+      { opId: 'op-st' },
+    );
+    const sled = await ogledaloto(dnevnik);
+    expect(redoveNaPlashtaniyata(sled, SEDMITSA).map((x) => x.id)).not.toContain('RZ-kesh');
+    // Самата категория си стои в картата · тя е ДРУГО събитие и никой не я е
+    // гасил. Това не е дефект: редът, който я показваше, вече го няма.
+    expect(kategoriyataNa(sled, 'faktura-kesh', 'RZ-kesh')).toBe('Материали');
+  });
+
+  it('и листовете носят колоната · и двете фактури пак с ЕДИН хедър', () => {
+    expect(koloniteNaVida('zaplata')).toContain('Категория');
+    expect(koloniteNaVida('faktura-kesh')).toEqual(koloniteNaVida('faktura-karta'));
+  });
+});
+
+describe('сборовете ПО КАТЕГОРИЯ · сборът на сериите Е сборът на седмицата', () => {
+  it('некатегоризираното пада в кофа с ИМЕ, не в общия сбор', async () => {
+    const { dnevnik, deystviya } = await sVsichko();
+    await deystviya.zadaydeKategoriya(
+      { vid: 'faktura-kesh', plashtaneId: 'RZ-kesh', kategoriya: 'Материали' },
+      { opId: 'op-k' },
+    );
+    const s = sedmitsataZaEkrana(await ogledaloto(dnevnik), SEDMITSA, KOGATO);
+
+    expect(s.poKategorii.map((x) => [x.kategoriya, x.broy, x.suma_st])).toEqual([
+      [BEZ_KATEGORIYA, 2, 600_00 + 60_00],
+      ['Материали', 1, 240_00],
+    ]);
+    // СВЕРКАТА · сборът на сериите е сборът на седмицата, до стотинка
+    expect(s.poKategorii.reduce((x, k) => x + k.suma_st, 0)).toBe(s.obshto_st);
+  });
+
+  it('и празната седмица дава празен списък, а не измислена кофа', async () => {
+    const { dnevnik } = await sVsichko();
+    const s = sedmitsataZaEkrana(await ogledaloto(dnevnik), '2026-W20', KOGATO);
+    expect(sborovetePoKategoriya(s.redove)).toEqual([]);
+    expect(s.poKategorii).toEqual([]);
   });
 });

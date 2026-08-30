@@ -1988,6 +1988,21 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .glava.plashtred, .red.plashtred {
   grid-template-columns:
     112px minmax(0, 200px) minmax(0, 150px) minmax(0, 190px) 116px 96px
-    82px minmax(0, 220px) 110px 62px 124px 118px 118px;
-  min-width: 1620px;
+    82px minmax(0, 220px) 110px 62px 124px 118px 118px minmax(0, 170px);
+  min-width: 1790px;
+}
+
+/* ── Категорията в Плащания Архив (резен 25 · ADR-085) ────────────────────
+   ЕДИНСТВЕНАТА клетка на този екран, която се ПИШЕ. Изглежда като клетка, не
+   като поле: рамка се появява при посочване и при фокус, иначе редът щеше да
+   изглежда като четиринайсет полета вместо като таблица. */
+.kletka-kategoriya {
+  width: 100%; min-height: 26px; padding: 2px 6px;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: inherit;
+  font: inherit; font-size: 0.893rem;
+}
+.red:hover .kletka-kategoriya { border-color: var(--liniya); }
+.kletka-kategoriya:focus {
+  border-color: var(--aktsent); background: #FFFFFF; outline: none;
 }

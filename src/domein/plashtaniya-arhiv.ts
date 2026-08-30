@@ -47,6 +47,13 @@ import {
 } from './zaplati.js';
 import type { Razhod } from '../ogledalo/ogledalo.js';
 
+export class GreshkaKategoriya extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaKategoriya';
+  }
+}
+
 // ── ВИДОВЕТЕ ───────────────────────────────────────────────────────────────
 
 /**
@@ -106,9 +113,21 @@ export const KOLONI_PLASHTANIYA_ARHIV: readonly string[] = Object.freeze([
   'Фактура №',
   'Сверка',
   'Сума €',
+  // ЧЕТИРИНАЙСЕТАТА · долепя се ОТДЯСНО (резен 25 · ADR-085).
+  //
+  // „Колони не се трият, а само се добавят" — негов закон. Тринайсетте му
+  // стоят на местата си и тестът пази реда им; новото застава след тях.
+  'Категория',
 ]);
 
-/** Колоните, които се СМЯТАТ · не се редактират от никого (правило 23). */
+/** Колко са НЕГОВИТЕ, приети с „Да, точно така" · новото се брои отделно. */
+export const NEGOVITE_TRINAYSET = 13;
+
+/**
+ * Колоните, които се СМЯТАТ · не се редактират от никого (правило 23).
+ *
+ * „Категория" НЕ е между тях: тя е единственото на този екран, което се ПИШЕ.
+ */
 export const ZATVORENI_PLASHTANIYA: readonly number[] = Object.freeze([4, 6, 11, 12]);
 
 /** Колоните, които са ПАРИ · видът живее в колоната, не се гади по данните. */
@@ -127,6 +146,17 @@ const PRAZNI_ZA_VIDA: Readonly<Record<VidPlashtane, readonly string[]>> = Object
   'faktura-kesh': Object.freeze(['Място', 'Обект', 'Заплата', 'Дни']),
   'faktura-karta': Object.freeze(['Място', 'Обект', 'Заплата', 'Дни']),
 });
+
+/**
+ * АДРЕСЪТ НА ЕДНА КАТЕГОРИЯ · ЕДИН дом (правило 17).
+ *
+ * ДВОЙКА, не гол id: заплатите и разходите живеят в различни карти и нищо не
+ * пази ключовете им от срещане. Гол id би закачил чужда категория за чуждо
+ * плащане — и то тихо, което е най-скъпият вид грешка.
+ */
+export function sashtnostNaKategoriya(vid: string, plashtaneId: string): string {
+  return `KAT:${vid}:${plashtaneId}`;
+}
 
 /** Хедърът на един лист · тринайсетте минус онези, които видът не пълни. */
 export function koloniteNaVida(vid: VidPlashtane): readonly string[] {
@@ -155,6 +185,8 @@ export interface RedNaPlashtane {
   readonly faktura: string;
   readonly svereno: string;
   readonly suma_st: number;
+  /** празна значи „още не е казана" · това е състояние, не грешка */
+  readonly kategoriya: string;
 }
 
 /**
@@ -195,6 +227,8 @@ export function kletkata(r: RedNaPlashtane, kolona: string): string | number | '
       return r.svereno;
     case 'Сума €':
       return r.suma_st;
+    case 'Категория':
+      return r.kategoriya;
     default:
       return '';
   }
@@ -206,6 +240,17 @@ export function kletkata(r: RedNaPlashtane, kolona: string): string | number | '
 export interface OgledaloNaPlashtaniyata extends OgledaloNaZaplati {
   readonly razhodi: ReadonlyMap<string, Razhod>;
   readonly imoti: ReadonlyMap<string, { readonly adres: string }>;
+  /** `KAT:<вид>:<id>` → категорията · последната дума е в сила */
+  readonly kategorii: ReadonlyMap<string, string>;
+}
+
+/** Категорията на едно плащане · празна, докато човек не я каже. */
+export function kategoriyataNa(
+  o: Pick<OgledaloNaPlashtaniyata, 'kategorii'>,
+  vid: string,
+  plashtaneId: string,
+): string {
+  return o.kategorii.get(sashtnostNaKategoriya(vid, plashtaneId)) ?? '';
 }
 
 /**
@@ -240,6 +285,7 @@ function redoveOtZaplatite(
       faktura: '',
       svereno: prehvarlena ? 'в Разходи' : 'чака петък',
       suma_st: sedmichnaZaplata(z),
+      kategoriya: kategoriyataNa(o, 'zaplata', z.id),
     }),
   );
 }
@@ -276,6 +322,7 @@ function redoveOtFakturite(
         faktura: r.dokument,
         svereno: r.dokument === '' ? 'БЕЗ документ' : 'с документ',
         suma_st: r.suma_st,
+        kategoriya: kategoriyataNa(o, vid, r.id),
       }),
     );
   }
@@ -338,6 +385,37 @@ export function sborovetePoVid(redove: readonly RedNaPlashtane[]): readonly Sbor
   );
 }
 
+export interface SborNaKategoriya {
+  readonly kategoriya: string;
+  readonly broy: number;
+  readonly suma_st: number;
+}
+
+/**
+ * СБОРОВЕТЕ ПО КАТЕГОРИЯ · неговата серия „По категории" (резен 25).
+ *
+ * Плащане без категория пада в кофа С ИМЕ (`BEZ_KATEGORIYA`), не в общия сбор:
+ * иначе некатегоризираното щеше да изчезне и сборът на сериите нямаше да е
+ * сборът на седмицата. Същият начин, по който разрезите вече казват „(няма)".
+ */
+export const BEZ_KATEGORIYA = '(без категория)';
+
+export function sborovetePoKategoriya(
+  redove: readonly RedNaPlashtane[],
+): readonly SborNaKategoriya[] {
+  const po = new Map<string, { broy: number; suma_st: number }>();
+  for (const r of redove) {
+    const k = r.kategoriya === '' ? BEZ_KATEGORIYA : r.kategoriya;
+    const veche = po.get(k) ?? { broy: 0, suma_st: 0 };
+    po.set(k, { broy: veche.broy + 1, suma_st: veche.suma_st + r.suma_st });
+  }
+  return Object.freeze(
+    [...po.entries()]
+      .map(([kategoriya, v]) => Object.freeze({ kategoriya, ...v }))
+      .sort((a, b) => b.suma_st - a.suma_st || a.kategoriya.localeCompare(b.kategoriya)),
+  );
+}
+
 /**
  * СВЕРКАТА ВХОД↔ИЗХОД · и защо входът се смята по ВТОРИ път.
  *
@@ -374,6 +452,7 @@ export interface SedmitsaNaPlashtaniyata {
   readonly do_: string;
   readonly redove: readonly RedNaPlashtane[];
   readonly sborove: readonly SborNaVida[];
+  readonly poKategorii: readonly SborNaKategoriya[];
   readonly obshto_st: number;
   readonly sverka: Sverka;
 }
@@ -392,6 +471,7 @@ export function sedmitsataZaEkrana(
     do_,
     redove,
     sborove,
+    poKategorii: sborovetePoKategoriya(redove),
     obshto_st: sborove.reduce((s, v) => s + v.suma_st, 0),
     sverka: sveriSedmitsata(o, sedmitsa, redove, kogato),
   });

@@ -31,6 +31,7 @@ import { obshtOstatak } from './krediti.js';
 import type { Ogledalo, Plashtane, Razhod } from '../ogledalo/ogledalo.js';
 import { duljimo } from '../ogledalo/ogledalo.js';
 import { vzemaniyaOtProdazhbi } from './prodazhbi.js';
+import { kategoriyataNa, vidatNaRazhoda } from './plashtaniya-arhiv.js';
 import type { Period } from './nachislyavane.js';
 import { smetki } from './smetki.js';
 import { prihodnaChast, razhodnaChast, type LichnoDvizhenie } from './lichni-pari.js';
@@ -357,10 +358,18 @@ interface DenSPari {
  *
  * „Дори измислен с измислена колона" ОТПАДА по негова дума (И107, 27.08) —
  * разбивка по собствена колона иска РЕДОВЕТЕ на моделната таблица, а те не
- * живеят в приложението (ADR-027 §2). Затова разрезите са ПЕТ и всеки от тях
- * се чете от поле, което Журналът вече носи.
+ * живеят в приложението (ADR-027 §2). Затова всеки разрез се чете от поле,
+ * което ЖУРНАЛЪТ вече носи.
+ *
+ * ═══ ШЕСТИЯТ · и защо той НЕ отменя И107 (резен 25 · ADR-085) ═══
+ *
+ * „По категории" изпълнява същото условие, не го заобикаля: категорията е
+ * СЪБИТИЕ в Журнала (`КатегорияЗададена`), значи е „поле, което Журналът вече
+ * носи" — точно критерия, който този коментар поставя. И107 отказа разрез по
+ * колона на МОДЕЛНА таблица, чиито редове ги няма в приложението; отказът
+ * остава в сила за онова, което отказва.
  */
-export const RAZREZI = ['bez', 'kontragent', 'nachin', 'sektor', 'potok'] as const;
+export const RAZREZI = ['bez', 'kontragent', 'nachin', 'sektor', 'potok', 'kategoriya'] as const;
 export type Razrez = (typeof RAZREZI)[number];
 
 export const IMENA_NA_RAZREZITE: Readonly<Record<Razrez, string>> = Object.freeze({
@@ -369,6 +378,7 @@ export const IMENA_NA_RAZREZITE: Readonly<Record<Razrez, string>> = Object.freez
   nachin: 'Банка или в брой',
   sektor: 'По сектор',
   potok: 'По поток',
+  kategoriya: 'По категории',
 });
 
 /**
@@ -449,16 +459,19 @@ function klyuchNaPlashtane(o: Ogledalo, p: Plashtane, razrez: Razrez): KlyuchISN
   if (!naem) return NYAMA;
   if (razrez === 'kontragent') return poIme(naem.naemetel);
   if (razrez === 'sektor') return poDuma(naem.sektor);
-  return NYAMA; // поток · приходът от наем няма поток
+  // ПОТОК и КАТЕГОРИЯ · приходът от наем няма нито едното. Категорията е за
+  // ИЗЛИЗАЩИТЕ пари (неговото „Плащания"); слагането ѝ и тук би било измислица.
+  return NYAMA;
 }
 
-function klyuchNaRazhod(r: Razhod, razrez: Razrez): KlyuchISNadpis {
+function klyuchNaRazhod(o: Ogledalo, r: Razhod, razrez: Razrez): KlyuchISNadpis {
   switch (razrez) {
     case 'bez': return BEZ_RAZREZ;
     case 'kontragent': return poIme(r.dostavchik);
     case 'nachin': return poDuma(r.nachin);
     case 'sektor': return poDuma(r.sektor);
     case 'potok': return poDuma(r.potok);
+    case 'kategoriya': return poDuma(kategoriyataNa(o, vidatNaRazhoda(r) ?? '', r.id));
   }
 }
 
@@ -472,6 +485,9 @@ function klyuchNaLichno(d: LichnoDvizhenie, razrez: Razrez): KlyuchISNadpis {
     case 'nachin': return NYAMA;
     case 'sektor': return NYAMA;
     case 'potok': return NYAMA;
+    // КАТЕГОРИЯ НЯМА · тя се закача за служебно плащане, а личното движение
+    // живее в ДРУГ Журнал. Кофата с име го КАЗВА, вместо да го слее с общия.
+    case 'kategoriya': return NYAMA;
   }
 }
 
@@ -497,7 +513,7 @@ function poDni(
     if (vlizaLi(p.data)) vzemi(p.data, klyuchNaPlashtane(o, p, razrez)).prihod_st += p.suma_st;
   }
   for (const r of o.razhodi.values()) {
-    if (vlizaLi(r.data)) vzemi(r.data, klyuchNaRazhod(r, razrez)).razhod_st += r.suma_st;
+    if (vlizaLi(r.data)) vzemi(r.data, klyuchNaRazhod(o, r, razrez)).razhod_st += r.suma_st;
   }
   /**
    * ТРЕТИЯТ ЦИКЪЛ · ЛИЧНИТЕ ПАРИ (И96 т.10).

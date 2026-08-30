@@ -39,6 +39,11 @@ import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.j
 import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
 import { GreshkaTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import {
+  GreshkaKategoriya,
+  sashtnostNaKategoriya,
+  VIDOVE_PLASHTANE,
+} from './plashtaniya-arhiv.js';
+import {
   dnitteNaSedmitsata,
   GreshkaZaplata,
   proveriZahranvane,
@@ -99,6 +104,7 @@ import type {
   PayloadPlashtanePoKredit,
   PayloadKeshZahranen,
   PayloadTablitsaOtFaylSazdadena,
+  PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -1299,6 +1305,53 @@ export class Deystviya {
       VID.tablitsaOtFayl,
       `TOF:${ime}`,
       { ...danni, klyuch: ime },
+      z,
+    );
+  }
+
+  /**
+   * ЗАДАВА КАТЕГОРИЯТА на едно плащане (резен 25 · ADR-085).
+   *
+   * „Плащания получава колона «Категория» — меню от Описа, храни серията
+   * «По категории»" *(р69·[50])*.
+   *
+   * ═══ ЗАЩО СВОЕ СЪБИТИЕ, А НЕ ПОЛЕ НА РАЗХОДА ═══
+   *
+   * Полето щеше да иска поправка на самия разход, а поправка = ново събитие
+   * (правило 1) — тоест пренаписване на факт заради ПРЕЦЕНКА върху него.
+   * А заплатата няма къде другаде да го носи.
+   *
+   * ═══ ТРИ ПРОВЕРКИ ═══
+   *
+   *   1. ВИДЪТ е изброен · свободна стойност би паднала в четвърти вид, който
+   *      никой лист не показва (същата поука като при начина на плащане);
+   *   2. ПЛАЩАНЕТО СЪЩЕСТВУВА · категория, закачена за нищо, виси в Журнала и
+   *      никой ред не я показва — тиха загуба;
+   *   3. НЕ ИСКА отключен период. Категорията не мени НИТО ЕДНО число: тя реже
+   *      сборове, не ги прави. Заключеният месец се преглежда по категории.
+   */
+  async zadaydeKategoriya(danni: PayloadKategoriyaZadadena, z: Zayavka): Promise<Rezultat> {
+    if (!(VIDOVE_PLASHTANE as readonly string[]).includes(danni.vid)) {
+      throw new GreshkaKategoriya(
+        `Непознат вид плащане „${danni.vid}". Изброените са: ${VIDOVE_PLASHTANE.join(' · ')}.`,
+      );
+    }
+    const o = await this.ogledalo();
+    const ima =
+      danni.vid === 'zaplata'
+        ? o.zaplati.has(danni.plashtaneId)
+        : o.razhodi.has(danni.plashtaneId);
+    if (!ima) {
+      throw new GreshkaKategoriya(
+        `Няма такова плащане (${danni.vid} · ${danni.plashtaneId}). Категория, закачена ` +
+          'за нищо, виси в Журнала и никой ред не я показва.',
+      );
+    }
+    return this.#pusni(
+      'КатегорияЗададена',
+      VID.kategoriya,
+      sashtnostNaKategoriya(danni.vid, danni.plashtaneId),
+      danni,
       z,
     );
   }

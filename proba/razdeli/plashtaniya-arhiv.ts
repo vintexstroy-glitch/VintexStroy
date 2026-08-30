@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran } from '../yadro/pomoshtni.ts';
+import { broySabitiya, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 102 · ПЛАЩАНИЯ АРХИВ · седмицата в три листа (резен 22 · ADR-082).
@@ -34,9 +34,9 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'plashtaniya', '[data-sektsiya=plashtaniya-arhiv]');
 
   proveri(
-    'главата носи ТРИНАЙСЕТТЕ колони',
+    'главата носи ЧЕТИРИНАЙСЕТ колони · тринайсетте му плюс Категория',
     await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .kletka', (e) => e.length),
-    13,
+    14,
   );
   proveri(
     'и в НЕГОВИЯ ред · наредба, не подредба при рисуване',
@@ -46,7 +46,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       )
     ).join(' · '),
     'Дата · Място · Обект · Страна · Вид · Начин · Сметка · Бележка · Заплата · Дни · ' +
-      'Фактура № · Сверка · Сума €',
+      'Фактура № · Сверка · Сума € · Категория',
   );
   proveri(
     'СМЕТНАТИТЕ четири колони са затворени · не се редактират от никого',
@@ -94,7 +94,56 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     'da',
   );
 
+  // ── КАТЕГОРИЯТА · единственото тук, което се ПИШЕ (резен 25 · ADR-085) ────
+  proveri(
+    'клетката „Категория" е ПОЛЕ, не текст · тя е единствената, която се пише',
+    await p.$$eval('[data-plashtane] .kletka-kategoriya', (e) => e.length) > 0,
+    true,
+  );
+  proveri(
+    'и менюто ѝ предлага вече писаното · „меню от Описа"',
+    await p.$$eval('#spisak-kategorii option', (e) => e.length) > 0,
+    true,
+  );
+
+  const predKategoriya = await broySabitiya(p);
+  // ТОЧНО КАКВОТО ПРАВИ ЧОВЕК: пише в клетката и излиза от нея. „change" идва
+  // от НАПУСКАНЕТО — едно събитие на решение, не едно на буква.
+  //
+  // Двата по-къси пътя паднаха и двата: само `fill` не пуска „change" изобщо
+  // (проходът увисна 30 s), а `fill` + ръчен `dispatchEvent` пускаше ДВЕ
+  // събития — първото прерисува екрана, а вторият стигаше до вече откачения
+  // възел, чието затваряне още помни празната стойност (268 срещу 269).
+  await sSabitie(p, async () => {
+    await p.fill('[data-plashtane][data-vid=zaplata] .kletka-kategoriya', 'Труд');
+    await p.$eval('[data-plashtane][data-vid=zaplata] .kletka-kategoriya', (e) =>
+      (e as HTMLElement).blur(),
+    );
+  });
+  proveri(
+    'задаването ражда ТОЧНО ЕДНО събитие',
+    (await broySabitiya(p)) - predKategoriya,
+    1,
+  );
+  proveri(
+    'и категорията стои в клетката след прерисуване',
+    await p.$eval('[data-plashtane][data-vid=zaplata] .kletka-kategoriya', (e) =>
+      (e as HTMLInputElement).value,
+    ),
+    'Труд',
+  );
+  proveri(
+    'разбивката „По категории" я БРОИ · и некатегоризираното не изчезва',
+    await p.$$eval('[data-tablitsa=plashtaniya-kategorii] [data-kategoriya]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['kategoriya']).includes('Труд'),
+    ),
+    true,
+  );
+
   // ── СВАЛЯНЕТО · ЕДИН файл, НУЛА събития ──────────────────────────────────
+  //
+  // Броячът се чете ТУК, а не в началото на блока: категорията горе НАРОЧНО
+  // пише едно събитие, и стар брояч би приписал него на свалянето.
   const predi = await broySabitiya(p);
   const [fayl] = await Promise.all([
     p.waitForEvent('download'),

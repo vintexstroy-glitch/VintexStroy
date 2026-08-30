@@ -81,6 +81,7 @@ import type {
   PayloadKeshZahranen,
   PayloadSedmitsaPrehvarlena,
   PayloadTablitsaOtFaylSazdadena,
+  PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
@@ -336,6 +337,13 @@ export interface Ogledalo {
    * таблицата, не ражда втора с това име.
    */
   readonly tablitsiOtFayl: ReadonlyMap<string, PayloadTablitsaOtFaylSazdadena>;
+  /**
+   * КАТЕГОРИИТЕ на плащанията · `KAT:<вид>:<id>` → думата (резен 25).
+   *
+   * Последната дума е в сила: повторно задаване е НОВО събитие, а не поправка
+   * на старото, тъй че историята „кога какво съм я мислел" остава цяла.
+   */
+  readonly kategorii: ReadonlyMap<string, string>;
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -594,6 +602,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
   const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
   const tablitsiOtFayl = new Map<string, PayloadTablitsaOtFaylSazdadena>();
+  const kategorii = new Map<string, string>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
@@ -1112,6 +1121,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'КатегорияЗададена': {
+        const p = s.payload as unknown as PayloadKategoriyaZadadena;
+        // ПРАЗНАТА маха · тя не е категория „", а решение да няма такава.
+        // Записът остава в Журнала — маха се от Огледалото, не от историята.
+        if (p.kategoriya === '') kategorii.delete(s.sashtnost.id);
+        else kategorii.set(s.sashtnost.id, p.kategoriya);
+        break;
+      }
+
       case 'КешЗахранен': {
         // ДОБАВЯ СЕ · салдото на джоба е СБОР, не поле. Сторното го сваля
         // оттук по `seq`, и кешът пада обратно сам.
@@ -1345,6 +1363,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prehvarleniSedmitsi,
     zahranvaniyaNaKesha,
     tablitsiOtFayl,
+    kategorii,
     pototsi,
     salda,
     dela,
