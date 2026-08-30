@@ -59,6 +59,7 @@ import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
 import { napraviRachniyaRed } from './porednost.js';
 import { proveriPapkata } from './papki.js';
+import { proveriKontakta, proveriPrepiskata, sashtnostNaKontakta } from './kontakti.js';
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
@@ -96,6 +97,8 @@ import type {
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
   PayloadDelaPodredeni,
+  PayloadKontaktZapisan,
+  PayloadPrepiskaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -780,6 +783,47 @@ export class Deystviya {
       { red: napraviRachniyaRed(danni.red) },
       z,
     );
+  }
+
+  /**
+   * ЗАПИСВА КОНТАКТ · „КОгато се вкарва човек става от Преписки и контакти"
+   * *(р65·[46])* (резен 38 · M10).
+   *
+   * ЕДНА проверка: името не е празно. То е и адресът — падащото меню
+   * „Отговорник" сочи контакта по име *(ред 1318)*, значи безименен контакт не
+   * може да се избере никъде.
+   *
+   * Телефонът, имейлът и „какъв е" НЕ се искат: контакт само с име е нормален
+   * случай. Поле, което човек е принуден да измисли, се пълни с боклук и после
+   * се брои като данни (дословно същата сметка като при мястото, ADR-091).
+   *
+   * И записът тук НЕ дава достъп до програмата: достъпът е при доставчика
+   * (правило 14), а служителите са свой екран.
+   */
+  async zapishiKontakt(danni: PayloadKontaktZapisan, z: Zayavka): Promise<Rezultat> {
+    const ime = proveriKontakta(danni.ime);
+    return this.#pusni(
+      'КонтактЗаписан',
+      VID.kontakt,
+      sashtnostNaKontakta(ime),
+      { ...danni, ime },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ПРЕПИСКА · РАБОТА с човек (резен 38 · р57·[28]).
+   *
+   * Своя същност с СВОЙ `id`, а не поле на контакта: един контакт носи много
+   * преписки, и записана като поле, втората щеше да изтрие първата.
+   *
+   * Контактът се сочи по ИМЕ, както делата сочат мястото — и по същата причина:
+   * преписка може да се запише за човек, който още не е вписан като контакт,
+   * а списъкът го показва като „срещан, но незаписан".
+   */
+  async zapishiPrepiska(id: string, danni: PayloadPrepiskaZapisana, z: Zayavka): Promise<Rezultat> {
+    proveriPrepiskata(danni.kontakt, danni.kakvo, danni.sastoyanie);
+    return this.#pusni('ПреписказЗаписана', VID.prepiska, id, danni, z);
   }
 
   /**

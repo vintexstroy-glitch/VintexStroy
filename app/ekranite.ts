@@ -22,6 +22,7 @@ import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
 import { narisuvayNAP, zakachiNAP } from './nap.js';
+import { narisuvayKontaktite, zakachiKontaktite } from './kontakti.js';
 import { narisuvayProdazhbi, zakachiProdazhbite } from './prodazhbi.js';
 import { narisuvayPlashtaniyaArhiv, zakachiPlashtaniyaArhiv } from './plashtaniya-arhiv.js';
 import { narisuvayTablo } from './tablo.js';
@@ -51,6 +52,7 @@ export type KoyEkran =
   | 'lichno'
   | 'sluzhiteli'
   | 'nap'
+  | 'kontakti'
   | 'prodazhbi'
   | 'plashtaniya'
   | 'tablo';
@@ -386,6 +388,21 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     iska: 'nap-vrazka',
     narisuvay: (r) => narisuvayNAP(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiNAP(z.koren, z.k, z.prerisuvay),
+  },
+  kontakti: {
+    ime: 'Контакти',
+    podnaslov: 'един таб, две секции · преписките и хората',
+    ikona: 'ekran-sluzhiteli',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`.
+     *
+     * Контактът е НОМЕНКЛАТУРА, не достъп: вписването тук не пуска никого в
+     * програмата (правило 14 · служителите са свой екран). А преписката е
+     * РАБОТА — същият служител, който води делата, води и нея. Роля тук би била
+     * втора врата към достъпа, точно каквото правило 23 забранява.
+     */
+    narisuvay: (r) => narisuvayKontaktite(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiKontaktite(z.koren, z.k, z.prerisuvay),
   },
   prodazhbi: {
     ime: 'Продажби',

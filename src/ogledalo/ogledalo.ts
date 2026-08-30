@@ -39,6 +39,7 @@ import type {
 } from '../domein/zaplati.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import { rachniyatRedOtZhurnala } from '../domein/porednost.js';
+import { svedenoIme, type Kontakt, type Prepiska, type SastoyanieNaPrepiska } from '../domein/kontakti.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
@@ -77,6 +78,8 @@ import type {
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
   PayloadDelaPodredeni,
+  PayloadKontaktZapisan,
+  PayloadPrepiskaZapisana,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
@@ -511,6 +514,15 @@ export interface Ogledalo {
    * поправката на фирмата е ново събитие върху същата същност.
    */
   readonly mesta: ReadonlyMap<string, Myasto>;
+  /**
+   * КОНТАКТИТЕ · сведеното име → записът (резен 38 · M10).
+   *
+   * Ключът е СВЕДЕНОТО име, по същата причина като при местата: преписките
+   * сочат контакта по ИМЕ, а „Иван Петров" и „иван петров " са един човек.
+   */
+  readonly kontakti: ReadonlyMap<string, Kontakt>;
+  /** ПРЕПИСКИТЕ · по свой `id`, защото един контакт носи много (резен 38). */
+  readonly prepiski: ReadonlyMap<string, Prepiska>;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -734,6 +746,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const godinite = new Map<string, number>();
   const zatvorenite = new Map<string, ZatvorenaGodina>();
   const mesta = new Map<string, Myasto>();
+  const kontakti = new Map<string, Kontakt>();
+  const prepiski = new Map<string, Prepiska>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -1293,6 +1307,38 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'КонтактЗаписан': {
+        // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на телефона е ново събитие върху
+        // същата същност, не втори човек (дословно както при мястото).
+        const p = s.payload as unknown as PayloadKontaktZapisan;
+        const klyuch = svedenoIme(p.ime);
+        kontakti.set(klyuch, {
+          ime: p.ime,
+          telefon: p.telefon,
+          imeyl: p.imeyl,
+          kakav: p.kakav,
+          seq: kontakti.get(klyuch)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'ПреписказЗаписана': {
+        const p = s.payload as unknown as PayloadPrepiskaZapisana;
+        prepiski.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          kontakt: p.kontakt,
+          kakvo: p.kakvo,
+          zaVzimane: p.zaVzimane,
+          sastoyanie: p.sastoyanie as SastoyanieNaPrepiska,
+          seq: prepiski.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
       case 'ГодинаЗатворена': {
         // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
         // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
@@ -1588,6 +1634,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     godinite,
     zatvorenite,
     mesta,
+    kontakti,
+    prepiski,
   };
 }
 

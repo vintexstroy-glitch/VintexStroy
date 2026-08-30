@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -1781,4 +1781,89 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('с обяснение защо е находка, а не отказ',
       (await tekstNa(p, '[data-papki-broy]')).includes('копирано поле'), true);
 
+
+    // ══ 116 · КОНТАКТИ И ПРЕПИСКИ · един таб, две секции (резен 38 · ADR-098) ══
+    //
+    // „Един таб, две секции" *(р57·[30])* · „Има още събери Преписки и контакти…
+    // кога са за взимане кто опция и дата" *(р57·[28])* · „КОгато се вкарва
+    // човек става от Преписки и контакти" *(р65·[46])*.
+    await naEkran(p, 'kontakti', '#forma-kontakt');
+
+    razdel = '116 · Контакти · ЕДИН таб, ДВЕ секции';
+    proveri('петнайсетият екран носи неговото име',
+      await p.$eval('.shapka h1', (e) => (e as any).textContent.trim()), 'Контакти');
+    proveri('и двете секции са НА ЕДИН екран',
+      await p.$$eval('[data-sektsiya=prepiski], [data-sektsiya=kontakti]', (e) => e.length), 2);
+    proveri('преписките са ПЪРВИ · работата се гледа всеки ден',
+      await p.$eval('.telo [data-sektsiya]', (e) => (e as any).dataset.sektsiya), 'prepiski');
+
+    razdel = '116 · Контактът · иска САМО име';
+    const prediKontakt = await broySabitiya(p);
+    await p.fill('#knt-ime', 'Мария Илиева');
+    await sSabitie(p, () => p.click('#forma-kontakt button[type=submit]'));
+    proveri('едно събитие, не две', await broySabitiya(p), prediKontakt + 1);
+    proveri('контактът стои в списъка',
+      await p.$$eval('[data-tablitsa=kontakti] [data-kontakt]', (e) => e.length), 1);
+    proveri('и е ЗАПИСАН, не само срещан',
+      await p.$eval('[data-kontakt] ', (e) => (e as any).dataset.zapisan), 'da');
+    proveri('телефонът и имейлът стоят празни · те са по избор',
+      (await p.$eval('[data-kontakt]', (e) => (e as any).innerText)).includes('—'), true);
+
+    razdel = '116 · Контактът · БЕЗ име се отказва с думи';
+    const prediOtkaza = await broySabitiya(p);
+    await p.fill('#knt-ime', '   ');
+    await p.click('#forma-kontakt button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-kontakt')?.textContent ?? '').length > 0);
+    proveri('казва ЗАЩО · името е и адресът му',
+      (await tekstNa(p, '#greshka-kontakt')).includes('Отговорник'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediOtkaza);
+
+    razdel = '116 · Преписката · с кого · за какво · кога';
+    await p.fill('#prep-kontakt', 'Мария Илиева');
+    await p.fill('#prep-kakvo', 'нотариален акт');
+    await p.fill('#prep-data', denOtDnes(3));
+    await sSabitie(p, () => p.click('#forma-prepiska button[type=submit]'));
+    proveri('преписката стои в своята таблица',
+      await p.$$eval('[data-tablitsa=prepiski] [data-prepiska]', (e) => e.length), 1);
+    proveri('и брои се при контакта си',
+      (await p.$eval('[data-kontakt]', (e) => (e as any).innerText)).includes('1'), true);
+    // ТРИ ДНИ ДО СРОКА · неговите прагове са 7 и 2, значи това е ЖЪЛТО.
+    proveri('светофарът е НЕГОВИЯТ · седем дни жълто, два червено',
+      await p.$eval('[data-prepiska]', (e) => (e as any).dataset.svetofar), 'zhalto');
+
+    razdel = '116 · Преписката · СРЕЩАНИЯТ, но незаписан контакт СТОИ';
+    await p.fill('#prep-kontakt', 'Николай Непознат');
+    await p.fill('#prep-kakvo', 'скица');
+    await sSabitie(p, () => p.click('#forma-prepiska button[type=submit]'));
+    proveri('списъкът с контакти порасна',
+      await p.$$eval('[data-tablitsa=kontakti] [data-kontakt]', (e) => e.length), 2);
+    proveri('и новият е обявен като САМО СРЕЩАН',
+      await p.$$eval('[data-kontakt][data-zapisan=ne]', (e) => e.length), 1);
+    proveri('с думи на самия ред, не с легенда',
+      (await p.$eval('[data-kontakt][data-zapisan=ne]', (e) => (e as any).innerText))
+        .includes('само срещан'), true);
+
+    razdel = '116 · Преписката · без дата НЕ свети';
+    await p.fill('#prep-kontakt', 'Мария Илиева');
+    await p.fill('#prep-kakvo', 'без срок');
+    await sSabitie(p, () => p.click('#forma-prepiska button[type=submit]'));
+    proveri('всички без дата са „нормално"',
+      await p.$$eval('[data-prepiska][data-svetofar=normalno]', (e) => e.length), 2);
+    proveri('и екранът КАЗВА защо',
+      (await tekstNa(p, '[data-sektsiya=prepiski]')).includes('никой не е бързал'), true);
+
+    razdel = '116 · Преписката · БЕЗ контакт се отказва';
+    const prediPrazna = await broySabitiya(p);
+    await p.fill('#prep-kontakt', '  ');
+    await p.fill('#prep-kakvo', 'нещо');
+    await p.click('#forma-prepiska button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-prepiska')?.textContent ?? '').length > 0);
+    proveri('и го казва с думи', (await tekstNa(p, '#greshka-prepiska')).includes('С кого'), true);
+    proveri('нула нови събития', await broySabitiya(p), prediPrazna);
+
+    razdel = '116 · Контактите · сверката брои преписките по хора';
+    proveri('сверката стои на екрана и е нула',
+      (await tekstNa(p, '[data-kontakti-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
 }

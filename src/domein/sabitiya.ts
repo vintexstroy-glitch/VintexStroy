@@ -102,6 +102,20 @@ export const VID = {
    */
   lenta: 'lenta',
   /**
+   * КОНТАКТЪТ · човек в номенклатурата (резен 38 · M10).
+   *
+   * Адресът е `KNT:<сведено име>`, като при мястото: човек пише „Иван Петров"
+   * веднъж и „иван петров" следващия път, а това е ЕДИН човек.
+   */
+  kontakt: 'kontakt',
+  /**
+   * ПРЕПИСКАТА · РАБОТА с човек (резен 38 · р57·[28]).
+   *
+   * Своя същност, а не поле на контакта: един контакт носи много преписки, и
+   * записана като поле, втората щеше да изтрие първата.
+   */
+  prepiska: 'prepiska',
+  /**
    * ПОРЕДНОСТТА · РЪЧНИЯТ ред на делата (резен 34 · ред 1496).
    *
    * Една същност за целия наемател, като лентата — но по СЪВСЕМ друга причина:
@@ -283,6 +297,8 @@ export type TipSabitie =
   | 'СвръзкаЗаписана'
   | 'НАПВръзкаПревключена'
   | 'ЛентаПодредена'
+  | 'КонтактЗаписан'
+  | 'ПреписказЗаписана'
   | 'ДелаПодредени'
   | 'ЛичноПревключено'
   | 'ДелоПрехвърлено'
@@ -1243,6 +1259,24 @@ export interface PayloadNAPVrazkaPrevklyuchena {
 export interface PayloadLentaPodredena {
   /** ключовете на екраните, в реда на Стопанина */
   readonly red: readonly string[];
+}
+
+export interface PayloadKontaktZapisan {
+  /** името, ДОСЛОВНО както го е написал човекът */
+  readonly ime: string;
+  /** по избор · контакт само с име е нормален случай */
+  readonly telefon: string;
+  readonly imeyl: string;
+  /** какъвто и да е той · свободен текст, защото ролите са негови */
+  readonly kakav: string;
+}
+
+export interface PayloadPrepiskaZapisana {
+  readonly kontakt: string;
+  readonly kakvo: string;
+  /** „кога са за взимане кто ОПЦИЯ и дата" · САМО дата, без час (р57·[34]) */
+  readonly zaVzimane: string;
+  readonly sastoyanie: string;
 }
 
 export interface PayloadDelaPodredeni {
