@@ -40,9 +40,24 @@ import {
   zashtoNeSePriema,
   type Predlozhenie,
 } from '../src/domein/zhurnal-ot-tablitsa.js';
+import {
+  PRAZEN_FILTAR,
+  zhurnalatZaEkrana,
+  type FiltarNaZhurnala,
+  type Sesiya,
+} from '../src/domein/sesii.js';
 import type { Sabitie } from '../src/yadro/index.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
+
+/**
+ * ЖУРНАЛЪТ, ПРОЧЕТЕН ЗА ГЛЕДАНЕ · живее, докато секцията стои отворена.
+ *
+ * Не се чете при ВСЯКО рисуване на Настройки: това е цялата книга, а секцията
+ * се показва и когато никой не я гледа. Чете се, когато човек поиска.
+ */
+let kniga: readonly Sabitie[] | null = null;
+let filtar: FiltarNaZhurnala = PRAZEN_FILTAR;
 
 /** Прочетеното живее, докато секцията стои отворена. */
 let predlozheno: Predlozhenie | null = null;
@@ -61,7 +76,7 @@ function zabraviTablitsata(): void {
   greshka = '';
 }
 
-export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number): string {
+export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number, dnes: string): string {
   const svrazki = [...o.svrazki.values()];
   return `
     <section data-sektsiya="zhurnalat">
@@ -81,7 +96,121 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number): string {
       ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
       ${predlozheno ? predlozhenieto(predlozheno) : ''}
       ${svrazki.length ? tablitsaNaSvrazkite(svrazki) : ''}
+    </section>
+
+    ${blokNaSesiite(dnes)}`;
+}
+
+/**
+ * СЕСИИТЕ НА РЕДАКТОРА · неговата находка, стигнала до екран (резен 26).
+ *
+ * „ако все пак сложим ДАТА И ИМЕ на журнала за търсене в него… промените
+ * направени от всеки като СЕСИЯ на всяка стъпка… а когато е ИЗКЛЮЧЕН фултъра
+ * там се показва ДНЕВНАТА сесия за всеки редактор" *(р84·[20])*.
+ *
+ * Книгата се чете С БУТОН, а не при всяко рисуване на Настройки: тя е цялата
+ * история, а секцията стои на екрана и когато никой не я гледа.
+ */
+function blokNaSesiite(dnes: string): string {
+  if (kniga === null) {
+    return `
+    <section data-sektsiya="zhurnal-sesii" data-otvoren="ne">
+      <div class="dyalglava">
+        <h2>Сесиите на редактора</h2>
+        <span>кой какво е пипал · по тайминга на записа</span>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="sesii-otvori">Отвори сесиите</button>
+      </div>
+      <p class="drebno">Книгата се чете чак когато поискаш — тя е цялата история,
+      а тази секция стои тук и когато никой не я гледа. <b>Нищо не се записва:</b>
+      сесията се СМЯТА от подписаните „кой" и „кога", значи е вярна и върху книга,
+      донесена отвън.</p>
     </section>`;
+  }
+
+  const izgled = zhurnalatZaEkrana(kniga, filtar, dnes, new Date().toISOString());
+  return `
+    <section data-sektsiya="zhurnal-sesii" data-otvoren="da"
+             data-izklyuchen="${izgled.izklyuchen ? 'da' : 'ne'}">
+      <div class="dyalglava">
+        <h2>Сесиите на редактора</h2>
+        <span data-sesii="${izgled.sesii.length}">${izgled.sesii.length} ${
+          izgled.sesii.length === 1 ? 'сесия' : 'сесии'
+        }${izgled.izklyuchen ? ` · днешният ден (${ekraniraj(dnes)})` : ' · по филтъра'}</span>
+      </div>
+
+      <div class="poleta">
+        <label class="pole"><span>От дата</span>
+          <input translate="no" type="date" id="sesii-ot" value="${ekraniraj(filtar.ot)}"></label>
+        <label class="pole"><span>До дата</span>
+          <input translate="no" type="date" id="sesii-do" value="${ekraniraj(filtar.do_)}"></label>
+        <label class="pole"><span>Име</span>
+          <input translate="no" id="sesii-koy" list="spisak-redaktori"
+                 value="${ekraniraj(filtar.koy)}" placeholder="имейл или част от него"></label>
+        <label class="pole"><span>Търси</span>
+          <input translate="no" id="sesii-tarsi" value="${ekraniraj(filtar.tarsi)}"
+                 placeholder="вид · същност · товар"></label>
+      </div>
+      <datalist id="spisak-redaktori" translate="no">
+        ${izgled.redaktori.map((x) => `<option value="${ekraniraj(x)}"></option>`).join('')}
+      </datalist>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="sesii-izchisti">Изчисти филтъра</button>
+        <button type="button" class="vtorichen" id="sesii-zatvori">Затвори</button>
+      </div>
+
+      ${
+        izgled.izklyuchen
+          ? `<p class="drebno"><b>Филтърът е изключен</b>, затова тук стои
+             ДНЕШНИЯТ ден за всеки редактор. Изключено не значи „покажи всичко" —
+             целият Журнал наведнъж е износът, не екранът.</p>`
+          : ''
+      }
+
+      ${
+        izgled.sesii.length === 0
+          ? '<p class="prazno">Нито една сесия по този филтър. Празното е отговор, не грешка.</p>'
+          : izgled.sesii.map(redNaSesiya).join('')
+      }
+
+      <div class="tablitsa">
+        <div class="red sverka" translate="no">
+          <span class="kletka"><b>Сверка вход↔изход</b><span>през филтъра ↔ в сесиите</span></span>
+          <span class="suma" data-st="${izgled.sverka.vhod}">${izgled.sverka.vhod}</span>
+          <span class="suma" data-st="${izgled.sverka.izhod}">${izgled.sverka.izhod}</span>
+          <span class="suma${izgled.sverka.razlika === 0 ? '' : ' duljimo'}"
+                data-razlika="${izgled.sverka.razlika}">${izgled.sverka.razlika}</span>
+        </div>
+      </div>
+      <p class="drebno">Разликата се показва и когато е нула. Тя лови точно едно:
+      ред, който филтърът е пуснал, а групирането е изгубил — на екран такова нещо
+      изглежда като „човекът не е работил", не като грешка.</p>
+    </section>`;
+}
+
+/** Една сесия · името, денят, часовете, и редовете под тях. */
+function redNaSesiya(s: Sesiya): string {
+  return `
+    <div class="karta sesiya" data-sesiya="${ekraniraj(`${s.den}·${s.koy}`)}"
+         data-broy="${s.broy}">
+      <div class="dyalglava">
+        <h3 translate="no">${ekraniraj(s.koy)}</h3>
+        <span translate="no">${ekraniraj(s.den)} · ${ekraniraj(s.ot)}–${ekraniraj(s.do_)} · ${
+          s.broy
+        } ${s.broy === 1 ? 'запис' : 'записа'}</span>
+      </div>
+      ${s.redove
+        .map(
+          (r) => `<div class="istoriya-sabitie" translate="no" data-seq="${r.seq}">
+        <span class="seq">№ ${r.seq}</span>
+        <b>${ekraniraj(r.type)}</b>
+        <span class="koga">${ekraniraj(String(r.ts).slice(11, 16))}</span>
+        <span class="opis">${ekraniraj(`${r.sashtnost.vid} · ${r.sashtnost.id}`)}</span>
+      </div>`,
+        )
+        .join('')}
+    </div>`;
 }
 
 /** Какво ще стане · показва се ПРЕДИ да се запише каквото и да е. */
@@ -202,6 +331,33 @@ export function zakachiZhurnalat(
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  // ── СЕСИИТЕ · четиво, нула записи (резен 26 · ADR-086) ───────────────────
+  koren.querySelector<HTMLButtonElement>('#sesii-otvori')?.addEventListener('click', async () => {
+    kniga = await k.dnevnik.chetiVsichki(k.akaunt);
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#sesii-zatvori')?.addEventListener('click', async () => {
+    // Пуска книгата от паметта · тя е цялата история и няма защо да стои.
+    kniga = null;
+    filtar = PRAZEN_FILTAR;
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#sesii-izchisti')?.addEventListener('click', async () => {
+    filtar = PRAZEN_FILTAR;
+    await prerisuvay();
+  });
+  for (const [znak, pole] of [
+    ['#sesii-ot', 'ot'],
+    ['#sesii-do', 'do_'],
+    ['#sesii-koy', 'koy'],
+    ['#sesii-tarsi', 'tarsi'],
+  ] as const) {
+    koren.querySelector<HTMLInputElement>(znak)?.addEventListener('change', async (e) => {
+      filtar = { ...filtar, [pole]: (e.target as HTMLInputElement).value.trim() };
+      await prerisuvay();
+    });
+  }
+
   koren.querySelector<HTMLButtonElement>('#zhurnal-iznesi')?.addEventListener('click', async () => {
     try {
       const sabitiya = await k.dnevnik.chetiVsichki(k.akaunt);

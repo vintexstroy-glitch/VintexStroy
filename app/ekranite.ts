@@ -261,6 +261,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
         // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
         punktoveNaMenyuto(r),
+        r.dnes,
       ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay),
   },

@@ -40,6 +40,7 @@ import * as zaplati from './razdeli/zaplati.ts';
 import * as tablitsaOtFayl from './razdeli/tablitsa-ot-fayl.ts';
 import * as plashtaniyaArhiv from './razdeli/plashtaniya-arhiv.ts';
 import * as prodazhbiIzhod from './razdeli/prodazhbi-izhod.ts';
+import * as sesii from './razdeli/sesii.ts';
 
 async function main(): Promise<void> {
   const server = pusniServer();
@@ -141,6 +142,9 @@ async function main(): Promise<void> {
     await plashtaniyaArhiv.blok1(ctx);
     // §103 стои СЛЕД §94: сделката и двете ѝ движения се записват там.
     await prodazhbiIzhod.blok1(ctx);
+    // §104 иска ПАДАЩИЯ РЕД на Настройки · `nastroyki.blok6` (§63) вече е
+    // доказал, че се отваря, и мястото е след него, не преди.
+    await sesii.blok1(ctx);
     await tablo.blok2(ctx);
     await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);

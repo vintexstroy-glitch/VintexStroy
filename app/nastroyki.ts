@@ -141,6 +141,8 @@ export function narisuvayNastroyki(
    * отговорът е „никъде".
    */
   punktove: readonly PunktNaMenyuto[] = [],
+  /** ДНЕШНИЯТ ден · подава се, не се чете: часовникът е довод (резен 26) */
+  dnes = '',
 ): string {
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
@@ -216,7 +218,7 @@ export function narisuvayNastroyki(
     ${blokNaKontragentite(o)}
     ${blokNaSverkite(o)}
     ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
-    ${sektsiyaZhurnalat(o, sabitiya)}
+    ${sektsiyaZhurnalat(o, sabitiya, dnes)}
     ${blokNaDeystviyata()}
     ${blokNaKartata()}`;
 }
