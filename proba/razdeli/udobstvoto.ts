@@ -2088,4 +2088,81 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       redove119.some((t) => t.includes('Николай Петков')), true);
     proveri('и мястото идва от закачането',
       redove119.some((t) => t.includes('закачена за дело · ')), true);
+
+    // ═══ 120 · СВОИТЕ ПОЛЕТА С ФОРМУЛА (И90 · резен 42) ═══
+    //
+    // „За финанситее ще хледаш формулата ще правиш полета в Секция Отчети
+    //  където ще се сложар полета които да покзват тези стойности с формули
+    //  между всички таблици нак вероятно." *(И90)*
+
+    razdel = '120 · Полетата · изворите са МЕЖДУ ВСИЧКИ таблици';
+    await naEkran(p, 'smetki', '#forma-pole');
+    const proizhod = await p.$$eval('#pf-lyavo optgroup', (e) => e.map((x) => x.getAttribute('label')));
+    proveri('менюто е групирано по ТРИ произхода',
+      JSON.stringify(proizhod), JSON.stringify(['Отчети', 'Коефициенти', 'Данни на периода']));
+    const broyIzvori = await p.$$eval('#pf-lyavo option', (e) => e.length);
+    proveri('и броят им се БРОИ, не се твърди',
+      await p.$eval('[data-izvori]', (e) => Number((e as any).dataset.izvori)), broyIzvori);
+
+    razdel = '120 · Полето · записва се и се СМЯТА';
+    const prediPole = await broySabitiya(p);
+    await p.fill('#pf-ime', 'Свободен паричен поток');
+    await p.selectOption('#pf-deystvie', 'razlika');
+    await p.selectOption('#pf-lyavo', 'danni:prihod_st');
+    await p.selectOption('#pf-dyasno', 'danni:razhod_st');
+    await sSabitie(p, () => p.click('#forma-pole button[type=submit]'));
+    proveri('едно събитие, не две', await broySabitiya(p), prediPole + 1);
+    proveri('полето стои в СВОЯТА таблица',
+      await p.$$eval('[data-svoe-pole]', (e) => e.length), 1);
+    proveri('и формулата се чете с ДУМИ, не с ключове',
+      (await p.$eval('[data-svoe-pole]', (e) => (e as any).innerText)).includes('разлика(Приход'), true);
+    proveri('стойността е сметната · редът НЕ чака',
+      await p.$$eval('[data-svoe-pole][data-chaka]', (e) => e.length), 0);
+
+    razdel = '120 · Полето · счупена формула изобщо НЕ се записва';
+    const prediSchupeno = await broySabitiya(p);
+    await p.fill('#pf-ime', 'Евро по евро');
+    await p.selectOption('#pf-deystvie', 'proizvedenie');
+    await p.selectOption('#pf-lyavo', 'danni:prihod_st');
+    await p.selectOption('#pf-dyasno', 'danni:razhod_st');
+    await p.click('#forma-pole button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-pole')?.textContent ?? '').length > 0);
+    proveri('казва ЗАЩО · евро по евро няма смисъл',
+      (await tekstNa(p, '#greshka-pole')).includes('евро по евро'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediSchupeno);
+
+    razdel = '120 · Полето · СЕБЕ СИ не се сочи два пъти';
+    await p.fill('#pf-ime', 'Само себе си');
+    await p.selectOption('#pf-deystvie', 'sbor');
+    await p.selectOption('#pf-lyavo', 'danni:prihod_st');
+    await p.selectOption('#pf-dyasno', 'danni:prihod_st');
+    await p.click('#forma-pole button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-pole')?.textContent ?? '').length > 0);
+    proveri('казва ЗАЩО · удвояване не е сметка',
+      (await tekstNa(p, '#greshka-pole')).includes('ЕДИН и същ извор'), true);
+
+    razdel = '120 · Полето · липсващото число КАЗВА защо';
+    // Ликвидността чака начални салда · тя е извор БЕЗ стойност.
+    const chakashti = await p.$$eval('#pf-lyavo option', (e) =>
+      e.filter((x) => (x.textContent ?? '').includes('(чака)')).map((x) => (x as HTMLOptionElement).value));
+    proveri('поне един извор се обявява за ЧАКАЩ', chakashti.length > 0, true);
+    await p.fill('#pf-ime', 'Върху непълно');
+    await p.selectOption('#pf-deystvie', 'razlika');
+    await p.selectOption('#pf-lyavo', chakashti[0]!);
+    await p.selectOption('#pf-dyasno', 'danni:prihod_st');
+    await sSabitie(p, () => p.click('#forma-pole button[type=submit]'));
+    proveri('редът се обявява за ЧАКАЩ, вместо да покаже нула',
+      await p.$$eval('[data-svoe-pole][data-chaka]', (e) => e.length), 1);
+    proveri('и казва ЗАЩО, с думите на извора',
+      (await p.$eval('[data-svoe-pole][data-chaka]', (e) => (e as any).innerText)).includes('чака'), true);
+    proveri('чакащите се БРОЯТ',
+      await p.$eval('[data-poleta-chakat]', (e) => (e as any).dataset.poletaChakat), '1');
+
+    razdel = '120 · Полетата · сверката брои сочени ↔ намерени извори';
+    proveri('сверката стои на екрана и е нула',
+      (await tekstNa(p, '[data-poleta-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
+    proveri('и полетата НЕ се записват като стойност · само като решение',
+      await broySabitiya(p), await broySabitiya(p));
 }

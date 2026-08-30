@@ -38,7 +38,7 @@ import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import { bezopasnoIme, dnesKato, ekraniraj, menyuNaDeystviyata, svaliFayl } from './obshto.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
 import { obrazetsOtModel, ZNAK_ZATVORENA } from '../src/iznos/ot-model.js';
 import {
@@ -791,11 +791,7 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
           <div class="poleta tesni">
             <div class="pole">
               <label for="nova-deystvie">Действие</label>
-              <select translate="no" id="nova-deystvie" name="deystvie">
-                ${DEYSTVIYA_NA_FORMULA.map(
-                  (d) => `<option value="${d}">${IMENA_NA_DEYSTVIYATA[d]}</option>`,
-                ).join('')}
-              </select>
+              ${menyuNaDeystviyata('nova-deystvie')}
             </div>
             ${[1, 2, 3]
               .map(

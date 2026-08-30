@@ -33,6 +33,8 @@ import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
 import type { Otsenka } from '../domein/dela.js';
+import type { PoleSFormula } from '../domein/pole-s-formula.js';
+import type { DeystvieNaFormula } from '../domein/formuli.js';
 import type {
   PrehvarlenaSedmitsa,
   RedNaZaplata,
@@ -90,6 +92,7 @@ import type {
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
   PayloadSreshtaZapisana,
+  PayloadPoleZapisano,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
@@ -535,6 +538,8 @@ export interface Ogledalo {
   readonly prepiski: ReadonlyMap<string, Prepiska>;
   /** СРЕЩИТЕ · по свой `id`, по същата причина като преписките (резен 39). */
   readonly sreshti: ReadonlyMap<string, Sreshta>;
+  /** ПОЛЕТАТА С ФОРМУЛА в Отчети · по свой `id` (резен 42). */
+  readonly poletaSFormula: ReadonlyMap<string, PoleSFormula>;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -761,6 +766,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const kontakti = new Map<string, Kontakt>();
   const prepiski = new Map<string, Prepiska>();
   const sreshti = new Map<string, Sreshta>();
+  const poletaSFormula = new Map<string, PoleSFormula>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -1376,6 +1382,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ПолеЗаписано': {
+        const p = s.payload as unknown as PayloadPoleZapisano;
+        poletaSFormula.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          ime: p.ime,
+          deystvie: p.deystvie as DeystvieNaFormula,
+          lyavo: p.lyavo,
+          dyasno: p.dyasno,
+          seq: poletaSFormula.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
       case 'ГодинаЗатворена': {
         // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
         // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
@@ -1674,6 +1695,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     kontakti,
     prepiski,
     sreshti,
+    poletaSFormula,
   };
 }
 

@@ -249,6 +249,13 @@ export async function blok4(
       obrazets.suggestedFilename(), `obrazets-Banka-OBB-${new Date().toISOString().slice(0, 10)}.xlsx`);
     // ПЪТЯТ „pishe" води до ФАЙЛ, не до записа: нищо не влиза в Журнала.
     proveri('образецът НЕ пише нищо в Журнала', await broySabitiya(p), predObrazets);
+    // ВЕСТТА СЕ ЧАКА, не се чете веднага. НАДПРЕВАРА, хваната в резен 42:
+    // `waitForEvent('download')` се развързва щом файлът тръгне — а вестта се
+    // слага СЛЕД това, в същия обработчик. При натоварена машина проходът
+    // четеше празен екран и падаше веднъж на три пускания. Проход, който лъже
+    // през ден, е по-скъп от липсващ (ADR-051).
+    await p.waitForFunction(() =>
+      (document.querySelector('.vest')?.textContent ?? '').length > 0);
     proveri('и го КАЗВА след свалянето',
       (await tekstNa(p, '.vest')).includes('празни реда'), true);
 

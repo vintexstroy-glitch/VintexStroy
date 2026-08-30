@@ -59,6 +59,8 @@ import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
 import { napraviRachniyaRed } from './porednost.js';
 import { proveriPapkata } from './papki.js';
+import { iztochnitsiteNaChisla } from './iztochnitsi-na-chisla.js';
+import { proveriPoleto } from './pole-s-formula.js';
 import {
   proveriKontakta,
   proveriPrepiskata,
@@ -105,6 +107,7 @@ import type {
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
   PayloadSreshtaZapisana,
+  PayloadPoleZapisano,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -842,6 +845,30 @@ export class Deystviya {
   async zapishiSreshta(id: string, danni: PayloadSreshtaZapisana, z: Zayavka): Promise<Rezultat> {
     proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie);
     return this.#pusni('СрещаЗаписана', VID.sreshta, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ПОЛЕ С ФОРМУЛА в Отчети · „с формули между всички таблици" *(И90)*.
+   *
+   * Проверката иска ЖИВИТЕ извори, а те се четат от Огледалото — тоест това
+   * действие пита книгата, преди да пише. Формула, сочеща извор, който го няма,
+   * се отказва СЕГА, вместо да мълчи после (Notion 2.0 · `formuli.ts`).
+   *
+   * Периодът е на ВИКАЩИЯ: изворите се смятат за конкретен месец, и поле,
+   * проверено срещу друг месец, не е проверено.
+   */
+  async zapishiPole(
+    id: string,
+    danni: PayloadPoleZapisano,
+    period: { readonly period: string; readonly ot: string; readonly do: string },
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const iztochnitsi = iztochnitsiteNaChisla(
+      o, period.period, period.ot, period.do, this.#chasovnik(),
+    );
+    proveriPoleto(danni.ime, danni.deystvie, danni.lyavo, danni.dyasno, iztochnitsi);
+    return this.#pusni('ПолеЗаписано', VID.poleSFormula, id, danni, z);
   }
 
   /**

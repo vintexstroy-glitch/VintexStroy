@@ -1,3 +1,4 @@
+import { DEYSTVIYA_NA_FORMULA, IMENA_NA_DEYSTVIYATA } from '../src/domein/formuli.js';
 /**
  * ОБЩОТО НА ЕКРАНИТЕ · четирите помощника, които всички ползват.
  *
@@ -130,4 +131,20 @@ export function bezopasnoIme(tekst: string): string {
   const chisto = latinitsa.replace(/[^A-Za-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '');
   // Празното име е по-лошо от родово: файл на име „-.xlsx" не се отваря никъде.
   return chisto === '' ? 'fayl' : chisto.slice(0, 80);
+}
+
+/**
+ * ПАДАЩОТО „ДЕЙСТВИЕ" · ЕДИН дом за двата екрана (правило 17 · резен 42).
+ *
+ * Настройки го рисува за КОЛОННАТА формула; Сметки — за полето в Отчети.
+ * Написано два пъти, второто място се разминава при първото ново действие: то
+ * щеше да се появи в едното меню и да липсва в другото, без нищо да падне.
+ * `npm run chistota` го хвана като пет еднакви реда.
+ */
+export function menyuNaDeystviyata(id: string, ime = 'deystvie'): string {
+  return `<select translate="no" id="${id}" name="${ime}">
+    ${DEYSTVIYA_NA_FORMULA.map(
+      (d) => `<option value="${d}">${IMENA_NA_DEYSTVIYATA[d]}</option>`,
+    ).join('')}
+  </select>`;
 }

@@ -71,6 +71,7 @@ import {
   type RedNaMesetsa,
 } from '../src/domein/mesetsat.js';
 import { narisuvayKalendara } from './kalendarat.js';
+import { narisuvayPoletata, zakachiPoletata } from './pole-s-formula.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
 import { legendata, zakachiPole } from './vhodni-problemi.js';
@@ -484,6 +485,8 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
         </div>
       </div>
       <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+
+      ${narisuvayPoletata(o, mesets, dnes)}
     </section>`;
 }
 
@@ -1117,6 +1120,10 @@ export function zakachiSmetki(
   slozhiShirinite(koren);
 
   zakachiKoefitsientite(koren, prerisuvay);
+  // СВОИТЕ ПОЛЕТА С ФОРМУЛА · „с формули между всички таблици" (резен 42).
+  // Месецът е СЪЩИЯТ като на Сметки: изворите се смятат за конкретен период,
+  // и поле, проверено срещу друг месец, не е проверено.
+  zakachiPoletata(koren, k, period ?? new Date().toISOString().slice(0, 7), prerisuvay);
   // КРЕДИТИТЕ · таблицата, планът по дати и плащането (резен 19 · ADR-079).
   zakachiKreditite(koren, k, prerisuvay);
   // ЗАПЛАТИТЕ · седмицата, кешът и следата (резен 20 · ADR-080).

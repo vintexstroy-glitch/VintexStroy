@@ -124,6 +124,14 @@ export const VID = {
    */
   sreshta: 'sreshta',
   /**
+   * ПОЛЕТО С ФОРМУЛА В ОТЧЕТИ · „ще правиш полета в Секция Отчети… с формули
+   * между всички таблици" *(И90)*, резен 42.
+   *
+   * Своя същност, защото е РЕШЕНИЕ на човек — кое число до кое число казва
+   * нещо. Самата стойност се СМЯТА и не влиза в Журнала (правило 20).
+   */
+  poleSFormula: 'pole-s-formula',
+  /**
    * ПОРЕДНОСТТА · РЪЧНИЯТ ред на делата (резен 34 · ред 1496).
    *
    * Една същност за целия наемател, като лентата — но по СЪВСЕМ друга причина:
@@ -308,6 +316,7 @@ export type TipSabitie =
   | 'КонтактЗаписан'
   | 'ПреписказЗаписана'
   | 'СрещаЗаписана'
+  | 'ПолеЗаписано'
   | 'ДелаПодредени'
   | 'ЛичноПревключено'
   | 'ДелоПрехвърлено'
@@ -1312,6 +1321,16 @@ export interface PayloadSreshtaZapisana {
   /** КОГА · САМО дата: „**Не, само дата**" *(р57·[34])* */
   readonly data: string;
   readonly sastoyanie: string;
+}
+
+export interface PayloadPoleZapisano {
+  /** името, което човекът дава · то е онова, което после чете в Отчети */
+  readonly ime: string;
+  /** сбор · разлика · произведение · процент — СЪЩИТЕ като при колоните */
+  readonly deystvie: string;
+  /** ключът на ЛЕВИЯ извор · „otchet:kapital" · „koef:dscr" · „danni:prihod" */
+  readonly lyavo: string;
+  readonly dyasno: string;
 }
 
 export interface PayloadDelaPodredeni {
