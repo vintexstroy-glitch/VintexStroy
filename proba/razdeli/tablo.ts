@@ -135,6 +135,43 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       Boolean(await p.$('#izbor-tab')), true);
     await naEkran(p, 'imoti', '#forma-imot');
 
+    // ══ 110 · ПРОБВАНЕТО · тридесет дни, СМЯТАНИ (резен 32 · ADR-092) ══════
+    //
+    // „с 30 дн[и] б[ез]платно пробване" *(р83·[57])*, потвърдено с „da wavi"
+    // (И86): „пробването е СРОК преди плащането, не безплатен план".
+    razdel = '110 · Пробването · тече, и се КАЗВА';
+    await naEkran(p, 'tablo', '[data-sektsiya=tablo-probvane]');
+    proveri('картата я има',
+      Boolean(await p.$('[data-sektsiya=tablo-probvane]')), true);
+    // Книгата има записи от днес · срокът е тръгнал и ТЕЧЕ.
+    proveri('състоянието е „тече"',
+      await p.$eval('[data-sektsiya=tablo-probvane]', (e) => (e as any).dataset.sastoyanie), 'teche');
+    proveri('остават 29 дни · първият ден се БРОИ',
+      await p.$eval('[data-pole="ostavat-dni"] .chislo', (e) => (e as any).textContent.trim()), '29');
+    proveri('и денят на започването се КАЗВА',
+      (await p.$eval('[data-pole="ostavat-dni"] .pod', (e) => (e as any).textContent)).includes('от '),
+      true);
+
+    razdel = '110 · Пробването · СРОК, не план';
+    proveri('заглавието го КАЗВА',
+      (await tekstNa(p, '[data-sektsiya=tablo-probvane] .dyalglava'))
+        .includes('не безплатен план'), true);
+    proveri('и текстът дава ЧИСЛОТО и деня',
+      (await tekstNa(p, '[data-sektsiya=tablo-probvane]')).includes('остават 29 дни'), true);
+
+    razdel = '110 · Пробването · честна спирачка, не ключалка';
+    /**
+     * КАРТАТА НЕ ПРЕДЛАГА НИЩО ЗА НАТИСКАНЕ · тя КАЗВА.
+     *
+     * Броят се бутоните в `.deystviya` — нейните. Двата отвън са стрелките за
+     * подреждане, които ВСЯКА секция получава (резен АО): те не са на картата и
+     * не бива да влизат в това твърдение.
+     */
+    proveri('картата не предлага НИТО ЕДИН свой бутон',
+      await p.$$eval('[data-sektsiya=tablo-probvane] .deystviya button', (e) => e.length), 0);
+    proveri('и не заплашва с думи',
+      /забранен|блокиран|спрян/i.test(await tekstNa(p, '[data-sektsiya=tablo-probvane]')), false);
+
     // ══ 61 · ВЪЗСТАНОВЯВАНЕТО · запасният контакт (И100 · ADR-044) ══════════
     //
     // Пътят обратно се вписва ПРЕДИ да потрябва. Тук се проверява и най-важното

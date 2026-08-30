@@ -49,6 +49,7 @@ import { butonSIkona } from './ikoni.js';
 import { kolkoMyasto } from '../src/nositel/hranilishte.js';
 import { presmetni, sDumi, type KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
+import { dumiteNaProbvaneto, probvanetoEIzteklo, type Probvane } from '../src/domein/probvane.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -512,6 +513,42 @@ function kartaVrashtane(): string {
  * тя е покана, а не отчет.
  */
 /**
+ * ПРОБВАНЕТО · тридесет дни, СМЯТАНИ от книгата (резен 32 · ADR-092).
+ *
+ * „с 30 дн[и] б[ез]платно пробване" *(р83·[57])*, потвърдено с „da wavi" (И86)
+ * и разчетено там: „пробването е СРОК преди плащането, не безплатен план".
+ *
+ * ═══ ЧЕСТНА СПИРАЧКА, НЕ КЛЮЧАЛКА ═══
+ *
+ * Изтеклият срок КАЗВА, че е изтекъл — и нищо повече. Нито един бутон не
+ * изчезва, Журналът не се заключва, износът работи. Приложение, което заключва
+ * данните на човека при изтекъл срок, е взело за заложник неговата книга.
+ *
+ * Затова и картата няма червено: тя е покана, не заплаха.
+ */
+function kartaProbvane(p: Probvane): string {
+  return `
+    <section class="karta" data-sektsiya="tablo-probvane" data-sastoyanie="${p.sastoyanie}">
+      <div class="dyalglava">
+        <h2>Пробване</h2>
+        <span>срок преди плащането · не безплатен план</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="ostavat-dni">
+          <div class="etiket">${probvanetoEIzteklo(p) ? 'Изтекло преди' : 'Остават'}</div>
+          <div class="chislo malak" translate="no">${Math.abs(p.ostavat)}</div>
+          <div class="pod">${Math.abs(p.ostavat) === 1 ? 'ден' : 'дни'}${
+            p.nachalo === '' ? '' : ` · от ${ekraniraj(p.nachalo)}`
+          }</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <p class="drebno">${ekraniraj(dumiteNaProbvaneto(p))}</p>
+      </div>
+    </section>`;
+}
+
+/**
  * ГОДИНИТЕ · и нулата се КАЗВА (резен 28 · ADR-088).
  *
  * Негово: „Става на календарна година автоматично прави пълен годишен архив"
@@ -641,12 +678,19 @@ export function narisuvayTablo(
     chakat: [],
     razminavat: [],
   },
+  /**
+   * ПРОБВАНЕТО · СМЯТА се от книгата и деня, подава се СМЕТНАТО (резен 32).
+   *
+   * Таблото не познава Журнала и не бива да го научава: то показва, не смята.
+   */
+  probvane: Probvane = { sastoyanie: 'ne-e-zapochnalo', nachalo: '', do_: '', ostavat: 30 },
 ): string {
   const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
     kartaKoySam(koj, akaunt, stopanin, rolya) +
     kartaTabove(negov, tabove.vsichki, tabove.dobaveni) +
     kartaGodinite(godini) +
+    kartaProbvane(probvane) +
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +

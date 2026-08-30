@@ -59,6 +59,7 @@ import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
+import { nachaloNaProbvaneto } from '../src/domein/probvane.js';
 import { prochetiKnigata } from '../src/domein/knigata.js';
 import { sveriVerigite } from '../src/domein/sverka-verigi.js';
 import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
@@ -751,6 +752,9 @@ async function trugvay(): Promise<void> {
           ${opis.narisuvay({
             ogledalo,
             broySabitiya: sabitiya.length,
+            // ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · книгата е ТУК, значи и сметката е тук
+            // (резен 32). Таблото получава готов низ и не научава за Журнала.
+            parviyatZapis: nachaloNaProbvaneto(sabitiya),
             dnes,
             izbor,
             kojSam,

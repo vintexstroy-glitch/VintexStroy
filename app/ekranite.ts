@@ -34,6 +34,7 @@ import { rolyataNa } from '../src/domein/stopanin.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
 import { godinite } from '../src/domein/godishna-ravnosmetka.js';
+import { probvaneto } from '../src/domein/probvane.js';
 import type { DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import type { Pravata, Vrata } from '../src/yadro/index.js';
 import type { Rolya, Samolichnost } from '../src/yadro/samolichnost.js';
@@ -143,6 +144,13 @@ interface ZaRisuvane {
   readonly broyLichni: number;
   /** колко заема Журналът · МЕРЕНО от браузъра (резен Д · честната спирачка) */
   readonly zaetoNaUstroystvoto: number;
+  /**
+   * ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · за пробването (резен 32).
+   *
+   * Подава се ЕДИН низ, а не цялата книга: Таблото показва, не смята, и няма
+   * защо да научава за Журнала заради едно число. Празно значи празна книга.
+   */
+  readonly parviyatZapis: string;
   /**
    * КОИ ЕКРАНА СА ДОСТЪПНИ на този човек · СМЯТА се в `main.ts` (правило 17).
    *
@@ -454,6 +462,8 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
             .filter((g) => g.sastoyanie === 'razminava')
             .map((g) => g.godina),
         },
+        // ПРОБВАНЕТО · СМЯТА се тук, където книгата и денят са налице.
+        probvaneto(r.parviyatZapis, r.dnes),
       ),
     zakachi: (z) => z.zakachiTabloto(),
   },
