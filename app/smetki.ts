@@ -73,6 +73,14 @@ import {
 import { narisuvayKalendara } from './kalendarat.js';
 import { narisuvayPoletata, zakachiPoletata } from './pole-s-formula.js';
 import { stalboveNaMesetsite } from './diagrami.js';
+import {
+  IMENA_NA_GNEZDATA,
+  KAKVO_E_GNEZDOTO,
+  REDAT_NA_GNEZDATA,
+  otchetite,
+  sveriGnezdata,
+} from '../src/domein/gnezda.js';
+import { registarZaMeseca, sboroveNaRegistara } from '../src/domein/registar-naemi.js';
 import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
 import { legendata, zakachiPole } from './vhodni-problemi.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
@@ -446,13 +454,31 @@ function formaSalda(o: Ogledalo): string {
 }
 
 /**
- * ОТЧЕТИТЕ · всяко число с формулата си под него.
+ * ГНЕЗДАТА · Отчети · Пари · Регистър, слети на едно място.
  *
- * Негова поръчка (И90): „ще правиш полета в Секция Отчети където ще се сложар
- * полета които да покзват тези стойности с формули между всички таблици."
+ * Негови ДВЕ изречения от 11.08, дословно:
  *
- * Затова тук няма голо число: под всяко стои от какво е съставено и откъде се
- * чете. Число, което никой не може да разглоби, е усещане с цифра пред себе си.
+ *   „Слей ги в гнезда (Отчети · Пари · Регистър)" *(р80·[50])*
+ *   „ОТЧЕТ СРЕДСТВА/ОТЧЕТ ФИНАНСИ" *(р80·[48])*
+ *
+ * Дотук на този екран стояха ЕДИН дял „Отчети" с четири полета, стълбовете на
+ * месеците и полетата с формула — един до друг, без имена помежду си; а
+ * Регистърът беше на съвсем друг екран. Тоест нито гнезда, нито двата
+ * поименни отчета: описът го броеше с нула попадения и беше прав.
+ *
+ * Сега трите гнезда носят НЕГОВИТЕ имена, в НЕГОВИЯ ред, а вътре в първото —
+ * двата поименни отчета, пак в неговия ред („СРЕДСТВА/ФИНАНСИ"). Имената се
+ * четат от `src/domein/gnezda.ts` и се БРОЯТ там; тук няма нито един низ, който
+ * да може да се разсинхронизира тихо (правило 17).
+ *
+ * ГРАНИЦАТА, КАЗАНА НА ГЛАС. Гнездото „Регистър" показва парите на наемите за
+ * периода и НИЩО повече: пълният Регистър — трите изгледа, групирането,
+ * месецът — се пише на Имоти. Посоката е една (правило 20): тук се ЧЕТЕ.
+ * Изключено ≠ липсващо, затова го пише на екрана, а не само тук.
+ *
+ * Негова поръчка отпреди (И90) остава в сила вътре в първото гнездо: „ще
+ * правиш полета в Секция Отчети където ще се сложар полета които да покзват
+ * тези стойности с формули между всички таблици." Затова тук няма голо число.
  */
 function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
   // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
@@ -464,29 +490,84 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
     new Date().toISOString(),
     stoynost_st === undefined ? {} : { stoynostNaSastoyanie_st: stoynost_st },
   );
+  const g = sveriGnezdata(r.poleta);
+  const sborNaNaemite = sboroveNaRegistara(registarZaMeseca(o, mesets, dnes));
   return `
     <section data-sektsiya="smetki-otcheti">
       <div class="dyalglava">
-        <h2>Отчети</h2>
-        <span>${ekraniraj(mesets)} · всяко число с формулата си</span>
+        <h2>${REDAT_NA_GNEZDATA.map((k) => ekraniraj(IMENA_NA_GNEZDATA[k])).join(' · ')}</h2>
+        <span>${ekraniraj(mesets)} · три гнезда, всяко число с формулата си</span>
       </div>
-      <div class="otcheti">
-        ${r.poleta.map(poleNaOtcheta).join('')}
-      </div>
-      ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
-      <div class="tablitsa">
-        ${GLAVA_NA_SVERKATA}
-        <div class="red sverka otchet-sverka" translate="no">
-          <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
-          <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
-          <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
-          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
-          <span>${znachkaNaSverkata(r.sverka.razlika_st === 0)}</span>
-        </div>
-      </div>
-      <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
 
-      ${narisuvayPoletata(o, mesets, dnes)}
+      <div class="gnezdo" data-gnezdo="otcheti">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.otcheti)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.otcheti)}</span>
+        </div>
+        ${otchetite(r.poleta)
+          .map(
+            (ot) => `
+          <article class="otchet" data-otchet="${ekraniraj(ot.klyuch)}">
+            <div class="otchetglava">
+              <h4>${ekraniraj(ot.ime)}</h4>
+              <span>${ekraniraj(ot.kakvo)}</span>
+            </div>
+            <div class="otcheti">
+              ${ot.poleta.map(poleNaOtcheta).join('')}
+            </div>
+          </article>`,
+          )
+          .join('')}
+        <div class="tablitsa">
+          ${GLAVA_NA_SVERKATA}
+          <div class="red sverka otchet-sverka" translate="no">
+            <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
+            <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
+            <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+            <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
+            <span>${znachkaNaSverkata(r.sverka.razlika_st === 0)}</span>
+          </div>
+        </div>
+        <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+        <p class="drebno" data-gnezda-sverka="${g.razlika}">Влизат ${g.vhod} полета, излизат ${g.izhod} по двата отчета · разлика ${g.razlika}.${
+          g.bez_otchet.length === 0 ? '' : ` Без отчет: ${g.bez_otchet.map(ekraniraj).join(' · ')}.`
+        }${g.bez_pole.length === 0 ? '' : ` Разпределение без поле: ${g.bez_pole.map(ekraniraj).join(' · ')}.`}
+          Кое поле в кой отчет влиза е НАШЕ решение, не негово изречение.</p>
+      </div>
+
+      <div class="gnezdo" data-gnezdo="pari">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.pari)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.pari)}</span>
+        </div>
+        ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
+        ${narisuvayPoletata(o, mesets, dnes)}
+      </div>
+
+      <div class="gnezdo" data-gnezdo="registar">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.registar)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.registar)}</span>
+        </div>
+        <div class="plochki">
+          <div class="plochka">
+            <span class="etiket">Начислено</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="nachisleno">${pishi(sborNaNaemite.nachisleno_st)}</span>
+            <span class="pod">${sborNaNaemite.redove} ${sborNaNaemite.redove === 1 ? 'ред' : 'реда'}</span>
+          </div>
+          <div class="plochka">
+            <span class="etiket">Събрано</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="plateno">${pishi(sborNaNaemite.plateno_st)}</span>
+            <span class="pod">по вземанията</span>
+          </div>
+          <div class="plochka${sborNaNaemite.ostatak_st === 0 ? '' : ' trevoga'}">
+            <span class="etiket">Остава</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="ostatak">${pishi(sborNaNaemite.ostatak_st)}</span>
+            <span class="pod">${sborNaNaemite.prosrocheni === 0 ? 'нищо просрочено' : `${sborNaNaemite.prosrocheni} просрочени`}</span>
+          </div>
+        </div>
+        <p class="drebno">Пълният Регистър — трите изгледа, групирането и месецът — се пише на Имоти. Тук се ЧЕТЕ: посоката е една.</p>
+      </div>
     </section>`;
 }
 

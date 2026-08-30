@@ -1591,6 +1591,19 @@ table.razbivka .drebno { font-size: 0.75rem; }
    Затова формулата НЕ е в подсказка при посочване и не е скрита зад бутон:
    тя стои под числото, винаги. Число, което трябва да се разглобява с клик,
    се чете като готово — а половината от тези числа още не са пълни. */
+/* ГНЕЗДАТА · именуваните групи на Сметки (резен 50 · негово: „Слей ги в гнезда
+   (Отчети · Пари · Регистър)"). Гнездото е ГРУПА, не карта: то само отделя с
+   линия отляво и заглавие, за да се вижда докъде стига. Влагане в рамка вътре в
+   рамка би направило три кутии в кутия за нищо. */
+.gnezdo { margin: 14px 0; padding-left: 12px; border-left: 3px solid var(--liniya); }
+.gnezdoglava { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.gnezdoglava h3 { font-family: Literata, Georgia, serif; font-size: 1rem; font-weight: 600; margin: 0; }
+.gnezdoglava span { font-size: 0.821rem; color: var(--mastilo2); }
+.otchet { margin: 10px 0; }
+.otchetglava { display: flex; align-items: baseline; gap: 10px; }
+.otchetglava h4 { font-size: 0.857rem; font-weight: 600; margin: 0; letter-spacing: 0.04em; text-transform: uppercase; }
+.otchetglava span { font-size: 0.821rem; color: var(--mastilo2); }
+
 .otcheti {
   display: grid; gap: 10px; margin: 12px 0;
   grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
