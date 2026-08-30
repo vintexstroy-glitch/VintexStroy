@@ -17,7 +17,8 @@
     "proba": "npm run build && node proba/prohod.ts",
     "merki": "vitest run proba/merki.test.ts",
     "ikoni": "node stroezh/risuvai-ikoni.mjs",
-    "chistota": "node stroezh/chistota.mjs"
+    "chistota": "node stroezh/chistota.mjs",
+    "chestnost": "node stroezh/chestnost.mjs"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",
