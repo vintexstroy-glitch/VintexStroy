@@ -59,7 +59,12 @@ import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
 import { napraviRachniyaRed } from './porednost.js';
 import { proveriPapkata } from './papki.js';
-import { proveriKontakta, proveriPrepiskata, sashtnostNaKontakta } from './kontakti.js';
+import {
+  proveriKontakta,
+  proveriPrepiskata,
+  proveriSreshtata,
+  sashtnostNaKontakta,
+} from './kontakti.js';
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
@@ -99,6 +104,7 @@ import type {
   PayloadDelaPodredeni,
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
+  PayloadSreshtaZapisana,
   PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
@@ -824,6 +830,18 @@ export class Deystviya {
   async zapishiPrepiska(id: string, danni: PayloadPrepiskaZapisana, z: Zayavka): Promise<Rezultat> {
     proveriPrepiskata(danni.kontakt, danni.kakvo, danni.sastoyanie);
     return this.#pusni('ПреписказЗаписана', VID.prepiska, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА СРЕЩА · „за контактите среща добавяш" *(р57·[30])*, резен 39.
+   *
+   * Контактът се сочи по ИМЕ, не по адрес на същност: срещата може да се запише
+   * и за човек, който още не е вписан в номенклатурата — точно както преписката.
+   * Обратното щеше да направи от вписването на контакт вратар на срещата.
+   */
+  async zapishiSreshta(id: string, danni: PayloadSreshtaZapisana, z: Zayavka): Promise<Rezultat> {
+    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie);
+    return this.#pusni('СрещаЗаписана', VID.sreshta, id, danni, z);
   }
 
   /**

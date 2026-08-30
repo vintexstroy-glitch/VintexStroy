@@ -1866,4 +1866,93 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '116 · Контактите · сверката брои преписките по хора';
     proveri('сверката стои на екрана и е нула',
       (await tekstNa(p, '[data-kontakti-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
+
+    // ═══ 117 · АВТО-ДЕЛАТА · вноска/преписка/среща → дело, червен списък ═══
+    //
+    // „Да — върни авто-делата (вноска/преписка/среща → дело, червен списък)"
+    // *(р65·[68])* · „за контактите среща добавяш" · „Става дело автоматично"
+    // *(р57·[30])* · „Не, само дата" · „Адрес на срещата" *(р57·[34])*.
+    //
+    // Разделът стои НАКРАЯ, защото пише събития: сложен по-нагоре, той щеше да
+    // размести абсолютните броячи на всеки следващ раздел (урок от §115).
+
+    razdel = '117 · Срещата · с кого · адрес · само дата';
+    const prediSreshta = await broySabitiya(p);
+    await p.fill('#sr-kontakt', 'Мария Илиева');
+    await p.fill('#sr-adres', 'кантора на нотариуса');
+    await p.fill('#sr-data', denOtDnes(1));
+    await sSabitie(p, () => p.click('#forma-sreshta button[type=submit]'));
+    proveri('едно събитие, не две', await broySabitiya(p), prediSreshta + 1);
+    proveri('срещата стои в СВОЯТА таблица',
+      await p.$$eval('[data-tablitsa=sreshti] [data-sreshta]', (e) => e.length), 1);
+    proveri('и полето за час го НЯМА · „Не, само дата"',
+      await p.$$eval('#forma-sreshta input[type=time]', (e) => e.length), 0);
+    proveri('адресът е СВОЙ на срещата, не преписан от контакта',
+      (await p.$eval('[data-sreshta]', (e) => (e as any).innerText)).includes('кантора'), true);
+
+    razdel = '117 · Срещата · вътре във ВТОРАТА секция, не трета';
+    proveri('секциите остават ДВЕ · „Един таб, две секции"',
+      await p.$$eval('[data-sektsiya=prepiski], [data-sektsiya=kontakti]', (e) => e.length), 2);
+    proveri('а срещите живеят ВЪТРЕ в контактите',
+      await p.$$eval('[data-sektsiya=kontakti] [data-blok=sreshti]', (e) => e.length), 1);
+
+    razdel = '117 · Срещата · БЕЗ дата се отказва с думи';
+    const prediBezData = await broySabitiya(p);
+    await p.fill('#sr-kontakt', 'Мария Илиева');
+    await p.$eval('#sr-data', (e) => { (e as HTMLInputElement).removeAttribute('required'); });
+    await p.fill('#sr-data', '');
+    await p.click('#forma-sreshta button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-sreshta')?.textContent ?? '').length > 0);
+    proveri('казва ЗАЩО · без нея не става дело',
+      (await tekstNa(p, '#greshka-sreshta')).includes('червения списък'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediBezData);
+
+    razdel = '117 · Червеният списък · трите извора на ЕДНО място';
+    await naEkran(p, 'gant', '[data-tablitsa=avtodela]');
+    const izvori = await p.$$eval('[data-avtodelo]', (e) =>
+      [...new Set(e.map((x) => (x as any).dataset.izvor))]);
+    // И ТРИТЕ · вноската идва от кредита, вписан по-рано в прохода; преписката
+    // и срещата — от Контактите. Това е целият смисъл на резена: един списък.
+    proveri('и трите извора стоят в него',
+      JSON.stringify([...izvori].sort()), JSON.stringify(['вноска', 'преписка', 'среща']));
+    proveri('подредени по СРОК, не по извор', await p.$eval(
+      '[data-tablitsa=avtodela] tbody tr', (e) => (e as any).dataset.izvor), 'среща');
+
+    razdel = '117 · Червеният списък · светофарът е НЕГОВИЯТ';
+    // Срещата е за УТРЕ (1 ден) → червено; преписката за след 3 дни → жълто.
+    proveri('срещата за утре ГОРИ',
+      await p.$eval('[data-izvor=среща]', (e) => (e as any).dataset.svetofar), 'cherveno');
+    proveri('а преписката за след три дни е жълта',
+      await p.$eval('[data-izvor=преписка]', (e) => (e as any).dataset.svetofar), 'zhalto');
+    proveri('и червените се БРОЯТ, не се твърдят',
+      await p.$eval('[data-avtodela-broy]', (e) => (e as any).dataset.avtodelaBroy), '1');
+
+    razdel = '117 · Червеният списък · СМЯТА се, не се записва';
+    const prediPrerisuvane = await broySabitiya(p);
+    await p.reload();
+    await p.waitForSelector('[data-tablitsa=avtodela]');
+    proveri('второто рисуване не ражда нито едно събитие',
+      await broySabitiya(p), prediPrerisuvane);
+    proveri('и екранът КАЗВА, че редовете се смятат',
+      (await tekstNa(p, '[data-sektsiya=avtodela]')).includes('затваря се ИЗВОРЪТ'), true);
+    proveri('сверката стои и е нула',
+      (await tekstNa(p, '[data-avtodela-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
+
+    razdel = '117 · Авто-делото си отива, щом изворът се затвори';
+    const prediZatvaryane = await p.$$eval('[data-avtodelo]', (e) => e.length);
+    await naEkran(p, 'kontakti', '#forma-sreshta');
+    // ЗАТВАРЯ СЕ ОТ САМИЯ РЕД, не с нова форма: втори запис през формата би
+    // родил ВТОРА среща, а не би затворил първата.
+    const prediSmyana = await broySabitiya(p);
+    await sSabitie(p, () => p.selectOption('[data-tablitsa=sreshti] select[data-smeni]', 'проведена'));
+    proveri('смяната е ЕДНО ново събитие, не презапис',
+      await broySabitiya(p), prediSmyana + 1);
+    proveri('и срещата остава ЕДНА · същият `id`',
+      await p.$$eval('[data-tablitsa=sreshti] [data-sreshta]', (e) => e.length), 1);
+    await naEkran(p, 'gant', '[data-tablitsa=avtodela]');
+    proveri('проведената среща пада от списъка',
+      await p.$$eval('[data-avtodelo]', (e) => e.length), prediZatvaryane - 1);
+    proveri('и то БЕЗ сторно · затворен е изворът, не делото',
+      await p.$$eval('[data-izvor=среща]', (e) => e.length), 0);
 }

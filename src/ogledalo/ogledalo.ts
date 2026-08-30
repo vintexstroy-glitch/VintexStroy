@@ -39,7 +39,14 @@ import type {
 } from '../domein/zaplati.js';
 import { redOtZhurnala } from '../domein/lenta.js';
 import { rachniyatRedOtZhurnala } from '../domein/porednost.js';
-import { svedenoIme, type Kontakt, type Prepiska, type SastoyanieNaPrepiska } from '../domein/kontakti.js';
+import {
+  svedenoIme,
+  type Kontakt,
+  type Prepiska,
+  type SastoyanieNaPrepiska,
+  type SastoyanieNaSreshta,
+  type Sreshta,
+} from '../domein/kontakti.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { Tab } from '../domein/tabove.js';
@@ -80,6 +87,7 @@ import type {
   PayloadDelaPodredeni,
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
+  PayloadSreshtaZapisana,
   PayloadDokumentiZakacheni,
   PayloadDvizhenieProdazhba,
   PayloadEtapNaProdazhbaZapisan,
@@ -523,6 +531,8 @@ export interface Ogledalo {
   readonly kontakti: ReadonlyMap<string, Kontakt>;
   /** ПРЕПИСКИТЕ · по свой `id`, защото един контакт носи много (резен 38). */
   readonly prepiski: ReadonlyMap<string, Prepiska>;
+  /** СРЕЩИТЕ · по свой `id`, по същата причина като преписките (резен 39). */
+  readonly sreshti: ReadonlyMap<string, Sreshta>;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -748,6 +758,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const mesta = new Map<string, Myasto>();
   const kontakti = new Map<string, Kontakt>();
   const prepiski = new Map<string, Prepiska>();
+  const sreshti = new Map<string, Sreshta>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -1339,6 +1350,22 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'СрещаЗаписана': {
+        const p = s.payload as unknown as PayloadSreshtaZapisana;
+        sreshti.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          kontakt: p.kontakt,
+          adres: p.adres,
+          data: p.data,
+          sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
+          // ПЪРВИЯТ `seq` остава · поправката мени съдържанието, не рождението.
+          seq: sreshti.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
       case 'ГодинаЗатворена': {
         // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
         // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
@@ -1636,6 +1663,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     mesta,
     kontakti,
     prepiski,
+    sreshti,
   };
 }
 

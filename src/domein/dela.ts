@@ -144,13 +144,19 @@ export function eEdnodnevno(d: Delo): boolean {
 }
 
 /**
- * КОЛКО ДНИ ОСТАВАТ до края · отрицателно значи просрочено.
+ * КОЛКО ДНИ ОСТАВАТ до един срок · отрицателно значи просрочено.
  *
  * Броят се цели дни по календара, не часове: делото няма час, освен когато
  * тръгне към календара *(р59·[92])*.
+ *
+ * Взима ГОЛА ДАТА, не дело. Три различни ангажимента броят едни и същи дни —
+ * вноската, преписката и срещата (резен 39) — и трите ползват този брояч.
+ * Обвивка „дни до края на ДЕЛОТО" стоеше тук, докато светофарът я викаше; след
+ * като той мина на голата дата, тя остана надпис с един-единствен викащ — теста
+ * си (ADR-041), и затова я няма.
  */
-export function dniDoKraya(d: Delo, dnes: string): number {
-  const kray = Date.parse(`${d.do}T00:00:00Z`);
+export function dniDoSroka(srok: string, dnes: string): number {
+  const kray = Date.parse(`${srok}T00:00:00Z`);
   const sega = Date.parse(`${dnes}T00:00:00Z`);
   return Math.round((kray - sega) / 86_400_000);
 }
@@ -164,17 +170,45 @@ export function dniDoKraya(d: Delo, dnes: string): number {
  *
  * Праговете са НЕГОВИ числа: 7 дни и 2 дни. Не се закръглят и не се „оправят".
  */
-type Svetofar = 'normalno' | 'zhalto' | 'cherveno' | 'prosrocheno';
+export type Svetofar = 'normalno' | 'zhalto' | 'cherveno' | 'prosrocheno';
+
+/**
+ * СВЕТОФАРЪТ на ГОЛА ДАТА · единственият дом на двата прага (правило 17).
+ *
+ * „Стщото и за Ъправление и за СМетки" *(р59·[71])* — „същото" значи ЕДНО
+ * място, не еднакъв препис на няколко. Преди резен 39 праговете живееха и тук,
+ * и в екрана на Контактите: два дома за едно число, и вторият нямаше как да
+ * научи, ако първият се смени.
+ *
+ * Празната дата НЕ свети: подразбран срок би оцветил в червено работа, за която
+ * никой не е бързал. И това е ЕДИНСТВЕНАТА липса, която минава мълчаливо.
+ *
+ * НЕЧЕТИМАТА ДАТА КРЕЩИ, не минава за „нормално". Находка от нарочното счупване
+ * (резен 39): махнеш ли пазача за празното, `Date.parse` дава NaN, всички три
+ * сравнения с NaN са лъжливи и функцията пак връща „normalno" — тоест сгрешена
+ * дата изглеждаше като спокоен срок. За светофар това е най-тихата възможна
+ * повреда: той съществува, за да КАЖЕ, а мълчеше.
+ */
+export function svetofarNaSroka(srok: string, dnes: string): Svetofar {
+  if (srok === '') return 'normalno';
+  const dni = dniDoSroka(srok, dnes);
+  if (Number.isNaN(dni)) {
+    throw new Error(
+      `Нечетима дата за светофара: „${srok}". Очаква се ГГГГ-ММ-ДД или празно. ` +
+        'Празното значи „без срок"; сгрешеното не значи нищо и не бива да минава за спокойно.',
+    );
+  }
+  if (dni < 0) return 'prosrocheno';
+  if (dni <= 2) return 'cherveno';
+  if (dni <= 7) return 'zhalto';
+  return 'normalno';
+}
 
 export function svetofar(d: Delo, dnes: string): Svetofar {
   // ОТПАДНАЛОТО НЕ СВЕТИ · срок, който никой няма да гони, не е спешен.
   if (d.sastoyanie === OTPADNALO) return 'normalno';
   if (d.sastoyanie === 'завършено' || d.otsenka === 'завършено') return 'normalno';
-  const dni = dniDoKraya(d, dnes);
-  if (dni < 0) return 'prosrocheno';
-  if (dni <= 2) return 'cherveno';
-  if (dni <= 7) return 'zhalto';
-  return 'normalno';
+  return svetofarNaSroka(d.do, dnes);
 }
 
 /**

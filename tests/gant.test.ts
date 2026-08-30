@@ -17,7 +17,7 @@ import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import {
-  dniDoKraya,
+  dniDoSroka,
   eEdnodnevno,
   IMENA_NA_OTSENKITE,
   OTSENKI,
@@ -149,7 +149,7 @@ describe('светофарът · неговите две числа, 7 и 2', (
 
   it('просрочено е СВОЕ състояние, не просто червено', () => {
     expect(svetofar(delo({ id: 'A', do: '2026-08-22' }), DNES)).toBe('prosrocheno');
-    expect(dniDoKraya(delo({ id: 'A', do: '2026-08-22' }), DNES)).toBe(-1);
+    expect(dniDoSroka('2026-08-22', DNES)).toBe(-1);
   });
 
   it('завършеното не гори, колкото и да е просрочено', () => {

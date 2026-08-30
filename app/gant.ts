@@ -25,6 +25,7 @@ import { imaRachenRed, nomeratNa, sledPremestvane } from '../src/domein/porednos
  * промяна на срок е събитие в Журнала; влаченето прави тиха промяна на дата.
  */
 
+import { narisuvayAvtoDelata } from './avtodela.js';
 import { otData } from '../src/yadro/data.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
@@ -298,6 +299,8 @@ export function narisuvayGant(
       </div>
     </div>
 
+    ${narisuvayAvtoDelata(o, dnes)}
+
     <section data-sektsiya="gant-izgled" class="karta">
       <div class="dyalglava">
         <h2>Изглед</h2>
@@ -378,7 +381,7 @@ export function narisuvayGant(
               <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
               <span>нито едно дело · първата колона е ДНЕС</span>
             </div>
-            <p class="prazno">Няма дела.<br>Времевият ред се пълни отдолу — ${ekraniraj(nadpisi.glavaNaImenata)}.</p>
+            <p class="prazno" data-prazno="dela">Няма дела.<br>Времевият ред се пълни отдолу — ${ekraniraj(nadpisi.glavaNaImenata)}.</p>
           </section>`
         : // И96 т.4 · „Диаграмата на Ганта е ОТДЯСНО на таблицата в Управление."
           //

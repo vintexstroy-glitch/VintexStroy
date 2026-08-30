@@ -17,10 +17,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // Празният екран КАЗВА и кой е (И98): дотук заглавието се рисуваше само
     // вътре в таблицата, а при нула дела таблица нямаше — празният личен
     // екран не казваше дори че е личен.
+    // ЦЕЛИ СЕ ПОИМЕННО, не с „първия .prazno на екрана": червеният списък
+    // (резен 39) също казва „нищо не чака" и стои НАД таблицата, тъй че гол
+    // клас щеше да чете чуждото празно. Същата спънка като `data-myasto` в
+    // резен 34 — селекторът лъже мълчаливо, а не пада.
     proveri('празният екран го КАЗВА',
-      (await p.$eval('.prazno', (e) => e.textContent)).includes('Място · Обект · Дело'), true);
+      (await p.$eval('[data-prazno=dela]', (e) => e.textContent)).includes('Място · Обект · Дело'), true);
     proveri('и се представя, вместо да мълчи',
-      (await p.$eval('.prazno', (e) => (e.closest('section') as any).textContent)).includes('Времевия Ред'), true);
+      (await p.$eval('[data-prazno=dela]', (e) => (e.closest('section') as any).textContent)).includes('Времевия Ред'), true);
 
     // ТРИТЕ КОЛОНИ · дело БЕЗ обект е нормално (негов случай).
     await zapishiDelo(p, { myasto: 'Малинова', obekt: 'бл. 1', ime: 'Акт 15',
