@@ -20,6 +20,7 @@ import {
 } from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
 import { klyuchNaZveno } from '../yadro/sabitie.js';
+import { svedenotoMyasto, type Myasto } from '../domein/mesta.js';
 import { dataNaZapisa, godinataNaZapisa, opisaNaZapisa, sumataNaZapisa } from '../domein/opis-na-zapisa.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
@@ -83,6 +84,7 @@ import type {
   PayloadSedmitsaPrehvarlena,
   PayloadTablitsaOtFaylSazdadena,
   PayloadGodinaZatvorena,
+  PayloadMyastoZapisano,
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
@@ -483,6 +485,14 @@ export interface Ogledalo {
    * я връща в „чака" — и тя пак се предлага.
    */
   readonly zatvorenite: ReadonlyMap<string, ZatvorenaGodina>;
+  /**
+   * МЕСТАТА (проектите) · сведеното име → записът (резен 31).
+   *
+   * Ключът е СВЕДЕНОТО име, защото делата сочат мястото по име, а „Малинова
+   * Долина" и „малинова долина " са едно място. Последният запис БИЕ:
+   * поправката на фирмата е ново събитие върху същата същност.
+   */
+  readonly mesta: ReadonlyMap<string, Myasto>;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -704,6 +714,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pogasenite: PogasenZapis[] = [];
   const godinite = new Map<string, number>();
   const zatvorenite = new Map<string, ZatvorenaGodina>();
+  const mesta = new Map<string, Myasto>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -1237,6 +1248,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'МястоЗаписано': {
+        // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на фирмата или папката е ново
+        // събитие върху същата същност, не второ място.
+        const p = s.payload as unknown as PayloadMyastoZapisano;
+        mesta.set(svedenotoMyasto(p.ime), {
+          ime: p.ime,
+          firma: p.firma,
+          papka: p.papka,
+          seq: mesta.get(svedenotoMyasto(p.ime))?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
       case 'ГодинаЗатворена': {
         // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
         // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
@@ -1527,6 +1553,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     pogasenite: Object.freeze(pogasenite),
     godinite,
     zatvorenite,
+    mesta,
   };
 }
 

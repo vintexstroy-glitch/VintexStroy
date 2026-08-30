@@ -13,6 +13,7 @@ import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/ind
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
 import { praviTsikal, SASTOYANIYA as SASTOYANIYA_NA_DELO } from './dela.js';
+import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
 import {
   GreshkaZadacha,
   napraviIzprashtane,
@@ -107,6 +108,7 @@ import type {
   PayloadTablitsaOtFaylSazdadena,
   PayloadKategoriyaZadadena,
   PayloadGodinaZatvorena,
+  PayloadMyastoZapisano,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -300,6 +302,33 @@ export class Deystviya {
       }
     }
     return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА МЯСТО (проект) · отговорник-ФИРМА и папка (резен 31 · ADR-091).
+   *
+   * „На нивото на проекта дай ЛИНК КЪМ ПАПКАТА с проекта" и „в таблицата за
+   * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])*.
+   *
+   * ЕДНА проверка: името не е празно. То е и адресът — делата сочат мястото по
+   * име, значи безименно място не може да се свърже с нищо.
+   *
+   * Фирмата и папката НЕ се искат: мястото има смисъл и само с име. Поле, което
+   * човек е принуден да измисли, се пълни с боклук и после се брои като данни.
+   *
+   * `opId` е на ВИКАЩИЯ: поправката на фирмата е ново решение, не повторение на
+   * старото — а ключ от съдържанието би върнал стария резултат при връщане към
+   * предишна стойност и поправката би изчезнала мълчаливо (правило 20).
+   */
+  async zapishiMyasto(danni: PayloadMyastoZapisano, z: Zayavka): Promise<Rezultat> {
+    const ime = proveriMyastoto(danni.ime);
+    return this.#pusni(
+      'МястоЗаписано',
+      VID.myasto,
+      sashtnostNaMyastoto(ime),
+      { ...danni, ime },
+      z,
+    );
   }
 
   /**

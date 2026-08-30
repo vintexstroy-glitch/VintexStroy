@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiVPoleto, sSabitie, zapishiDelo } from '../yadro/pomoshtni.ts';
 
 /** 24 · Гант */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -35,6 +35,57 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('делото без обект се показва с тире',
       (await p.$$eval('.gant-delo .drebno', (e) => e.map((x) => x.textContent)))
         .some((t) => t.startsWith('—')), true);
+
+    // ══ 109 · МЕСТАТА · отговорник-ФИРМА и папка (резен 31 · ADR-091) ═════
+    //
+    // Едно негово изречение, два реда от описа: „На нивото на проекта дай линк
+    // към папката с проекта" и „в таблицата за отговорник напиши фирмата която
+    // управлява проекта" *(р48·[42])*. И границата: отговорникът на ДЕЛОТО е
+    // ЧОВЕК *(р48·[44])*.
+    razdel = '109 · Местата · незаписаните се ПОКАЗВАТ';
+    proveri('двете места от делата са в списъка',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 2);
+    proveri('и двете КАЗВАТ, че още не са записани',
+      await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).dataset.bezZapis), '2');
+    proveri('сверката се КАЗВА, дори когато е нула',
+      (await p.$eval('[data-mesta-sverka]', (e) => (e as any).innerText)).includes('разлика 0'), true);
+
+    razdel = '109 · Местата · фирмата и папката';
+    const prediMyasto = await broySabitiya(p);
+    await napishiVPoleto(p, '#d-m-ime', 'Малинова');
+    await napishiVPoleto(p, '#d-m-firma', 'Винтекс Строй ЕООД');
+    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
+    proveri('записването е ЕДНО събитие', await broySabitiya(p), prediMyasto + 1);
+    proveri('фирмата стои на реда на мястото',
+      (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText))
+        .includes('Винтекс Строй ЕООД'), true);
+    proveri('и редът вече НЕ е „още не е записано"',
+      await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).dataset.bezZapis), '1');
+    proveri('броят на делата на мястото се КАЗВА',
+      (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText)).includes('2'), true);
+
+    razdel = '109 · Местата · двата отговорника не се смесват';
+    proveri('делото си пази ЧОВЕКА',
+      (await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).innerText).join(' ')))
+        .includes('Николай Петков'), true);
+    proveri('а мястото носи ФИРМАТА · заглавието го КАЗВА',
+      (await p.$eval('[data-sektsiya=gant-mesta] .dyalglava', (e) => (e as any).innerText))
+        .includes('ФИРМА'), true);
+
+    razdel = '109 · Местата · второто записване ПОПРАВЯ';
+    const prediPopravka = await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length);
+    await napishiVPoleto(p, '#d-m-ime', 'малинова');
+    await napishiVPoleto(p, '#d-m-firma', 'Друга Фирма ООД');
+    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
+    proveri('редовете НЕ стават повече · сведеното име е ЕДНО',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), prediPopravka);
+    proveri('и фирмата е новата',
+      (await p.$eval('[data-myasto="малинова"]', (e) => (e as any).innerText))
+        .includes('Друга Фирма ООД'), true);
+    // ЗАПИСАНОТО ИМЕ БИЕ · последната дума е в сила (правило 1). Различният
+    // регистър не ражда второ място — той СМЕНЯ изписването на същото.
+    proveri('и изписването е новото · старото го няма',
+      await p.$$eval('[data-myasto="Малинова"]', (e) => e.length), 0);
 
     // ══ 108 · ОТПАДНАЛИТЕ ДЕЛА (резен 30 · ADR-090) ═══════════════════════
     //

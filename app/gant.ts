@@ -55,6 +55,7 @@ import {
   otpadnalite,
   zhivite,
 } from '../src/domein/dela.js';
+import { mestata, sveriMestata } from '../src/domein/mesta.js';
 import {
   obobshteniRedove,
   reshetka,
@@ -385,9 +386,110 @@ export function narisuvayGant(
           </div>`
     }
 
+    ${blokNaMestata(o, dnes, predstavka)}
+
     ${blokNaOtpadnalite(o, predstavka)}
 
     ${formaDelo(o, dnes, predstavka, nadpisi)}`;
+}
+
+/**
+ * МЕСТАТА (проектите) · отговорник-ФИРМА и папка (резен 31 · ADR-091).
+ *
+ * „На нивото на проекта дай ЛИНК КЪМ ПАПКАТА с проекта" и „в таблицата за
+ * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])*.
+ *
+ * ═══ ДВА ОТГОВОРНИКА, КОИТО НЕ СЕ СМЕСВАТ ═══
+ *
+ * Мястото (проектът) го управлява ФИРМА; делото (задачата) го върши ЧОВЕК
+ * *(р48·[44])*. Колоната тук КАЗВА кой е кой, за да не се четат двете като едно.
+ *
+ * ═══ НЕЗАПИСАНИТЕ СЕ ПОКАЗВАТ СЪЩО ═══
+ *
+ * Място, което само се среща по делата, стои в списъка с празни полета и белег
+ * „още не е записано". Списък само от записаните щеше да КРИЕ точно работата —
+ * човек вижда къде има какво да допълни, вместо да се сеща сам.
+ */
+function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
+  const redove = mestata(o, zhivite([...o.dela.values()]));
+  const bezZapis = redove.filter((r) => !r.zapisano).length;
+  const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
+
+  return `
+    <section data-sektsiya="gant-mesta" data-broy="${redove.length}" data-bez-zapis="${bezZapis}">
+      <div class="dyalglava">
+        <h2>Местата · проектите</h2>
+        <span>отговорникът на МЯСТОТО е ФИРМА · на ДЕЛОТО е ЧОВЕК</span>
+      </div>
+
+      ${
+        redove.length === 0
+          ? '<p class="drebno">Още няма нито едно място — то се появява с първото дело или се записва оттук.</p>'
+          : `<div class="skrolkutiya">
+        <table class="tablitsa" data-tablitsa="mestata">
+          <thead>
+            <tr><th>Място</th><th>Фирма · управлява проекта</th><th>Папка</th><th class="chislo">Дела</th></tr>
+          </thead>
+          <tbody>${redove
+            .map(
+              (r) => `
+            <tr data-myasto="${ekraniraj(r.ime)}"${r.zapisano ? '' : ' class="bez-zapis"'}>
+              <td translate="no">${ekraniraj(r.ime)}${
+                r.zapisano ? '' : ' <span class="drebno">още не е записано</span>'
+              }</td>
+              <td translate="no">${ekraniraj(r.firma) || '<span class="drebno">—</span>'}</td>
+              <td translate="no">${
+                r.papka === ''
+                  ? '<span class="drebno">—</span>'
+                  : `<a href="${ekraniraj(r.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
+              }</td>
+              <td class="chislo" translate="no">${r.dela}</td>
+            </tr>`,
+            )
+            .join('')}</tbody>
+        </table>
+      </div>`
+      }
+
+      <form class="forma" id="${predstavka}forma-myasto">
+        <div class="poleta">
+          <div class="pole">
+            <label for="${predstavka}m-ime">Място</label>
+            <input translate="no" type="text" id="${predstavka}m-ime" name="ime" required
+                   list="${predstavka}m-imena" placeholder="Малинова Долина">
+            <datalist id="${predstavka}m-imena">
+              ${redove.map((r) => `<option value="${ekraniraj(r.ime)}"></option>`).join('')}
+            </datalist>
+          </div>
+          <div class="pole">
+            <label for="${predstavka}m-firma">Фирма · управлява проекта</label>
+            <input translate="no" type="text" id="${predstavka}m-firma" name="firma"
+                   placeholder="Винтекс Строй ЕООД">
+          </div>
+          <div class="pole">
+            <label for="${predstavka}m-papka">Линк към папката</label>
+            <!-- ПЛЕЙСХОЛДЪР БЕЗ АДРЕС · стената срещу кода брои всеки адрес в
+                 него, и е права да не различава плейсхолдър от истинско
+                 посягане: адрес в кода е адрес в кода. Думите вършат същата
+                 работа. -->
+            <input translate="no" type="url" id="${predstavka}m-papka" name="papka"
+                   placeholder="адресът на папката в Драйва">
+          </div>
+        </div>
+        <div class="deystviya">
+          <button type="submit" class="glaven">Запиши мястото</button>
+          <span class="drebno">Фирмата и папката са <b>по избор</b> — мястото има смисъл
+          и само с име. Второто записване ПОПРАВЯ същото място, не ражда второ.</span>
+        </div>
+      </form>
+
+      <p class="drebno" data-mesta-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
+      разлика ${sv.razlika}.${
+        bezZapis === 0
+          ? ' Всяко място си има запис.'
+          : ` ${bezZapis} ${bezZapis === 1 ? 'място чака' : 'места чакат'} фирма и папка.`
+      }</p>
+    </section>`;
 }
 
 /**
@@ -829,6 +931,28 @@ export function zakachiGant(
   // Речниците се четат при закачане, значи всяко ново дело ги обогатява само.
   const menyutata = rechnitsite(predstavka);
   zakachiMenyuta(koren, menyutata);
+
+  // МЯСТОТО (проектът) · записва се от УПРАВЛЕНИЕ, „само от там" (р83·[18]).
+  koren
+    .querySelector<HTMLFormElement>(`#${predstavka}forma-myasto`)
+    ?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const d = new FormData(e.target as HTMLFormElement);
+      try {
+        await k.deystviya.zapishiMyasto(
+          {
+            ime: String(d.get('ime') ?? ''),
+            firma: String(d.get('firma') ?? ''),
+            papka: String(d.get('papka') ?? ''),
+          },
+          { opId: `myasto:${crypto.randomUUID()}` },
+        );
+        k.vest('dobre', `Мястото „${String(d.get('ime') ?? '')}" е записано.`);
+      } catch (err) {
+        k.vest('zle', err instanceof Error ? err.message : String(err));
+      }
+      await prerisuvay();
+    });
 
   // СКРИВАНЕТО НА ОТПАДНАЛИТЕ Е ЛИЧНО · памет на екрана, нула събития
   // (правило 23 · ADR-022). Отпадналото дело не се мени от това, че някой не
