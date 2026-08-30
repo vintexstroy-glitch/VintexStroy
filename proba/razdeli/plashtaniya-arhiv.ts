@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, naEkran, napishiVPoleto, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 102 · ПЛАЩАНИЯ АРХИВ · седмицата в три листа (резен 22 · ADR-082).
@@ -110,16 +110,11 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // ТОЧНО КАКВОТО ПРАВИ ЧОВЕК: пише в клетката и излиза от нея. „change" идва
   // от НАПУСКАНЕТО — едно събитие на решение, не едно на буква.
   //
-  // Двата по-къси пътя паднаха и двата: само `fill` не пуска „change" изобщо
-  // (проходът увисна 30 s), а `fill` + ръчен `dispatchEvent` пускаше ДВЕ
-  // събития — първото прерисува екрана, а вторият стигаше до вече откачения
-  // възел, чието затваряне още помни празната стойност (268 срещу 269).
-  await sSabitie(p, async () => {
-    await p.fill('[data-plashtane][data-vid=zaplata] .kletka-kategoriya', 'Труд');
-    await p.$eval('[data-plashtane][data-vid=zaplata] .kletka-kategoriya', (e) =>
-      (e as HTMLElement).blur(),
-    );
-  });
+  // Пише и излиза · двата по-къси пътя паднаха и двата, а поуката живее на
+  // ЕДНО място (`pomoshtni.ts` · napishiVPoleto, правило 17).
+  await sSabitie(p, () =>
+    napishiVPoleto(p, '[data-plashtane][data-vid=zaplata] .kletka-kategoriya', 'Труд'),
+  );
   proveri(
     'задаването ражда ТОЧНО ЕДНО събитие',
     (await broySabitiya(p)) - predKategoriya,

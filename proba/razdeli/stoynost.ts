@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, plochka, plochkaPod, redove, smeniKoefitsient, tekstNa } from '../yadro/pomoshtni.ts';
+import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -84,6 +84,59 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.selectOption('#koya-tsena', 'sastoyanie'));
     proveri('изборът се задържа след прерисуване', await p.$eval('#koya-tsena', (e) => (e as any).value), 'sastoyanie');
     proveri('таблицата на екрана НЕ се мени — изборът е за износа', (await redove(p, '.red.stoynost:not(.sbor)')).length, 5);
+
+    // ══ 107 · „СЪЗДАЙ СГРАДА" · Калкулаторът и РАЖДА (резен 29 · ADR-089) ══
+    //
+    // Негово: „да ще е най интересно да има създай сграда там . Качваш
+    // таблицата и управлваш" *(р83·[20])*, с обхвата от същия ден: „всипки се
+    // създават от Упрсвление. Само от там.. При сгради ще е от калкулатова".
+    razdel = '107 · Създай сграда · редът се явява при прочетени обекти';
+    proveri('редът го има, щом файлът е прочетен',
+      Boolean(await p.$('[data-sektsiya=sazday-sgrada]')), true);
+    proveri('и бутонът КАЗВА колко обекта ще роди',
+      (await tekstNa(p, '#sazday-sgrada')).includes('5 обекта'), true);
+
+    razdel = '107 · Създай сграда · празното име отказва с ДУМИ';
+    const prediOtkaz = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#sazday-sgrada'));
+    proveri('отказва, вместо да роди безименни имоти',
+      (await tekstNa(p, '.vest.zle')).includes('няма име'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediOtkaz);
+
+    razdel = '107 · Създай сграда · ражда ИМОТИ, и само тях';
+    await napishiVPoleto(p, '#ime-sgrada', 'ул. Опитна 7');
+    await sSabitiya(p, 5, () => p.click('#sazday-sgrada'));
+    proveri('казва СВЕРКАТА вход↔изход',
+      (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
+    proveri('и колко нови имота са родени',
+      (await tekstNa(p, '.vest.dobre')).includes('5 нови имота'), true);
+    proveri('обявява, че дела НЕ се раждат',
+      (await tekstNa(p, '.vest.dobre')).includes('Дела не се раждат'), true);
+
+    await naEkran(p, 'imoti', '#forma-imot');
+    const sImoti = await redove(p, '[data-tablitsa=imoti] .red');
+    proveri('петте обекта СА в Имоти, под неговото име',
+      sImoti.filter((r) => String(r[0] ?? '').includes('Опитна 7')).length, 5);
+
+    /**
+     * 107 · ВТОРОТО НАТИСКАНЕ · и какво ТОЧНО пази тази проверка.
+     *
+     * Тя пази, че екранът РАЗПОЗНАВА вече родените и го КАЗВА — не че `opId`-ът
+     * е идемпотентен. Разликата излезе от счупване, което МИНА: замених адреса
+     * на действието със случайно число и проходът не мигна, защото `zaVpisvane`
+     * филтрира съществуващите ПРЕДИ записа и до Вратата не стига нищо.
+     *
+     * Идемпотентността се пази от `tests/sazdavane-sgrada.test.ts` — там две
+     * ЕДНОВРЕМЕННИ раждания виждат едно и също Огледало, и тогава единственото,
+     * което спира дубликата, е `opId`-ът.
+     */
+    razdel = '107 · Създай сграда · вече роденото се РАЗПОЗНАВА и се КАЗВА';
+    await naEkran(p, 'stoynost', '#sazday-sgrada');
+    const prediVtoro = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#sazday-sgrada'));
+    proveri('нито едно ново събитие', await broySabitiya(p), prediVtoro);
+    proveri('и екранът КАЗВА, че вече ги е имало',
+      (await tekstNa(p, '.vest.dobre')).includes('5 вече ги имаше'), true);
 
     // ══ 23 · Отчетите · всяко число с формулата си ═══════════════════════
 }

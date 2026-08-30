@@ -25,6 +25,13 @@
 import { pishi } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import {
+  opIdNaObekta,
+  ploshttaZaImota,
+  proveriImetoNaSgradata,
+  sveriSazdavaneto,
+  zaVpisvane,
+} from '../src/kalkulator/sazdavane.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
@@ -68,6 +75,13 @@ let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 /** Последният прочит на „ЦЕНИ МД" · носи цените и белега ПРОДАДЕН — за
  *  вписването в Имоти и делата (И92). */
 let otMD: ProchetenoTseniMD | null = null;
+/**
+ * ИМЕТО НА СГРАДАТА · памет на ЕКРАНА, нула събития (резен 29).
+ *
+ * Живее тук, а не в Журнала: докато сградата не е създадена, това е чернова —
+ * записано, то щеше да е решение, което човекът не е взел.
+ */
+let imeNaSgradata = '';
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
 /** обект → `imotId` · „Продаден" от менюто иска САМОЛИЧНОСТ, не число (29.08) */
@@ -203,6 +217,33 @@ export function narisuvayStoynost(): string {
             : ''
         }
       </div>
+      ${
+        /**
+         * „СЪЗДАЙ СГРАДА" · Калкулаторът и РАЖДА (резен 29 · ADR-089).
+         *
+         * Негово: „да ще е най интересно да има създай сграда там . Качваш
+         * таблицата и управлваш" *(р83·[20])*, и обхватът от същия ден: „всипки
+         * се създават от Упрсвление. Само от там.. При сгради ще е от
+         * калкулатова" *(р83·[18])*.
+         *
+         * Редът се ЯВЯВА чак когато има прочетени обекти: бутон, който няма
+         * какво да роди, е надпис (ADR-041).
+         */
+        obekti.length === 0
+          ? ''
+          : `<div class="deystviya" data-sektsiya="sazday-sgrada">
+        <label class="pole">
+          <span>Име на сградата</span>
+          <input translate="no" type="text" id="ime-sgrada" value="${ekraniraj(imeNaSgradata)}"
+                 placeholder="ул. Иван Вазов 12, Пловдив">
+        </label>
+        <button type="button" class="glaven" id="sazday-sgrada">Създай сграда · ${obekti.length} обекта</button>
+        <span class="drebno">Обектите стават <b>Имоти</b> под това име. Второто
+        натискане не удвоява нищо: адресът на действието е сградата и обектът,
+        не случайно число. <b>Дела не се раждат</b> — те са негов сценарий за
+        конкретна сграда, а измислени дела за чужда са по-лоши от липсващи.</span>
+      </div>`
+      }
       <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
       <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
@@ -493,6 +534,42 @@ export function zakachiStoynost(
 
   koren.querySelector<HTMLButtonElement>('#cheti-ploshti')?.addEventListener('click', () => {
     poleto('fayl-ploshti')?.click();
+  });
+
+  // ── „СЪЗДАЙ СГРАДА" · Калкулаторът и РАЖДА (резен 29 · ADR-089) ──────────
+  koren.querySelector<HTMLInputElement>('#ime-sgrada')?.addEventListener('change', (e) => {
+    imeNaSgradata = (e.target as HTMLInputElement).value;
+  });
+
+  koren.querySelector<HTMLButtonElement>('#sazday-sgrada')?.addEventListener('click', async (e) => {
+    const buton = e.target as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const adres = proveriImetoNaSgradata(imeNaSgradata);
+      const { novi, veche } = zaVpisvane(obekti, adres, await k.deystviya.ogledalo());
+
+      for (const ob of novi) {
+        await k.deystviya.dobaviImot(
+          `I:${crypto.randomUUID()}`,
+          { adres, edinitsa: ob.obekt, ploshtad_kvsm: ploshttaZaImota(ob) },
+          // АДРЕСЪТ НА ДЕЙСТВИЕТО, не случайно число: второто натискане връща
+          // същия резултат, вместо да роди втори имот със същото име.
+          { opId: opIdNaObekta(adres, ob.obekt) },
+        );
+      }
+
+      // Партида без сверка не се приема · и нулата се КАЗВА (правило 7).
+      const sv = sveriSazdavaneto(obekti.length, 0, novi.length, veche, new Date().toISOString());
+      k.vest(
+        sv.nared ? 'dobre' : 'zle',
+        `„${adres}": ${novi.length} нови имота${veche > 0 ? ` · ${veche} вече ги имаше` : ''}. ` +
+          `Сверка вход↔изход: ${sv.vhod} → ${sv.izhod}, разлика ${sv.razlika}. ` +
+          'Дела не се раждат — те са сценарий за конкретна сграда.',
+      );
+    } catch (err) {
+      k.vest('zle', err instanceof Error ? err.message : String(err));
+    }
+    await prerisuvay();
   });
   koren.querySelector<HTMLButtonElement>('#cheti-tseni')?.addEventListener('click', () => {
     poleto('fayl-tseni')?.click();

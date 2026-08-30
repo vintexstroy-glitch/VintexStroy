@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran } from '../yadro/pomoshtni.ts';
+import { broySabitiya, naEkran, napishiVPoleto } from '../yadro/pomoshtni.ts';
 
 /**
  * 104 · СЕСИИТЕ НА РЕДАКТОРА · неговата находка на екран (резен 26 · ADR-086).
@@ -38,16 +38,9 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     'ne',
   );
 
-  /**
-   * ПИШЕ В ПОЛЕ И ИЗЛИЗА ОТ НЕГО · точно каквото прави човек.
-   *
-   * Само `fill` НЕ пуска „change" — платено в резен 25 (ADR-085 §7.3) и пак тук:
-   * проходът увисна пет секунди, чакайки прерисуване, което няма как да дойде.
-   */
-  const napishi = async (znak: string, stoynost: string): Promise<void> => {
-    await p.fill(znak, stoynost);
-    await p.$eval(znak, (e) => (e as HTMLElement).blur());
-  };
+  // Пише и излиза · домът на поуката е `pomoshtni.ts` (правило 17, резен 29).
+  const napishi = (znak: string, stoynost: string): Promise<void> =>
+    napishiVPoleto(p, znak, stoynost);
 
   const predi = await broySabitiya(p);
   await p.click('#sesii-otvori');
