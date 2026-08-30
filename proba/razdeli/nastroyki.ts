@@ -597,5 +597,70 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и са ОСЕМНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 18);
     await naEkran(p, 'imoti', '#forma-imot');
 
+    // ══ 106 · ГОДИНАТА СЕ ЗАТВАРЯ (резен 28 · ADR-088) ═════════════════════
+    //
+    // Негово: „Става на календарна година автоматично прави пълен годишен архив
+    // и променяш само през журнала назад" *(р85·[51])*. Автоматичен ЗАПИС няма
+    // — автоматично е ЯВЯВАНЕТО на приключилата година и МЯРКАТА на
+    // разминаването.
+    //
+    // Годината се взима от БРАУЗЪРА, а не се заковава: прикован „2025" щеше да
+    // мине днес и да падне на 1 януари, тоест точно когато резенът работи.
+    const minalata = String(new Date().getFullYear() - 1);
+
+    razdel = '106 · Годината · приключилата се ЯВЯВА сама';
+    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await p.selectOption('#razhod-potok', 'fakturi');
+    await p.fill('#razhod-dostavchik', 'Миналогодишен ЕООД');
+    await p.fill('#razhod-opis', 'вар от миналата година');
+    await p.fill('#razhod-suma', '300,00');
+    await p.fill('#razhod-data', `${minalata}-11-12`);
+    await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
+
+    await naEkran(p, 'nastroyki', '[data-sektsiya=godinite]');
+    proveri('годината стои в таблицата, без да е търсена',
+      Boolean(await p.$(`[data-godina="${minalata}"]`)), true);
+    proveri('и състоянието ѝ е „чака затваряне"',
+      await p.$eval(`[data-godina="${minalata}"]`, (e) => (e as any).dataset.sastoyanie), 'chaka');
+    proveri('секцията БРОИ чакащите',
+      await p.$eval('[data-sektsiya=godinite]', (e) => (e as any).dataset.chakat), '1');
+    proveri('текущата НЕ се предлага за затваряне · непълна година не е архив',
+      await p.$eval(`[data-godina="${String(new Date().getFullYear())}"]`, (e) => (e as any).dataset.sastoyanie),
+      'tekushta');
+
+    razdel = '106 · Годината · затварянето е ЕДИН запис';
+    await sSabitie(p, () => p.click(`[data-zatvori="${minalata}"]`));
+    proveri('състоянието се сменя пред очите',
+      await p.$eval(`[data-godina="${minalata}"]`, (e) => (e as any).dataset.sastoyanie), 'zatvorena');
+    proveri('разминаването е НУЛА и се КАЗВА',
+      await p.$eval(`[data-godina="${minalata}"] [data-raznika]`, (e) => (e as any).innerText),
+      'няма разминаване');
+    proveri('и екранът обявява проверената нула',
+      (await p.$eval('[data-godini-nula]', (e) => (e as any).innerText)),
+      'Всички приключили години са затворени.');
+
+    razdel = '106 · Годината · разминаването се МЕРИ, не се отказва';
+    const prediRazminavane = await broySabitiya(p);
+    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await p.selectOption('#razhod-potok', 'fakturi');
+    await p.fill('#razhod-dostavchik', 'Закъснял ЕООД');
+    await p.fill('#razhod-opis', 'фактура, дошла късно');
+    await p.fill('#razhod-suma', '120,00');
+    await p.fill('#razhod-data', `${minalata}-12-20`);
+    await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
+    proveri('затворената година НЕ отказва записа',
+      await broySabitiya(p), prediRazminavane + 1);
+
+    await naEkran(p, 'nastroyki', '[data-sektsiya=godinite]');
+    proveri('и разминаването се появява със ЗНАК',
+      await p.$eval(`[data-godina="${minalata}"] [data-raznika]`, (e) => (e as any).dataset.raznika), '1');
+    proveri('с думи, разбираеми без легенда',
+      await p.$eval(`[data-godina="${minalata}"] [data-raznika]`, (e) => (e as any).innerText),
+      '+1 запис СЛЕД затварянето');
+    proveri('състоянието става „разминава се"',
+      await p.$eval(`[data-godina="${minalata}"]`, (e) => (e as any).dataset.sastoyanie), 'razminava');
+    proveri('и втори бутон „Затвори" вече няма',
+      await p.$$eval(`[data-zatvori="${minalata}"]`, (e) => e.length), 0);
+
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
 }

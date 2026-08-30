@@ -80,11 +80,30 @@ export function opisaNaZapisa(s: Sabitie): string {
  * (`period`), и чак накрая — времето на записването. Последното е ЧЕСТНО
  * падане: запис без своя дата няма друга.
  */
-export function dataNaZapisa(s: Sabitie): string {
+function iztochnikatNaDatata(s: Sabitie): string {
   const p = s.payload as Record<string, unknown>;
   const data = p['data'];
-  if (typeof data === 'string' && /^\d{4}-\d{2}-\d{2}/.test(data)) return data.slice(0, 10);
+  if (typeof data === 'string' && ZAPOCHVA_S_DEN.test(data)) return data;
   const period = p['period'];
-  if (typeof period === 'string' && /^\d{4}-\d{2}/.test(period)) return `${period}-01`;
-  return String(s.ts).slice(0, 10);
+  if (typeof period === 'string' && ZAPOCHVA_S_MESETS.test(period)) return `${period}-01`;
+  return String(s.ts);
+}
+
+const ZAPOCHVA_S_DEN = /^\d{4}-\d{2}-\d{2}/;
+const ZAPOCHVA_S_MESETS = /^\d{4}-\d{2}/;
+
+export function dataNaZapisa(s: Sabitie): string {
+  return iztochnikatNaDatata(s).slice(0, 10);
+}
+
+/**
+ * ГОДИНАТА на един запис · СЪЩИЯТ източник, отрязан по-рано (резен 28).
+ *
+ * Своя функция, а не `dataNaZapisa(s).slice(0, 4)` при викащия: горещият обход
+ * на Огледалото я вика за ВСЯКО събитие, и междинният низ от десет знака се
+ * ражда двайсет хиляди пъти за нищо. Редът на предпочитане (`data` → `period`
+ * → `ts`) си остава казан ВЕДНЪЖ, в `iztochnikatNaDatata`.
+ */
+export function godinataNaZapisa(s: Sabitie): string {
+  return iztochnikatNaDatata(s).slice(0, 4);
 }

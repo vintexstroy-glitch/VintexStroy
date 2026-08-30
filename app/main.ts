@@ -779,6 +779,7 @@ async function trugvay(): Promise<void> {
       k,
       lichen,
       prerisuvay,
+      dnes: dnesKato(),
       prevklyuchiLichnoto: (znak, vklyucheno) => zakachiPrevklyuchvaneto(koren, znak, vklyucheno),
       zakachiTabloto: () => {
         /**

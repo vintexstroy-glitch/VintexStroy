@@ -35,6 +35,7 @@ import {
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
+import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { bezopasnoIme, dnesKato, ekraniraj, svaliFayl } from './obshto.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
@@ -219,6 +220,7 @@ export function narisuvayNastroyki(
     ${blokNaSverkite(o)}
     ${mozhe(izbor, 'nap-vrazka') ? blokNaNAP(o, negoviyat) : ''}
     ${sektsiyaZhurnalat(o, sabitiya, dnes)}
+    ${sektsiyaGodinite(o, dnes, negoviyat)}
     ${blokNaDeystviyata()}
     ${blokNaKartata()}`;
 }
@@ -1199,6 +1201,8 @@ export function zakachiNastroyki(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
+  /** ДНЕШНИЯТ ден · за затварянето на година (резен 28) */
+  dnes = '',
 ): void {
   // ОТМЕТКАТА ЗА ТАБЛИЦАТА КРЕДИТИ · същата дръжка, втори екран (резен 19).
   zakachiKreditite(koren, k, prerisuvay);
@@ -1221,6 +1225,7 @@ export function zakachiNastroyki(
 
   // Журналът от таблица (И96 т.8) · своя секция, свое закачане.
   zakachiZhurnalat(koren, k, prerisuvay);
+  zakachiGodinite(koren, k, prerisuvay, dnes);
 
   /**
    * ПАРАМЕТРИТЕ ПРИ ВЪВЕЖДАНЕ (И96 т.1 · ADR-046).

@@ -38,6 +38,7 @@ import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from '.
 import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.js';
 import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
 import { GreshkaTablitsaOtFayl } from './tablitsa-ot-fayl.js';
+import { proveriZatvaryane } from './godishna-ravnosmetka.js';
 import {
   GreshkaKategoriya,
   sashtnostNaKategoriya,
@@ -105,6 +106,7 @@ import type {
   PayloadKeshZahranen,
   PayloadTablitsaOtFaylSazdadena,
   PayloadKategoriyaZadadena,
+  PayloadGodinaZatvorena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -1354,6 +1356,42 @@ export class Deystviya {
       danni,
       z,
     );
+  }
+
+  /**
+   * ЗАТВАРЯ ЕДНА ГОДИНА (резен 28 · ADR-088).
+   *
+   * „Става на календарна година автоматично прави пълен годишен архив и
+   * променяш само през журнала назад" *(р85·[51])*.
+   *
+   * ═══ КАКВО ВЛИЗА В ЖУРНАЛА ═══
+   *
+   * САМО мигът. Съдържанието на годината се СМЯТА от книгата по всяко време —
+   * записано, то щеше да е второ копие, разминаващо се с първото при първата
+   * поправка. Прецедентът е негов, правило 20: смятаното не се записва.
+   *
+   * ═══ ДВЕТЕ ПРОВЕРКИ · и защо са ТУК ═══
+   *
+   *   1. годината е ПРИКЛЮЧИЛА · непълна година не е архив;
+   *   2. книгата има записи в нея · затваряне на празна година е надпис (ADR-041).
+   *
+   * Четат Огледалото, значи мястото им е тук: Вратата не чете Огледалото
+   * (дословният прецедент е `vpishiZapasen`).
+   *
+   * ═══ И ЕДНА, КОЯТО НАРОЧНО Я НЯМА ═══
+   *
+   * Затворената година НЕ отказва записи. Неговата дума е „променяш само през
+   * журнала назад" — позволение, не забрана; отказ тук би блъснал и сторното,
+   * и сверената промяна. Разминаването се МЕРИ и се КАЗВА (`godinite()`).
+   */
+  async zatvoriGodinata(godina: string, dnes: string, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    proveriZatvaryane(o, godina, dnes);
+    const danni: PayloadGodinaZatvorena = {
+      godina,
+      broySabitiya: o.godinite.get(godina) ?? 0,
+    };
+    return this.#pusni('ГодинаЗатворена', VID.godina, godina, danni, z);
   }
 
   /**

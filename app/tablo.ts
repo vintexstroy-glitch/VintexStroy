@@ -511,6 +511,52 @@ function kartaVrashtane(): string {
  * (`ekranite.ts`). Показва се и на него, когато няма нито един свой таб: тогава
  * тя е покана, а не отчет.
  */
+/**
+ * ГОДИНИТЕ · и нулата се КАЗВА (резен 28 · ADR-088).
+ *
+ * Негово: „Става на календарна година автоматично прави пълен годишен архив"
+ * *(р85·[51])*. Автоматичен ЗАПИС няма — в целия код няма запис без човешки
+ * жест. Автоматично е ЯВЯВАНЕТО: щом дойде 1 януари, миналата година застава
+ * ТУК, вместо да чака някой да си спомни за нея.
+ *
+ * Картата стои и когато няма какво да каже: проверената нула е различна от
+ * нулата, за която никой не е питал (правило 7).
+ */
+function kartaGodinite(godini: {
+  readonly chakat: readonly string[];
+  readonly razminavat: readonly string[];
+}): string {
+  const chakat = godini.chakat.length;
+  const razminavat = godini.razminavat.length;
+  return `
+    <section class="karta" data-sektsiya="tablo-godini">
+      <div class="dyalglava">
+        <h2>Годините</h2>
+        <span>приключилата година се явява сама · затварянето е негово решение</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="chakat-godini">
+          <div class="etiket">Чакат затваряне</div>
+          <div class="chislo malak" translate="no">${chakat}</div>
+          <div class="pod">${chakat === 0 ? 'всички приключили са затворени' : godini.chakat.join(' · ')}</div>
+        </div>
+        <div class="plochka" data-pole="razminavat-godini">
+          <div class="etiket">Разминават се</div>
+          <div class="chislo malak" translate="no">${razminavat}</div>
+          <div class="pod">${razminavat === 0 ? 'нито една затворена не е мръднала' : godini.razminavat.join(' · ')}</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" data-ekran="nastroyki">Отвори Годините</button>
+        <p class="drebno">
+          Затворената година <b>не отказва записи</b> — негово е „променяш само през
+          журнала назад". Онова, което затварянето добавя, е <b>мярката</b>: колко се е
+          променила годината оттогава, и в коя посока.
+        </p>
+      </div>
+    </section>`;
+}
+
 function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
   if (!tozi) return '';
   return `
@@ -585,11 +631,22 @@ export function narisuvayTablo(
    * живее в `main.ts` заедно с останалото за носителя.
    */
   nuzhnoZaZhurnala = 0,
+  /**
+   * ГОДИНИТЕ · кои приключили чакат затваряне и кои се РАЗМИНАВАТ (резен 28).
+   *
+   * Подават се СМЕТНАТИ, не се четат тук: Таблото не познава Огледалото, и
+   * това е нарочно — то показва, не смята.
+   */
+  godini: { readonly chakat: readonly string[]; readonly razminavat: readonly string[] } = {
+    chakat: [],
+    razminavat: [],
+  },
 ): string {
   const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
     kartaKoySam(koj, akaunt, stopanin, rolya) +
     kartaTabove(negov, tabove.vsichki, tabove.dobaveni) +
+    kartaGodinite(godini) +
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +

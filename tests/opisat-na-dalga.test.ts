@@ -158,12 +158,23 @@ describe('описът на дълга · адресите сочат НЯКЪД
  */
 const razdel = (zaglavie: string, sledvasht: string): string[] => {
   const ot = OPIS.indexOf(zaglavie);
-  const doo = sledvasht === '' ? OPIS.length : OPIS.indexOf(sledvasht);
-  expect(ot, `няма раздел „${zaglavie}"`).toBeGreaterThan(-1);
+  if (ot === -1) return [];
+  const sled = sledvasht === '' ? -1 : OPIS.indexOf(sledvasht);
+  const doo = sled === -1 ? OPIS.length : sled;
   return OPIS.slice(ot, doo)
     .split('\n')
     .filter((r) => /^\| (M\d\d|⬜|🟡) /.test(r));
 };
+
+/**
+ * ИЗЧЕРПАН РАЗДЕЛ · липсата му е ВАЛИДНО състояние, но не е мълчаливо.
+ *
+ * Раздел В (последните от M14) се изчерпа в резен 28: платеното ИЗЧЕЗВА от
+ * описа, следата остава в ADR-а и в git. Тъй че `razdel` вече връща празно
+ * вместо да гърми — а за да не скрие това изтрит раздел А или Б, двата се
+ * проверяват ПОИМЕННО, че още ги има.
+ */
+const IMA_RAZDEL = (zaglavie: string): boolean => OPIS.includes(zaglavie);
 
 describe('описът на дълга · цитат, не преразказ', () => {
   /**
@@ -178,10 +189,20 @@ describe('описът на дълга · цитат, не преразказ', 
     expect(bez, `редове без цитат в А: ${bez.join(' | ')}`).toEqual([]);
   });
 
-  it('и всеки ред в раздел В също · той е сверен на ръка', () => {
-    const bez = razdel('## В ·', '## Какво НЕ е')
-      .filter((r) => !r.includes('„'))
-      .map((r) => r.slice(0, 70));
+  it('двата ЖИВИ раздела ги ИМА · липсата им не минава за празнота', () => {
+    expect(IMA_RAZDEL('## А ·'), 'раздел А изчезна').toBe(true);
+    expect(IMA_RAZDEL('## Б ·'), 'раздел Б изчезна').toBe(true);
+  });
+
+  it('раздел В е ИЗЧЕРПАН · а докато го имаше, всеки негов ред носеше цитат', () => {
+    // Резен 28 плати последното от него. Проверката ОСТАВА: върне ли се
+    // разделът някога, редовете му пак ще трябва да носят дословна негова дума.
+    const redove = razdel('## В ·', '## Какво НЕ е');
+    if (!IMA_RAZDEL('## В ·')) {
+      expect(redove).toEqual([]);
+      return;
+    }
+    const bez = redove.filter((r) => !r.includes('„')).map((r) => r.slice(0, 70));
     expect(bez, `редове без цитат в В: ${bez.join(' | ')}`).toEqual([]);
   });
 
@@ -203,12 +224,14 @@ describe('описът на дълга · цитат, не преразказ', 
   });
 
   it('а раздел Б носи ЧЕТИРИ · няма колона за цитат, защото няма цитат', () => {
-    for (const r of razdel('## Б ·', '## В ·')) expect(kletki(r), r.slice(0, 60)).toBe(4);
+    for (const r of razdel('## Б ·', IMA_RAZDEL('## В ·') ? '## В ·' : '## Какво НЕ е'))
+      expect(kletki(r), r.slice(0, 60)).toBe(4);
   });
 
-  it('и двата раздела заедно дават ЦЕЛИЯ опис · сверка вход↔изход', () => {
+  it('разделите заедно дават ЦЕЛИЯ опис · сверка вход↔изход', () => {
+    const kray = IMA_RAZDEL('## В ·') ? '## В ·' : '## Какво НЕ е';
     const a = razdel('## А ·', '## Б ·').length;
-    const b = razdel('## Б ·', '## В ·').length;
+    const b = razdel('## Б ·', kray).length;
     const v = razdel('## В ·', '## Какво НЕ е').length;
     expect(a + b + v).toBe(REDOVE.length);
     expect(a).toBeGreaterThan(b);

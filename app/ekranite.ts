@@ -33,6 +33,7 @@ import { mozhe, type Izbor, type Vazmozhnost } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
+import { godinite } from '../src/domein/godishna-ravnosmetka.js';
 import type { DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import type { Pravata, Vrata } from '../src/yadro/index.js';
 import type { Rolya, Samolichnost } from '../src/yadro/samolichnost.js';
@@ -158,6 +159,8 @@ interface ZaZakachane {
   readonly k: Konteks;
   readonly lichen: Konteks;
   readonly prerisuvay: () => Promise<void>;
+  /** ДНЕШНИЯТ ден · подава се, не се чете — часовникът е довод (резен 26) */
+  readonly dnes: string;
   /**
    * ДВЕТЕ НЕЩА, КОИТО ЖИВЕЯТ В ЗАТВАРЯНЕТО на `trugvay` и не могат да се
    * вдигнат на модулно ниво: превключването на личното (пише в личния Журнал
@@ -263,7 +266,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         punktoveNaMenyuto(r),
         r.dnes,
       ),
-    zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay),
+    zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay, z.dnes),
   },
   stoynost: {
     ime: 'Стойност на Състояние',
@@ -442,6 +445,15 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
           moyatRedEPipnat: moyatRed().length > 0,
         },
         r.zaetoNaUstroystvoto,
+        // ГОДИНИТЕ · СМЯТАТ се тук, където Огледалото и денят са налице.
+        {
+          chakat: godinite(r.ogledalo, r.dnes)
+            .filter((g) => g.sastoyanie === 'chaka')
+            .map((g) => g.godina),
+          razminavat: godinite(r.ogledalo, r.dnes)
+            .filter((g) => g.sastoyanie === 'razminava')
+            .map((g) => g.godina),
+        },
       ),
     zakachi: (z) => z.zakachiTabloto(),
   },

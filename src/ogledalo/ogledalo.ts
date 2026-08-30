@@ -20,7 +20,7 @@ import {
 } from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
 import { klyuchNaZveno } from '../yadro/sabitie.js';
-import { dataNaZapisa, opisaNaZapisa, sumataNaZapisa } from '../domein/opis-na-zapisa.js';
+import { dataNaZapisa, godinataNaZapisa, opisaNaZapisa, sumataNaZapisa } from '../domein/opis-na-zapisa.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
@@ -82,6 +82,7 @@ import type {
   PayloadKeshZahranen,
   PayloadSedmitsaPrehvarlena,
   PayloadTablitsaOtFaylSazdadena,
+  PayloadGodinaZatvorena,
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
@@ -466,6 +467,31 @@ export interface Ogledalo {
    * екраните ги искат ПОИМЕННО.
    */
   readonly pogasenite: readonly PogasenZapis[];
+  /**
+   * КОЛКО НОСИ ВСЯКА ГОДИНА · '2025' → брой и сбор (резен 28).
+   *
+   * СМЯТА се в същия обход (резен 24 ги сля в един и този не отваря нов).
+   * Годината на един запис е `dataNaZapisa(s)`, тоест СОБСТВЕНАТА му дата, а не
+   * часът на натискането: разход от 12.11, въведен днес, принадлежи на ноември
+   * (поуката на резен 27 §7).
+   */
+  readonly godinite: ReadonlyMap<string, number>;
+  /**
+   * ЗАТВОРЕНИТЕ ГОДИНИ · '2025' → мигът на затварянето.
+   *
+   * Единственото от годината, което НЕ може да се смята. Сторно на затварянето
+   * я връща в „чака" — и тя пак се предлага.
+   */
+  readonly zatvorenite: ReadonlyMap<string, ZatvorenaGodina>;
+}
+
+/** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
+export interface ZatvorenaGodina {
+  readonly godina: string;
+  readonly broySabitiya: number;
+  readonly koy: string;
+  readonly kogato: string;
+  readonly seq: number;
 }
 
 /**
@@ -676,6 +702,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let prilozheni = 0;
 
   const pogasenite: PogasenZapis[] = [];
+  const godinite = new Map<string, number>();
+  const zatvorenite = new Map<string, ZatvorenaGodina>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -705,6 +733,19 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       continue;
     }
     prilozheni += 1;
+
+    // ГОДИНАТА НА ЗАПИСА · тук, в СЪЩИЯ обход (резен 24 · ADR-084). Отделен
+    // обход върху 20 000 събития щеше да струва колкото целия `fold`.
+    //
+    // БРОИ СЕ, НЕ СЕ СУМИРА. Сбор на годината звучеше полезно, докато не се
+    // погледне какво събира: наем, разход и внесено ДДС в едно число. Такъв
+    // сбор не значи нищо счетоводно и щеше да стои на екрана до истинските
+    // числа, все едно е едно от тях. Годишният приход и разход се смятат по
+    // своите пътища (`otcheti.ts` · `mesetsat.ts`) и домът им е там.
+    {
+      const godina = godinataNaZapisa(s);
+      godinite.set(godina, (godinite.get(godina) ?? 0) + 1);
+    }
 
     switch (s.type) {
       case 'ИмотДобавен': {
@@ -1191,6 +1232,21 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ГодинаЗатворена': {
+        // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
+        // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
+        // това: четенето остава вярно и върху пипнат отвън Журнал.
+        const p = s.payload as unknown as PayloadGodinaZatvorena;
+        zatvorenite.set(p.godina, {
+          godina: p.godina,
+          broySabitiya: p.broySabitiya,
+          koy: s.actor,
+          kogato: String(s.ts),
+          seq: s.seq,
+        });
+        break;
+      }
+
       case 'ТаблицаОтФайлСъздадена': {
         const p = s.payload as unknown as PayloadTablitsaOtFaylSazdadena;
         tablitsiOtFayl.set(p.klyuch, p);
@@ -1464,6 +1520,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prilozheni,
     pogaseni,
     pogasenite: Object.freeze(pogasenite),
+    godinite,
+    zatvorenite,
   };
 }
 
