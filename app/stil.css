@@ -2006,3 +2006,19 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .kletka-kategoriya:focus {
   border-color: var(--aktsent); background: #FFFFFF; outline: none;
 }
+
+/* ── Сторнираното СЕ ВИЖДА (резен 27 · ADR-087) ──────────────────────────
+   Негово, прието: „Сиво + зачертано + малък знак ★". Трите носителя са ТРИ,
+   не един: цвят, черта и знак. Онзи, който не различава сивото, вижда чертата;
+   онзи, който гледа на телефон в слънце, вижда ★ (ADR-032 · цветът НАМИРА,
+   знакът ОБЯСНЯВА). */
+.red.pogasen {
+  color: var(--mastilo2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  background: repeating-linear-gradient(
+    135deg, transparent, transparent 6px, rgba(42, 37, 33, 0.03) 6px, rgba(42, 37, 33, 0.03) 12px
+  );
+}
+/* Обяснението до реда НЕ се зачертава — то е онова, което трябва да се ЧЕТЕ. */
+.red.pogasen .kletka > span { text-decoration: none; }

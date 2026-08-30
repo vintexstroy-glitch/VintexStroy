@@ -101,6 +101,34 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');
 
+    // ══ 105 · СТОРНИРАНОТО СЕ ВИЖДА (резен 27 · ADR-087) ═══════════════════
+    //
+    // Негово, прието: „Сиво + зачертано + малък знак ★". Дотук Огледалото
+    // прескачаше погасеното и редът просто изчезваше — човек не можеше да
+    // различи „сторнирано" от „никога не е било записано".
+    razdel = '105 · Сторнираното СЕ ВИЖДА';
+    proveri('сторнираният ред ОСТАВА на екрана',
+      await p.$$eval('[data-tablitsa=razhodi-pogaseni] [data-pogasen]', (r) => r.length) > 0, true);
+    proveri('и е ЗАЧЕРТАН · класът е на реда, не в изречение',
+      await p.$eval('[data-pogasen]', (e) => e.classList.contains('pogasen')), true);
+    proveri('носи знака ★ и КОЙ го е сторнирал',
+      (await p.$eval('[data-pogasen]', (e) => (e as any).innerText)).includes('★ сторниран'), true);
+    proveri('броят се КАЗВА',
+      Number(await p.$eval('[data-sektsiya=razhodi-pogasenite]', (e) => (e as any).dataset.pogaseni)) > 0, true);
+    proveri('и екранът казва, че НЕ влизат в сбора',
+      (await p.$eval('[data-sektsiya=razhodi-pogasenite]', (e) => (e as any).innerText)).includes('НЕ влизат в сбора'), true);
+
+    // СКРИВАНЕТО Е ЛИЧНО · нула събития (правило 23 · ADR-022).
+    const predSkrivane = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#pogaseni-prevkl'));
+    proveri('скриването маха редовете от екрана',
+      await p.$$eval('[data-tablitsa=razhodi-pogaseni]', (r) => r.length), 0);
+    proveri('но НЕ пише нищо в Журнала', await broySabitiya(p), predSkrivane);
+    proveri('и сборът НЕ мърда от скриването', await plochka(p, 'Разход за'), '2 000,00 €');
+    await deystvieSPrerisuvane(p, () => p.click('#pogaseni-prevkl'));
+    proveri('връщането ги показва пак',
+      await p.$$eval('[data-tablitsa=razhodi-pogaseni] [data-pogasen]', (r) => r.length) > 0, true);
+
     // ══ 11г · източниците · таблица от Драйва ════════════════════════════
 }
 

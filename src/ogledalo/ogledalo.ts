@@ -20,6 +20,7 @@ import {
 } from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
 import { klyuchNaZveno } from '../yadro/sabitie.js';
+import { dataNaZapisa, opisaNaZapisa, sumataNaZapisa } from '../domein/opis-na-zapisa.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
@@ -452,6 +453,19 @@ export interface Ogledalo {
    * от 1, тъй че число само по себе си сочи по едно събитие във всяка от тях.
    */
   readonly pogaseni: ReadonlySet<string>;
+  /**
+   * ПОГАСЕНИТЕ ЗАПИСИ · за да СЕ ВИЖДАТ (резен 27 · ADR-087).
+   *
+   * Негово, прието: „Сиво + зачертано + малък знак ★" *(р82·[37])*. Журналът
+   * пази и записа, и сторното му завинаги — но Огледалото ПРЕСКАЧА погасеното
+   * и на екрана редът просто изчезваше. Човек не можеше да различи „сторнирано"
+   * от „никога не е било записано".
+   *
+   * ОТДЕЛЕН СПИСЪК, не връщане в картите. Върнати там, погасените щяха да
+   * влязат във ВСЕКИ сбор — тихо и навсякъде. Тук сумите не ги виждат:
+   * екраните ги искат ПОИМЕННО.
+   */
+  readonly pogasenite: readonly PogasenZapis[];
 }
 
 /**
@@ -516,6 +530,31 @@ export const VIDOVE_S_POPRAVKA_NA_MYASTO: readonly TipSabitie[] = Object.freeze(
   'ЗаплатаЗаписана',
 ]);
 
+/** Един погасен запис · толкова, колкото трябва за зачертан ред. */
+export interface PogasenZapis {
+  readonly vid: string;
+  readonly id: string;
+  readonly seq: number;
+  readonly ts: string;
+  /**
+   * ДАТАТА НА САМИЯ ЗАПИС · не времето на записването.
+   *
+   * Разход с дата 12.11, въведен днес, принадлежи на НОЕМВРИ — там го търси
+   * човекът. Филтриране по `ts` го слагаше в днешния месец (ADR-087 §7).
+   */
+  readonly data: string;
+  readonly actor: string;
+  readonly type: string;
+  /** съкращението за човешко око · от `opis-na-zapisa.ts` */
+  readonly opis: string;
+  /** цели центове · липсва, когато записът не носи сума */
+  readonly suma_st: number | undefined;
+  /** думата на човека ПРИ СТОРНОТО · празна, ако не е писал */
+  readonly prichina: string;
+  /** `seq` на сторното, което го погаси · нула, ако е самото сторно */
+  readonly storniranOt: number;
+}
+
 export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pogaseni = new Set<string>();
   /**
@@ -531,13 +570,23 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   // не се доверява на писането. Списъкът, който пълни картата, е строгият.
   const parvoto = new Map<string, Map<string, string>>();
   for (const vid of VIDOVE_S_POPRAVKA_NA_MYASTO) parvoto.set(vid, new Map());
+  /** звено → сторното, което го гаси · за причината и за „от кого". */
+  const gasiGo = new Map<string, Sabitie>();
 
   for (const s of sabitiya) {
     if (s.type === 'Сторно') {
       const p = s.payload as unknown as PayloadStorno;
       // Пропусната верига значи СВОЯТА — виж `PayloadStorno.pogasyavaVeriga`.
-      pogaseni.add(klyuchNaZveno({ naematel: p.pogasyavaVeriga ?? s.naematel, seq: p.pogasyavaSeq }));
+      const zveno = klyuchNaZveno({
+        naematel: p.pogasyavaVeriga ?? s.naematel,
+        seq: p.pogasyavaSeq,
+      });
+      pogaseni.add(zveno);
       pogaseni.add(klyuchNaZveno(s));
+      // ПЪРВОТО сторно печели: второ сторно на същото звено не мени причината,
+      // с която редът е бил свален (правило 1 · последната дума важи за
+      // ПОПРАВКА, а тук се пази ПЪРВОТО решение).
+      if (!gasiGo.has(zveno)) gasiGo.set(zveno, s);
       continue;
     }
     const negovite = parvoto.get(s.type);
@@ -626,8 +675,35 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
+  const pogasenite: PogasenZapis[] = [];
+
   for (const s of sabitiya) {
-    if (pogaseni.has(klyuchNaZveno(s))) continue;
+    if (pogaseni.has(klyuchNaZveno(s))) {
+      // САМОТО СТОРНО не се показва като погасен ред · то е поправката, не
+      // поправеното. Иначе всяка поправка щеше да ражда ДВА зачертани реда.
+      if (s.type !== 'Сторно') {
+        const gasi = gasiGo.get(klyuchNaZveno(s));
+        const prichina = gasi
+          ? String((gasi.payload as unknown as PayloadStorno).prichina ?? '')
+          : '';
+        pogasenite.push(
+          Object.freeze({
+            vid: s.sashtnost.vid,
+            id: s.sashtnost.id,
+            seq: s.seq,
+            ts: String(s.ts),
+            data: dataNaZapisa(s),
+            actor: s.actor,
+            type: s.type,
+            opis: opisaNaZapisa(s),
+            suma_st: sumataNaZapisa(s),
+            prichina,
+            storniranOt: gasi ? gasi.seq : 0,
+          }),
+        );
+      }
+      continue;
+    }
     prilozheni += 1;
 
     switch (s.type) {
@@ -1387,6 +1463,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     sverki,
     prilozheni,
     pogaseni,
+    pogasenite: Object.freeze(pogasenite),
   };
 }
 

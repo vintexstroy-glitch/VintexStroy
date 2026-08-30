@@ -71,7 +71,7 @@ import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.j
 import { legendata, zakachiPole } from './vhodni-problemi.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
-import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
+import type { Ogledalo, PogasenZapis, Razhod } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
@@ -366,6 +366,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         }
       </div>
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
+      ${blokNaPogasenite(o, mesets)}
     </section>`
     }
 
@@ -703,6 +704,67 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
         </div>
       </form>
     </section>`;
+}
+
+/**
+ * СТОРНИРАНОТО СЕ ВИЖДА · „Сиво + зачертано + малък знак ★" (резен 27 · ADR-087).
+ *
+ * Журналът пази и записа, и сторното му завинаги, но Огледалото ПРЕСКАЧА
+ * погасеното — и на екрана редът просто изчезваше. Човек не можеше да различи
+ * „сторнирано" от „никога не е било записано".
+ *
+ * ═══ ТЕ НЕ СА В СБОРА, И ТОВА Е СТРУКТУРНО ═══
+ *
+ * Сборът чете от `o.razhodi`, който НЕ ги съдържа. Тоест инвариантът не се
+ * пази с дисциплина, а с устройство: няма как да влязат, дори да се опита.
+ *
+ * ═══ ПОКАЗВАТ СЕ ПО ПОДРАЗБИРАНЕ ═══
+ *
+ * Негово е „сиво + зачертано", не „скрито". Скриването е ЛИЧНО и минава през
+ * паметта на екрана — нула събития (ADR-022 · правило 23).
+ */
+function blokNaPogasenite(o: Ogledalo, mesets: string): string {
+  const nashite = o.pogasenite.filter(
+    // ПО ДАТАТА НА ЗАПИСА, не по времето на записването · разход с дата 12.11,
+    // въведен днес, принадлежи на НОЕМВРИ (ADR-087 §7).
+    (x) => x.vid === 'razhod' && x.data.slice(0, 7) === mesets,
+  );
+  const pokazani = chetiEkranno('razhodi.pogasenite', true);
+  if (nashite.length === 0) {
+    return `<p class="drebno" data-pogaseni="0">Нито един сторниран разход за този
+    месец. Нулата се КАЗВА — иначе „няма сторнирани" е неразличимо от „не е
+    гледано".</p>`;
+  }
+  return `
+    <div class="deystviya" data-sektsiya="razhodi-pogasenite" data-pogaseni="${nashite.length}">
+      <button type="button" class="vtorichen malak" id="pogaseni-prevkl">${
+        pokazani ? 'Скрий сторнираните' : 'Покажи сторнираните'
+      }</button>
+      <span class="drebno">${nashite.length} ${
+        nashite.length === 1 ? 'сторниран ред' : 'сторнирани реда'
+      } · НЕ влизат в сбора</span>
+    </div>
+    ${
+      pokazani
+        ? `<div class="tablitsa" data-tablitsa="razhodi-pogaseni">
+      ${nashite.map(redNaPogasen).join('')}
+    </div>`
+        : ''
+    }`;
+}
+
+/** Един зачертан ред · трите носителя стоят в CSS-а, думите — тук. */
+function redNaPogasen(x: PogasenZapis): string {
+  return `<div class="red razhod pogasen" translate="no" data-pogasen="${x.seq}">
+    <span class="kletka"><b>${ekraniraj(x.opis === '' ? x.type : x.opis)}</b><span>★ сторниран${
+      x.storniranOt > 0 ? ` с № ${x.storniranOt}` : ''
+    }${x.prichina === '' ? '' : ` · „${ekraniraj(x.prichina)}"`}</span></span>
+    <span class="suma">${x.suma_st === undefined ? '' : pishi(x.suma_st)}</span>
+    <span>${ekraniraj(x.data)}</span>
+    <span>${ekraniraj(x.actor)}</span>
+    <span></span>
+    <span></span>
+  </div>`;
 }
 
 function redNaRazhod(r: Razhod, o: Ogledalo): string {
@@ -1136,6 +1198,12 @@ export function zakachiSmetki(
   koren.querySelector<HTMLInputElement>('#klyuch-tsifrite')?.addEventListener('change', async (e) => {
     sTsifrite = (e.target as HTMLInputElement).checked;
     zapomniEkranno('smetki.tsifrite', sTsifrite);
+    await prerisuvay();
+  });
+
+  // СКРИВАНЕТО НА СТОРНИРАНИТЕ Е ЛИЧНО · памет на екрана, нула събития.
+  koren.querySelector<HTMLButtonElement>('#pogaseni-prevkl')?.addEventListener('click', async () => {
+    zapomniEkranno('razhodi.pogasenite', !chetiEkranno('razhodi.pogasenite', true));
     await prerisuvay();
   });
 
