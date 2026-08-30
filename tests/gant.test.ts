@@ -48,6 +48,8 @@ function delo(p: Partial<Delo> & { id: string }): Delo {
     sastoyanie: 'чака',
     nadDelo: '',
     dokument: '',
+    promeneno: '2026-08-27T09:00:00.000Z',
+    promeniGo: 'vintexstroy@gmail.com',
     ...p,
   };
 }
@@ -309,6 +311,7 @@ describe('подредбата при непозната оценка', () => {
       id, seq: 1, myasto: 'Малинова', obekt: '', ime: id, otgovornik: '',
       ot: '2026-08-20', do: '2026-09-20',
       otsenka: otsenka as Delo['otsenka'], sastoyanie: 'чака', nadDelo: '', dokument: '',
+      promeneno: '', promeniGo: '',
     });
     const podredeni = podredi(
       [delo('чуждо', 'измислена-оценка'), delo('спешното', 'спешно-важно'), delo('обикновено', 'нито-едно')],

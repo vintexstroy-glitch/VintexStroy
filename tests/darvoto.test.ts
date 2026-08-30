@@ -38,6 +38,8 @@ function delo(n: Partial<Delo> & { id: string }): Delo {
     sastoyanie: 'чака',
     nadDelo: '',
     dokument: '',
+    promeneno: '2026-08-27T09:00:00.000Z',
+    promeniGo: 'vintexstroy@gmail.com',
     ...n,
   };
 }

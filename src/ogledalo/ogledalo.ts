@@ -1077,6 +1077,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           sastoyanie: p.sastoyanie as Delo['sastoyanie'],
           nadDelo: p.nadDelo,
           dokument: p.dokument,
+          // КОГА и КОЙ · от ПОСЛЕДНОТО записване, не от създаването (резен 30).
+          // „Пази се история като бекъп" — Журналът я пази цяла; това е онова
+          // от нея, което трябва да се ВИДИ на реда, без да се отваря книгата.
+          promeneno: String(s.ts),
+          promeniGo: s.actor,
         });
         break;
       }

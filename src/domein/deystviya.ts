@@ -12,7 +12,7 @@
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
-import { praviTsikal } from './dela.js';
+import { praviTsikal, SASTOYANIYA as SASTOYANIYA_NA_DELO } from './dela.js';
 import {
   GreshkaZadacha,
   napraviIzprashtane,
@@ -258,6 +258,24 @@ export class Deystviya {
     // Журнал. Единственият вход, който го връща, е обратният пренос
     // (`priemiPrehvarleno` в другата посока) — иначе следващият внос от МД
     // или невнимателна форма би го възкресила мълчаливо.
+    /**
+     * СЪСТОЯНИЕТО Е ИЗБРОЕНО · намерено от резен 30, не от план.
+     *
+     * Дотук тук проверка нямаше: свободна дума („зарязано") влизаше в Журнала
+     * и делото се появяваше като ЖИВО, с етикет, който никой изглед не разбира
+     * — нито светофарът, нито подредбата, нито новият списък на отпадналите.
+     *
+     * Дословно същата поука като при начина на плащане, където `app/menyu.ts`
+     * предвиди, че свободна стойност ще падне ТИХО в грешна кофа. Тук пада
+     * НАРОЧНО и с думи, а разликата между „тихо" и „нарочно" е целият смисъл
+     * на изброяването.
+     */
+    if (!(SASTOYANIYA_NA_DELO as readonly string[]).includes(danni.sastoyanie)) {
+      throw new GreshkaTablitsa(
+        `Непознато състояние „${danni.sastoyanie}". Изброените са: ` +
+          `${SASTOYANIYA_NA_DELO.join(' · ')}.`,
+      );
+    }
     const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
     if (prehvarleno) {
       throw new GreshkaTablitsa(

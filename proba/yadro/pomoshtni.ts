@@ -346,6 +346,17 @@ async function tekstNaPoleto(p: Page, klyuch: string): Promise<string> {
   return p.$eval(`[data-pole="${klyuch}"] .chislo`, (e) => (e as HTMLElement).textContent!.trim());
 }
 
+/**
+ * СУРОВИЯТ текст на едно поле · за ЧАКАНЕ, не за твърдение (резен 30).
+ *
+ * Чака се ИЗХОДЪТ да мръдне — нещо, което само пресмятането може да направи.
+ * Чакането по ВХОДА (полето, което сам си написал с `fill`) минава веднага и
+ * не свидетелства за нищо: точно това остави §84 да трепка след ADR-087 §8.
+ */
+export async function tekstNaChisloto(p: Page, klyuch: string): Promise<string> {
+  return tekstNaPoleto(p, klyuch);
+}
+
 /** Цялото число от плочка · за броячи, които не са пари. */
 export async function chisloNaPoleto2(p: Page, klyuch: string): Promise<number> {
   const tekst = await tekstNaPoleto(p, klyuch);
@@ -369,11 +380,13 @@ export interface DeloVhod {
   readonly do: string;
   readonly otsenka: string;
   readonly nad?: string;
+  /** по избор · подразбраното е първото в менюто, „чака" (резен 30) */
+  readonly sastoyanie?: string;
 }
 
 export async function zapishiDelo(
   p: Page,
-  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad }: DeloVhod,
+  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie }: DeloVhod,
 ): Promise<void> {
   await p.fill('#d-myasto', myasto);
   await p.fill('#d-obekt', obekt);
@@ -382,6 +395,9 @@ export async function zapishiDelo(
   await p.fill('#d-ot', ot);
   await p.fill('#d-do', doData);
   await p.selectOption('#d-otsenka', otsenka);
+  // СЪСТОЯНИЕТО по избор · подразбраното е първото в менюто („чака"), тъй че
+  // старите викащи не се менят (резен 30).
+  if (sastoyanie) await p.selectOption('#d-sastoyanie', sastoyanie);
   if (nad) await p.selectOption('#d-nad', { label: nad });
   await sSabitie(p, () => p.click('#d-forma-delo button[type=submit]'));
 }

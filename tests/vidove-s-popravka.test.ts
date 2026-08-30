@@ -90,7 +90,7 @@ const DELO = {
   ot: '2026-08-01',
   do: '2026-08-20',
   otsenka: 'sredna',
-  sastoyanie: 'chaka',
+  sastoyanie: 'чака',
   nadDelo: '',
   dokument: '',
 };

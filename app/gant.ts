@@ -52,6 +52,8 @@ import {
   eEdnodnevno,
   type Delo,
   type Otsenka,
+  otpadnalite,
+  zhivite,
 } from '../src/domein/dela.js';
 import {
   obobshteniRedove,
@@ -118,7 +120,9 @@ function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu
   return menyuOtZhivi(
     klyuch,
     ime,
-    [...o.dela.values()].map((d) => d[klyuch]),
+    // Менютата растат от ЖИВИТЕ · отпадналото дело не предлага място и обект
+    // за нови (правило 17 · `zhivite`, резен 30).
+    zhivite([...o.dela.values()]).map((d) => d[klyuch]),
   );
 }
 
@@ -230,7 +234,8 @@ export function narisuvayGant(
   // месец и полетата стоят отворени — правило 15: изключеното се КАЗВА.
   const svoyGotov = p.svoy.ot !== '' && p.svoy.do !== '' && p.svoy.do >= p.svoy.ot;
   const takt = p.takt === 'svoy' && !svoyGotov ? 'mesets' : p.takt;
-  const vsichki = [...o.dela.values()];
+  // ЖИВИТЕ · отпадналите имат свой изглед и не се смесват с работата.
+  const vsichki = zhivite([...o.dela.values()]);
   // ПОДРЕДБАТА Е ДЪРВОВИДНА (резен 12б): детето винаги СЛЕД родителя си, а
   // вътре в едно ниво важи неговата подредба (спешност → Оценка → завършените
   // долу). Правилото му не се мени — прилага се на всяко ниво поотделно.
@@ -380,7 +385,74 @@ export function narisuvayGant(
           </div>`
     }
 
+    ${blokNaOtpadnalite(o, predstavka)}
+
     ${formaDelo(o, dnes, predstavka, nadpisi)}`;
+}
+
+/**
+ * ОТПАДНАЛИТЕ ДЕЛА · „остават в отедлно наи тфолу" (резен 30 · ADR-090).
+ *
+ * Негова дума: „остават в отедлно наи тфолу тези които са отпаднали но се пази
+ * история като бацк уп".
+ *
+ * ═══ ОТДЕЛНО, НЕ ИЗТРИТО · и НЕ сторнирано ═══
+ *
+ * Сторното казва „това никога не е трябвало да се записва"; отпадналото казва
+ * „беше вярно, вече няма предмет". Дотук честен изход нямаше: човек или
+ * сторнираше (лъжа за миналото), или пишеше „завършено" (лъжа за настоящето).
+ *
+ * „Бекъпът" не се строи — Журналът е само за добавяне и историята е там цяла.
+ * Тук стои онова от нея, което трябва да се ВИДИ на реда: КОГА и КОЙ.
+ *
+ * Блокът стои и при НУЛА · проверената нула е различна от премълчаната
+ * (правило 7), а и оттук човек научава, че такова състояние изобщо има.
+ */
+function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
+  const redove = otpadnalite([...o.dela.values()]);
+  const skriti = chetiEkranno<boolean>(`${predstavka}.otpadnalite`, false);
+
+  return `
+    <section data-sektsiya="gant-otpadnali" data-broy="${redove.length}">
+      <div class="dyalglava">
+        <h2>Отпаднали дела</h2>
+        <span>отпадналото НЕ е сторнирано · остава, но не се работи по него</span>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="${predstavka}otpadnali-prevkl">
+          ${skriti ? 'Покажи отпадналите' : 'Скрий отпадналите'}
+        </button>
+        <span class="drebno">${
+          redove.length === 0
+            ? 'Нито едно отпаднало дело.'
+            : `${redove.length} ${redove.length === 1 ? 'отпаднало дело' : 'отпаднали дела'} · не влизат в срока, в светофара и в диаграмата`
+        }</span>
+      </div>
+      ${
+        skriti || redove.length === 0
+          ? ''
+          : `<div class="skrolkutiya">
+        <table class="tablitsa" data-tablitsa="otpadnali-dela">
+          <thead>
+            <tr><th>Място</th><th>Обект</th><th>Дело</th><th>Отговорник</th><th>Отпаднало на</th><th>От кого</th></tr>
+          </thead>
+          <tbody>${redove
+            .map(
+              (d) => `
+            <tr data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo">
+              <td translate="no">${ekraniraj(d.myasto)}</td>
+              <td translate="no">${ekraniraj(d.obekt)}</td>
+              <td translate="no">${ekraniraj(d.ime)}</td>
+              <td translate="no">${ekraniraj(d.otgovornik)}</td>
+              <td translate="no">${ekraniraj(d.promeneno.slice(0, 10))}</td>
+              <td translate="no">${ekraniraj(d.promeniGo)}</td>
+            </tr>`,
+            )
+            .join('')}</tbody>
+        </table>
+      </div>`
+      }
+    </section>`;
 }
 
 function broyPo(dela: readonly Delo[], dnes: string, kakvo: string): number {
@@ -697,7 +769,7 @@ export function formaDelo(
             <label for="${id('nad')}">Поддело на</label>
             <select translate="no" id="${id('nad')}" name="nadDelo">
               <option value="">— самостоятелно —</option>
-              ${[...o.dela.values()]
+              ${zhivite([...o.dela.values()])
                 .map((d) => `<option value="${ekraniraj(d.id)}">${ekraniraj(d.ime)}</option>`)
                 .join('')}
             </select>
@@ -757,6 +829,17 @@ export function zakachiGant(
   // Речниците се четат при закачане, значи всяко ново дело ги обогатява само.
   const menyutata = rechnitsite(predstavka);
   zakachiMenyuta(koren, menyutata);
+
+  // СКРИВАНЕТО НА ОТПАДНАЛИТЕ Е ЛИЧНО · памет на екрана, нула събития
+  // (правило 23 · ADR-022). Отпадналото дело не се мени от това, че някой не
+  // иска да го гледа.
+  koren
+    .querySelector<HTMLButtonElement>(`#${predstavka}otpadnali-prevkl`)
+    ?.addEventListener('click', async () => {
+      const klyuchat = `${predstavka}.otpadnalite`;
+      zapomniEkranno(klyuchat, !chetiEkranno<boolean>(klyuchat, false));
+      await prerisuvay();
+    });
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {

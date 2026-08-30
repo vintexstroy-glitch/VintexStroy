@@ -46,7 +46,7 @@ import {
   type Tab,
   type VidSektsiya,
 } from '../src/domein/tabove.js';
-import { podredi } from '../src/domein/dela.js';
+import { podredi, zhivite } from '../src/domein/dela.js';
 import {
   adresnaKniga,
   samotni,
@@ -132,7 +132,7 @@ function redoveZaIztochnik(o: Ogledalo, iztochnik: IztochnikTablitsa): readonly 
         klyuchove: {},
       }));
     case 'dela':
-      return [...o.dela.values()].map((d) => ({
+      return zhivite([...o.dela.values()]).map((d) => ({
         id: d.id,
         etiket: d.ime,
         detayl: `${d.ot} → ${d.do}`,
@@ -371,7 +371,7 @@ function blokSektsiya(o: Ogledalo, t: Tab, s: Sektsiya, dnes: string): string {
 
 function diagramaNaSektsiya(o: Ogledalo, iztochnik: IztochnikDiagrama, dnes: string): string {
   if (iztochnik === 'mesetsi') return stalboveNaMesetsite(mesechnitePari(o, dnes));
-  const dela = podredi([...o.dela.values()], dnes);
+  const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '<p class="prazno">Още няма дела.</p>';
   const r = reshetka(dela, 'mesets', dnes);
   return narisuvayDiagrama(dela, r, dnes);

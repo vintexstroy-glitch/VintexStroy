@@ -65,8 +65,50 @@ export const TEZHEST: Readonly<Record<Otsenka, number>> = Object.freeze({
  * Състояние." Стойностите са трите от `р51·[143]`; те не са надживени —
  * надживени са само шестте избора за ЗНАЧИМОСТТА.
  */
-export const SASTOYANIYA = ['чака', 'в процес', 'завършено'] as const;
+export const SASTOYANIYA = ['чака', 'в процес', 'завършено', 'отпаднало'] as const;
 type SastoyanieDelo = (typeof SASTOYANIYA)[number];
+
+/**
+ * ОТПАДНАЛОТО НЕ Е СТОРНИРАНО · и това е цялата разлика (резен 30).
+ *
+ * Негова дума *(р?·`izvori/02` 617-618)*: „остават в отедлно наи тфолу тези
+ * които са отпаднали но се пази история като бацк уп".
+ *
+ * ═══ ДВЕ РАЗЛИЧНИ НЕЩА, КОИТО ЛЕСНО СЕ СЛИВАТ ═══
+ *
+ *   СТОРНО      · „това никога не е трябвало да се записва" — грешка на ръката;
+ *   ОТПАДНАЛО   · „беше вярно, но вече няма предмет" — решение на човек.
+ *
+ * Точно разликата между две от петте кофи на правило 28. Слети, те щяха да
+ * дадат книга, в която отменената поръчка изглежда като сгрешен запис.
+ *
+ * Дотук честен изход нямаше: човек или сторнираше (лъжа за миналото), или
+ * слагаше „завършено" (лъжа за настоящето).
+ *
+ * Историята се пази САМА — отпадането е ново `ДелоЗаписано` върху същата
+ * същност, а Журналът е само за добавяне (правило 1). „Бекъп" не се строи.
+ */
+export const OTPADNALO = 'отпаднало';
+
+/**
+ * КОИ ДЕЛА СА ЖИВИ · ЕДИН дом за въпроса (правило 17).
+ *
+ * Седем места четяха `o.dela.values()` и всяко решаваше само дали да филтрира:
+ * едно махаше завършените, друго — нищо. Ново състояние без този дом щеше да
+ * се появи на едни екрани и да липсва на други, тихо.
+ */
+export function zhivite<T extends { readonly sastoyanie: string }>(
+  dela: readonly T[],
+): readonly T[] {
+  return dela.filter((d) => d.sastoyanie !== OTPADNALO);
+}
+
+/** И обратното · отпадналите СТОЯТ, отделно, вместо да изчезнат. */
+export function otpadnalite<T extends { readonly sastoyanie: string }>(
+  dela: readonly T[],
+): readonly T[] {
+  return dela.filter((d) => d.sastoyanie === OTPADNALO);
+}
 
 export interface Delo {
   readonly id: string;
@@ -90,6 +132,10 @@ export interface Delo {
   readonly nadDelo: string;
   /** връзка към документ, ако делото има нужда от такъв *(р48·[42])* */
   readonly dokument: string;
+  /** ISO време на ПОСЛЕДНОТО записване · не на създаването (резен 30) */
+  readonly promeneno: string;
+  /** имейлът на онзи, който го е пипнал последен */
+  readonly promeniGo: string;
 }
 
 /** Еднодневното дело се оцветява различно — и полето, и текстът, и датата. */
@@ -121,6 +167,8 @@ export function dniDoKraya(d: Delo, dnes: string): number {
 type Svetofar = 'normalno' | 'zhalto' | 'cherveno' | 'prosrocheno';
 
 export function svetofar(d: Delo, dnes: string): Svetofar {
+  // ОТПАДНАЛОТО НЕ СВЕТИ · срок, който никой няма да гони, не е спешен.
+  if (d.sastoyanie === OTPADNALO) return 'normalno';
   if (d.sastoyanie === 'завършено' || d.otsenka === 'завършено') return 'normalno';
   const dni = dniDoKraya(d, dnes);
   if (dni < 0) return 'prosrocheno';

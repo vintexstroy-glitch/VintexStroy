@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
+import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -304,23 +304,35 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и НИЩО от това не влиза в Журнала', await broySabitiya(p), predSabitiya);
     // Връщането връща числото ТОЧНО — инак закръглянето би оставило утайка.
     //
-    // ЧАКА СЕ САМОТО ПОЛЕ, не прерисуването · същата поука, която стои двайсет
-    // реда по-горе за коефициента, и същата, която пази гаража по-долу:
-    // обработчикът прави ДВЕ неща (смята и прерисува), тъй че „шапката е нова"
-    // не значи „полето е новото". Проверката минаваше през път и падна веднъж
-    // с 215 810 000 срещу 190 860 000 — а проверка, която пада ПРЕЗ ПЪТ, е
-    // по-скъпа от липсваща (ADR-087 §8).
-    //
-    // Чака се ПОЛЕТО; твърди се ЧИСЛОТО. Двете са различни неща — затова
-    // твърдението пак може да падне, ако пресмятането сгреши.
+    /**
+     * ЧАКА СЕ ИЗХОДЪТ ДА МРЪДНЕ · и това е ВТОРАТА поправка на тази проверка.
+     *
+     * Обработчикът прави ДВЕ неща (смята и прерисува), тъй че „шапката е нова"
+     * не значи „числото е новото". Проверката падаше ПРЕЗ ПЪТ с 215 810 000
+     * срещу 190 860 000.
+     *
+     * ═══ ПЪРВАТА ПОПРАВКА (ADR-087 §8) НЕ СТИГНА ═══
+     *
+     * Тя чакаше ПОЛЕТО `#kalk-baza` да стане „3000". Но полето го написах САМ
+     * с `fill` — то е готово ПРЕДИ да е почнало пресмятането, тъй че чакането
+     * минаваше веднага и не свидетелстваше за нищо. Резен 30 я хвана пак.
+     *
+     * Сега се чака ИЗХОДЪТ да напусне 3500-състоянието — нещо, което САМО
+     * пресмятането може да направи. И чак тогава се твърди ТОЧНОТО число:
+     * „мръднало е" и „мръднало е точно дотам" са различни неща, значи
+     * твърдението пак може да падне.
+     */
+    const izhodPri3500 = await tekstNaChisloto(p, 'stoynost-a');
     await deystvieSPrerisuvane(p, async () => {
       await p.fill('#kalk-baza', '3000');
       await p.dispatchEvent('#kalk-baza', 'change');
     });
-    await p.waitForFunction(() =>
-      ((document.querySelector('#kalk-baza') as HTMLInputElement | null)?.value ?? '')
-        .replace(/\s/g, '')
-        .startsWith('3000'));
+    await p.waitForFunction(
+      (staro) =>
+        (document.querySelector('[data-pole="stoynost-a"] .chislo')?.textContent ?? '').trim() !==
+        staro,
+      izhodPri3500,
+    );
     proveri('връщането връща същото число', await chisloNaPoleto(p, 'stoynost-a'), predBazata);
 
     razdel = '84 · Базите · и ГАРАЖЪТ вече се пипа';

@@ -309,9 +309,21 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       Boolean(await p.$('.padasht-menyu > [data-ekran=smetki]')), true);
     proveri('и Имоти също · пет секции е повече от три',
       Boolean(await p.$('.padasht-menyu > [data-ekran=imoti]')), true);
-    // ГРАНИЦАТА: три реда в меню са повече работа от превъртането.
-    proveri('Гант НЯМА · три секции не правят меню',
-      Boolean(await p.$('.padasht-menyu > [data-ekran=gant]')), false);
+    /**
+     * ГРАНИЦАТА: три реда в меню са повече работа от превъртането.
+     *
+     * ГАНТ Я МИНА в резен 30 и това е ПРАВИЛОТО, работещо както е обявено, а
+     * не дефект: списъкът на отпадналите дела е ЧЕТВЪРТА секция там, и оттам
+     * нататък падащият ред е по-евтин от превъртането (ADR-057). Странична
+     * последица е, но обявена — не премълчана.
+     *
+     * Проверката НЕ се маха: тя пази ПРАГА. Ако утре някой го смени, тук ще
+     * падне — и точно затова насреща стои екран, който още е ПОД него.
+     */
+    proveri('Гант ВЕЧЕ носи ред · четвъртата секция мина прага (резен 30)',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=gant]')), true);
+    proveri('а Стойност още НЕ · три секции не правят меню',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=stoynost]')), false);
     proveri('Настройки пази СВОЯ ред · теми, не секции',
       Boolean(await p.$('.menyu-nastroyki #nastroyki-red')), true);
 

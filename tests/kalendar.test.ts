@@ -54,6 +54,8 @@ const DELO: Delo = {
   sastoyanie: 'чака',
   nadDelo: '',
   dokument: 'фактура 4412',
+    promeneno: '2026-08-27T09:00:00.000Z',
+    promeniGo: 'vintexstroy@gmail.com',
 };
 
 describe('границата · какво напуска и какво НЕ', () => {

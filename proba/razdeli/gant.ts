@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { denOtDnes, naEkran, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, zapishiDelo } from '../yadro/pomoshtni.ts';
 
 /** 24 · Гант */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -35,6 +35,52 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('делото без обект се показва с тире',
       (await p.$$eval('.gant-delo .drebno', (e) => e.map((x) => x.textContent)))
         .some((t) => t.startsWith('—')), true);
+
+    // ══ 108 · ОТПАДНАЛИТЕ ДЕЛА (резен 30 · ADR-090) ═══════════════════════
+    //
+    // Негова дума: „остават в отедлно наи тфолу тези които са отпаднали но се
+    // пази история като бацк уп". Отпадналото НЕ е сторнирано: сторното казва
+    // „това никога не е трябвало да се записва", отпадането — „беше вярно,
+    // вече няма предмет".
+    razdel = '108 · Отпадналите · блокът КАЗВА и нулата';
+    proveri('блокът стои и при НУЛА отпаднали',
+      await p.$eval('[data-sektsiya=gant-otpadnali]', (e) => (e as any).dataset.broy), '0');
+    proveri('и го КАЗВА с думи',
+      (await p.$eval('[data-sektsiya=gant-otpadnali]', (e) => (e as any).innerText))
+        .includes('Нито едно отпаднало дело'), true);
+    proveri('„отпаднало" е избираемо в менюто на състоянието',
+      await p.$$eval('#d-sastoyanie option', (o) => o.map((x) => (x as any).value)),
+      ['чака', 'в процес', 'завършено', 'отпаднало']);
+
+    razdel = '108 · Отпадналите · новото не влиза при живите, но ОСТАВА';
+    const prediOtpadane = await p.$$eval('.gant-delo', (e) => e.length);
+    await zapishiDelo(p, { myasto: 'Хисаря', obekt: '', ime: 'Оглед без обект',
+      otgovornik: 'Ивайло Петков', ot: denOtDnes(0), do: denOtDnes(0),
+      otsenka: 'важно-неспешно', sastoyanie: 'отпаднало' });
+
+    // Делото е записано ВЕДНАГА като отпаднало, тъй че живите НЕ се менят —
+    // а точно това е проверката: новото не влиза при работата.
+    proveri('живите НЕ се менят · отпадналото не влиза при тях',
+      await p.$$eval('.gant-delo', (e) => e.length), prediOtpadane);
+    proveri('но делото СТОИ в своя списък',
+      await p.$$eval('[data-tablitsa=otpadnali-dela] [data-otpadnalo]', (e) => e.length), 1);
+    proveri('и списъкът казва КОЙ го е отпаднал',
+      (await p.$eval('[data-tablitsa=otpadnali-dela] [data-otpadnalo]', (e) => (e as any).innerText))
+        .includes('vintexstroy@gmail.com'), true);
+    proveri('броят се КАЗВА',
+      await p.$eval('[data-sektsiya=gant-otpadnali]', (e) => (e as any).dataset.broy), '1');
+
+    razdel = '108 · Отпадналите · скриването е ЛИЧНО, нула събития';
+    const prediSkrivane = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#d-otpadnali-prevkl'));
+    proveri('скриването маха таблицата от екрана',
+      await p.$$eval('[data-tablitsa=otpadnali-dela]', (e) => e.length), 0);
+    proveri('но НЕ пише нищо в Журнала', await broySabitiya(p), prediSkrivane);
+    proveri('и блокът пак КАЗВА колко са',
+      await p.$eval('[data-sektsiya=gant-otpadnali]', (e) => (e as any).dataset.broy), '1');
+    await deystvieSPrerisuvane(p, () => p.click('#d-otpadnali-prevkl'));
+    proveri('връщането ги показва пак',
+      await p.$$eval('[data-tablitsa=otpadnali-dela] [data-otpadnalo]', (e) => e.length), 1);
 
     // ══ 57 · ЗАКОНЪТ ЗА МЕНЮТАТА · живите речници (И97 · ADR-040) ══════════
     //

@@ -54,7 +54,7 @@ import {
 } from '../src/domein/otcheti.js';
 import { sboratZaKapitala } from './stoynost.js';
 import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
-import { podredi } from '../src/domein/dela.js';
+import { podredi, zhivite } from '../src/domein/dela.js';
 import { obobshteniRedove, reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
@@ -550,7 +550,7 @@ function redNaMesetsa(r: RedNaMesetsa): string {
 }
 
 function blokDelata(o: Ogledalo, dnes: string): string {
-  const dela = podredi([...o.dela.values()], dnes);
+  const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '';
   const r = reshetka(dela, 'mesets', dnes);
   const parvata = r.koloni[0]!;
