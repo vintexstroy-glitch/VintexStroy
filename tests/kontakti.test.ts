@@ -39,6 +39,15 @@ import {
   type Kontakt,
   type Prepiska,
 } from '../src/domein/kontakti.js';
+import {
+  kogaEZaVzimane,
+  proveriPrepiskata,
+  sveriZakachaniyata,
+  VIDOVE_ZAKACHANE,
+  zakachanetoNa,
+} from '../src/domein/kontakti.js';
+import { OTSENKI } from '../src/domein/dela.js';
+import { fold } from '../src/ogledalo/ogledalo.js';
 import { SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -71,6 +80,11 @@ const kontakt = (p: Partial<Kontakt> & { ime: string }): Kontakt => ({
 const prepiska = (p: Partial<Prepiska> & { id: string; kontakt: string }): Prepiska => ({
   kakvo: 'договор',
   zaVzimane: '',
+  chas: '',
+  otgovornik: '',
+  otsenka: 'нито-едно',
+  zakachenaKam: '',
+  zakachenaId: '',
   sastoyanie: 'чака',
   seq: 1,
   kogato: KOGATO,
@@ -129,12 +143,12 @@ describe('преписката', () => {
     const { deystviya } = stend();
     await deystviya.zapishiPrepiska(
       'P-1',
-      { kontakt: 'Иван Петров', kakvo: 'договор', zaVzimane: '', sastoyanie: 'чака' },
+      { kontakt: 'Иван Петров', kakvo: 'договор', zaVzimane: '', chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
       { opId: 'op-1' },
     );
     await deystviya.zapishiPrepiska(
       'P-2',
-      { kontakt: 'Иван Петров', kakvo: 'скица', zaVzimane: '2026-09-10', sastoyanie: 'чака' },
+      { kontakt: 'Иван Петров', kakvo: 'скица', zaVzimane: '2026-09-10', chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
       { opId: 'op-2' },
     );
     const o = await deystviya.ogledalo();
@@ -147,7 +161,7 @@ describe('преписката', () => {
     await expect(
       deystviya.zapishiPrepiska(
         'P-1',
-        { kontakt: '  ', kakvo: 'договор', zaVzimane: '', sastoyanie: 'чака' },
+        { kontakt: '  ', kakvo: 'договор', zaVzimane: '', chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
         { opId: 'op-1' },
       ),
     ).rejects.toThrow(/с кого|С кого/);
@@ -159,7 +173,7 @@ describe('преписката', () => {
     await expect(
       deystviya.zapishiPrepiska(
         'P-1',
-        { kontakt: 'Иван', kakvo: '', zaVzimane: '', sastoyanie: 'чака' },
+        { kontakt: 'Иван', kakvo: '', zaVzimane: '', chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
         { opId: 'op-1' },
       ),
     ).rejects.toThrow(/за какво/);
@@ -170,7 +184,7 @@ describe('преписката', () => {
     await expect(
       deystviya.zapishiPrepiska(
         'P-1',
-        { kontakt: 'Иван', kakvo: 'договор', zaVzimane: '', sastoyanie: 'зарязано' },
+        { kontakt: 'Иван', kakvo: 'договор', zaVzimane: '', chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'зарязано' },
         { opId: 'op-1' },
       ),
     ).rejects.toThrow(/Непознато състояние/);
@@ -268,5 +282,205 @@ describe('сверката', () => {
     expect(s.izhod).toBe(0);
     expect(s.razlika).toBe(-1);
     expect(s.nared).toBe(false);
+  });
+});
+
+// ── РЕЗЕН 41 · ПРЕПИСКАТА НОСИ УПРАВЛЕНИЕ ─────────────────────────────────
+//
+// Негова дума, 30.08:
+//
+//   „преписката има всичко което се попълва в Управление като данни и дата с
+//    час, както и имот, дело или поддело."
+//
+// Шест обещания:
+//   1. Часът е ПО ИЗБОР · празният значи „само дата", както беше досега.
+//   2. Час БЕЗ дата се отказва · час без ден не свети и не влиза в списъка.
+//   3. Оценката е СЪЩАТА като при делото · работата се мери еднакво.
+//   4. Закачането е ЕДНО · вид и адрес вървят заедно или ги няма.
+//   5. Мястото се СМЯТА от закаченото, не се преписва.
+//   6. Изгубеното закачане се КАЗВА · и сверката го брои.
+
+const PLNO = {
+  kontakt: 'Иван',
+  kakvo: 'договор',
+  zaVzimane: '2026-09-10',
+  chas: '14:30',
+  otgovornik: 'Николай Петков',
+  otsenka: 'спешно-важно',
+  zakachenaKam: '',
+  zakachenaId: '',
+  sastoyanie: 'чака',
+};
+
+describe('преписката носи Управление', () => {
+  it('часът е ПО ИЗБОР · празният значи „само дата"', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska('pr-1', { ...PLNO, chas: '' }, { opId: 'op-1' });
+    const p = (await deystviya.ogledalo()).prepiski.get('pr-1')!;
+    expect(p.chas).toBe('');
+    expect(kogaEZaVzimane(p)).toBe('2026-09-10');
+  });
+
+  it('а с час се чете „дата час" · негова дума, 30.08', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska('pr-1', PLNO, { opId: 'op-1' });
+    const p = (await deystviya.ogledalo()).prepiski.get('pr-1')!;
+    expect(p.chas).toBe('14:30');
+    expect(kogaEZaVzimane(p)).toBe('2026-09-10 14:30');
+  });
+
+  it('нечетимият час се отказва с думи', () => {
+    expect(() => proveriPrepiskata({ ...PLNO, chas: '25:00' })).toThrow(/ЧЧ:ММ/);
+    expect(() => proveriPrepiskata({ ...PLNO, chas: '14.30' })).toThrow(GreshkaKontakt);
+    expect(() => proveriPrepiskata({ ...PLNO, chas: '9:05' })).toThrow(/ЧЧ:ММ/);
+  });
+
+  it('и час БЕЗ дата се отказва · час без ден не свети', () => {
+    expect(() => proveriPrepiskata({ ...PLNO, zaVzimane: '', chas: '14:30' })).toThrow(/без дата/);
+    // А празен час без дата е нормалният стар случай.
+    expect(() => proveriPrepiskata({ ...PLNO, zaVzimane: '', chas: '' })).not.toThrow();
+  });
+
+  it('оценката е СЪЩАТА като при делото · пет думи, не свои', () => {
+    expect(OTSENKI).toContain('спешно-важно');
+    expect(() => proveriPrepiskata({ ...PLNO, otsenka: 'много спешно' })).toThrow(/Непозната оценка/);
+  });
+
+  it('закачането е ЕДНО · вид и адрес вървят ЗАЕДНО', () => {
+    expect(VIDOVE_ZAKACHANE).toEqual(['имот', 'дело']);
+    expect(() => proveriPrepiskata({ ...PLNO, zakachenaKam: 'дело', zakachenaId: '' })).toThrow(/не е казано КОЕ/);
+    expect(() => proveriPrepiskata({ ...PLNO, zakachenaKam: '', zakachenaId: 'D-1' })).toThrow(/КЪМ КАКВО/);
+    expect(() => proveriPrepiskata({ ...PLNO, zakachenaKam: 'поддело', zakachenaId: 'D-1' }))
+      .toThrow(/подделото Е дело/);
+    // И двете празни е нормалният случай · „към нищо".
+    expect(() => proveriPrepiskata(PLNO)).not.toThrow();
+  });
+
+  it('мястото се СМЯТА от закаченото · не се преписва в преписката', async () => {
+    const { deystviya } = stend();
+    await deystviya.dobaviImot('I-1', { adres: 'Малинова', edinitsa: 'бл. 1', ploshtad_kvsm: 0 }, { opId: 'op-i' });
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { ...PLNO, zakachenaKam: 'имот', zakachenaId: 'I-1' },
+      { opId: 'op-1' },
+    );
+    const o = await deystviya.ogledalo();
+    const z = zakachanetoNa(o.prepiski.get('pr-1')!, o.imoti, o.dela);
+    expect(z.kam).toBe('имот');
+    expect(z.nadpis).toBe('Малинова · бл. 1');
+    expect(z.nameren).toBe(true);
+    // И НЯМА поле „място" в самата преписка · инак адресът щеше да остарява сам.
+    expect(Object.keys(o.prepiski.get('pr-1')!)).not.toContain('myasto');
+  });
+
+  it('и закачането за ДЕЛО носи името му и мястото му', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiDelo(
+      'D-1',
+      {
+        myasto: 'Малинова',
+        obekt: 'бл. 1',
+        ime: 'Акт 15',
+        otgovornik: 'Николай Петков',
+        ot: '2026-09-01',
+        do: '2026-09-30',
+        otsenka: 'спешно-важно',
+        sastoyanie: 'в процес',
+        nadDelo: '',
+        dokument: '',
+      },
+      { opId: 'op-d' },
+    );
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { ...PLNO, zakachenaKam: 'дело', zakachenaId: 'D-1' },
+      { opId: 'op-1' },
+    );
+    const o = await deystviya.ogledalo();
+    expect(zakachanetoNa(o.prepiski.get('pr-1')!, o.imoti, o.dela).nadpis).toBe('Акт 15 · Малинова · бл. 1');
+  });
+
+  it('изгубеният ИМОТ също се КАЗВА · не само изгубеното дело', async () => {
+    // НАХОДКА (резен 41): първата версия проверяваше само изгубено ДЕЛО, тъй че
+    // счупването на имотния клон минаваше — двата клона са отделни редове код и
+    // всеки иска свой пример.
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { ...PLNO, zakachenaKam: 'имот', zakachenaId: 'НЯМА-ТАКЪВ' },
+      { opId: 'op-1' },
+    );
+    const o = await deystviya.ogledalo();
+    const z = zakachanetoNa(o.prepiski.get('pr-1')!, o.imoti, o.dela);
+    expect(z.nameren).toBe(false);
+    expect(z.nadpis).toBe('имотът вече го няма');
+  });
+
+  it('изгубеното закачане се КАЗВА · и сверката го брои', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { ...PLNO, zakachenaKam: 'дело', zakachenaId: 'НЯМА-ТАКОВА' },
+      { opId: 'op-1' },
+    );
+    const o = await deystviya.ogledalo();
+    const p = o.prepiski.get('pr-1')!;
+    expect(zakachanetoNa(p, o.imoti, o.dela).nameren).toBe(false);
+    expect(zakachanetoNa(p, o.imoti, o.dela).nadpis).toContain('вече го няма');
+    const sv = sveriZakachaniyata([p], o.imoti, o.dela, KOGATO);
+    expect(sv.vhod).toBe(1);
+    expect(sv.izhod).toBe(0);
+    expect(sv.razlika).toBe(-1);
+    expect(sv.nared).toBe(false);
+  });
+
+  it('а когато няма нито едно закачане · нулата пак се записва (правило 7)', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska('pr-1', PLNO, { opId: 'op-1' });
+    const o = await deystviya.ogledalo();
+    const sv = sveriZakachaniyata([...o.prepiski.values()], o.imoti, o.dela, KOGATO);
+    expect(sv.vhod).toBe(0);
+    expect(sv.izhod).toBe(0);
+    expect(sv.razlika).toBe(0);
+  });
+
+  it('ВРАТАТА отказва стар товар · новото поле е задължително ОТСЕГА', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.zapishiPrepiska(
+        'pr-1',
+        { kontakt: 'Иван', kakvo: 'старо', zaVzimane: '', sastoyanie: 'чака' } as unknown as
+          Parameters<typeof deystviya.zapishiPrepiska>[1],
+        { opId: 'op-1' },
+      ),
+    ).rejects.toThrow(/Непозната оценка/);
+  });
+
+  it('но ОГЛЕДАЛОТО чете стария ЗАПИС · той не се пренаписва (правило 1)', () => {
+    // НАХОДКА (резен 41): първата версия минаваше през Вратата с ПЪЛЕН товар,
+    // само празен — тогава `?? 'нито-едно'` никога не се задейства и счупването
+    // му минаваше. Тук събитието е сглобено с ръка, точно както изглежда запис
+    // отпреди резена: ЧЕТИРИ полета, нищо повече.
+    const staro = {
+      opId: 'op-staro',
+      ts: KOGATO,
+      naematel: NAEMATEL,
+      actor: 'vintexstroy@gmail.com',
+      type: 'ПреписказЗаписана',
+      sashtnost: { vid: 'prepiska', id: 'pr-staro' },
+      payload: { kontakt: 'Иван', kakvo: 'старо', zaVzimane: '', sastoyanie: 'чака' },
+      seq: 1,
+      prevHash: '',
+      hash: 'x',
+    };
+    const p = fold([staro]).prepiski.get('pr-staro')!;
+    expect(p.kakvo).toBe('старо');
+    expect(p.chas).toBe('');
+    expect(p.otgovornik).toBe('');
+    // ПОДРАЗБИРАНЕТО Е „нито-едно" · не „завършено": стара преписка, прочетена
+    // като завършена, би изчезнала от всеки списък мълчаливо.
+    expect(p.otsenka).toBe('нито-едно');
+    expect(p.zakachenaKam).toBe('');
+    expect(p.zakachenaId).toBe('');
   });
 });

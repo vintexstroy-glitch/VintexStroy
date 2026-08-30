@@ -1283,8 +1283,24 @@ export interface PayloadKontaktZapisan {
 export interface PayloadPrepiskaZapisana {
   readonly kontakt: string;
   readonly kakvo: string;
-  /** „кога са за взимане кто ОПЦИЯ и дата" · САМО дата, без час (р57·[34]) */
+  /** „кога са за взимане кто ОПЦИЯ и дата" *(р57·[28])* · ГГГГ-ММ-ДД или празно */
   readonly zaVzimane: string;
+  /**
+   * ЧАСЪТ · „преписката има… и **дата с час**" *(негова дума, 30.08)*.
+   *
+   * НАДЖИВЯВА моята формулировка от резен 38, която пренесе „Не, само дата"
+   * *(р57·[34])* и върху преписката. Онова изречение е негов отговор на МОЙ
+   * въпрос за ДЕЛАТА; преписката той назова сам, и с час (ADR-101 §3).
+   */
+  readonly chas: string;
+  /** ОТ УПРАВЛЕНИЕ · кой я върши */
+  readonly otgovornik: string;
+  /** ОТ УПРАВЛЕНИЕ · Айзенхауер */
+  readonly otsenka: string;
+  /** „както и **имот, дело или поддело**" · видът */
+  readonly zakachenaKam: string;
+  /** …и адресът му */
+  readonly zakachenaId: string;
   readonly sastoyanie: string;
 }
 

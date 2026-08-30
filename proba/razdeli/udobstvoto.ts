@@ -2014,4 +2014,78 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и това НЕ е същият месец', predi118 === '2026-07', false);
     proveri('нула събития · изгледът се смята, не се записва',
       await broySabitiya(p), await broySabitiya(p));
+
+    // ═══ 119 · ПРЕПИСКАТА НОСИ УПРАВЛЕНИЕ (негова дума, 30.08 · резен 41) ═══
+    //
+    // „преписката има всичко което се попълва в Управление като данни и дата с
+    //  час, както и имот, дело или поддело."
+
+    razdel = '119 · Преписката · дата С ЧАС';
+    await naEkran(p, 'kontakti', '#forma-prepiska');
+    await p.fill('#prep-kontakt', 'Мария Илиева');
+    await p.fill('#prep-kakvo', 'нотариален акт с час');
+    await p.fill('#prep-data', denOtDnes(4));
+    await p.fill('#prep-chas', '14:30');
+    await p.fill('#prep-otgovornik', 'Николай Петков');
+    await p.selectOption('#prep-otsenka', 'спешно-важно');
+    await sSabitie(p, () => p.click('#forma-prepiska button[type=submit]'));
+    const sChas = await p.$eval(
+      '[data-tablitsa=prepiski] tbody tr:first-child [data-koga]',
+      (e) => (e as any).dataset.koga);
+    proveri('датата и часът стоят ЗАЕДНО', sChas, `${denOtDnes(4)} 14:30`);
+    proveri('отговорникът е СВОЕ поле, не контактът',
+      (await p.$eval('[data-tablitsa=prepiski] tbody tr:first-child', (e) => (e as any).innerText))
+        .includes('Николай Петков'), true);
+    proveri('и оценката е СЪЩАТА като при делото',
+      await p.$eval('[data-tablitsa=prepiski] tbody tr:first-child [data-otsenka]',
+        (e) => (e as any).dataset.otsenka), 'спешно-важно');
+
+    razdel = '119 · Преписката · час БЕЗ дата се отказва с думи';
+    const prediChas = await broySabitiya(p);
+    await p.fill('#prep-kontakt', 'Мария Илиева');
+    await p.fill('#prep-kakvo', 'без ден');
+    await p.fill('#prep-data', '');
+    await p.fill('#prep-chas', '09:00');
+    await p.click('#forma-prepiska button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-prepiska')?.textContent ?? '').length > 0);
+    proveri('казва ЗАЩО · час без ден не свети',
+      (await tekstNa(p, '#greshka-prepiska')).includes('червения списък'), true);
+    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediChas);
+
+    razdel = '119 · Преписката · закача се за ИМОТ, ДЕЛО или ПОДДЕЛО';
+    const gnezda = await p.$$eval('#prep-zakachena optgroup', (e) =>
+      e.map((x) => x.getAttribute('label')));
+    proveri('менюто има ДВЕ гнезда · имоти и дела',
+      JSON.stringify(gnezda), JSON.stringify(['Имоти', 'Дела и поддела']));
+    proveri('подделата се четат по НОМЕР · 1.1 казва степента',
+      (await p.$$eval('#prep-zakachena optgroup:nth-of-type(2) option',
+        (e) => e.map((x) => x.textContent))).some((t) => /^\d+\.\d+/.test(t ?? '')), true);
+
+    razdel = '119 · Закачането · мястото се СМЯТА, не се преписва';
+    const koeDelo = await p.$eval('#prep-zakachena optgroup:nth-of-type(2) option',
+      (e) => (e as HTMLOptionElement).value);
+    await p.fill('#prep-kontakt', 'Мария Илиева');
+    await p.fill('#prep-kakvo', 'закачена за дело');
+    await p.fill('#prep-data', denOtDnes(2));
+    await p.fill('#prep-chas', '');
+    await p.selectOption('#prep-zakachena', koeDelo);
+    await sSabitie(p, () => p.click('#forma-prepiska button[type=submit]'));
+    const nadpis = await p.$eval('[data-zakachena=дело]', (e) => (e as any).innerText);
+    proveri('редът показва делото И мястото му', nadpis.includes(' · '), true);
+    proveri('и нито един ред не е ИЗГУБЕН',
+      await p.$$eval('[data-zakachena][data-izgubena]', (e) => e.length), 0);
+    proveri('сверката на закачането стои и е нула',
+      (await tekstNa(p, '[data-zakachvane-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
+
+    razdel = '119 · Червеният списък научава отговорника и мястото';
+    await naEkran(p, 'gant', '[data-tablitsa=avtodela]');
+    // ЦЕЛИМ СЕ ПОИМЕННО · „първата преписка" е ЧУЖД ред: §116 вече е записал
+    // няколко и подредбата е по СРОК, не по ред на писане.
+    const redove119 = await p.$$eval('[data-izvor=преписка]', (e) =>
+      e.map((x) => (x as any).innerText));
+    proveri('в „с кого" стои ОТГОВОРНИКЪТ, не контактът',
+      redove119.some((t) => t.includes('Николай Петков')), true);
+    proveri('и мястото идва от закачането',
+      redove119.some((t) => t.includes('закачена за дело · ')), true);
 }

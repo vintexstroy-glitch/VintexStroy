@@ -45,7 +45,13 @@
  */
 
 import { svetofarNaSroka, dniDoSroka, type Svetofar } from './dela.js';
-import { predstoyashtiSreshti, zaVzimane, type Prepiska, type Sreshta } from './kontakti.js';
+import {
+  predstoyashtiSreshti,
+  zakachanetoNa,
+  zaVzimane,
+  type Prepiska,
+  type Sreshta,
+} from './kontakti.js';
 import { planaNa, predstoyashtiteVnoski } from './krediti.js';
 import { sverka, MERKA, type Sverka } from '../yadro/sverka.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
@@ -113,7 +119,16 @@ export function avtoDelata(o: Ogledalo, dnes: string): readonly AvtoDelo[] {
   const prepiski: readonly Prepiska[] = [...o.prepiski.values()];
   for (const p of zaVzimane(prepiski)) {
     if (dniDoSroka(p.zaVzimane, dnes) > NAPRED_DNI) continue;
-    redove.push(red('преписка', p.id, p.kakvo, p.kontakt, p.zaVzimane, dnes));
+    // С КОГО · ОТГОВОРНИКЪТ бие контакта (резен 41). Двамата са различни хора:
+    // контактът е онзи, С КОГОТО е преписката; отговорникът — онзи, КОЙТО я
+    // върши. В списък „кое гори" човек търси второто, за да знае кой да я хване.
+    // Празен отговорник пада обратно на контакта — по-добре нечие име, отколкото
+    // тире.
+    const kogo = p.otgovornik === '' ? p.kontakt : p.otgovornik;
+    // КЪДЕ · СМЯТА се от закачането, не се преписва (правило 17).
+    const kade = zakachanetoNa(p, o.imoti, o.dela);
+    const ime = kade.kam === '' ? p.kakvo : `${p.kakvo} · ${kade.nadpis}`;
+    redove.push(red('преписка', p.id, ime, kogo, p.zaVzimane, dnes));
   }
 
   const sreshti: readonly Sreshta[] = [...o.sreshti.values()];

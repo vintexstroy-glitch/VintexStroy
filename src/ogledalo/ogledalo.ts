@@ -32,6 +32,7 @@ import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
+import type { Otsenka } from '../domein/dela.js';
 import type {
   PrehvarlenaSedmitsa,
   RedNaZaplata,
@@ -46,6 +47,7 @@ import {
   type SastoyanieNaPrepiska,
   type SastoyanieNaSreshta,
   type Sreshta,
+  type VidNaZakachaneto,
 } from '../domein/kontakti.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
@@ -1342,6 +1344,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           kontakt: p.kontakt,
           kakvo: p.kakvo,
           zaVzimane: p.zaVzimane,
+          // ЛИПСВАЩОТО ≠ ПРАЗНОТО, но тук четенето е ЕДНО: преписка, записана
+          // ПРЕДИ резен 41, няма тези полета в товара си, и празното е точният
+          // ѝ смисъл — „не е казано". Стар запис не се пренаписва (правило 1).
+          chas: p.chas ?? '',
+          otgovornik: p.otgovornik ?? '',
+          otsenka: (p.otsenka ?? 'нито-едно') as Otsenka,
+          zakachenaKam: (p.zakachenaKam ?? '') as VidNaZakachaneto,
+          zakachenaId: p.zakachenaId ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaPrepiska,
           seq: prepiski.get(s.sashtnost.id)?.seq ?? s.seq,
           kogato: String(s.ts),

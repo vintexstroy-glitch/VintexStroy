@@ -828,7 +828,7 @@ export class Deystviya {
    * а списъкът го показва като „срещан, но незаписан".
    */
   async zapishiPrepiska(id: string, danni: PayloadPrepiskaZapisana, z: Zayavka): Promise<Rezultat> {
-    proveriPrepiskata(danni.kontakt, danni.kakvo, danni.sastoyanie);
+    proveriPrepiskata(danni);
     return this.#pusni('ПреписказЗаписана', VID.prepiska, id, danni, z);
   }
 

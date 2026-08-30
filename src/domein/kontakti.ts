@@ -42,6 +42,7 @@
  */
 
 import { sverka, MERKA, type Sverka } from '../yadro/sverka.js';
+import { OTSENKI, type Otsenka } from './dela.js';
 
 export class GreshkaKontakt extends Error {
   constructor(message: string) {
@@ -122,6 +123,27 @@ export interface Prepiska {
    * И е САМО ДАТА, без час: „**Не, само дата**" *(р57·[34])*.
    */
   readonly zaVzimane: string;
+  /**
+   * ЧАСЪТ · „преписката има… и **дата с час**" *(негова дума, 30.08)*.
+   *
+   * ПО ИЗБОР, „ЧЧ:ММ" или празно. Празното значи „само дата" — точно каквото
+   * беше преписката до резен 41, тъй че всеки вече записан ред остава верен без
+   * да се пипа (правило 1). Задължителен час щеше да поиска човек да измисли
+   * число за всяка стара преписка, и то щеше да се брои като данни.
+   *
+   * И той е ЧАС НА ПРЕПИСКАТА, не на светофара: дните до срока се броят по
+   * КАЛЕНДАР, а не по часовник — иначе преписка в 23:00 и преписка в 01:00 на
+   * същия ден щяха да светят различно.
+   */
+  readonly chas: string;
+  /** ОТ УПРАВЛЕНИЕ · кой я върши · празно значи „още не е казано" */
+  readonly otgovornik: string;
+  /** ОТ УПРАВЛЕНИЕ · Айзенхауер, същите пет думи като при делото */
+  readonly otsenka: Otsenka;
+  /** КЪМ КАКВО е закачена · „имот" · „дело" · празно значи „към нищо" */
+  readonly zakachenaKam: VidNaZakachaneto;
+  /** идентификаторът на закаченото · празен, когато видът е празен */
+  readonly zakachenaId: string;
   readonly sastoyanie: SastoyanieNaPrepiska;
   readonly seq: number;
   readonly kogato: string;
@@ -129,22 +151,106 @@ export interface Prepiska {
 }
 
 /**
+ * КЪМ КАКВО СЕ ЗАКАЧА ЕДНА ПРЕПИСКА · негова дума, 30.08:
+ *
+ *   „преписката има всичко което се попълва в Управление като данни и дата с
+ *    час, **както и имот, дело или поддело**."
+ *
+ * ТРИТЕ МУ ДУМИ СА ДВА ВИДА, и това не е свиване. Подделото Е дело — то е дело
+ * с `nadDelo`, и второ име за него в кода би направило от една същност две.
+ * Трите се виждат там, където той ги е казал: в МЕНЮТО, където подделата стоят
+ * с номера си (1.2 · 1.2.3) и се четат като поддела.
+ *
+ * ЕДНО закачане, не списък. Преписка, закачена и за имот, и за дело, отговаря
+ * два пъти на въпроса „къде е това" — а двата отговора могат да се разминат.
+ */
+export const VIDOVE_ZAKACHANE = ['имот', 'дело'] as const;
+export type VidNaZakachaneto = (typeof VIDOVE_ZAKACHANE)[number] | '';
+
+/**
  * ПРОВЕРКАТА на преписката · контактът и какво, останалото по избор.
  *
  * Преписка без контакт е бележка, не преписка — тя не може да влезе в „с кого".
  * Преписка без „какво" е празен ред, който заема място в списъка за взимане.
  */
-export function proveriPrepiskata(kontakt: string, kakvo: string, sastoyanie: string): void {
-  if (kontakt.trim() === '') {
+export function proveriPrepiskata(n: {
+  readonly kontakt: string;
+  readonly kakvo: string;
+  readonly sastoyanie: string;
+  readonly zaVzimane: string;
+  readonly chas: string;
+  readonly otsenka: string;
+  readonly zakachenaKam: string;
+  readonly zakachenaId: string;
+}): void {
+  if (n.kontakt.trim() === '') {
     throw new GreshkaKontakt('Преписката няма контакт. „С кого" е половината от нея.');
   }
-  if (kakvo.trim() === '') {
+  if (n.kakvo.trim() === '') {
     throw new GreshkaKontakt('Преписката няма „за какво". Празен ред заема място и не казва нищо.');
   }
-  if (!(SASTOYANIYA_NA_PREPISKA as readonly string[]).includes(sastoyanie)) {
+  if (!(SASTOYANIYA_NA_PREPISKA as readonly string[]).includes(n.sastoyanie)) {
     throw new GreshkaKontakt(
-      `Непознато състояние „${sastoyanie}". Изброените са: ` +
+      `Непознато състояние „${n.sastoyanie}". Изброените са: ` +
         `${SASTOYANIYA_NA_PREPISKA.join(' · ')}.`,
+    );
+  }
+  if (!(OTSENKI as readonly string[]).includes(n.otsenka)) {
+    throw new GreshkaKontakt(
+      `Непозната оценка „${n.otsenka}". Тя е СЪЩАТА като при делото — ` +
+        `${OTSENKI.join(' · ')} — защото преписката е работа, а работата се мери еднакво.`,
+    );
+  }
+  proveriChasa(n.chas, n.zaVzimane);
+  proveriZakachaneto(n.zakachenaKam, n.zakachenaId);
+}
+
+/**
+ * ЧАСЪТ · „ЧЧ:ММ" или празно, и час БЕЗ дата се отказва.
+ *
+ * Час без дата е обещание без ден: той не може нито да свети, нито да влезе в
+ * червения списък, а на екрана изглежда като уговорено време.
+ */
+function proveriChasa(chas: string, zaVzimane: string): void {
+  if (chas === '') return;
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(chas)) {
+    throw new GreshkaKontakt(
+      `Нечетим час „${chas}". Очаква се ЧЧ:ММ (24-часов) или празно. ` +
+        'Празното значи „само дата" — то е нормален случай, не пропуск.',
+    );
+  }
+  if (zaVzimane.trim() === '') {
+    throw new GreshkaKontakt(
+      `Час „${chas}" без дата. Час без ден не свети и не влиза в червения списък, ` +
+        'а на екрана изглежда като уговорено време.',
+    );
+  }
+}
+
+/**
+ * ЗАКАЧАНЕТО · видът и адресът вървят ЗАЕДНО или ги няма.
+ *
+ * Вид без адрес е надпис „закачено за дело", зад който няма дело; адрес без вид
+ * е низ, който никой не знае къде да търси. Двете половини се отказват поотделно
+ * и с думи, защото и двете грешки изглеждат еднакво на екрана: празна клетка.
+ */
+function proveriZakachaneto(kam: string, id: string): void {
+  if (kam === '' && id.trim() === '') return;
+  if (kam === '') {
+    throw new GreshkaKontakt(
+      `Има адрес „${id}", но не е казано КЪМ КАКВО. Изброените са: ` +
+        `${VIDOVE_ZAKACHANE.join(' · ')}.`,
+    );
+  }
+  if (!(VIDOVE_ZAKACHANE as readonly string[]).includes(kam)) {
+    throw new GreshkaKontakt(
+      `Непознат вид закачане „${kam}". Изброените са: ${VIDOVE_ZAKACHANE.join(' · ')} — ` +
+        'подделото Е дело, затова свой вид няма.',
+    );
+  }
+  if (id.trim() === '') {
+    throw new GreshkaKontakt(
+      `Казано е „${kam}", но не е казано КОЕ. Вид без адрес е надпис, зад който няма нищо.`,
     );
   }
 }
@@ -335,5 +441,90 @@ export function proveriSreshtata(
 export function predstoyashtiSreshti(sreshti: readonly Sreshta[]): readonly Sreshta[] {
   return Object.freeze(
     sreshti.filter((s) => s.sastoyanie === 'чака').sort((a, b) => a.data.localeCompare(b.data)),
+  );
+}
+
+// ── КЪДЕ Е ЗАКАЧЕНА ЕДНА ПРЕПИСКА (резен 41) ──────────────────────────────
+
+/**
+ * МЯСТОТО И ОБЕКТЪТ НЕ СЕ ПРЕПИСВАТ · СМЯТАТ СЕ от закаченото (правило 17).
+ *
+ * Той казва „преписката има всичко което се попълва в Управление като данни…
+ * както и имот, дело или поддело". Първата половина изкушава да се препишат
+ * Място и Обект в самата преписка — и точно това не се прави: делото вече ги
+ * носи, имотът също. Преписан адрес остарява в мига, в който делото се премести,
+ * и после два реда казват различно за едно място.
+ *
+ * Затова тук стои ЧЕТЕНЕ, не поле: закачането носи вида и адреса, а името се
+ * чете от онова, за което е закачено. Изчезнало закачане се КАЗВА поименно —
+ * дело, което вече го няма, не бива да минава за „никъде".
+ */
+export interface Zakachaneto {
+  readonly kam: VidNaZakachaneto;
+  /** какво пише на екрана · „—" когато няма закачане */
+  readonly nadpis: string;
+  /** намери ли се онова, за което е закачена */
+  readonly nameren: boolean;
+}
+
+export function zakachanetoNa(
+  p: Prepiska,
+  imoti: ReadonlyMap<string, { readonly adres: string; readonly edinitsa: string }>,
+  dela: ReadonlyMap<string, { readonly myasto: string; readonly obekt: string; readonly ime: string }>,
+): Zakachaneto {
+  if (p.zakachenaKam === '') return Object.freeze({ kam: '', nadpis: '—', nameren: true });
+  if (p.zakachenaKam === 'имот') {
+    const i = imoti.get(p.zakachenaId);
+    return i
+      ? Object.freeze({
+          kam: 'имот' as const,
+          nadpis: i.edinitsa === '' ? i.adres : `${i.adres} · ${i.edinitsa}`,
+          nameren: true,
+        })
+      : Object.freeze({ kam: 'имот' as const, nadpis: 'имотът вече го няма', nameren: false });
+  }
+  const d = dela.get(p.zakachenaId);
+  if (!d) return Object.freeze({ kam: 'дело' as const, nadpis: 'делото вече го няма', nameren: false });
+  const kade = [d.myasto, d.obekt].filter((x) => x !== '').join(' · ');
+  return Object.freeze({
+    kam: 'дело' as const,
+    nadpis: kade === '' ? d.ime : `${d.ime} · ${kade}`,
+    nameren: true,
+  });
+}
+
+/**
+ * КОГА · датата и часът, слепени за екрана и за календара.
+ *
+ * Празната дата дава празен низ; дата без час дава само датата. Слепени с
+ * интервал, а не с „T": това е четиво за човек, не ISO за машина — ISO-то се
+ * прави там, където тръгва към календара.
+ */
+export function kogaEZaVzimane(p: Prepiska): string {
+  if (p.zaVzimane === '') return '';
+  return p.chas === '' ? p.zaVzimane : `${p.zaVzimane} ${p.chas}`;
+}
+
+/**
+ * СВЕРКАТА НА ЗАКАЧАНЕТО · вход↔изход, и нулата се записва (правило 7).
+ *
+ * ВХОД: преписките, които ТВЪРДЯТ закачане. ИЗХОД: онези, чието закачане се
+ * НАМИРА. Разлика значи преписка, увиснала на изтрито дело или имот — тя
+ * изглежда закачена и на екрана, и в износа, а зад нея няма нищо.
+ */
+export function sveriZakachaniyata(
+  prepiski: readonly Prepiska[],
+  imoti: ReadonlyMap<string, { readonly adres: string; readonly edinitsa: string }>,
+  dela: ReadonlyMap<string, { readonly myasto: string; readonly obekt: string; readonly ime: string }>,
+  kogato: string,
+): Sverka {
+  const tvardyat = prepiski.filter((p) => p.zakachenaKam !== '');
+  const namereni = tvardyat.filter((p) => zakachanetoNa(p, imoti, dela).nameren);
+  return sverka(
+    'преписки · закачени ↔ намерени',
+    tvardyat.length,
+    namereni.length,
+    kogato,
+    MERKA.broy,
   );
 }

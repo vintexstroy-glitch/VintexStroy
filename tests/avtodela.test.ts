@@ -162,7 +162,7 @@ async function tritefIzvora() {
   );
   await deystviya.zapishiPrepiska(
     'pr-1',
-    { kontakt: 'Иван Петров', kakvo: 'договор за подпис', zaVzimane: sled(1), sastoyanie: 'чака' },
+    { kontakt: 'Иван Петров', kakvo: 'договор за подпис', zaVzimane: sled(1), chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
     { opId: 'op-pr' },
   );
   await deystviya.zapishiSreshta(
@@ -189,6 +189,50 @@ describe('червеният списък', () => {
     expect([...avto].sort((a, b) => a.do.localeCompare(b.do)).map((a) => a.do)).toEqual(
       avto.map((a) => a.do),
     );
+  });
+
+  it('при преписка „с кого" е ОТГОВОРНИКЪТ, не контактът', async () => {
+    // НАХОДКА (резен 41): нито един тест не твърдеше чие име стои в колоната,
+    // тъй че връщането ѝ на контакта минаваше. Двамата са РАЗЛИЧНИ хора:
+    // контактът е онзи, С КОГОТО е преписката; отговорникът — онзи, КОЙТО я
+    // върши. В списък „кое гори" човек търси второто.
+    const { deystviya } = stend();
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { kontakt: 'Иван Петров', kakvo: 'договор', zaVzimane: sled(1), chas: '',
+        otgovornik: 'Николай Петков', otsenka: 'спешно-важно',
+        zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
+      { opId: 'op-1' },
+    );
+    const avto = avtoDelata(await deystviya.ogledalo(), DNES);
+    expect(avto[0]!.kogo).toBe('Николай Петков');
+
+    // А БЕЗ отговорник пада обратно на контакта · по-добре нечие име от тире.
+    const { deystviya: d2 } = stend();
+    await d2.zapishiPrepiska(
+      'pr-1',
+      { kontakt: 'Иван Петров', kakvo: 'договор', zaVzimane: sled(1), chas: '',
+        otgovornik: '', otsenka: 'нито-едно',
+        zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
+      { opId: 'op-1' },
+    );
+    expect(avtoDelata(await d2.ogledalo(), DNES)[0]!.kogo).toBe('Иван Петров');
+  });
+
+  it('и КЪДЕ идва от закачането · сметнато, не преписано', async () => {
+    const { deystviya } = stend();
+    await deystviya.dobaviImot(
+      'I-1', { adres: 'Малинова', edinitsa: 'бл. 1', ploshtad_kvsm: 0 }, { opId: 'op-i' },
+    );
+    await deystviya.zapishiPrepiska(
+      'pr-1',
+      { kontakt: 'Иван', kakvo: 'нотариален акт', zaVzimane: sled(1), chas: '',
+        otgovornik: '', otsenka: 'нито-едно',
+        zakachenaKam: 'имот', zakachenaId: 'I-1', sastoyanie: 'чака' },
+      { opId: 'op-1' },
+    );
+    const avto = avtoDelata(await deystviya.ogledalo(), DNES);
+    expect(avto[0]!.ime).toBe('нотариален акт · Малинова · бл. 1');
   });
 
   it('червеното са само горящите и просрочените · ЖЪЛТОТО остава вън', async () => {
@@ -254,7 +298,7 @@ describe('червеният списък', () => {
     const { deystviya } = stend();
     await deystviya.zapishiPrepiska(
       'pr-1',
-      { kontakt: 'Иван', kakvo: 'далечно', zaVzimane: sled(46), sastoyanie: 'чака' },
+      { kontakt: 'Иван', kakvo: 'далечно', zaVzimane: sled(46), chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
       { opId: 'op-1' },
     );
     await deystviya.zapishiSreshta(
@@ -277,13 +321,13 @@ describe('червеният списък', () => {
     const { deystviya } = stend();
     await deystviya.zapishiPrepiska(
       'pr-1',
-      { kontakt: 'Иван', kakvo: 'договор', zaVzimane: sled(1), sastoyanie: 'чака' },
+      { kontakt: 'Иван', kakvo: 'договор', zaVzimane: sled(1), chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'чака' },
       { opId: 'op-1' },
     );
     expect(avtoDelata(await deystviya.ogledalo(), DNES)).toHaveLength(1);
     await deystviya.zapishiPrepiska(
       'pr-1',
-      { kontakt: 'Иван', kakvo: 'договор', zaVzimane: sled(1), sastoyanie: 'взето' },
+      { kontakt: 'Иван', kakvo: 'договор', zaVzimane: sled(1), chas: '', otgovornik: '', otsenka: 'нито-едно', zakachenaKam: '', zakachenaId: '', sastoyanie: 'взето' },
       { opId: 'op-2' },
     );
     expect(avtoDelata(await deystviya.ogledalo(), DNES)).toHaveLength(0);

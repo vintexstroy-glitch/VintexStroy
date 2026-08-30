@@ -16,17 +16,27 @@
 
 import {
   imenataNaKontaktite,
+  kogaEZaVzimane,
   kontaktite,
   predstoyashtiSreshti,
   SASTOYANIYA_NA_PREPISKA,
   SASTOYANIYA_NA_SRESHTA,
   sveriKontaktite,
+  sveriZakachaniyata,
+  zakachanetoNa,
   zaVzimane,
   type Kontakt,
   type Prepiska,
   type Sreshta,
 } from '../src/domein/kontakti.js';
-import { svetofarNaSroka } from '../src/domein/dela.js';
+import {
+  IMENA_NA_OTSENKITE,
+  nomeraPoDarvo,
+  OTSENKI,
+  podredeniPoDarvo,
+  svetofarNaSroka,
+  zhivite,
+} from '../src/domein/dela.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 import { ekraniraj } from './obshto.js';
@@ -103,16 +113,20 @@ export function narisuvayKontaktite(o: Ogledalo, dnes: string): string {
       </div>
     </div>
 
-    ${sektsiyaPrepiski(prepiski, imena, dnes)}
+    ${sektsiyaPrepiski(o, prepiski, imena, dnes)}
     ${sektsiyaKontakti(redove, sv, sreshti, imena, dnes)}`;
 }
 
 /** ПЪРВАТА секция · работата. */
 function sektsiyaPrepiski(
+  o: Ogledalo,
   prepiski: readonly Prepiska[],
   imena: readonly string[],
   dnes: string,
 ): string {
+  const zhivi = zhivite([...o.dela.values()]);
+  const nomera = nomeraPoDarvo(podredeniPoDarvo(zhivi, dnes, o.rachniyatRedNaDelata));
+  const svZ = sveriZakachaniyata(prepiski, o.imoti, o.dela, dnes);
   const podredeni = [...prepiski].sort(
     (a, b) => (b.zaVzimane || '0').localeCompare(a.zaVzimane || '0') || a.kakvo.localeCompare(b.kakvo, 'bg'),
   );
@@ -141,7 +155,50 @@ function sektsiyaPrepiski(
           <div class="pole">
             <label for="prep-data">Кога е за взимане (по избор)</label>
             <input translate="no" type="date" id="prep-data" name="zaVzimane">
-            <span class="drebno">САМО дата, без час — „Не, само дата".</span>
+          </div>
+          <div class="pole">
+            <label for="prep-chas">Час (по избор)</label>
+            <input translate="no" type="time" id="prep-chas" name="chas">
+            <span class="drebno">Празен час значи „само дата".</span>
+          </div>
+          <div class="pole">
+            <label for="prep-otgovornik">Отговорник</label>
+            <input translate="no" id="prep-otgovornik" name="otgovornik" autocomplete="off"
+                   list="spisak-kontakti" placeholder="кой я върши">
+          </div>
+          <div class="pole">
+            <label for="prep-otsenka">Оценка</label>
+            <select translate="no" id="prep-otsenka" name="otsenka">
+              ${OTSENKI.map((x) => `<option value="${x}">${IMENA_NA_OTSENKITE[x]}</option>`).join('')}
+            </select>
+          </div>
+          <div class="pole">
+            <label for="prep-zakachena">Имот, дело или поддело (по избор)</label>
+            <select translate="no" id="prep-zakachena" name="zakachena">
+              <option value="">— към нищо —</option>
+              <optgroup label="Имоти">
+                ${[...o.imoti.values()]
+                  .map(
+                    (i) =>
+                      `<option value="имот:${ekraniraj(i.id)}">${ekraniraj(
+                        i.edinitsa === '' ? i.adres : `${i.adres} · ${i.edinitsa}`,
+                      )}</option>`,
+                  )
+                  .join('')}
+              </optgroup>
+              <optgroup label="Дела и поддела">
+                ${podredeniPoDarvo(zhivi, dnes, o.rachniyatRedNaDelata)
+                  .map(
+                    (d) =>
+                      // НОМЕРЪТ прави подделото четимо като поддело: 1.2.3 казва
+                      // трета степен по-ясно от всеки отстъп в падащо меню.
+                      `<option value="дело:${ekraniraj(d.id)}">${ekraniraj(
+                        `${nomera.get(d.id) ?? ''} ${d.ime}`.trim(),
+                      )}</option>`,
+                  )
+                  .join('')}
+              </optgroup>
+            </select>
           </div>
           <div class="pole">
             <label for="prep-sastoyanie">Състояние</label>
@@ -165,7 +222,8 @@ function sektsiyaPrepiski(
           : `<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="prepiski">
           <thead>
-            <tr><th>С кого</th><th>За какво</th><th>За взимане</th><th>Състояние</th></tr>
+            <tr><th>С кого</th><th>За какво</th><th>За взимане</th><th>Отговорник</th>
+                <th>Оценка</th><th>Имот · дело</th><th>Състояние</th></tr>
           </thead>
           <tbody>${podredeni
             .map(
@@ -174,7 +232,14 @@ function sektsiyaPrepiski(
                 data-sastoyanie="${ekraniraj(p.sastoyanie)}">
               <td translate="no">${ekraniraj(p.kontakt)}</td>
               <td translate="no">${ekraniraj(p.kakvo)}</td>
-              <td translate="no">${p.zaVzimane === '' ? '—' : ekraniraj(p.zaVzimane)}</td>
+              <td translate="no" data-koga="${ekraniraj(kogaEZaVzimane(p))}">${
+                kogaEZaVzimane(p) === '' ? '—' : ekraniraj(kogaEZaVzimane(p))
+              }</td>
+              <td translate="no">${p.otgovornik === '' ? '—' : ekraniraj(p.otgovornik)}</td>
+              <td data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(IMENA_NA_OTSENKITE[p.otsenka])}</td>
+              <td translate="no" data-zakachena="${ekraniraj(p.zakachenaKam)}"${
+                zakachanetoNa(p, o.imoti, o.dela).nameren ? '' : ' data-izgubena'
+              }>${ekraniraj(zakachanetoNa(p, o.imoti, o.dela).nadpis)}</td>
               <td>${padashtoSastoyanie('prepiska', p.id, p.sastoyanie, SASTOYANIYA_NA_PREPISKA)}</td>
             </tr>`,
             )
@@ -183,7 +248,15 @@ function sektsiyaPrepiski(
       </div>`
       }
       <p class="drebno">Без дата преписката НЕ свети: подразбран срок би оцветил
-      в червено работа, за която никой не е бързал.</p>
+      в червено работа, за която никой не е бързал. Часът е ПО ИЗБОР — празен час
+      значи „само дата", и дните до срока се броят по КАЛЕНДАР, не по часовник.</p>
+
+      <p class="drebno">Мястото и обектът НЕ се преписват в преписката: те идват от
+      онова, за което е закачена. Преписан адрес остарява в мига, в който делото се
+      премести, и после два реда казват различно за едно място.</p>
+
+      <p class="drebno" data-zakachvane-sverka>Сверка вход↔изход: ${svZ.vhod} закачени преписки →
+      ${svZ.izhod} намерени, разлика ${svZ.razlika}.</p>
     </section>`;
 }
 
@@ -350,6 +423,36 @@ function blokSreshti(
     ангажимент без изход би светил вечно.</p>`;
 }
 
+/**
+ * ФОРМАТА → ТОВАРА · ЕДИН дом за четенето (правило 17).
+ *
+ * Двата викащи — новата преписка и смяната на състоянието от реда — четат
+ * едни и същи полета. Написано два пъти, второто място се разминава при
+ * първото ново поле: точно това щеше да стане при `chas` и закачането.
+ *
+ * ЗАКАЧАНЕТО идва като ЕДИН низ „вид:адрес", защото в едно падащо меню то Е
+ * един избор. Разделя се тук, до мястото, където се чете.
+ */
+function otPoletata(d: FormData): {
+  kontakt: string; kakvo: string; zaVzimane: string; chas: string;
+  otgovornik: string; otsenka: string; zakachenaKam: string; zakachenaId: string;
+  sastoyanie: string;
+} {
+  const izbor = String(d.get('zakachena') ?? '');
+  const dvoetochie = izbor.indexOf(':');
+  return {
+    kontakt: String(d.get('kontakt') ?? '').trim(),
+    kakvo: String(d.get('kakvo') ?? '').trim(),
+    zaVzimane: String(d.get('zaVzimane') ?? ''),
+    chas: String(d.get('chas') ?? ''),
+    otgovornik: String(d.get('otgovornik') ?? '').trim(),
+    otsenka: String(d.get('otsenka') ?? 'нито-едно'),
+    zakachenaKam: dvoetochie === -1 ? '' : izbor.slice(0, dvoetochie),
+    zakachenaId: dvoetochie === -1 ? '' : izbor.slice(dvoetochie + 1),
+    sastoyanie: String(d.get('sastoyanie') ?? 'чака'),
+  };
+}
+
 export function zakachiKontaktite(
   koren: HTMLElement,
   k: Konteks,
@@ -393,7 +496,20 @@ export function zakachiKontaktite(
           if (!p) return;
           await k.deystviya.zapishiPrepiska(
             id,
-            { kontakt: p.kontakt, kakvo: p.kakvo, zaVzimane: p.zaVzimane, sastoyanie: el.value },
+            {
+              // ВСИЧКИТЕ полета се пренасят, не само променяното: товарът е
+              // ЦЯЛОТО състояние на записа, и пропуснато поле щеше да се чете
+              // като „изтрито" при следващото сгъване (правило 1).
+              kontakt: p.kontakt,
+              kakvo: p.kakvo,
+              zaVzimane: p.zaVzimane,
+              chas: p.chas,
+              otgovornik: p.otgovornik,
+              otsenka: p.otsenka,
+              zakachenaKam: p.zakachenaKam,
+              zakachenaId: p.zakachenaId,
+              sastoyanie: el.value,
+            },
             { opId: `prepiska:${crypto.randomUUID()}` },
           );
         } else {
@@ -446,12 +562,7 @@ export function zakachiKontaktite(
     try {
       await k.deystviya.zapishiPrepiska(
         crypto.randomUUID(),
-        {
-          kontakt: String(d.get('kontakt') ?? '').trim(),
-          kakvo: String(d.get('kakvo') ?? '').trim(),
-          zaVzimane: String(d.get('zaVzimane') ?? ''),
-          sastoyanie: String(d.get('sastoyanie') ?? 'чака'),
-        },
+        otPoletata(d),
         { opId: `prepiska:${crypto.randomUUID()}` },
       );
     } catch (err) {
