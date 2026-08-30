@@ -681,6 +681,49 @@ describe('съгласуването · претеглената цена от �
   });
 });
 
+describe('група Г · липсващото НЕ се заглажда до нула (резен 47)', () => {
+  /**
+   * НУЛАТА Е СЕНТИНЕЛ ЗА „НЕ Е ДАДЕНО", не цена.
+   *
+   * Дотук сентинелът важеше само когато ДВЕТЕ разходни числа са нула. При ЕДНО
+   * липсващо подходът смяташе наполовина и раждаше число, което ИЗГЛЕЖДА
+   * сметнато — после то влизаше в съгласуването и дърпаше крайното надолу.
+   */
+  const sChisla = (zemya: number, stroitelna: number) => ({
+    ...MATRITSA_ZA_RAZRABOTKA,
+    zemya_st_kvm: { ...MATRITSA_ZA_RAZRABOTKA.zemya_st_kvm, apartament: zemya },
+    stroitelna_st_kvm: { ...MATRITSA_ZA_RAZRABOTKA.stroitelna_st_kvm, apartament: stroitelna },
+  });
+  const STO_KVM = 1_000_000; // 100 м² в кв.см · с ръка, както и в съседния блок
+  const po = (m: ReturnType<typeof sChisla>): number =>
+    tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: m });
+
+  it('и ДВЕТЕ числа дадени · подходът ражда число', () => {
+    expect(po(sChisla(50_000, 100_000))).toBeGreaterThan(0);
+  });
+
+  it('ЕДНО липсващо · подходът НЕ ражда число, вместо да смята наполовина', () => {
+    // Числата с ръка: 100 кв.м × 500 €/м² земя биха дали НЕ-нула, ако липсата
+    // на строителна се заглаждаше. Точно това правеше кодът досега.
+    expect(po(sChisla(50_000, 0))).toBe(0);
+    expect(po(sChisla(0, 100_000))).toBe(0);
+  });
+
+  it('и ДВЕТЕ липсващи · същото, както преди', () => {
+    expect(po(sChisla(0, 0))).toBe(0);
+  });
+
+  it('а отпадналият подход се НАЗОВАВА, не се премълчава (правило 15)', () => {
+    const sag = saglasuvana({
+      pazaren_st: 100_00,
+      dohoden_st: 200_00,
+      razhoden_st: po(sChisla(50_000, 0)),
+      tegla: MATRITSA_ZA_RAZRABOTKA.tegla,
+    });
+    expect(sag.otpadnali).toContain('разходен');
+  });
+});
+
 describe('пиновете · главата и думата се твърдят с ръка (резен 46 · група В)', () => {
   it('главата на Ценовата листа е ЕДИНАЙСЕТ колони', () => {
     expect(GLAVA_NA_TSENITE).toHaveLength(11);

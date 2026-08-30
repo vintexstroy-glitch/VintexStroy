@@ -311,7 +311,9 @@ function redoveNaV(n: Nastroyki, v: Vhod): RedNaRazbivka[] {
   const redove: RedNaRazbivka[] = [];
   const zemya_st_kvm = n.zemya_st_kvm[v.vid] ?? 0;
   const stroitelna_st_kvm = n.stroitelna_st_kvm[v.vid] ?? 0;
-  if (v.obshta_kvsm <= 0 || (zemya_st_kvm === 0 && stroitelna_st_kvm === 0)) return redove;
+  // ИЛИ, не И · едно липсващо число спира целия подход (`tsenaPoRazhod`), тъй
+  // че разбивката не бива да рисува редове за сметка, която не се прави.
+  if (v.obshta_kvsm <= 0 || zemya_st_kvm === 0 || stroitelna_st_kvm === 0) return redove;
 
   const m = matritsaOtNastroyki(n);
   const kvm = kvSmVM2(v.obshta_kvsm);

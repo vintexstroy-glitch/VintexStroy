@@ -492,6 +492,30 @@ describe('дадено срещу чакащо · базите на Калкул
   });
 });
 
+describe('група Г · разбивката не рисува сметка, която не се прави (резен 47)', () => {
+  /**
+   * НАМЕРЕНО СЪС СЧУПВАНЕ, не с четене: върнах условието на разбивката към „И"
+   * и НИТО ЕДИН тест не падна. Тоест поправката в `tsenaPoRazhod` се пазеше, а
+   * съседката ѝ — не: числото щеше да е нула, а редовете щяха да го обясняват.
+   */
+  const sChisla = (zemya: number, stroitelna: number) => ({
+    ...PO_PODRAZBIRANE,
+    zemya_st_kvm: { ...PO_PODRAZBIRANE.zemya_st_kvm, apartament: zemya },
+    stroitelna_st_kvm: { ...PO_PODRAZBIRANE.stroitelna_st_kvm, apartament: stroitelna },
+  });
+  const redoveNaV = (n: ReturnType<typeof sChisla>): number =>
+    razbivka(n, { ...PRIMEREN_OBEKT, dobavki: {} }).v.length;
+
+  it('и двете числа дадени · В носи редове', () => {
+    expect(redoveNaV(sChisla(50_000, 100_000))).toBeGreaterThan(0);
+  });
+
+  it('ЕДНО липсващо · В няма НИТО ЕДИН ред', () => {
+    expect(redoveNaV(sChisla(50_000, 0))).toBe(0);
+    expect(redoveNaV(sChisla(0, 100_000))).toBe(0);
+  });
+});
+
 describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
   it('настройките по подразбиране носят ЧЕТИРИНАЙСЕТ полета', () => {
     expect(Object.keys(PO_PODRAZBIRANE)).toHaveLength(14);
