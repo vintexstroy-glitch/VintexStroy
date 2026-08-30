@@ -2066,3 +2066,41 @@ table.razbivka .drebno { font-size: 0.75rem; }
 }
 /* Обяснението до реда НЕ се зачертава — то е онова, което трябва да се ЧЕТЕ. */
 .red.pogasen .kletka > span { text-decoration: none; }
+
+/* ═══ КАЛЕНДАРЪТ · месечната мрежа с цифрите (резен 40 · И90) ═══
+   Седем колони, винаги — понеделник първи, българската норма. Мрежата се пише
+   с `repeat(7, …)`, а не с брой от кода: клетките са СЕДЕМ по устройство, не по
+   сметка, и число от кода тук би могло да се разбие с число от домейна. */
+.kalendar {
+  border: 1px solid var(--liniya); border-radius: 6px; overflow: hidden;
+  background: #FFFFFF; margin-bottom: 10px;
+}
+.kalendar-glava, .kalendar-sedmitsa { display: grid; grid-template-columns: repeat(7, 1fr); }
+.kalendar-glava {
+  background: var(--hartiya); border-bottom: 1px solid var(--liniya);
+  font-size: 0.75rem; color: var(--mastilo2);
+}
+.kalendar-glava span { padding: 5px 8px; text-align: right; }
+.kalendar-sedmitsa + .kalendar-sedmitsa { border-top: 1px solid var(--liniya); }
+.kalendar-den {
+  min-height: 58px; padding: 4px 6px; border-left: 1px solid var(--liniya);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.kalendar-den:first-child { border-left: none; }
+.kalendar-chislo { font-size: 0.75rem; color: var(--mastilo2); font-variant-numeric: tabular-nums; }
+/* ЧУЖДИЯТ ДЕН държи решетката права и нищо друго — сив, без числа. */
+.kalendar-den.chuzhd { background: var(--hartiya); }
+.kalendar-den.chuzhd .kalendar-chislo { opacity: 0.4; }
+.kalendar-den.dnes { background: var(--toplo); }
+.kalendar-den.dnes .kalendar-chislo { font-weight: 600; }
+.kalendar-pari {
+  display: flex; flex-direction: column; align-items: flex-end;
+  font-size: 0.679rem; line-height: 1.25; font-variant-numeric: tabular-nums;
+}
+/* ДВЕТЕ ЧИСЛА НЕ СЕ СЛИВАТ · същите два цвята като под решетката на Ганта. */
+.kalendar-pari b, .kalendar-sbor b { color: var(--zeleno); font-weight: 500; }
+.kalendar-pari i, .kalendar-sbor i { color: var(--aktsent); font-style: normal; }
+.kalendar-sbor {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  font-variant-numeric: tabular-nums; margin-bottom: 6px;
+}

@@ -70,6 +70,7 @@ import {
   mesetsatKatoTablitsa,
   type RedNaMesetsa,
 } from '../src/domein/mesetsat.js';
+import { narisuvayKalendara } from './kalendarat.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
 import { legendata, zakachiPole } from './vhodni-problemi.js';
@@ -352,6 +353,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     </section>
 
     ${narisuvayKoefitsientite(o, dnes)}
+
+    ${narisuvayKalendara(o, mesets, dnes)}
 
     ${blokMesetsatZaAgenta(o, mesets)}
 

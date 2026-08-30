@@ -334,7 +334,7 @@ export function otcheti(
 }
 
 /** Двете суми за един ден · приход и разход, поотделно. */
-interface DenSPari {
+export interface DenSPari {
   readonly data: string;
   readonly prihod_st: number;
   readonly razhod_st: number;

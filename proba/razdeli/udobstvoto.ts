@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -1955,4 +1955,63 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-avtodelo]', (e) => e.length), prediZatvaryane - 1);
     proveri('и то БЕЗ сторно · затворен е изворът, не делото',
       await p.$$eval('[data-izvor=среща]', (e) => e.length), 0);
+
+    // ═══ 118 · КАЛЕНДАРЪТ · цифрите в полето на деня (И90 · резен 40) ═══
+    //
+    // „Както и всички приходи и разходи са с цифри в полето на календара."
+    // *(И90 · 23.08)*
+    //
+    // Разделът СЛЕД §117 по същата причина: той чете екрана Сметки, чиито
+    // числа зависят от всичко, писано дотук.
+
+    razdel = '118 · Календарът · седем колони, понеделник пръв';
+    await naEkran(p, 'smetki', '[data-sektsiya=smetki-kalendar]');
+    proveri('главата носи СЕДЕМ дни',
+      await p.$$eval('.kalendar-glava span', (e) => e.length), 7);
+    proveri('и първият е ПОНЕДЕЛНИК · българската норма',
+      await p.$eval('.kalendar-glava span', (e) => e.textContent.trim()), 'пн');
+    const sedmitsi = await p.$$eval('.kalendar-sedmitsa', (e) =>
+      e.map((x) => x.children.length));
+    proveri('всяка седмица е СЕДЕМ клетки, винаги',
+      JSON.stringify([...new Set(sedmitsi)]), JSON.stringify([7]));
+
+    razdel = '118 · Календарът · чуждият ден стои, но е ПРАЗЕН';
+    const chuzhdi = await p.$$eval('.kalendar-den[data-chuzhd]', (e) => e.length);
+    proveri('мрежата е правоъгълна · има чужди дни',
+      chuzhdi > 0, true);
+    proveri('и НИТО ЕДИН от тях не носи числа',
+      await p.$$eval('.kalendar-den[data-chuzhd] .kalendar-pari', (e) => e.length), 0);
+    proveri('екранът КАЗВА защо стоят',
+      (await tekstNa(p, '[data-sektsiya=smetki-kalendar]')).includes('държат\n      решетката права')
+        || (await tekstNa(p, '[data-sektsiya=smetki-kalendar]')).includes('решетката права'), true);
+
+    razdel = '118 · Календарът · цифрите СТОЯТ в полето на деня';
+    const sPari = await p.$$eval('.kalendar-den.s-pari', (e) => e.length);
+    proveri('поне един ден носи движение', sPari > 0, true);
+    proveri('и броят е СМЕТНАТ, не преписан',
+      await p.$eval('[data-kalendar]', (e) => Number((e as any).dataset.dniSPari)), sPari);
+    proveri('всяко поле с пари носи ДВЕТЕ числа, не едно',
+      await p.$$eval('.kalendar-den.s-pari .kalendar-pari b', (e) => e.length), sPari);
+    proveri('и разходът стои до прихода',
+      await p.$$eval('.kalendar-den.s-pari .kalendar-pari i', (e) => e.length), sPari);
+
+    razdel = '118 · Календарът · сборът и сверката';
+    proveri('месецът има свой сбор',
+      (await tekstNa(p, '.kalendar-sbor')).includes('Месецът'), true);
+    proveri('сверката стои и е нула',
+      (await tekstNa(p, '[data-kalendar-sverka]')).replace(/\s+/g, ' ').includes('разлика 0,00'), true);
+    proveri('и екранът казва, че двете числа НЕ се сливат',
+      (await tekstNa(p, '[data-sektsiya=smetki-kalendar]')).includes('не е празен ден'), true);
+
+    razdel = '118 · Календарът · слуша СЪЩИЯ месец като Сметки';
+    const predi118 = await p.$eval('[data-kalendar]', (e) => (e as any).dataset.kalendar);
+    await deystvieSPrerisuvane(p, async () => {
+      await napishiVPoleto(p, '#smetki-period', '2026-07');
+      await p.click('#forma-period button[type=submit]');
+    });
+    proveri('смяната на периода мести и календара',
+      await p.$eval('[data-kalendar]', (e) => (e as any).dataset.kalendar), '2026-07');
+    proveri('и това НЕ е същият месец', predi118 === '2026-07', false);
+    proveri('нула събития · изгледът се смята, не се записва',
+      await broySabitiya(p), await broySabitiya(p));
 }
