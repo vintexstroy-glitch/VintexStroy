@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, dokatoStane, naEkran, napishiSigurno, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -2178,4 +2178,91 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '[data-poleta-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
     proveri('и полетата НЕ се записват като стойност · само като решение',
       await broySabitiya(p), await broySabitiya(p));
+
+    // ══ 121 · ЖИВИЯТ ХЕДЪР · смяната при скрол (M15 · резен 49) ═══════════
+    //
+    // „Има стационарни горни редове на таблиците, а когато скролваш и минаваш
+    // по различни таблици, да се сменя нов хедър." Тук се проверява ЖИВИЯТ
+    // резултат в истински браузър; числата на решението са в теста на домейна.
+    //
+    // ═══ СКРОЛЪТ СЕ КАРА ДО ТОЧНО МЯСТО, не до дъното ═══
+    //
+    // Първата версия буташе кутията до дъното и очакваше смяна. Тя не идваше, и
+    // това НЕ беше дефект на кода: на този екран таблиците може да са малко, а
+    // кутията да скролва по-малко от височината на една таблица. Проверка, която
+    // зависи от това колко данни е събрал проходът дотук, мери късмет.
+    //
+    // Сега скролът се кара ТОЧНО дотам, където ВТОРАТА таблица взима горния ръб.
+    // Тогава смяната е задължителна по неговото правило („надолу е нормално
+    // всичко") и проверката мери правилото, а не височината на екрана.
+    razdel = '121 · Живият хедър · залепен и жив';
+    await naEkran(p, 'smetki', '#forma-period');
+    // Живият хедър се състезава между ВСИЧКИ таблици на екрана; стеснен до една
+    // секция, броят щеше да мери друго, не онова, което закачката вижда.
+    // Обявено, защото изключение, зашито мълчаливо, е дупка (обход Б):
+    // ОБХВАТ: ЦЯЛАТА СТРАНИЦА
+    const broyTablitsi = await p.$$eval('[data-tablitsa]', (e) => e.length);
+    // ДВЕ Е НАЙ-МАЛКОТО, при което въпросът изобщо съществува · без този ред
+    // проверките отдолу биха минали и на екран с ЕДНА таблица, без да мерят нищо.
+    proveri('екранът носи поне ДВЕ таблици · инак няма какво да се сменя',
+      broyTablitsi >= 2, true);
+    proveri('живата глава е ТОЧНО ЕДНА · не нула и не две',
+      await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 1);
+
+    razdel = '121 · Живият хедър · надолу се сменя ВЕДНАГА';
+    const prvata = await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '');
+    // СКРОЛИРА СЕ КУТИЯТА, не прозорецът: `.telo` е ЕДИНСТВЕНАТА скролираща
+    // кутия (резен 9а). Първата версия движеше `window` и нищо не мърдаше —
+    // находката, заради която и самата закачка смени съда си.
+    // ═══ ТЪРСИ СЕ ТАБЛИЦА С РАЗЛИЧНА ГЛАВА, не просто следващата ═══
+    //
+    // ВТОРА НАХОДКА НА ПРОХОДА, и тя показа, че кодът е ПРАВ: първата версия
+    // скролваше до втората таблица по РЕД, а на Сметки първите две са
+    // коефициентни и носят ЕДНА И СЪЩА глава. Тогава по неговото правило главата
+    // НЕ бива да се сменя („когато двете таблици са от едно семейство по хедър…
+    // то си остава хедърът от първата") — и не се сменяше. Проверката мереше
+    // роднинството, а твърдеше смяна.
+    const dovtorata = await p.evaluate(() => {
+      const telo = document.querySelector('.telo') as HTMLElement | null;
+      const t = [...document.querySelectorAll<HTMLElement>('[data-tablitsa]')];
+      if (!telo || t.length < 2) return -1;
+      const glavata = (x: HTMLElement): string =>
+        [...x.querySelectorAll('thead th, .glava > *')].map((k) => k.textContent?.trim() ?? '').join('·');
+      const zhiva = document.querySelector<HTMLElement>('[data-zhiv-hedar]');
+      if (!zhiva) return -1;
+      const negovata = glavata(zhiva);
+      const chuzhda = t.find((x) => glavata(x) !== negovata);
+      if (!chuzhda) return -1;
+      const gore = telo.getBoundingClientRect().top;
+      // до горния ръб на ЧУЖДАТА таблица, плюс един пиксел навътре в нея
+      return telo.scrollTop + (chuzhda.getBoundingClientRect().top - gore) + 1;
+    });
+    proveri('има таблица с РАЗЛИЧНА глава и тя има измеримо място', dovtorata > 0, true);
+    await dokatoStane(
+      p,
+      () => p.evaluate((kade) => {
+        const t = document.querySelector('.telo') as HTMLElement | null;
+        if (t) t.scrollTop = kade as number;
+      }, dovtorata),
+      async () =>
+        (await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '')) !== prvata,
+      'главата се сменя, щом втората таблица вземе горния ръб',
+    );
+    const vtorata = await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '');
+    proveri('надолу главата е СМЕНЕНА · „надолу е нормално всичко"', vtorata !== prvata, true);
+    proveri('и пак е ТОЧНО ЕДНА', await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 1);
+
+    razdel = '121 · Живият хедър · нагоре се връща';
+    await dokatoStane(
+      p,
+      () => p.evaluate(() => {
+        const t = document.querySelector('.telo') as HTMLElement | null;
+        if (t) t.scrollTop = 0;
+      }),
+      async () =>
+        (await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '')) === prvata,
+      'горната глава се връща при скрол нагоре',
+    );
+    proveri('нагоре се връща ПЪРВАТА · след като се види повече от половината ѝ',
+      await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? ''), prvata);
 }

@@ -39,6 +39,7 @@ import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
+import { zakachiZhiviyaHedar } from './zhiviyat-hedar.js';
 import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
 import {
   kopchetoNaLentata,
@@ -649,6 +650,16 @@ async function trugvay(): Promise<void> {
     });
   }
 
+  /**
+   * ДРЪЖКАТА НА ЖИВИЯ ХЕДЪР · пази се, за да се ОТВЪРЖЕ при следващото рисуване.
+   *
+   * Слушателят стои на `window`, не на корена, защото страницата се скролва
+   * цялата. Всяко прерисуване подменя корена, тъй че без отвързване след десет
+   * прерисувания на `window` висят десет слушателя — и всеки мери целия екран
+   * на всеки кадър. Точно лагът, който той нарочно е поискал да го няма.
+   */
+  let otvarzhiZhiviyaHedar: (() => void) | undefined;
+
   async function prerisuvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
@@ -885,6 +896,12 @@ async function trugvay(): Promise<void> {
     // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
     // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
+    // ЖИВИЯТ ХЕДЪР · коя глава стои горе при скрол (M15 · резен 49). НАКРАЯ:
+    // той МЕРИ вече нарисуваното, а всичко над него още мести секции и възли.
+    // Предишната закачка се отвързва, инак при всяко прерисуване се трупа още
+    // един слушател върху `window` и лагът, който той не иска, идва сам.
+    otvarzhiZhiviyaHedar?.();
+    otvarzhiZhiviyaHedar = zakachiZhiviyaHedar(koren);
     /**
      * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
      *

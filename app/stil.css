@@ -578,6 +578,11 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   width: max-content; min-width: 100%;
 }
 .glava { position: sticky; top: 0; z-index: 3; }
+/* ЖИВАТА ГЛАВА · онази, чиято таблица държи горния ръб (M15 · резен 49).
+   Тя стои НАД останалите, за да не я покрие съседна залепена глава при бърз
+   скрол. Само това — цвят не се мени: смяната трябва да е незабележима, а не
+   да мига. */
+[data-zhiv-hedar] .glava, [data-zhiv-hedar] thead { z-index: 4; }
 .glava > :first-child, .red > :first-child { position: sticky; left: 0; z-index: 1; }
 .glava > :first-child { background: var(--panel); }
 .red > :first-child { background: #FFFFFF; }
