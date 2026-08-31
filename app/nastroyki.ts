@@ -52,6 +52,7 @@ import {
   type Buton,
   type Deystvie,
 } from '../src/domein/butoni.js';
+import { premestiKolona } from '../src/domein/premestvane-na-kolona.js';
 import { belegNaModel, IMENA_NA_ROLITE, type ModelNaTablitsa } from '../src/iztochnik/model.js';
 import {
   dobaviKolona,
@@ -475,7 +476,7 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
   return `
     <div class="tablitsa">
       <div class="glava redaktor">
-        <span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
+        <span>Ред</span><span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
       </div>
       ${m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')}
     </div>
@@ -544,8 +545,16 @@ function redNaKolona(m: ModelNaTablitsa, ime: string, k: number): string {
   const nosiRolya = Object.values(m.koloni).includes(k);
   // Формулната колона не се пише и не се маха оттук: тя е сметка (правило 23).
   const formula = m.formuli[k];
+  const posleden = m.glavi.length - 1;
   return `
-    <div class="red redaktor" translate="no">
+    <div class="red redaktor" translate="no" draggable="true" data-kolona-red="${k}">
+      <span class="kletka drazhka">
+        <span class="hvat" aria-hidden="true">⠿</span>
+        <button type="button" class="vtorichen" data-gore="${k}"${k === 0 ? ' disabled' : ''}
+          aria-label="премести колоната нагоре">▲</button>
+        <button type="button" class="vtorichen" data-dolu="${k}"${k === posleden ? ' disabled' : ''}
+          aria-label="премести колоната надолу">▼</button>
+      </span>
       <span class="kletka">
         <input data-ime-vhod="${k}" value="${ekraniraj(ime)}"${zaklyucheno ? ' disabled title="името е заключено — падащото меню беше изтрито"' : ''} aria-label="име на колоната">
         ${zaklyucheno ? '<span>🔒 името е заключено</span>' : ''}
@@ -1428,6 +1437,65 @@ export function zakachiNastroyki(
     await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
     k.vest('dobre', vest);
   };
+
+  /**
+   * МЕСТЕНЕ НА КОЛОНА · влачене И стрелки, ЕДНО действие отдолу.
+   *
+   * Влаченето е удобно, но не е достъпно: с клавиатура не се влачи, на телефон
+   * се влачи трудно. Затова до него стоят двете стрелки — същият прецедент като
+   * лентата на менюто (ADR-066), където изборът е бутон, а не само провлачване.
+   *
+   * И двете стигат до `premestiKolona`, тоест до ЕДНА сметка. Два пътя, които
+   * местят поотделно, са два начина да се сгреши различно.
+   */
+  const premesti = async (ot: number, kade: number): Promise<void> => {
+    // ВИНАГИ ОТ ОГЛЕДАЛОТО, не от екрана · същото правило като при другите
+    // поправки на хедъра: екранът може да е нарисуван преди чуждо записване.
+    const star = await hedarSega();
+    if (star === undefined) return;
+    try {
+      const nov = premestiKolona(star, ot, kade);
+      await zapishiHedar(star, nov, `„${star.glavi[ot] ?? ''}" се премести на място ${kade + 1}.`);
+      greshka = '';
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  };
+
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-gore]')) {
+    but.addEventListener('click', async () => {
+      const k = Number(but.dataset['gore']);
+      await premesti(k, k - 1);
+    });
+  }
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-dolu]')) {
+    but.addEventListener('click', async () => {
+      const k = Number(but.dataset['dolu']);
+      await premesti(k, k + 1);
+    });
+  }
+
+  // ВЛАЧЕНЕТО · само два номера напускат него — „откъде" и „докъде".
+  let vlacheniyat = -1;
+  for (const red of koren.querySelectorAll<HTMLElement>('[data-kolona-red]')) {
+    red.addEventListener('dragstart', () => {
+      vlacheniyat = Number(red.dataset['kolonaRed']);
+    });
+    red.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      red.classList.add('nad-nego');
+    });
+    red.addEventListener('dragleave', () => red.classList.remove('nad-nego'));
+    red.addEventListener('drop', async (e) => {
+      e.preventDefault();
+      red.classList.remove('nad-nego');
+      const kade = Number(red.dataset['kolonaRed']);
+      if (vlacheniyat < 0 || vlacheniyat === kade) return;
+      await premesti(vlacheniyat, kade);
+      vlacheniyat = -1;
+    });
+  }
 
   const chlenoveOt = (tekst: string): string[] =>
     tekst

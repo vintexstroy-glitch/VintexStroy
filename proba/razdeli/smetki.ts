@@ -269,7 +269,9 @@ export async function blok4(
     const sledDobavyane = await redove(p, '.red.redaktor');
     proveri('колоната е добавена в КРАЯ', sledDobavyane.length, koloniPredi + 1);
     const nova = sledDobavyane[sledDobavyane.length - 1];
-    proveri('и носи готовото меню от Описа', nova?.[3], 'готово меню от Описа');
+    // Клетка 4 е номенклатурата · нулевата (ред · дръжка и стрелки) я измести
+    // с една при резен 55.
+    proveri('и носи готовото меню от Описа', nova?.[4], 'готово меню от Описа');
     // Членовете стоят в полето за писане, не в текста на клетката.
     const chlenoveNaEkran = await p.$$eval('[data-menyu-vhod]', (x) => x.map((i) => (i as any).value));
     proveri('членовете са запазени', chlenoveNaEkran.some((v) => v.includes('Кеш · Банка')), true);
@@ -289,7 +291,7 @@ export async function blok4(
     proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
     proveri(
       'и колоната пада на първия вид',
-      (await redove(p, '.red.redaktor')).pop()?.[3],
+      (await redove(p, '.red.redaktor')).pop()?.[4],
       'без падащо меню',
     );
 
