@@ -74,6 +74,7 @@ import type {
   PayloadSluzhitelZapisan,
   PayloadPotokZapisan,
   PayloadRedNaTablitsaZapisan,
+  PayloadSemeystvoGlaviZapisano,
   PayloadRedoveRazkacheni,
   PayloadRedoveZakacheni,
   PayloadSaldoZapisano,
@@ -433,6 +434,14 @@ export interface Ogledalo {
    * която проверява, не може да падне (правило 7 · обход В).
    */
   readonly vhodNaRedovete: ReadonlyMap<string, VhodNaRedovete>;
+  /**
+   * СЕМЕЙСТВАТА ОТ ГЛАВИ · ключ → решението на човека (резен 62).
+   *
+   * РАЗПУСНАТИТЕ ОСТАВАТ, с вдигнато знаме — по същата причина като махнатите
+   * редове: „нямаше го" и „разпуснахме го" са различни неща, а разпускането е
+   * запис със същия ключ, не изчезване от картата.
+   */
+  readonly semeystvataNaGlavite: ReadonlyMap<string, PayloadSemeystvoGlaviZapisano>;
   /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
   readonly agenti: ReadonlyMap<string, Agent>;
   /**
@@ -781,6 +790,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const koefitsienti = new Map<string, SvoyKoefitsient>();
   const zakachki = new Map<string, Zakachka>();
   const redoveNaTablitsi = new Map<string, Map<string, RedNaTablitsa>>();
+  const semeystvataNaGlavite = new Map<string, PayloadSemeystvoGlaviZapisano>();
   const vhodNaRedove = new Map<string, { klyuchove: Set<string>; mahnati: Set<string> }>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
@@ -1006,6 +1016,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         if (p.mahnat) v.mahnati.add(p.red);
         else v.mahnati.delete(p.red);
         vhodNaRedove.set(p.tablitsa, v);
+        break;
+      }
+
+      case 'СемействоГлавиЗаписано': {
+        // Последната дума за същия ключ бие — и разпускането е дума със същия
+        // ключ, не липса. Затова тук няма `delete`.
+        const p = s.payload as unknown as PayloadSemeystvoGlaviZapisano;
+        semeystvataNaGlavite.set(p.klyuch, p);
         break;
       }
 
@@ -1775,6 +1793,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     koefitsienti,
     zakachki,
     redoveNaTablitsi,
+    semeystvataNaGlavite,
     vhodNaRedovete: new Map(
       [...vhodNaRedove].map(([t, v]) => [t, { zapisani: v.klyuchove.size, mahnati: v.mahnati.size }]),
     ),

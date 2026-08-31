@@ -80,6 +80,14 @@ export const VID = {
   zakachka: 'zakachka',
   /** РЕД на създадена таблица · данните ѝ живеят вътре (M12) */
   redNaTablitsa: 'red-na-tablitsa',
+  /**
+   * СЕМЕЙСТВОТО ОТ ГЛАВИ · кои таблици работят с ЕДНА глава (резен 62).
+   *
+   * Негово (ред 935): „Фактурите и двете са с еднакъв хедър. Така се групират."
+   * Еднаквостта обаче не е дадена — тя се ПРАВИ: двата му листа с продажби
+   * носят разместени колони и различни думи за едно и също.
+   */
+  semeystvoGlavi: 'semeystvo-glavi',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
   /**
@@ -316,6 +324,7 @@ export type TipSabitie =
   | 'РедовеЗакачени'
   | 'РедовеРазкачени'
   | 'РедНаТаблицаЗаписан'
+  | 'СемействоГлавиЗаписано'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
@@ -988,6 +997,28 @@ export interface PayloadTablitsaOtFaylSazdadena {
   readonly vidove: Readonly<Record<string, string>>;
   readonly formuli: Readonly<Record<string, { readonly deystvie: string; readonly ot: readonly number[] }>>;
   readonly nekopirani: readonly string[];
+}
+
+/**
+ * СЕМЕЙСТВОТО ОТ ГЛАВИ · кои създадени таблици работят с ЕДНА глава.
+ *
+ * Записва се РЕШЕНИЕТО на човека, не догадка: кои таблици са в семейството, коя
+ * е общата им глава, и коя тяхна колона отговаря на коя обща. Всичко останало —
+ * сравнението, предложенията по близост — се СМЯТА при показване и няма нужда
+ * да живее в Журнала (`obshta-glava.ts`).
+ *
+ * `mahnato` разпуска семейството. То е поле, не втори тип: разпуснатото се
+ * връща със същия ключ, а не като ново семейство (правило 1).
+ */
+export interface PayloadSemeystvoGlaviZapisano {
+  readonly klyuch: string;
+  /** ключовете на създадените таблици · поне ДВЕ, иначе семейство няма */
+  readonly tablitsi: readonly string[];
+  /** общата глава, по ред · имената, дословно както ги е писал той */
+  readonly koloni: readonly string[];
+  /** таблица → своя колона (номер като низ) → номер в ОБЩАТА глава */
+  readonly kartata: Readonly<Record<string, Readonly<Record<string, string>>>>;
+  readonly mahnato: boolean;
 }
 
 /**
