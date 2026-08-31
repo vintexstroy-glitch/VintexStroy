@@ -589,7 +589,22 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .pod { font-size: 0.857rem; color: var(--mastilo2); }
 
 /* ── таблица ─────────────────────────────────────────────────────── */
-.dyalglava { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+/* ЛЯВО ПОДРАВНЯВАНЕ, а последното дете отива вдясно.
+   Дотук беше `space-between` с ДВЕ деца. Знакът за сгъване стана трето — и
+   `space-between` изхвърли заглавието в СРЕДАТА. Правилото важи и за две, и
+   за три деца: първите се редят отляво, поясненията остават отдясно. */
+.dyalglava { display: flex; align-items: baseline; justify-content: flex-start; gap: 12px; }
+.dyalglava:not(.sIkona) > :last-child { margin-left: auto; }
+/* ЗНАКЪТ ЗА СГЪВАНЕ · дребен и тих, както той поиска („скрито с дребни
+   бутончета"). Не заема свой ред: сяда преди заглавието. */
+.dyalsgavach {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.75rem; line-height: 1;
+  padding: 2px 5px; margin-right: -2px; border-radius: 3px; align-self: center;
+}
+.dyalsgavach:hover, .dyalsgavach:focus-visible { background: var(--panel); color: var(--mastilo); }
+/* Сгънатият дял е ЕДИН ред · без вътрешен отстъп, който да го прави на кутия. */
+.telo > .sganat { padding-bottom: 0; }
 .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 1.107rem; font-weight: 600; margin: 0; }
 .dyalglava span { font-size: 0.857rem; color: var(--mastilo2); }
 
@@ -700,7 +715,12 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 /* Максимумът е ЗАКОВАН (240px), не `1fr` — късо поле („Площ", „Падеж") спира
    да се разтяга наравно с дълго („Място или адрес") само защото реда му е
    широк. Празното място остава ПРАЗНО в края на реда, не се разпределя. */
-.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 240px)); gap: var(--space-sm); }
+/* ПОЛЕТАТА ПЪЛНЯТ ШИРИНАТА · негово, 31.08: „Пак има ПРАЗНИ ПРОСТРАНСТВА
+   неизползвани." Горната граница беше ЗАКОВАНА на 240px, тъй че в карта от
+   1000px три полета заемаха 760 и дясната четвърт стоеше празна на всяка
+   форма на всеки екран. `1fr` ги разтяга; долната граница пази реда да не се
+   натроши на тесен екран. */
+.poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-sm); }
 .pole { display: flex; flex-direction: column; gap: 6px; }
 /* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
    „<label class=pole><span>". Втората е в личните форми; без този ред нейният
@@ -736,7 +756,13 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 /* ДВЕ КОЛОНИ · пунктът и стрелките му падат на ЕДИН ред сами, без обвивка
    (резен 15). Обвивка би счупила `.nav > [data-ekran]` — селекторът, с който
    падащият ред на екрана си намира пункта. */
-.nav { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px; padding: 8px 12px; }
+/* ЕДНА КОЛОНА · и това е ПОПРАВКА на дефект, който сам направих (резен 64).
+   Решетката беше `1fr auto`, защото втората клетка носеше стрелките ▲▼. Щом
+   те паднаха (ADR-117), пунктовете почнаха да се сдвояват по ДВА на ред и
+   менюто се разпадна — „Сметки" до „Настройки", „Стойност" до „Служители".
+   Снимка на екрана го показа; нито един тест не го хвана, защото всички питаха
+   „има ли пункт", не „къде стои". */
+.nav { display: flex; flex-direction: column; align-items: stretch; gap: 2px; padding: 8px 12px; }
 .navred {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; border: none; border-radius: 4px;
@@ -744,18 +770,6 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
-/* „Да е СКРИТО с дребни бутончета" — негово (И101). Стрелките се появяват при
-   минаване с мишка ВЪРХУ ЛЕНТАТА и при фокус вътре: клавиатурата стига до тях,
-   без да ги държи пред очите през цялото време. `opacity`, не `display`, за да
-   не скача ширината на реда при всяко минаване. */
-.navmesti { display: flex; flex-direction: column; opacity: 0; transition: opacity 0.12s; }
-.nav:hover .navmesti, .nav:focus-within .navmesti { opacity: 1; }
-.navstrelka {
-  border: none; background: transparent; cursor: pointer;
-  color: var(--mastilo2); font-size: 0.6rem; line-height: 1;
-  padding: 1px 4px; border-radius: 3px;
-}
-.navstrelka:hover { background: #EAE2D6; color: var(--mastilo); }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
 .navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }

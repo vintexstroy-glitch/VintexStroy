@@ -234,6 +234,98 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
     ekran,
     sektsii.map((e) => ({ klyuch: klyuchNaSektsiya(e), ime: zaglavieNa(e) || klyuchNaSektsiya(e) })),
   );
+
+  prilozhiSgavaneto(koren, ekran, sektsii);
+}
+
+// ── СГЪВАНЕТО НА ДЯЛА · резен 64 ────────────────────────────────────────────
+/**
+ * ДЯЛЪТ СЕ СГЪВА ДО ЗАГЛАВИЕТО СИ · негово (И101): „Да е СКРИТО с дребни
+ * бутончета и падащи менюта и отметки."
+ *
+ * ЗАЩО ТОВА, А НЕ ПО-МАЛКИ БУТОНИ. Преброено: Сметки държи 78 черупкови
+ * управления на един екран, Настройки — 59. Смаляването им с два пиксела не
+ * мени нищо; двайсет отворени форми една под друга остават двайсет. Сгънатият
+ * дял показва ЕДИН ред и не показва нищо друго.
+ *
+ * ОТВОРЕНО Е ПОДРАЗБИРАНЕТО. Сгънато по подразбиране би скрило всяка функция
+ * от онзи, който още не е пипал нищо — и то мълчешком. Човек сгъва каквото не
+ * ползва, и това се помни (паметта на екрана, нула събития).
+ *
+ * ИМЕТО Е `dyalsgavach`, не `sgavach`: второто вече го носи сгъването на ДЕЛО
+ * в Ганта, и проходът пази „Сметки няма нито един сгъвач". Едно име за две
+ * различни неща щеше да направи тази проверка неразбираема — тя щеше да пада
+ * заради дялове, а да говори за дела (правило 17).
+ *
+ * ЗНАКЪТ Е ЕДИН, НЕ ДВА. Стрелките ▲▼ бяха два бутона за едно решение; тук е
+ * ЕДИН превключвател с `aria-expanded` — четецът на екран казва „сгънато" сам,
+ * без да му се пише дума.
+ */
+const KLYUCH_SGANATI = 'podredba.sganati';
+
+function sganatiteNa(ekran: string): readonly string[] {
+  return chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {})[ekran] ?? [];
+}
+
+/** Сгъва или разтваря един дял · връща новия списък на сгънатите. */
+export function preobarniSgavaneto(ekran: string, klyuch: string): readonly string[] {
+  const vsichki = chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {});
+  const sega = new Set(vsichki[ekran] ?? []);
+  if (sega.has(klyuch)) sega.delete(klyuch);
+  else sega.add(klyuch);
+  const nov = [...sega];
+  zapomniEkranno(KLYUCH_SGANATI, { ...vsichki, [ekran]: nov });
+  return nov;
+}
+
+/** Сгъва или разтваря ВСИЧКИ дялове на един екран наведнъж. */
+export function sganiVsichki(ekran: string, klyuchove: readonly string[], sgani: boolean): void {
+  const vsichki = chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {});
+  zapomniEkranno(KLYUCH_SGANATI, { ...vsichki, [ekran]: sgani ? [...klyuchove] : [] });
+}
+
+/** Колко дяла са сгънати на този екран · за думите в Настройки. */
+export function broySganati(ekran: string): number {
+  return sganatiteNa(ekran).length;
+}
+
+/**
+ * Слага знака и прилага състоянието · вика се СЛЕД всяко рисуване.
+ *
+ * Съдържанието се СКРИВА с `hidden`, не се маха: махнатото щеше да губи
+ * попълнена форма при всяко сгъване.
+ */
+function prilozhiSgavaneto(koren: HTMLElement, ekran: string, sektsii: readonly HTMLElement[]): void {
+  const sganati = new Set(sganatiteNa(ekran));
+  for (const vazel of sektsii) {
+    const klyuch = klyuchNaSektsiya(vazel);
+    const glava = vazel.querySelector('.dyalglava');
+    if (!glava) continue;
+    const sganat = sganati.has(klyuch);
+
+    for (const dete of vazel.children) {
+      if (dete === glava) continue;
+      (dete as HTMLElement).hidden = sganat;
+    }
+    vazel.classList.toggle('sganat', sganat);
+
+    let znak = glava.querySelector<HTMLButtonElement>('[data-sgavane]');
+    if (!znak) {
+      znak = document.createElement('button');
+      znak.type = 'button';
+      znak.className = 'dyalsgavach';
+      znak.dataset['sgavane'] = klyuch;
+      znak.addEventListener('click', () => {
+        preobarniSgavaneto(ekran, klyuch);
+        prilozhiSgavaneto(koren, ekran, sektsii);
+      });
+      glava.prepend(znak);
+    }
+    znak.setAttribute('aria-expanded', sganat ? 'false' : 'true');
+    znak.title = sganat ? 'Разтвори дяла' : 'Сгъни дяла';
+    znak.setAttribute('aria-label', `${sganat ? 'Разтвори' : 'Сгъни'} „${zaglavieNa(vazel) || klyuch}"`);
+    znak.textContent = sganat ? '▸' : '▾';
+  }
 }
 
 // ── КОЕ Е ВИДЯНО · за Настройки (резен 63) ──────────────────────────────────

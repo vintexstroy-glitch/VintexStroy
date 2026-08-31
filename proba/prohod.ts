@@ -150,6 +150,7 @@ async function main(): Promise<void> {
     await vhodISamolichnost.blok2(ctx);
     await infrastruktura.blok4(ctx);
     await mnogotoVerigi.blok2(ctx);
+    await infrastruktura.blok6(ctx);
     await infrastruktura.blok5(ctx);
     // §71 стои НАКРАЯ нарочно: обхожда лентата, отваря редове и мени екрана,
     // а дотогава всеки друг блок вече си е взел своето. Блок, който мести

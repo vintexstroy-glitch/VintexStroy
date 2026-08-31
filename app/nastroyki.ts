@@ -97,8 +97,10 @@ import type { Konteks } from './ekranite.js';
 import { EKRANI, type KoyEkran } from './ekranite.js';
 import { moyatRed, podredeniPunktove, zabraviMoyaRed, premestiVMoyaRed } from './lenta.js';
 import {
+  broySganati,
   ekraniSPodredba,
   premestiSektsiya,
+  sganiVsichki,
   videniteSektsii,
   zabraviRedaNaSektsiite,
 } from './podredba.js';
@@ -1358,6 +1360,9 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
           </div>
           <div class="deystviya">
             <button type="button" class="vtorichen malak" data-zabravi-ekran="${ekraniraj(e)}">Върни реда</button>
+            <button type="button" class="vtorichen malak" data-sgani-vsichki="${ekraniraj(e)}">Сгъни всички</button>
+            <button type="button" class="vtorichen malak" data-razgani-vsichki="${ekraniraj(e)}">Разтвори всички</button>
+            <span class="drebno">${broySganati(e)} от ${sektsii.length} са сгънати</span>
           </div>
         </div>`;
               })
@@ -1614,6 +1619,18 @@ export function zakachiNastroyki(
       zabraviRedaNaSektsiite(but.dataset['zabraviEkran'] ?? '');
       await prerisuvay();
     });
+  }
+  // СГЪВАНЕТО НАВЕДНЪЖ · за екран с двайсет дяла двайсет натискания не са
+  // функция. Кой дял има екранът, знае паметта — същият списък, който се
+  // подрежда точно отгоре.
+  for (const [beleg, sgani] of [['data-sgani-vsichki', true], ['data-razgani-vsichki', false]] as const) {
+    for (const but of koren.querySelectorAll<HTMLButtonElement>(`[${beleg}]`)) {
+      but.addEventListener('click', async () => {
+        const ekran = but.getAttribute(beleg) ?? '';
+        sganiVsichki(ekran, videniteSektsii(ekran).map((x) => x.klyuch), sgani);
+        await prerisuvay();
+      });
+    }
   }
 
   koren.querySelector<HTMLButtonElement>('#litse-semeystva')?.addEventListener('click', async () => {

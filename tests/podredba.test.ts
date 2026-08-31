@@ -6,8 +6,15 @@
  * доказва без браузър.
  */
 
-import { describe, expect, it } from 'vitest';
-import { podredi, premesti, prevediZapomnenoto } from '../app/podredba.js';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import {
+  broySganati,
+  podredi,
+  premesti,
+  preobarniSgavaneto,
+  prevediZapomnenoto,
+  sganiVsichki,
+} from '../app/podredba.js';
 
 describe('подредбата · нищо не изчезва', () => {
   it('запомненият ред важи', () => {
@@ -105,5 +112,60 @@ describe('преводът на ключовете · без разбърква�
       'imoti-nov',
       'x',
     ]);
+  });
+});
+
+/**
+ * СГЪВАНЕТО НА ДЯЛА · резен 64.
+ *
+ * Негово (И101): „Да е СКРИТО с дребни бутончета и падащи менюта и отметки."
+ * Преброено: Сметки държи 78 черупкови управления на един екран. Смаляването
+ * им не мени нищо — двайсет отворени форми една под друга остават двайсет.
+ */
+describe('сгъването на дяла', () => {
+  // ПАМЕТТА НА ЕКРАНА · подставена, както при другите ѝ тестове. Извън браузър
+  // `localStorage` го няма, а функциите тук четат точно през него.
+  const zapisi = new Map<string, string>();
+  beforeEach(() => {
+    zapisi.clear();
+    (globalThis as { localStorage?: unknown }).localStorage = {
+      getItem: (k: string) => zapisi.get(k) ?? null,
+      setItem: (k: string, v: string) => void zapisi.set(k, v),
+      removeItem: (k: string) => void zapisi.delete(k),
+    };
+  });
+  afterEach(() => {
+    delete (globalThis as { localStorage?: unknown }).localStorage;
+  });
+
+  it('по подразбиране НИЩО не е сгънато · нищо не се крие само', () => {
+    expect(broySganati('smetki')).toBe(0);
+  });
+
+  it('превключването сгъва, второто разтваря · ЕДИН знак, не два бутона', () => {
+    expect(preobarniSgavaneto('smetki', 'период')).toEqual(['период']);
+    expect(broySganati('smetki')).toBe(1);
+    expect(preobarniSgavaneto('smetki', 'период')).toEqual([]);
+    expect(broySganati('smetki')).toBe(0);
+  });
+
+  it('всеки ЕКРАН помни СВОИТЕ · сгънатото в Сметки не пипа Имоти', () => {
+    preobarniSgavaneto('smetki', 'период');
+    expect(broySganati('smetki')).toBe(1);
+    expect(broySganati('imoti')).toBe(0);
+  });
+
+  it('„Сгъни всички" хваща всичките · и „Разтвори" ги пуска', () => {
+    sganiVsichki('smetki', ['а', 'б', 'в'], true);
+    expect(broySganati('smetki')).toBe(3);
+    sganiVsichki('smetki', ['а', 'б', 'в'], false);
+    expect(broySganati('smetki')).toBe(0);
+  });
+
+  it('разтварянето на всички НЕ пипа другия екран', () => {
+    sganiVsichki('smetki', ['а'], true);
+    sganiVsichki('imoti', ['б'], true);
+    sganiVsichki('smetki', ['а'], false);
+    expect(broySganati('imoti')).toBe(1);
   });
 });

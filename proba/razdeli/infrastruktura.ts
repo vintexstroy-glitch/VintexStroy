@@ -524,6 +524,154 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     //   · Таблото КАЗВА в коя верига се пише.
 }
 
+/**
+ * 134 · ПЛЪТНОСТТА НА ЕКРАНА · брои се, не се оценява (резен 64).
+ *
+ * Негова дума, 31.08: „Искам да е ЖИВ… с ПО-МАЛКИ И СКРИТИ бутони. Пак има
+ * ПРАЗНИ ПРОСТРАНСТВА неизползвани."
+ *
+ * И двете са мерими, значи се МЕРЯТ (правило 17):
+ *
+ *   · колко управления стоят видими наведнъж — и колко от тях са СВИТИ в
+ *     група (ADR-057). Свитото не се брои за шум;
+ *   · колко празно остава ОТДЯСНО — ширината на тялото минус най-широкото,
+ *     което го запълва.
+ *
+ * Праговете са ХРАПОВИ: днешното число, което може само да пада. Число, което
+ * може да расте, не е праг, а надпис.
+ */
+export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    razdel = '134 · плътността на екрана';
+
+    const redove: string[] = [];
+    let nayMnogoGoli = 0;
+    let nayMnogoPrazno = 0;
+    for (const [ekran, znak] of [
+      ['imoti', '#forma-imot'],
+      ['pari', '#forma-nachisli'],
+      ['smetki', '#razhod-dostavchik'],
+      ['gant', '#d-forma-delo'],
+      ['stoynost', '#cheti-ploshti'],
+      ['tabove', '#izbor-tab'],
+      ['nastroyki', '#nov-buton'],
+      ['ii', '#nov-agent'],
+      ['tablo', '#tablo-lichno'],
+    ] as const) {
+      await naEkran(p, ekran, znak);
+      const m = await p.evaluate(() => {
+        const vidim = (e: Element): boolean => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const telo = document.querySelector('.telo');
+        if (!telo) return { goli: 0, vGrupa: 0, prazno: 0 };
+        // БРОИ СЕ ЧЕРУПКАТА, не данните.
+        //
+        // Първият ми опит броеше ВСИЧКИ бутони под `.telo` и даваше 476 за
+        // Ганта — всеки ДЕН от решетката е бутон. Число, което мери данните,
+        // не мери претрупаност: то расте с работата на човека.
+        //
+        // Черупка е онова, което стои в ГЛАВАТА на дял, в реда с ДЕЙСТВИЯ или
+        // сред ПОЛЕТАТА на форма. Останалото е съдържание.
+        const upravleniya = [...telo.querySelectorAll(
+          '.dyalglava button, .dyalglava select, .deystviya button, .deystviya select,' +
+          ' .poleta button, .poleta select',
+        )]
+          .filter(vidim)
+          // ЗНАКЪТ ЗА СГЪВАНЕ НЕ СЕ БРОИ · той е управлението, което МАХА
+          // черупка, не което я добавя. Броен, той щеше да наказва точно
+          // лекарството: всеки нов сгъваем дял вдига числото с едно.
+          .filter((b) => !(b as HTMLElement).dataset['sgavane']);
+        const vGrupa = upravleniya.filter((b) => b.closest('.grupa-deystviya')).length;
+        const shirina = telo.getBoundingClientRect().width;
+        let nayShirok = 0;
+        for (const v of telo.querySelectorAll('*')) {
+          const r = (v as HTMLElement).getBoundingClientRect();
+          if (r.height > 0 && r.width > nayShirok && r.width <= shirina + 1) nayShirok = r.width;
+        }
+        return {
+          goli: upravleniya.length - vGrupa,
+          vGrupa,
+          prazno: Math.round(shirina - nayShirok),
+        };
+      });
+      redove.push(
+        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · в група ${String(m.vGrupa).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px`,
+      );
+      if (m.goli > nayMnogoGoli) nayMnogoGoli = m.goli;
+      if (m.prazno > nayMnogoPrazno) nayMnogoPrazno = m.prazno;
+    }
+    console.log(`\n  ПЛЪТНОСТТА НА ЕКРАНА (праг ${PRAG_GOLI} голи · ${PRAG_PRAZNO}px празно)\n${redove.join('\n')}\n`);
+
+    proveri(
+      `най-натоварен екран · голи управления под прага ${PRAG_GOLI}`,
+      nayMnogoGoli <= PRAG_GOLI ? 'да' : `не · ${nayMnogoGoli}`,
+      'да',
+    );
+    proveri(
+      `най-празен екран · неизползвано отдясно под ${PRAG_PRAZNO}px`,
+      nayMnogoPrazno <= PRAG_PRAZNO ? 'да' : `не · ${nayMnogoPrazno}px`,
+      'да',
+    );
+
+    // ── СГЪВАНЕТО НА ДЯЛА · „да е СКРИТО с дребни бутончета" (И101) ────────
+    razdel = '134б · дялът се сгъва';
+    await naEkran(p, 'smetki', '#forma-period');
+    const vidimiPoleta = async (): Promise<number> =>
+      p.$$eval('[data-sektsiya=smetki-period] input, [data-sektsiya=smetki-period] button:not([data-sgavane])', (e) =>
+        e.filter((x) => {
+          const r = x.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        }).length,
+      );
+    proveri('всеки дял носи ЕДИН знак за сгъване, не два бутона',
+      await p.$$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.length), 1);
+    proveri('и по подразбиране е РАЗТВОРЕН · нищо не се крие само',
+      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      'true');
+    const predSgavane = await vidimiPoleta();
+    proveri('дялът показва полетата си', predSgavane > 0, true);
+
+    const predSabitiyaSg = await broySabitiya(p);
+    // СГЪВАНЕТО НЕ ПРЕРИСУВА екрана — то е местен превключвател. Затова тук не
+    // се чака прерисуване, а самото СЪСТОЯНИЕ: четене веднага след клик е
+    // точно това, което обход Е брои (`docs/11`).
+    await p.click('[data-sektsiya=smetki-period] [data-sgavane]');
+    await p.waitForSelector('[data-sektsiya=smetki-period] [data-sgavane][aria-expanded=false]');
+    proveri('сгънатият дял не показва НИЩО освен главата си', await vidimiPoleta(), 0);
+    proveri('и знакът го КАЗВА на четеца на екран',
+      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      'false');
+    proveri('сгъването е ПОГЛЕД · нула събития', await broySabitiya(p), predSabitiyaSg);
+
+    // ПОМНИ СЕ · като всеки друг поглед (ADR-022).
+    // ЧАКА СЕ СЕКЦИЯТА, не поле в нея: сгънатият дял НЯМА видимо поле, и
+    // чакането щеше да виси трийсет секунди върху собствения си успех.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'smetki', '[data-sektsiya=smetki-period]');
+    proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
+
+    // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
+    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    // ПРЕЗ ГРУПАТА · трите действия на картата станаха група (ADR-057) и
+    // видимо стои само последно избраното. Точно за това е `natisniVGrupata`.
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-razgani-vsichki="smetki"]'));
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('„Разтвори всички" връща дяла разтворен', await vidimiPoleta(), predSgavane);
+}
+
+/**
+ * ХРАПОВИТЕ ПРАГОВЕ · днешните числа, които могат само да ПАДАТ.
+ *
+ * Вдигане на праг е решение, не поправка: то се вижда в диф-а и иска дума.
+ */
+const PRAG_GOLI = 78;
+const PRAG_PRAZNO = 40;
+
 /** 48 · джобът накрая */
 export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
   const { stranitsa: p, broyach } = ctx;
