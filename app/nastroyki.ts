@@ -92,6 +92,7 @@ import type { PunktNaMenyuto } from '../src/domein/hedari-po-tabove.js';
 import { IME_BEZ_TAB } from '../src/domein/hedari-po-tabove.js';
 import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
+import { izboratZaSemeystvo, sravniGlavi } from '../src/domein/obshta-glava.js';
 import type { Konteks } from './ekranite.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
@@ -113,7 +114,19 @@ const POSOKA_S_DUMI: Readonly<Record<string, string>> = Object.freeze({
  * ЕДНОТО МЯСТО с двете лица (И58): „Две отделни, но свързани, и се редактират
  * от едно място СЪС СМЯНА НА РЕДАКТОРА." Смяната е това поле, не втори екран.
  */
-let litseNaRedaktora: 'hedari' | 'opis' = 'hedari';
+let litseNaRedaktora: 'hedari' | 'opis' | 'semeystva' = 'hedari';
+/**
+ * ТРЕТОТО ЛИЦЕ · семействата от глави (резен 62).
+ *
+ * Негово: „това пак се прави от Редактора на хедърите в Настройки" — затова е
+ * ЛИЦЕ на същия редактор, а не шестнайсети екран.
+ */
+let semA = '';
+let semB = '';
+/** Кои предложени двойки е потвърдил човекът · „своя колона↔своя колона". */
+let potvardeni = new Set<string>();
+/** Името на семейството, както се пише в полето. */
+let imeNaSemeystvo = '';
 /** Кой хедър е отворен в Редактора. Празно значи „никой". */
 let izbranHedar = '';
 
@@ -213,7 +226,7 @@ export function narisuvayNastroyki(
       Хедърите и колоните им се редактират нормално.</p>
     </section>`
     }
-    ${blokNaRedaktora(modeli)}
+    ${blokNaRedaktora(modeli, o)}
     ${blokNaParametrite(o)}
     ${blokNaEtapite(o)}
 
@@ -374,7 +387,7 @@ function redNaModel(m: ModelNaTablitsa): string {
  * Настройки е екранът на главния акаунт (И57); кой точно е натиснал, записва
  * Вратата в `actor`, не този файл.
  */
-function blokNaRedaktora(modeli: readonly ModelNaTablitsa[]): string {
+function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): string {
   const izbran = modeli.find((m) => m.klyuch === izbranHedar);
   return `
     <section data-sektsiya="hedari">
@@ -385,9 +398,137 @@ function blokNaRedaktora(modeli: readonly ModelNaTablitsa[]): string {
       <div class="deystviya">
         <button type="button" class="${litseNaRedaktora === 'hedari' ? 'glaven' : 'vtorichen'}" id="litse-hedari">Редактор на хедъри</button>
         <button type="button" class="${litseNaRedaktora === 'opis' ? 'glaven' : 'vtorichen'}" id="litse-opis">Опис на Подредба</button>
+        <button type="button" class="${litseNaRedaktora === 'semeystva' ? 'glaven' : 'vtorichen'}" id="litse-semeystva">Семейства от глави</button>
       </div>
-      ${litseNaRedaktora === 'opis' ? litseOpis(modeli) : litseHedari(modeli, izbran)}
+      ${
+        litseNaRedaktora === 'opis'
+          ? litseOpis(modeli)
+          : litseNaRedaktora === 'semeystva'
+            ? litseSemeystva(o)
+            : litseHedari(modeli, izbran)
+      }
     </section>`;
+}
+
+/**
+ * ЛИЦЕТО „СЕМЕЙСТВА ОТ ГЛАВИ" · две таблици стават една (резен 62).
+ *
+ * Негово (ред 935): „Фактурите и двете са с еднакъв хедър. Така се групират."
+ * Еднаквостта обаче не е дадена: двата му листа с продажби носят разместени
+ * колони и различни думи за едно и също. Тук тя се ПРАВИ — и я прави човекът.
+ *
+ * Машината показва какво съвпада само́, какво е само тук и какво ПРИЛИЧА.
+ * Потвърждава се с отметка; предложение без отметка не влиза никъде.
+ */
+function litseSemeystva(o: Ogledalo): string {
+  const tablitsi = [...o.tablitsiOtFayl.values()].sort((a, b) =>
+    a.klyuch.localeCompare(b.klyuch, 'bg'),
+  );
+  if (tablitsi.length < 2) {
+    return `<p class="prazno" data-sektsiya="semeystva-prazno">Семейство иска ПОНЕ ДВЕ
+      таблици от файл.<br>Създадени са ${tablitsi.length} — качи втора в Сметки и се върни тук.</p>`;
+  }
+
+  const izborat = izboratZaSemeystvo(
+    tablitsi.map((t) => ({ tablitsa: t.klyuch, glavi: t.glavi })),
+    semA,
+    semB,
+    potvardeni,
+  );
+  if (izborat === undefined) {
+    return '<p class="prazno" data-sektsiya="semeystva-prazno">Няма две таблици за семейство.</p>';
+  }
+  const { a, b, obshtata: og } = izborat;
+  const s = sravniGlavi(a.glavi, b.glavi);
+  const zhivi = [...o.semeystvataNaGlavite.values()].filter((x) => !x.mahnato);
+
+  const izborNa = (id: string, izbrano: string): string =>
+    `<select translate="no" id="${id}">${tablitsi
+      .map(
+        (t) =>
+          `<option value="${ekraniraj(t.klyuch)}"${t.klyuch === izbrano ? ' selected' : ''}>${ekraniraj(t.klyuch)}</option>`,
+      )
+      .join('')}</select>`;
+
+  const imeNa = (glavi: readonly string[], k: string): string => glavi[Number(k)] ?? '?';
+
+  return `
+    <div class="karta" data-sektsiya="semeystva">
+      <div class="deystviya">
+        <label>Първа ${izborNa('sem-a', a.tablitsa)}</label>
+        <label>Втора ${izborNa('sem-b', b.tablitsa)}</label>
+      </div>
+
+      <p class="drebno" id="sverka-semeystvo" data-ednakvi="${s.ednakvi.length}"
+         data-samo-a="${s.samoA.length}" data-samo-b="${s.samoB.length}"
+         data-obshti="${og.koloni.length}">
+        Съвпадат по име: <b>${s.ednakvi.length}</b> · само в „${ekraniraj(a.tablitsa)}":
+        <b>${s.samoA.length}</b> · само в „${ekraniraj(b.tablitsa)}": <b>${s.samoB.length}</b> ·
+        разлика: <b>${s.sverka.razlika}</b> → обща глава от <b>${og.koloni.length}</b> колони
+      </p>
+
+      ${
+        s.predlozheni.length === 0
+          ? '<p class="drebno">Няма какво да се предложи — нищо не си прилича по думи.</p>'
+          : `<div class="tablitsa" data-tablitsa="predlozheni-dvoyki">
+        <div class="red glava"><span>Едно и също?</span><span>в „${ekraniraj(a.tablitsa)}"</span><span>в „${ekraniraj(b.tablitsa)}"</span><span>защо се предлага</span></div>
+        ${s.predlozheni
+          .map((p: { readonly a: string; readonly b: string; readonly zashto: string }) => {
+            const klyuch = `${p.a}|${p.b}`;
+            return `<div class="red opis" data-predlozhena="${ekraniraj(klyuch)}">
+            <span><input type="checkbox" data-dvoyka="${ekraniraj(klyuch)}"${potvardeni.has(klyuch) ? ' checked' : ''}></span>
+            <span translate="no">${ekraniraj(imeNa(a.glavi, p.a))}</span>
+            <span translate="no">${ekraniraj(imeNa(b.glavi, p.b))}</span>
+            <span class="drebno">${ekraniraj(p.zashto)}</span>
+          </div>`;
+          })
+          .join('')}
+      </div>`
+      }
+
+      <div class="tablitsa" data-tablitsa="obshtata-glava">
+        <div class="red glava"><span>№</span><span>обща колона</span><span>„${ekraniraj(a.tablitsa)}"</span><span>„${ekraniraj(b.tablitsa)}"</span></div>
+        ${og.koloni
+          .map((ime: string, i: number) => {
+            const ot = (t: string, glavi: readonly string[]): string => {
+              const svoya = Object.entries(og.kartata[t] ?? {}).find(([, kam]) => kam === String(i));
+              return svoya === undefined ? '—' : imeNa(glavi, svoya[0]);
+            };
+            return `<div class="red opis" data-obshta="${i}">
+              <span translate="no">${i + 1}</span>
+              <span translate="no">${ekraniraj(ime)}</span>
+              <span translate="no">${ekraniraj(ot(a.tablitsa, a.glavi))}</span>
+              <span translate="no">${ekraniraj(ot(b.tablitsa, b.glavi))}</span>
+            </div>`;
+          })
+          .join('')}
+      </div>
+
+      <form id="forma-semeystvo" class="red-forma">
+        <label>Име на семейството
+          <input translate="no" id="ime-semeystvo" value="${ekraniraj(imeNaSemeystvo)}" placeholder="Продажби">
+        </label>
+        <button type="submit" class="glaven">Запиши семейството</button>
+      </form>
+
+      ${
+        zhivi.length === 0
+          ? '<p class="drebno">Още няма записано семейство.</p>'
+          : `<div class="tablitsa" data-tablitsa="semeystvata">
+        <div class="red glava"><span>семейство</span><span>таблици</span><span>колони</span><span></span></div>
+        ${zhivi
+          .map(
+            (x) => `<div class="red opis" data-semeystvo="${ekraniraj(x.klyuch)}">
+          <span translate="no">${ekraniraj(x.klyuch)}</span>
+          <span translate="no">${ekraniraj(x.tablitsi.join(' · '))}</span>
+          <span translate="no">${x.koloni.length}</span>
+          <span><button type="button" class="vtorichen malak" data-razpusni="${ekraniraj(x.klyuch)}">Разпусни</button></span>
+        </div>`,
+          )
+          .join('')}
+      </div>`
+      }
+    </div>`;
 }
 
 /** Лицето „Опис на Подредба" — всичко именувано е ред (ред 1970). Изглед, не втора истина. */
@@ -1337,6 +1478,86 @@ export function zakachiNastroyki(
     litseNaRedaktora = 'opis';
     await prerisuvay();
   });
+  koren.querySelector<HTMLButtonElement>('#litse-semeystva')?.addEventListener('click', async () => {
+    litseNaRedaktora = 'semeystva';
+    await prerisuvay();
+  });
+
+  // ── СЕМЕЙСТВАТА ОТ ГЛАВИ (резен 62) ─────────────────────────────────────
+  // Смяната на която и да е от двете таблици ЗАБРАВЯ потвърдените двойки: те
+  // са двойки на ТЕЗИ две глави. Пренесени наум към други две, щяха да сочат
+  // чужди номера — и то мълчаливо.
+  for (const [id, koya] of [['sem-a', 'a'], ['sem-b', 'b']] as const) {
+    koren.querySelector<HTMLSelectElement>(`#${id}`)?.addEventListener('change', async (e) => {
+      const stoynost = (e.target as HTMLSelectElement).value;
+      if (koya === 'a') semA = stoynost;
+      else semB = stoynost;
+      potvardeni = new Set();
+      await prerisuvay();
+    });
+  }
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-dvoyka]')) {
+    kutiya.addEventListener('change', async () => {
+      const klyuch = kutiya.dataset['dvoyka'] ?? '';
+      if (kutiya.checked) potvardeni.add(klyuch);
+      else potvardeni.delete(klyuch);
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLInputElement>('#ime-semeystvo')?.addEventListener('input', (e) => {
+    imeNaSemeystvo = (e.target as HTMLInputElement).value;
+  });
+  koren.querySelector<HTMLFormElement>('#forma-semeystvo')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    greshka = '';
+    try {
+      // СЪЩИЯТ избор, който екранът ПОКАЗВА — един дом, не втори препис.
+      const og0 = await k.deystviya.ogledalo();
+      const izborat = izboratZaSemeystvo(
+        [...og0.tablitsiOtFayl.values()]
+          .sort((x, y) => x.klyuch.localeCompare(y.klyuch, 'bg'))
+          .map((t) => ({ tablitsa: t.klyuch, glavi: t.glavi })),
+        semA,
+        semB,
+        potvardeni,
+      );
+      if (izborat === undefined) throw new Error('Семейство иска ДВЕ таблици.');
+      const { a, b, obshtata: og } = izborat;
+      await k.deystviya.zapishiSemeystvoGlavi(
+        {
+          klyuch: imeNaSemeystvo.trim(),
+          tablitsi: [a.tablitsa, b.tablitsa],
+          koloni: og.koloni,
+          kartata: og.kartata,
+          mahnato: false,
+        },
+        { opId: `sem:${crypto.randomUUID()}` },
+      );
+      imeNaSemeystvo = '';
+      potvardeni = new Set();
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-razpusni]')) {
+    but.addEventListener('click', async () => {
+      const klyuch = but.dataset['razpusni'] ?? '';
+      const sega = (await k.deystviya.ogledalo()).semeystvataNaGlavite.get(klyuch);
+      if (sega === undefined) return;
+      greshka = '';
+      try {
+        // РАЗПУСКАНЕТО е ЗАПИС със същия ключ, не триене (правило 1).
+        await k.deystviya.zapishiSemeystvoGlavi(
+          { ...sega, mahnato: true },
+          { opId: `sem-razp:${crypto.randomUUID()}` },
+        );
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
   koren.querySelector<HTMLSelectElement>('#izbor-hedar')?.addEventListener('change', async (e) => {
     izbranHedar = (e.target as HTMLSelectElement).value;
     dobavyamKolona = false;

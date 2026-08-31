@@ -28,6 +28,7 @@ import {
   type Krai,
 } from './mnogo-kam-mnogo.js';
 import { proveriRed } from './redove-na-tablitsa.js';
+import { proveriSemeystvo } from './obshta-glava.js';
 
 /**
  * ТОВАРЪТ на закачането и на разкачането · ЕДИН дом.
@@ -128,6 +129,7 @@ import type {
   PayloadParametarNaVhodaZapisan,
   PayloadKoefitsientZapisan,
   PayloadRedNaTablitsaZapisan,
+  PayloadSemeystvoGlaviZapisano,
   PayloadRedoveZakacheni,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
@@ -1733,6 +1735,38 @@ export class Deystviya {
       'РедНаТаблицаЗаписан',
       VID.redNaTablitsa,
       `RED:${danni.tablitsa}:${danni.red}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА СЕМЕЙСТВО ОТ ГЛАВИ · кои таблици работят с ЕДНА глава (резен 62).
+   *
+   * Адресът е `SEM:<ключ>` — СЪЩИЯТ при поправка и при разпускане, защото това
+   * е едно и също семейство. Ново име = ново семейство, и точно затова ключът е
+   * име, а не съдържание: препокриване на две таблици може да се върне към
+   * предишното си състояние, а ключ от съдържанието би върнал стария резултат и
+   * поправката би изчезнала мълчаливо (правило 20).
+   *
+   * Пазачът чете ГЛАВИТЕ от Огледалото, не от подаденото: карта, сочеща колона,
+   * каквато таблицата няма, лъже чак при първото четене.
+   */
+  async zapishiSemeystvoGlavi(
+    danni: PayloadSemeystvoGlaviZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const og = await this.ogledalo();
+    const glaviteNa = new Map<string, readonly string[]>();
+    for (const t of danni.tablitsi) {
+      const glavata = og.tablitsiOtFayl.get(t);
+      if (glavata !== undefined) glaviteNa.set(t, glavata.glavi);
+    }
+    proveriSemeystvo(danni, glaviteNa);
+    return this.#pusni(
+      'СемействоГлавиЗаписано',
+      VID.semeystvoGlavi,
+      `SEM:${danni.klyuch}`,
       danni,
       z,
     );

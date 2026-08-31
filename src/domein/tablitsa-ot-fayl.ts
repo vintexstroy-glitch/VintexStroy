@@ -135,6 +135,27 @@ export interface PredlozhenieZaTablitsa {
 export const REDOVE_ZA_SVERKA = 20;
 
 /**
+ * ИМЕТО НА БЕЗИМЕННАТА КОЛОНА · ЕДИН дом за плейсхолдъра (правило 17).
+ *
+ * Вратата не пуска колона без име, а неговите листове ги имат: „Малинова" носи
+ * безименна колона между „квадратура" и „цена" (цената на кв.м), „Студентски" —
+ * шест накрая. Затова тук се дава име по НОМЕР.
+ *
+ * И точно затова името трябва да се ПОЗНАВА обратно: то не е негова дума, а
+ * наша временна. Две таблици с „Колона 21" на едно и също място НЕ са една и
+ * съща колона — сливането им би било сливане по ПОЗИЦИЯ, преоблечено като по
+ * име (`obshta-glava.ts`).
+ */
+function imeNaBezimenna(k: number): string {
+  return `Колона ${k + 1}`;
+}
+
+/** Това име наше ли е, или негово? Плейсхолдърът не свързва нищо сам. */
+export function bezimennaE(ime: string): boolean {
+  return /^Колона \d+$/.test(ime.trim());
+}
+
+/**
  * НА КОЙ РЕД Е ГЛАВАТА · познава се, не се приема за първия.
  *
  * Неговите листове почват със ЗАГЛАВИЕ в една клетка („Т А Б Л И Ц А за
@@ -188,7 +209,7 @@ export function predlozhiTablitsa(
   const imena: string[] = [];
   const vidove: VidStoynost[] = [];
   for (let k = 0; k < shirina; k += 1) {
-    imena.push((glava[k] ?? '').trim() || `Колона ${k + 1}`);
+    imena.push((glava[k] ?? '').trim() || imeNaBezimenna(k));
     vidove.push(vidNaKolonata(danni.map((r) => r[k] ?? '')));
   }
 

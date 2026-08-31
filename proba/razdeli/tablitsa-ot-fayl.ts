@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, natisniVGrupata, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -280,5 +280,105 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     'и двойката показва В КОЯ таблица е редът',
     ((await p.textContent('[data-tablitsa=zakachki]')) ?? '').includes('Фактури от файл'),
     true,
+  );
+
+  // ══ 132а · ВТОРАТА ТАБЛИЦА · за семейството от глави (резен 62) ══════════
+  // Втори лист на СЪЩАТА работа, с разместени колони и друга дума за едно и
+  // също („Ставка" ↔ „АКТ Ставка"). Едната таблица не може да покаже проблема,
+  // за който семейството съществува.
+  await naEkran(p, 'smetki', '[data-sektsiya=tablitsa-ot-fayl]');
+  await p.setInputFiles(
+    '#fayl-tablitsa',
+    new URL('../../primeri/fakturi-vtori-obekt.xlsx', import.meta.url).pathname,
+  );
+  await p.waitForSelector('[data-predlozhenie]', { timeout: 5_000 });
+  proveri(
+    'вторият лист носи ШЕСТ колони · безименната си има име по номер',
+    await p.$eval('[data-sektsiya=tablitsa-ot-fayl] [data-koloni]', (e) =>
+      Number((e as HTMLElement).dataset['koloni']),
+    ),
+    6,
+  );
+  await p.fill('#nova-tablitsa-ime', 'Втори обект');
+  await sSabitie(p, () => p.click('#forma-sazday-tablitsa button[type=submit]'));
+  proveri(
+    'и двете таблици вече се виждат',
+    ((await p.textContent('[data-sektsiya=sazdadenite-tablitsi]')) ?? '').includes('Втори обект'),
+    true,
+  );
+
+  // ВТОРАТА ТАБЛИЦА СМЕНИ ПОДРАЗБИРАНЕТО: менюто ги дава подредени по име, а
+  // „Втори обект" е преди „Фактури от файл" — и той няма нито един ред. Затова
+  // таблицата се избира ПОИМЕННО, вместо да се разчита на първата.
+  await naEkran(p, 'tabove', '#izbor-tab');
+  await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-a', 'red'));
+  await deystvieSPrerisuvane(p, () => p.selectOption('#zak-tablitsa-a', 'Фактури от файл'));
+  proveri(
+    'изборът на таблица сменя КОИ редове се предлагат',
+    await p.$$eval('#zak-red-a option', (e) => e.map((x) => x.textContent).join(' ')),
+    'Кауфланд Пощенска Техномаркет Ф-7',
+  );
+
+  // ── СЕМЕЙСТВОТО ЖИВЕЕ ТУК, а не при Настройки ──────────────────────────
+  // Първият ми опит го сложи в блока на Настройки — а той върви ПРЕДИ този и
+  // тогава създадена таблица още няма нито една. Проходът тече по реда на
+  // ЕКРАНИТЕ, не по реда на темите (същата бележка стои и при §129).
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  // ══ 132 · СЕМЕЙСТВОТО ОТ ГЛАВИ · две таблици стават една (резен 62) ═════
+  //
+  // Негово (ред 935): „Фактурите и двете са с еднакъв хедър. Така се
+  // групират." Двата листа тук НЕ са с еднакъв хедър — единият носи
+  // безименна колона, а „Ставка" се казва „АКТ Ставка". Еднаквостта се ПРАВИ.
+  // ТРЕТИЯТ бутон СЕ СВИ В ГРУПАТА (ADR-057) — с два лица нищо не се свиваше,
+  // с три вече да. Затова се натиска ПРЕЗ групата, точно както го прави човек:
+  // отваря стрелкичката, избира по думата, чак тогава натиска.
+  await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#litse-semeystva'));
+  await p.waitForSelector('[data-sektsiya=semeystva]');
+  proveri('третото лице на Редактора се отваря', (await p.$$('#forma-semeystvo')).length, 1);
+
+  const chislo = async (kakvo: string): Promise<number> =>
+    Number(await p.$eval('#sverka-semeystvo', (e, k) =>
+      (e as HTMLElement).dataset[k as string] ?? '-1', kakvo));
+
+  proveri('еднаквите по име се хващат САМИ · и през интервала накрая', await chislo('ednakvi'), 4);
+  proveri('останалото е „само тук" от двете страни · по едно', await chislo('samoA'), 1);
+  proveri('и по едно от другата', await chislo('samoB'), 1);
+  proveri('без нито една двойка общата глава е СБОРЪТ на различията', await chislo('obshti'), 7);
+
+  proveri(
+    'различната дума за едно и също се ПРЕДЛАГА, не се решава',
+    (await p.$$eval('[data-tablitsa=predlozheni-dvoyki] .red.opis', (e) =>
+      e.map((x) => x.textContent ?? '').join(' '))).includes('АКТ Ставка'),
+    true,
+  );
+  // ПЛЕЙСХОЛДЪРЪТ „Колона 2" стои в общата глава, но НЕ се е слял с нищо:
+  // той е наше име по номер, не негова дума.
+  proveri(
+    'безименната колона стои в общата глава със своето временно име',
+    (await p.$$eval('[data-tablitsa=obshtata-glava] .red.opis', (e) =>
+      e.map((x) => x.textContent ?? '').join(' '))).includes('Колона 2'),
+    true,
+  );
+
+  // ПО КЛЮЧ, не „първата отметка": ключът е „своя колона | своя колона".
+  // ПЪРВА е „Втори обект" — таблиците идват ПОДРЕДЕНИ по име, а „В" е преди
+  // „Ф". Тоест „АКТ Ставка" (№6 там) към „Ставка" (№5 във „Фактури от файл").
+  await deystvieSPrerisuvane(p, () => p.click('[data-dvoyka="5|4"]'));
+  proveri('потвърдената двойка сваля общата глава с ЕДНО', await chislo('obshti'), 6);
+
+  await p.fill('#ime-semeystvo', 'Фактурите');
+  await sSabitie(p, () => p.click('#forma-semeystvo button[type=submit]'));
+  proveri(
+    'записаното семейство се вижда с двете си таблици',
+    ((await p.textContent('[data-tablitsa=semeystvata]')) ?? '').includes('Втори обект'),
+    true,
+  );
+
+  // РАЗПУСКАНЕТО е ЗАПИС, не триене · Журналът расте, редът си отива от списъка
+  await sSabitie(p, () => p.click('[data-razpusni="Фактурите"]'));
+  proveri(
+    'разпуснатото си отива от списъка · но е ЗАПИС, не триене',
+    (await p.$$('[data-semeystvo="Фактурите"]')).length,
+    0,
   );
 }
