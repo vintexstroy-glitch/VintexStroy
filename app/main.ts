@@ -44,9 +44,11 @@ import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
 import {
   kopchetoNaLentata,
   lentataESvita,
+  polozhiShirinata,
+  razdelitelyat,
+  zakachiRazdelitelya,
   moyatRed,
   podredeniPunktove,
-  premestiVMoyaRed,
   skritiPunktove,
   zabraviMoyaRed,
   vidimiPunktove,
@@ -698,6 +700,8 @@ async function trugvay(): Promise<void> {
         lichnoOgledalo !== null,
         koyGleda(kojSam.imeyl, ogledalo),
       )}
+      ${/* РАЗДЕЛИТЕЛНАТА ЛИНИЯ · едно докосване прибира, задържане мери (резен 63). */
+        razdelitelyat()}
       <main class="glavno">
         <header class="shapka">
           <div>
@@ -916,23 +920,10 @@ async function trugvay(): Promise<void> {
 
     // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
     zakachiSvivachaNaLentata(koren, prerisuvay);
+    polozhiShirinata();
+    zakachiRazdelitelya(koren, prerisuvay);
     // И СЕ ПОДРЕЖДА · всеки за себе си (И111). Стрелките пишат в паметта на
     // екрана, не в Журнала — затова тук няма нито едно повикване към Вратата.
-    for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-mesti]')) {
-      b.addEventListener('click', async (e) => {
-        // Пунктът е бутон и стрелката е ДО него, не в него — инак натискането
-        // на стрелка би сменило и екрана. Спира се пътят нагоре за всеки случай.
-        e.stopPropagation();
-        const og = await k.deystviya.ogledalo();
-        premestiVMoyaRed(
-          dostapnite(og),
-          og.redNaLentata,
-          b.dataset['mesti']!,
-          b.dataset['posoka'] as 'gore' | 'dolu',
-        );
-        await prerisuvay();
-      });
-    }
     prilozhiSkritite(koren);
     // ЗЕБРАТА е ПОСЛЕДНА: тя брои РЕДОВЕТЕ, а скритите колони и подредбата
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
@@ -1034,7 +1025,7 @@ function strana(
   const podredeni = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
   const skriti = skritiPunktove();
   const punktove = (vidimiPunktove(podredeni, skriti) as KoyEkran[])
-    .map((koy, i, spisak) => {
+    .map((koy) => {
       const e = EKRANI[koy];
       /**
        * НАСТРОЙКИ Е ПАДАЩ РЕД, не обикновен пункт (И101 т.2 · ADR-045).
@@ -1050,26 +1041,13 @@ function strana(
       // ИМЕТО В СВОЙ ВЪЗЕЛ · гол текстов възел не се скрива с CSS, а свитата
       // лента трябва да остави само знака (ADR-058). `textContent` не се мени,
       // значи проходът и контекстното меню четат същото.
-      // СТРЕЛКИТЕ СА НА ВСЕКИ · това е неговото „всеки човек сам да подреди и
-      // размества" (И101). Местят МОЯ ред, не общия — нула събития в Журнала.
-      // Крайните не показват стрелка към нищото: бутон, който не прави нищо,
-      // учи човека да не му вярва.
-      const strelki =
-        `<span class="navmesti">` +
-        (i > 0
-          ? `<button type="button" class="navstrelka" data-mesti="${koy}" data-posoka="gore" title="Нагоре" aria-label="Премести „${e.ime}" нагоре">▲</button>`
-          : '') +
-        (i < spisak.length - 1
-          ? `<button type="button" class="navstrelka" data-mesti="${koy}" data-posoka="dolu" title="Надолу" aria-label="Премести „${e.ime}" надолу">▼</button>`
-          : '') +
-        `</span>`;
-      // БЕЗ ОБВИВКА · `.nav` е РЕШЕТКА с две колони (`1fr auto`), значи пунктът
-      // и стрелките му падат на един ред сами. Обвивка тук би счупила
-      // `.nav > [data-ekran]` — селекторът, с който падащият ред на екрана си
-      // намира пункта (`menyu-ekran.ts`), и той падна точно така при първия опит.
+      // СТРЕЛКИТЕ ГИ НЯМА ТУК · негова дума, 31.08: „Махни това смешно
+      // разместване. То ще се прави от всеки стопанин ОТ НАСТРОЙКИ, където да
+      // определяш кое къде седи и как работи." Редът си остава негов и личен —
+      // мести се от Настройки · „Подредбата на екраните" (ADR-117).
       return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
         ${ikona(e.ikona, 'ikona navikona')}<span class="navime">${e.ime}</span>${znachka}
-      </button>${strelki}`;
+      </button>`;
     })
     .join('');
 

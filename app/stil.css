@@ -386,8 +386,11 @@ a:hover { color: var(--aktsent-tumen); }
 /* ── страничната лента · свива се и се застопорява (ADR-058) ────────
    Разтворената при минаване с мишка ЛЯГА върху екрана, не бута таблицата:
    местен ред под курсора значи натиснато друго, не което човек е гледал. */
+/* ШИРИНАТА идва от корена · `polozhiShirinata()` я слага през CSSOM, защото
+   приложението забранява inline стилове (`default-src 'self'`). Стойността тук
+   е падането, когато променливата я няма. */
 .strana {
-  width: 232px;
+  width: var(--shirina-lenta, 232px);
   flex-shrink: 0;
   background: var(--panel);
   border-right: 1px solid var(--liniya);
@@ -399,6 +402,32 @@ a:hover { color: var(--aktsent-tumen); }
   overflow-y: auto;
 }
 .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+
+/* ── РАЗДЕЛИТЕЛНАТА ЛИНИЯ · едно докосване прибира, задържане мери (резен 63)
+   Негова поръчка, дословно: „прибирането му с едно докосване на разделителната
+   линия и движението на ширините на таблото с задържане."
+
+   Линията е 5px ШИРОКА, а се ВИЖДА като 1px: пръст и мишка искат площ, окото —
+   тънка черта. Тесен хват значи промъкване, а промъкването учи човека, че
+   функцията е капризна. */
+.razdelitel {
+  width: 5px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  position: relative;
+  touch-action: none;
+}
+.razdelitel::after {
+  content: '';
+  position: absolute;
+  inset: 0 2px;
+  background: var(--liniya);
+}
+.razdelitel:hover::after, .razdelitel:focus-visible::after { background: var(--mastilo2); }
+.razdelitel:hover, .razdelitel:focus-visible { background: color-mix(in srgb, var(--mastilo2) 12%, transparent); }
+/* Свитият панел вече носи своята дясна черта — двойна линия изглежда счупено. */
+.strana.svita + .razdelitel::after { opacity: 0.6; }
 /* СВИТАТА ЛЕНТА · остават само знаците. */
 .strana.svita { width: 52px; }
 .strana.svita .marka { padding: 18px 8px 12px; align-items: center; }
@@ -410,12 +439,7 @@ a:hover { color: var(--aktsent-tumen); }
 .strana.svita .strelka-dolu,
 .strana.svita .nastroyki-red,
 .strana.svita .ekran-red,
-/* СТРЕЛКИТЕ СИ ОТИВАТ СЪС СВИВАНЕТО · в 52 пиксела няма къде да застанат, а
-   стърчащи ▲▼ изглеждат като счупен екран, не като свита лента. */
-.strana.svita .navmesti,
 .strana.svita .veriga { display: none; }
-/* …и се връщат, щом лентата се разтвори при минаване. */
-.strana.svita:hover .navmesti, .strana.svita:focus-within .navmesti { display: flex; }
 /* Марката се свива до първата буква · цялото име не се побира в 52px и
    стърчащият му остатък изглежда като счупен екран, не като свита лента. */
 .strana.svita .marka b { font-size: 0; }

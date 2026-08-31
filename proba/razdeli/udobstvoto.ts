@@ -516,24 +516,32 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       );
     const predRazmestvaneto = await sektsiiteNaSmetki();
     proveri('екранът носи повече от една секция', predRazmestvaneto.length > 1, true);
-    proveri('и всяка има свои дребни бутончета',
-      (await p.$$eval('.telo [data-premesti]', (e) => e.length)) >= 2, true);
+    // СТРЕЛКИТЕ ГИ НЯМА ВЕЧЕ ПО ЗАГЛАВИЯТА · негова дума, 31.08: „Махни това
+    // смешно разместване. То ще се прави от всеки стопанин ОТ НАСТРОЙКИ."
+    proveri('по самите заглавия НЯМА стрелки · разместването си отиде',
+      await p.$$eval('.telo [data-premesti]', (e) => e.length), 0);
 
-    // Второто слиза на първо място · местенето е една стъпка, без изненади.
-    // Второто по ред · първото няма къде да отиде нагоре.
-    await p.evaluate(() => {
-      const dyalove = [...document.querySelectorAll('.telo > *')].filter((x) => x.querySelector('.dyalglava'));
-      (dyalove[1]!.querySelector('[data-premesti="gore"]') as any).click();
-    });
+    // ── РАЗМЕСТВАНЕТО СТАВА ОТ НАСТРОЙКИ ─────────────────────────────────
+    const predSabitiya = await broySabitiya(p);
+    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    proveri('Настройки знае секциите на екрана, който вече е отварян',
+      (await p.$$eval('[data-podredba-ekran=smetki] [data-sektsiya-red]', (e) => e.length)) > 1,
+      true);
+    // ВТОРАТА се вдига · първата няма къде да отиде нагоре.
+    const vtorata = (await p.$$eval('[data-podredba-ekran=smetki] [data-sektsiya-red]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['sektsiyaRed'] ?? '')))[1]!;
+    await deystvieSPrerisuvane(p, () =>
+      p.click(`[data-podredi="ekran:smetki"][data-klyuch="${vtorata}"][data-posoka=gore]`));
+
+    await naEkran(p, 'smetki', '#forma-period');
     const sledRazmestvaneto = await sektsiiteNaSmetki();
-    proveri('натискането разменя съседите',
+    proveri('натискането в Настройки разменя съседите НА ЕКРАНА',
       sledRazmestvaneto[0], predRazmestvaneto[1]);
     proveri('и нищо не изчезва · същите секции, друг ред',
       [...sledRazmestvaneto].sort().join('|'), [...predRazmestvaneto].sort().join('|'));
 
     // ПОМНИ СЕ · подредбата е поглед, не факт (ADR-022): преживява смяна на
     // екран, но НЕ влиза в Журнала — тя е негова, не обща.
-    const predSabitiya = await broySabitiya(p);
     await naEkran(p, 'imoti', '#forma-imot');
     await naEkran(p, 'smetki', '#forma-period');
     proveri('редът се помни след връщане',
@@ -800,6 +808,46 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.click('#svii-lentata'));
     proveri('и се връща разтворена',
       await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
+
+    // ══ 133 · РАЗДЕЛИТЕЛНАТА ЛИНИЯ · едно докосване прибира, задържане мери ══
+    //
+    // Негова поръчка, 31.08: „прибирането му с ЕДНО ДОКОСВАНЕ на разделителната
+    // линия и движението на ширините на таблото с ЗАДЪРЖАНЕ."
+    razdel = '133 · Разделителната линия';
+    proveri('линията стои между панела и екрана', (await p.$$('#razdelitel')).length, 1);
+    const shirinata = async (): Promise<number> =>
+      p.$eval('.strana', (e) => Math.round(e.getBoundingClientRect().width));
+    const predShirina = await shirinata();
+
+    // ДОКОСВАНЕ · къс клик, без мърдане → панелът се прибира.
+    await deystvieSPrerisuvane(p, () => p.click('#razdelitel'));
+    proveri('едно докосване ПРИБИРА панела',
+      await p.$eval('.strana', (e) => e.classList.contains('svita')), true);
+    await deystvieSPrerisuvane(p, () => p.click('#razdelitel'));
+    proveri('и второто го връща',
+      await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
+    proveri('ширината му е същата · докосването не мери', await shirinata(), predShirina);
+
+    // ЗАДЪРЖАНЕ И ВЛАЧЕНЕ · ширината се мени и НЕ се прибира.
+    const kutiya = (await p.$('#razdelitel'))!;
+    const mesto = (await kutiya.boundingBox())!;
+    const predVlachene = await broySabitiya(p);
+    await p.mouse.move(mesto.x + mesto.width / 2, mesto.y + mesto.height / 2);
+    await p.mouse.down();
+    await p.mouse.move(mesto.x + mesto.width / 2 + 60, mesto.y + mesto.height / 2, { steps: 8 });
+    await deystvieSPrerisuvane(p, () => p.mouse.up());
+    proveri('задържането МЕРИ · панелът стана по-широк', (await shirinata()) > predShirina, true);
+    proveri('и НЕ се прибира · влаченето не е докосване',
+      await p.$eval('.strana', (e) => e.classList.contains('svita')), false);
+    proveri('ширината е ПОГЛЕД · нула събития в Журнала',
+      await broySabitiya(p), predVlachene);
+
+    // ПОМНИ СЕ · същото като всеки друг поглед (ADR-022).
+    const sledVlachene = await shirinata();
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('и ширината преживява смяна на екран', await shirinata(), sledVlachene);
+
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 72 · РЕДЪТ НА МЕНЮТО · два слоя, и само единият пише (И111) ═══════
@@ -808,16 +856,24 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // личен". Проходът брои точно това разделение — СЪБИТИЯТА.
     razdel = '72 · Менюто · моят ред НЕ пише в Журнала';
     const punktovePredi = await p.$$eval('.navred[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
-    proveri('всеки пункт носи стрелки за местене',
-      (await p.$$eval('[data-mesti]', (e) => e.length)) >= punktovePredi.length - 1, true);
-    // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
-    // човека да не вярва на бутоните.
-    proveri('първият няма стрелка нагоре',
-      await p.$$eval('.navpunkt:first-child [data-posoka=gore]', (e) => e.length), 0);
+    // ПО САМАТА ЛЕНТА НЯМА СТРЕЛКИ · те се преместиха в Настройки (резен 63).
+    proveri('лентата е чиста от стрелки',
+      await p.$$eval('[data-mesti]', (e) => e.length), 0);
 
     const predMestene = await broySabitiya(p);
+    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    proveri('Настройки изрежда ВСИЧКИ пунктове на лентата',
+      await p.$$eval('[data-lentapunkt]', (e) => e.length), punktovePredi.length);
+    // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
+    // човека да не вярва на бутоните.
+    // ПЪРВИЯТ ред, не първият възел: главата на таблицата също е `div` и
+    // `:first-of-type` хващаше нея. Четат се РЕДОВЕТЕ и се гледа първият.
+    proveri('първият ред няма ДЕЙСТВАЩА стрелка нагоре',
+      (await p.$$eval('[data-lentapunkt] [data-posoka=gore]',
+        (e) => e.map((x) => (x as HTMLButtonElement).disabled)))[0], true);
     await deystvieSPrerisuvane(p, () =>
-      p.click(`[data-mesti="${punktovePredi[1]}"][data-posoka=gore]`));
+      p.click(`[data-podredi=lenta][data-klyuch="${punktovePredi[1]}"][data-posoka=gore]`));
+
     const punktoveSled = await p.$$eval('.navred[data-ekran]', (e) => e.map((x) => (x as HTMLElement).dataset['ekran']));
     proveri('вторият пункт стана ПЪРВИ', punktoveSled[0], punktovePredi[1]);
     proveri('и НИТО ЕДНО събитие не е влязло · редът ми е ПОГЛЕД',

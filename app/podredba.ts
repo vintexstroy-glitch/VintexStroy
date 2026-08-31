@@ -216,23 +216,78 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
     }
   }
 
-  for (const vazel of sektsii) {
-    const klyuch = klyuchNaSektsiya(vazel);
-    const glava = vazel.querySelector('.dyalglava');
-    if (!glava || glava.querySelector('[data-premesti]')) continue;
-    const kutiya = document.createElement('span');
-    kutiya.className = 'premestvane';
-    kutiya.innerHTML =
-      `<button type="button" class="premestvach" data-premesti="gore" title="Нагоре" aria-label="Премести нагоре">${ikona('podredba')}▲</button>` +
-      `<button type="button" class="premestvach" data-premesti="dolu" title="Надолу" aria-label="Премести надолу">▼</button>`;
-    glava.append(kutiya);
-    for (const b of kutiya.querySelectorAll<HTMLButtonElement>('[data-premesti]')) {
-      b.addEventListener('click', () => {
-        const sega = podredi(sektsiiteNa(koren).map(klyuchNaSektsiya), zapomneniyatRed(ekran));
-        const nov = premesti(sega, klyuch, b.dataset['premesti'] as 'gore' | 'dolu');
-        zapomniEkranno(klyuchat(ekran), [...nov]);
-        zakachiPodredbata(koren, ekran);
-      });
-    }
-  }
+  /**
+   * СТРЕЛКИТЕ ГИ НЯМА ВЕЧЕ · негова дума, 31.08.
+   *
+   * „Махни това смешно разместване. То ще се прави от всеки стопанин ОТ
+   * НАСТРОЙКИ, където да определяш кое къде седи и как работи."
+   *
+   * Дотук всяко заглавие на всяка секция на всеки екран носеше ▲▼ — петдесет и
+   * няколко чифта стрелки, които стоят винаги и вършат работа веднъж. Редът си
+   * остава негов и личен; мести се от Настройки · „Подредбата на екраните".
+   *
+   * ЗАТОВА ТУК СЕ ЗАПИСВА КОЕ Е ВИДЯНО: Настройки не може да пита чужд екран
+   * кои секции има — те се знаят само когато екранът е нарисуван. Записва се
+   * ключът И заглавието, за да има какво да покаже човек, вместо `data-sektsiya`.
+   */
+  zapishiVidenite(
+    ekran,
+    sektsii.map((e) => ({ klyuch: klyuchNaSektsiya(e), ime: zaglavieNa(e) || klyuchNaSektsiya(e) })),
+  );
+}
+
+// ── КОЕ Е ВИДЯНО · за Настройки (резен 63) ──────────────────────────────────
+
+/** Една секция, както Настройки я показва. */
+export interface VidenaSektsiya {
+  readonly klyuch: string;
+  readonly ime: string;
+}
+
+const KLYUCH_VIDENI = 'podredba.videni';
+
+/** Кои екрани изобщо са били отваряни · само за тях има какво да се подрежда. */
+export function ekraniSPodredba(): readonly string[] {
+  return Object.keys(chetiEkranno<Record<string, VidenaSektsiya[]>>(KLYUCH_VIDENI, {})).sort();
+}
+
+/** Секциите на един екран, В РЕДА, в който човек ги вижда днес. */
+export function videniteSektsii(ekran: string): readonly VidenaSektsiya[] {
+  const vsichki = chetiEkranno<Record<string, VidenaSektsiya[]>>(KLYUCH_VIDENI, {});
+  const moite = vsichki[ekran] ?? [];
+  const poKlyuch = new Map(moite.map((s) => [s.klyuch, s]));
+  return podredi(
+    moite.map((s) => s.klyuch),
+    zapomneniyatRed(ekran),
+  ).map((k) => poKlyuch.get(k)!);
+}
+
+/**
+ * ЗАПИСВА кои секции е видял екранът · нула събития, само памет на екрана.
+ *
+ * Пише САМО при разлика. Запис при всяко рисуване е писане без повод — и точно
+ * такова писане прави паметта неразличима от състояние.
+ */
+function zapishiVidenite(ekran: string, sektsii: readonly VidenaSektsiya[]): void {
+  const vsichki = chetiEkranno<Record<string, VidenaSektsiya[]>>(KLYUCH_VIDENI, {});
+  const belegat = (s: readonly VidenaSektsiya[]): string => s.map((x) => `${x.klyuch}=${x.ime}`).join('|');
+  if (belegat(vsichki[ekran] ?? []) === belegat(sektsii)) return;
+  zapomniEkranno(KLYUCH_VIDENI, { ...vsichki, [ekran]: [...sektsii] });
+}
+
+/** Мести една секция в реда на своя екран · връща новия ред. */
+export function premestiSektsiya(
+  ekran: string,
+  klyuch: string,
+  posoka: 'gore' | 'dolu',
+): readonly string[] {
+  const sega = videniteSektsii(ekran).map((s) => s.klyuch);
+  const nov = premesti(sega, klyuch, posoka);
+  zapishiRedaNaSektsiite(ekran, nov);
+  return nov;
+}
+
+/** Забравя реда на един екран · връща го към нарисувания. */
+export function zabraviRedaNaSektsiite(ekran: string): void {
+  zapishiRedaNaSektsiite(ekran, []);
 }

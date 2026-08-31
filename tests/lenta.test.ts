@@ -19,8 +19,13 @@
 
 import { describe, expect, it } from 'vitest';
 import {
+  MRADVA_ZA_VLACHENE,
   NESKRIVAEMI,
   podredeniPunktove,
+  SHIRINA_NAY_MALKO,
+  SHIRINA_NAY_MNOGO,
+  SHIRINA_PODRAZBIRANA,
+  shirinaVGranitsi,
   sPrevklyuchenPunkt,
   vidimiPunktove,
 } from '../app/lenta.js';
@@ -189,5 +194,56 @@ describe('началният ред се задава само от Стопан
     await expect(
       stopaninat.podrediLentata({ red: ['tablo', 'tablo'] }, { opId: 'l3' }),
     ).rejects.toThrow(GreshkaLenta);
+  });
+});
+
+/**
+ * ШИРИНАТА НА ПАНЕЛА · резен 63.
+ *
+ * Негова поръчка: „прибирането му с ЕДНО ДОКОСВАНЕ на разделителната линия и
+ * движението на ширините на таблото с ЗАДЪРЖАНЕ." Границите не са украса: под
+ * долната имената не се четат, над горната панелът изяжда таблицата.
+ */
+describe('ширината на панела', () => {
+  it('подразбраната е тази, с която панелът живя досега', () => {
+    expect(shirinaVGranitsi(SHIRINA_PODRAZBIRANA)).toBe(SHIRINA_PODRAZBIRANA);
+    expect(SHIRINA_PODRAZBIRANA).toBeGreaterThanOrEqual(SHIRINA_NAY_MALKO);
+    expect(SHIRINA_PODRAZBIRANA).toBeLessThanOrEqual(SHIRINA_NAY_MNOGO);
+  });
+
+  // ЧИСЛАТА СА С РЪКА · пин, не препратка. Написани като
+  // `SHIRINA_NAY_MALKO - 1`, тези проверки щяха да се местят ЗАЕДНО с
+  // константата и да минават на всяка нейна стойност — обход А ги брои точно
+  // затова (`docs/11`).
+  it('границите са ТЕЗИ числа · сменят се нарочно, не мимоходом', () => {
+    expect(SHIRINA_NAY_MALKO).toBe(168);
+    expect(SHIRINA_NAY_MNOGO).toBe(420);
+    expect(SHIRINA_PODRAZBIRANA).toBe(232);
+  });
+
+  it('по-тясното се вдига до долната граница · имената трябва да се четат', () => {
+    expect(shirinaVGranitsi(0)).toBe(168);
+    expect(shirinaVGranitsi(-500)).toBe(168);
+    expect(shirinaVGranitsi(167)).toBe(168);
+  });
+
+  it('по-широкото се сваля до горната · панелът не изяжда таблицата', () => {
+    expect(shirinaVGranitsi(9_000)).toBe(420);
+    expect(shirinaVGranitsi(421)).toBe(420);
+  });
+
+  it('вътре в границите числото ОЦЕЛЯВА · само се закръгля до цял пиксел', () => {
+    expect(shirinaVGranitsi(300)).toBe(300);
+    expect(shirinaVGranitsi(300.4)).toBe(300);
+    expect(shirinaVGranitsi(300.6)).toBe(301);
+  });
+
+  it('нечислото пада на подразбраната, не на нула · нула би скрила панела без дума', () => {
+    expect(shirinaVGranitsi(Number.NaN)).toBe(SHIRINA_PODRAZBIRANA);
+    expect(shirinaVGranitsi(Number.POSITIVE_INFINITY)).toBe(SHIRINA_PODRAZBIRANA);
+  });
+
+  it('прагът за влачене е по-голям от нула · инак всяко докосване е влачене', () => {
+    expect(MRADVA_ZA_VLACHENE).toBeGreaterThan(0);
   });
 });

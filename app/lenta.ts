@@ -56,6 +56,114 @@ export function zakachiSvivachaNaLentata(koren: HTMLElement, prerisuvay: () => P
   });
 }
 
+// ── РАЗДЕЛИТЕЛНАТА ЛИНИЯ · резен 63 ─────────────────────────────────────────
+/**
+ * ШИРИНАТА НА ПАНЕЛА · негова поръчка, дословно (31.08):
+ *
+ * „…прибирането му с ЕДНО ДОКОСВАНЕ на разделителната линия и движението на
+ *  ширините на таблото с ЗАДЪРЖАНЕ."
+ *
+ * Тоест ЕДНА линия, ДВЕ действия, разделени по време: късо докосване прибира,
+ * задържане и влачене мери. Без този праг всяко влачене щеше да завършва и с
+ * прибиране — панелът се свива точно когато човек го е разширил.
+ */
+const KLYUCH_SHIRINA = 'lenta.shirina';
+
+/** Подразбраната ширина · същата, с която панелът живя досега. */
+export const SHIRINA_PODRAZBIRANA = 232;
+/** По-тясно от това имената не се четат; по-широко изяжда таблицата. */
+export const SHIRINA_NAY_MALKO = 168;
+export const SHIRINA_NAY_MNOGO = 420;
+/**
+ * Колко пиксела правят влаченето ВЛАЧЕНЕ · под този праг то е ДОКОСВАНЕ.
+ *
+ * Пръст, който само докосва, мърда с един-два пиксела. Праг нула би направил
+ * всяко докосване влачене и панелът никога не би се прибирал.
+ */
+export const MRADVA_ZA_VLACHENE = 4;
+
+/** Ширината, свита в границите си · чиста функция, за да се проверява. */
+export function shirinaVGranitsi(shirina: number): number {
+  if (!Number.isFinite(shirina)) return SHIRINA_PODRAZBIRANA;
+  return Math.min(SHIRINA_NAY_MNOGO, Math.max(SHIRINA_NAY_MALKO, Math.round(shirina)));
+}
+
+function shirinataNaLentata(): number {
+  return shirinaVGranitsi(chetiEkranno<number>(KLYUCH_SHIRINA, SHIRINA_PODRAZBIRANA));
+}
+
+/**
+ * ПОЛАГА ширината върху корена · през CSS-променлива, не през атрибут.
+ *
+ * НАХОДКА, платена от прохода: приложението носи `default-src 'self'` и
+ * БРАУЗЪРЪТ ОТКАЗВА всеки inline `style="…"` в разметката. Първият ми опит
+ * пишеше ширината точно така — и тя мълчаливо не се прилагаше, а конзолата
+ * се пълнеше с откази. Правилото не се разхлабва заради една ширина.
+ *
+ * През CSSOM (`setProperty`) е позволено и е по-точно: стилът стои на КОРЕНА,
+ * тъй че преживява прерисуването на цялата черупка.
+ */
+export function polozhiShirinata(): void {
+  document.documentElement.style.setProperty('--shirina-lenta', `${shirinataNaLentata()}px`);
+}
+
+/** Разделителната линия · рисува се МЕЖДУ панела и екрана. */
+export function razdelitelyat(): string {
+  return (
+    `<div class="razdelitel" id="razdelitel" role="separator" aria-orientation="vertical"` +
+    ` title="Докосни, за да прибереш · задръж и влачи, за да мериш"` +
+    ` aria-label="Разделителна линия · докосване прибира панела, задържане мени ширината"></div>`
+  );
+}
+
+/**
+ * Закача линията · вика се СЛЕД всяко рисуване.
+ *
+ * Ширината се пише ПРАВО в стила, докато трае влаченето, и се ЗАПОМНЯ чак на
+ * пускане. Прерисуване на всеки пиксел би било прерисуване на цялата книга —
+ * а тук се мени един размер, не едно число в нея.
+ */
+export function zakachiRazdelitelya(koren: HTMLElement, prerisuvay: () => Promise<void>): void {
+  const liniya = koren.querySelector<HTMLElement>('#razdelitel');
+  const panel = koren.querySelector<HTMLElement>('.strana');
+  if (!liniya || !panel) return;
+
+  liniya.addEventListener('pointerdown', (e) => {
+    e.preventDefault();
+    const nachalo = e.clientX;
+    const bilo = panel.getBoundingClientRect().width;
+    let vlacheno = false;
+    liniya.setPointerCapture(e.pointerId);
+
+    const mesti = (h: PointerEvent): void => {
+      if (Math.abs(h.clientX - nachalo) >= MRADVA_ZA_VLACHENE) vlacheno = true;
+      if (!vlacheno) return;
+      document.documentElement.style.setProperty(
+        '--shirina-lenta',
+        `${shirinaVGranitsi(bilo + (h.clientX - nachalo))}px`,
+      );
+    };
+    const pusni = async (h: PointerEvent): Promise<void> => {
+      liniya.removeEventListener('pointermove', mesti);
+      liniya.removeEventListener('pointerup', pusni);
+      liniya.removeEventListener('pointercancel', pusni);
+      if (vlacheno) {
+        // ВЛАЧЕНЕ · мерене. Свитият панел се разтваря сам: човек, който мери
+        // ширина, я иска видима.
+        zapomniEkranno(KLYUCH_SHIRINA, shirinaVGranitsi(bilo + (h.clientX - nachalo)));
+        if (lentataESvita()) zapomniEkranno(KLYUCH, false);
+      } else {
+        // ДОКОСВАНЕ · прибиране.
+        zapomniEkranno(KLYUCH, !lentataESvita());
+      }
+      await prerisuvay();
+    };
+    liniya.addEventListener('pointermove', mesti);
+    liniya.addEventListener('pointerup', (h) => void pusni(h));
+    liniya.addEventListener('pointercancel', (h) => void pusni(h));
+  });
+}
+
 // ── ДВАТА СЛОЯ НА РЕДА · резен 15 · И111 ─────────────────────────────────────
 /**
  * РЕДЪТ НА ПУНКТОВЕТЕ · негово решение от 28.08, взето измежду три:
