@@ -233,3 +233,52 @@ export function obobshteniRedove(
 function tezhest(nadpis: string): number {
   return nadpis === BEZ_STOYNOST ? 1 : 0;
 }
+
+/**
+ * КОЕ СЕ ВИЖДА · таблицата, диаграмата, или двете.
+ *
+ * Негово, 31.08, за таблицата на Ганта: „**Да и на двете места. Да може да се
+ * крие.**" Тоест таблицата остава И в Управление, И в Сметки, а скриването е
+ * ЛИЧЕН избор на екрана, не решение на кода.
+ *
+ * ЗАЩО ЧИСТА ФУНКЦИЯ, А НЕ ДВА `if`-а НА ДВА ЕКРАНА. Правилото има ЕДНО място,
+ * където може да сгреши: и двете скрити наведнъж оставят празна секция, в която
+ * човекът вижда изчезнала работа, а не скрит изглед. Затова последното видимо
+ * не се скрива, и отказът се КАЗВА (правило 15) — вместо да се преглътне.
+ *
+ * Скриването пипа САМО екрана: нито сбор, нито Журнал, нито износ (правило 23).
+ */
+export interface KoeSeVizhda {
+  readonly tablitsa: boolean;
+  readonly diagrama: boolean;
+}
+
+export type KoePrevkluchva = 'tablitsa' | 'diagrama';
+
+export interface Prevkluchvane {
+  readonly sled: KoeSeVizhda;
+  /** празно, когато е станало · иначе ПРИЧИНАТА с думи */
+  readonly otkaz: string;
+}
+
+export function prevkluchi(sega: KoeSeVizhda, koe: KoePrevkluchva): Prevkluchvane {
+  const sled = { ...sega, [koe]: !sega[koe] };
+  if (!sled.tablitsa && !sled.diagrama) {
+    return Object.freeze({
+      sled: sega,
+      otkaz: 'Последният изглед не се скрива — иначе секцията остава празна.',
+    });
+  }
+  return Object.freeze({ sled: Object.freeze(sled), otkaz: '' });
+}
+
+/** Думите на бутона · казват какво ще СТАНЕ, не какво е сега. */
+export function dumataNaButona(sega: KoeSeVizhda, koe: KoePrevkluchva): string {
+  const ime = koe === 'tablitsa' ? 'таблицата' : 'диаграмата';
+  return `${sega[koe] ? 'Скрий' : 'Покажи'} ${ime}`;
+}
+
+/** Може ли изобщо · за да не се предлага избор, който ще бъде отказан. */
+export function mozheDaSeSkrie(sega: KoeSeVizhda, koe: KoePrevkluchva): boolean {
+  return prevkluchi(sega, koe).otkaz === '';
+}

@@ -24,6 +24,7 @@ import {
   KOEFITSIENTI,
   NAY_GOLYAM_BT,
   NEGOVI_BAZI,
+  SLUCHAI,
   PO_PODRAZBIRANE,
   btOtDumata,
   dobavka_st,
@@ -443,16 +444,58 @@ describe('изписването · коефициент, процент, про
  * пада — и екранът чете СЪЩИЯ списък, значи двете не могат да се разминат.
  */
 describe('дадено срещу чакащо · базите на Калкулатора', () => {
-  it('НЕГОВА е ЕДНА база — апартаментът, и тя е 3 000 €/м²', () => {
-    expect(NEGOVI_BAZI).toEqual(['apartament']);
+  // ВСИЧКИТЕ ПЕТ вече са негови (31.08): апартаментът е 3 000 €/м² от И53·И55,
+  // а другите четири са 2 000 €/м² от „Остави ги празни или напиши 2 000 евро
+  // на всички". Изборът между двете беше мой; ЧИСЛОТО е негово.
+  it('НЕГОВИ са ВСИЧКИТЕ ПЕТ бази · апартаментът 3 000, другите по 2 000 €/м²', () => {
+    expect(NEGOVI_BAZI).toEqual(['apartament', 'garazh', 'parkomyasto', 'sklad', 'drug']);
+    for (const vid of ['garazh', 'parkomyasto', 'sklad', 'drug'] as const) {
+      expect(PO_PODRAZBIRANE.baza_st[vid]).toBe(200_000);
+    }
     expect(PO_PODRAZBIRANE.baza_st.apartament).toBe(300_000);
     expect(bazataENegova('apartament')).toBe(true);
   });
 
-  it('другите ЧЕТИРИ чакат него · и това се брои, не се чете от изречение', () => {
+  // ═══ РЕЗЕН 52 · шестте числа на разходния подход и теглата ═══
+  it('полезният живот е СТО години · поправен от 70 след проучване', () => {
+    // Занаятът дава 100–150 за масивна монолитна сграда и 50 за панелна.
+    // Взима се долната граница: тя амортизира по-бързо, тоест е предпазлива.
+    // При 70 сграда на 20 години губеше 28,6 % — почти двойно спрямо занаята.
+    expect(PO_PODRAZBIRANE.polezen_zhivot_g).toBe(100);
+  });
+
+  it('другите пет числа на разходния подход се ПОТВЪРДИХА, не се смениха', () => {
+    expect(PO_PODRAZBIRANE.zemya_st_kvm.apartament).toBe(60_000); // 600 €/м² РЗП
+    expect(PO_PODRAZBIRANE.stroitelna_st_kvm.apartament).toBe(120_000); // 1 200 €/м²
+    expect(PO_PODRAZBIRANE.vazrast_g).toBe(0);
+  });
+
+  // НЕГОВ ИЗБОР, ДЕЛЕГИРАН: „Избор. То ми кажи. Имаш цялото знание свободно."
+  it('пазарният подход ВОДИ и при ново строителство', () => {
+    const novo = SLUCHAI.find((x) => x.klyuch === 'novo')!;
+    expect([novo.pazaren_bt, novo.dohoden_bt, novo.razhoden_bt]).toEqual([5_000, 1_000, 4_000]);
+  });
+
+  // ИНВАРИАНТЪТ, а не само числото: купувачът плаща ЦЕНА, не себестойност.
+  // Себестойността е ПОД, не стойност — тя казва под кое число никой не би
+  // строил, а не над кое някой би платил. Затова разходният подход няма право
+  // да води в НИТО ЕДИН случай, каквито и числа да се сложат утре.
+  it('и разходният подход НЕ води в нито един случай', () => {
+    for (const sl of SLUCHAI) {
+      expect(sl.razhoden_bt, `${sl.klyuch}: разходният води`).toBeLessThanOrEqual(sl.pazaren_bt);
+    }
+  });
+
+  it('и трите случая още затварят на сто процента', () => {
+    for (const sl of SLUCHAI) {
+      expect(sl.pazaren_bt + sl.dohoden_bt + sl.razhoden_bt, sl.klyuch).toBe(10_000);
+    }
+  });
+
+  it('НИТО ЕДНА база вече не чака него · и това се брои, не се твърди', () => {
     const chakat = VIDOVE_OBEKT.filter((v) => !bazataENegova(v));
-    expect(chakat).toEqual(['garazh', 'parkomyasto', 'sklad', 'drug']);
-    expect(chakat).toHaveLength(4);
+    // НУЛА чакащи · и празният списък се БРОИ, не се чете от изречение.
+    expect(chakat).toEqual([]);
   });
 
   it('и ПЕТТЕ имат база · нито един вид не се смята с нула', () => {
@@ -484,7 +527,7 @@ describe('дадено срещу чакащо · базите на Калкул
    * КАЗВА, вместо да го премълчи.
    */
   it('паркомястото има И цена на м², И цена на брой · и екранът го казва', () => {
-    expect(PO_PODRAZBIRANE.baza_st.parkomyasto).toBe(190_000);
+    expect(PO_PODRAZBIRANE.baza_st.parkomyasto).toBe(200_000);
     const naBroy = DOBAVKI.find((d) => d.klyuch === 'parkomyasto')!;
     expect(naBroy.vid).toBe('broy');
     expect(naBroy.stoynost).toBe(12_000_00);

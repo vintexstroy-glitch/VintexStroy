@@ -60,7 +60,10 @@ import {
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
 import {
+  dumataNaButona,
+  mozheDaSeSkrie,
   obobshteniRedove,
+  prevkluchi,
   reshetka,
   type RedNaRazrez,
 } from '../src/domein/gant.js';
@@ -106,6 +109,8 @@ interface PogledNaGanta {
   razrez: Razrez;
   readonly sgunati: Set<string>;
   diagrama: boolean;
+  /** негово, 31.08: „Да може да се крие" · таблицата, като диаграмата */
+  tablitsa: boolean;
   filtarMyasto: string;
   filtarObekt: string;
   filtarOtsenka: string;
@@ -175,6 +180,7 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     razrez: chetiEkranno<Razrez>(`${klyuch}.razrez`, 'bez'),
     sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
+    tablitsa: chetiEkranno(`${klyuch}.tablitsa`, true),
     filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
     filtarObekt: chetiEkranno(`${klyuch}.obekt`, ''),
     filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
@@ -192,6 +198,7 @@ function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.razrez`, p.razrez);
   zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
+  zapomniEkranno(`${p.klyuch}.tablitsa`, p.tablitsa);
   zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
   zapomniEkranno(`${p.klyuch}.obekt`, p.filtarObekt);
   zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
@@ -270,7 +277,7 @@ export function narisuvayGant(
   predstavka = 'd-',
 ): string {
   const p = pogled(klyuch);
-  const { sgunati, diagrama, filtarMyasto, filtarObekt, filtarOtsenka } = p;
+  const { sgunati, diagrama, tablitsa, filtarMyasto, filtarObekt, filtarOtsenka } = p;
   // СВОЯТ ТАКТ без период е такт без решетка. Вместо празен екран се пада на
   // месец и полетата стоят отворени — правило 15: изключеното се КАЗВА.
   const svoyGotov = p.svoy.ot !== '' && p.svoy.do !== '' && p.svoy.do >= p.svoy.ot;
@@ -379,9 +386,20 @@ export function narisuvayGant(
                 title="Върни подредбата по спешност и Оценка">Подреди</button>`
             : ''
         }
-        <button type="button" id="kam-diagrama" class="vtorichen">${
-          diagrama ? 'Скрий диаграмата' : 'Покажи диаграмата'
-        }</button>
+        <button type="button" id="kam-diagrama" class="vtorichen"${
+          mozheDaSeSkrie({ tablitsa, diagrama }, 'diagrama') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona({ tablitsa, diagrama }, 'diagrama'))}</button>
+        <button type="button" id="kam-tablitsa" class="vtorichen"${
+          mozheDaSeSkrie({ tablitsa, diagrama }, 'tablitsa') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona({ tablitsa, diagrama }, 'tablitsa'))}</button>
+        ${
+          mozheDaSeSkrie({ tablitsa, diagrama }, 'tablitsa') &&
+          mozheDaSeSkrie({ tablitsa, diagrama }, 'diagrama')
+            ? ''
+            : `<span class="drebno" data-posleden-izgled>${ekraniraj(
+                prevkluchi({ tablitsa, diagrama }, tablitsa ? 'tablitsa' : 'diagrama').otkaz,
+              )}</span>`
+        }
       </div>
       <div class="poleta tesni">
         <div class="pole">
@@ -435,10 +453,10 @@ export function narisuvayGant(
           // Ключът е СЪЩИЯТ като на празния случай отгоре: това са две лица
           // на ЕДНА секция, а не две секции. Различен ключ тук би значел, че
           // подредбата на човека се губи в мига, в който първото дело влезе.
-          `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}" data-sektsiya="gant-delata">
-            <div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
+          `<div class="gant-dvete${diagrama ? '' : ' bez-diagrama'}${tablitsa ? '' : ' bez-tablitsa'}" data-sektsiya="gant-delata">
+            ${tablitsa ? `<div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
               broyDokumenti(o, 'delo', id), rachen,
-            )}</div>
+            )}</div>` : ''}
             ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
           </div>`
     }
@@ -1184,11 +1202,22 @@ export function zakachiGant(
     });
   }
 
-  koren.querySelector<HTMLButtonElement>('#kam-diagrama')?.addEventListener('click', async () => {
-    p.diagrama = !p.diagrama;
+  // ДВАТА БУТОНА минават през ЕДНО решение (`prevkluchi`), не през два `if`-а:
+  // правилото „последният видим не се скрива" има ЕДНО място, където може да
+  // сгреши. Отказът се КАЗВА, не се преглъща (правило 15).
+  const skriy = (koe: 'tablitsa' | 'diagrama') => async () => {
+    const r = prevkluchi({ tablitsa: p.tablitsa, diagrama: p.diagrama }, koe);
+    // Отказът НЕ се показва тук с вест: бутонът вече е изключен, а ПРИЧИНАТА
+    // стои на екрана до него (правило 15). Изключен бутон без дума учи човека,
+    // че приложението е счупено; изключен бутон С дума го учи защо.
+    if (r.otkaz !== '') return;
+    p.tablitsa = r.sled.tablitsa;
+    p.diagrama = r.sled.diagrama;
     zapomniPogleda(p);
     await prerisuvay();
-  });
+  };
+  koren.querySelector<HTMLButtonElement>('#kam-diagrama')?.addEventListener('click', skriy('diagrama'));
+  koren.querySelector<HTMLButtonElement>('#kam-tablitsa')?.addEventListener('click', skriy('tablitsa'));
 
   const vrazhi = (id: string, kam: (v: string) => void) => {
     koren.querySelector<HTMLSelectElement>(id)?.addEventListener('change', async (e) => {

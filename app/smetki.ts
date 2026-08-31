@@ -59,7 +59,14 @@ import {
 import { sboratZaKapitala } from './stoynost.js';
 import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 import { podredi, zhivite } from '../src/domein/dela.js';
-import { obobshteniRedove, reshetka } from '../src/domein/gant.js';
+import {
+  dumataNaButona,
+  mozheDaSeSkrie,
+  obobshteniRedove,
+  prevkluchi,
+  reshetka,
+  type KoeSeVizhda,
+} from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import {
@@ -157,6 +164,17 @@ let period: string | null = chetiEkranno<string | null>('smetki.period', null);
  * ЕКРАНА и нищо друго (правило 23) — сборовете пак се смятат.
  */
 let sTsifrite = chetiEkranno('smetki.tsifrite', true);
+/**
+ * КОЕ СЕ ВИЖДА тук · негово, 31.08: „Да и на двете места. Да може да се крие."
+ *
+ * Паметта е СВОЯ (`smetki.*`), а не споделена с Управление: това са два ЕКРАНА,
+ * и човек, който крие таблицата в Сметки, не иска да я скрие и в Управление.
+ * Общ ключ би пренесъл едното решение върху другото — тих инцидент.
+ */
+let vizhdanoTuk: KoeSeVizhda = {
+  tablitsa: chetiEkranno('smetki.dela.tablitsa', true),
+  diagrama: chetiEkranno('smetki.dela.diagrama', true),
+};
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -583,6 +601,29 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
  * гледа месеци, не дни.
  */
 /**
+ * ЗАЩО НЕ `.deystviya` за двата превключвателя на изгледа.
+ *
+ * Класът пуска ГРУПИРАНЕТО със стрелкичка (ADR-057) — няколко действия на едно
+ * място стават един бутон. Но това не са действия върху данни, а превключватели
+ * на ИЗГЛЕД: свити зад стрелка, те се скриват точно от онзи, който ги търси.
+ * Първото писане ги сложи в `.deystviya` и проходът ги намери СКРИТИ — намери и
+ * трети бутон, самата стрелкичка.
+ *
+ * И ЧЕТВЪРТИ, от същия род: обвивките на диаграмата и таблицата станаха преки
+ * деца на скролиращата кутия и носеха `.dyalglava`, но НЯМАХА ключ — тоест две
+ * секции без ключ, които проход §68 брои като изчезнали при разместване. Ключ
+ * им се даде: те наистина СА секции, щом се местят отделно.
+ *
+ * И ТРЕТИ: белегът им беше `data-sektsiya`, сложен ВЪТРЕ в секцията „Делата".
+ * Ключът на секцията е един на секция и един на екран (проход §68) — вложен, той
+ * дава два еднакви ключа. Изгледът получи СВОЙ белег.
+ *
+ * И втори капан, платен веднага след първия: обяснението стоеше като HTML
+ * коментар ВЪТРЕ в шаблонния низ и носеше обратни апострофи. Те затварят низа —
+ * страницата падна с „.deystviya is not a function". Обяснението за кода живее
+ * в кода, не в разметката.
+ */
+/**
  * МЕСЕЦЪТ ЗА АГЕНТА · това, и НИЩО друго, тръгва навън (резен 15б · ADR-005).
  *
  * Негови думи: агентът „смята и предлага, и анализира финансовите показатели и
@@ -670,9 +711,24 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         <span class="vazm-tyalo"><b>Приходите и Разходите в решетката</b>
         <span>скриването пипа екрана и нищо друго — сборовете ПАК се смятат (правило 23)</span></span>
       </label>
+      <div class="lostove" data-izgled-na-delata>
+        <button type="button" id="smetki-kam-diagrama" class="vtorichen"${
+          mozheDaSeSkrie(vizhdanoTuk, 'diagrama') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona(vizhdanoTuk, 'diagrama'))}</button>
+        <button type="button" id="smetki-kam-tablitsa" class="vtorichen"${
+          mozheDaSeSkrie(vizhdanoTuk, 'tablitsa') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona(vizhdanoTuk, 'tablitsa'))}</button>
+        ${
+          mozheDaSeSkrie(vizhdanoTuk, 'tablitsa') && mozheDaSeSkrie(vizhdanoTuk, 'diagrama')
+            ? ''
+            : `<span class="drebno" data-posleden-izgled>${ekraniraj(
+                prevkluchi(vizhdanoTuk, vizhdanoTuk.tablitsa ? 'tablitsa' : 'diagrama').otkaz,
+              )}</span>`
+        }
+      </div>
     </section>
-    ${narisuvayDiagrama(dela, r, dnes)}
-    ${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}
+    ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes)}</div>` : ''}
+    ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
     ${formaDelo(o, dnes)}`;
 }
 
@@ -1312,6 +1368,20 @@ export function zakachiSmetki(
     zapomniEkranno('smetki.tsifrite', sTsifrite);
     await prerisuvay();
   });
+
+  // ДВАТА БУТОНА · същото решение като в Управление (`prevkluchi`), друга памет.
+  const skriyTuk = (koe: 'tablitsa' | 'diagrama') => async () => {
+    const r = prevkluchi(vizhdanoTuk, koe);
+    if (r.otkaz !== '') return;
+    vizhdanoTuk = r.sled;
+    zapomniEkranno('smetki.dela.tablitsa', vizhdanoTuk.tablitsa);
+    zapomniEkranno('smetki.dela.diagrama', vizhdanoTuk.diagrama);
+    await prerisuvay();
+  };
+  koren.querySelector<HTMLButtonElement>('#smetki-kam-diagrama')
+    ?.addEventListener('click', skriyTuk('diagrama'));
+  koren.querySelector<HTMLButtonElement>('#smetki-kam-tablitsa')
+    ?.addEventListener('click', skriyTuk('tablitsa'));
 
   // СКРИВАНЕТО НА СТОРНИРАНИТЕ Е ЛИЧНО · памет на екрана, нула събития.
   koren.querySelector<HTMLButtonElement>('#pogaseni-prevkl')?.addEventListener('click', async () => {

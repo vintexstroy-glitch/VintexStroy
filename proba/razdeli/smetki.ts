@@ -539,6 +539,41 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       stalbPredi + 3300);
 
     // ══ 40 · формулната колона (И92 т.8–9) ═══════════════════════════════════
+
+    // ══ 124 · ТАБЛИЦАТА НА ГАНТА СЕ КРИЕ · и на двете места (резен 52) ═══
+    //
+    // Живее ТУК, а не при §122: секцията „Делата" се появява едва когато има
+    // дела, а те се раждат в този блок. Проверка, сложена преди раждането им,
+    // не мери скриване — мери липса.
+    //
+    // Негово, 31.08: „Да и на двете места. Да може да се крие."
+    razdel = '124 · таблицата на Ганта се крие';
+
+    proveri('в Сметки стоят ДВАТА бутона',
+      await p.$$eval('[data-izgled-na-delata] button', (e) => e.length), 2);
+    proveri('и двата са ЖИВИ, докато и двете се виждат',
+      await p.$$eval('[data-izgled-na-delata] button:not([disabled])',
+        (e) => e.length), 2);
+
+    // ПОИМЕНЕН БЕЛЕГ, не съседство. Първото писане ползваше
+    // `[data-sektsiya="smetki-dela"] ~ .tablitsa` и връщаше НУЛА и в двете
+    // състояния — тоест „скритата я няма" минаваше, без изобщо да мери нещо.
+    // Проверка, която е зелена по грешна причина, е по-лоша от липсваща.
+    const imaTablitsa = async (): Promise<boolean> =>
+      (await p.$$eval('[data-smetki-gant=tablitsa]', (e) => e.length)) > 0;
+
+    await deystvieSPrerisuvane(p, () => p.click('#smetki-kam-tablitsa'));
+    proveri('скритата таблица я НЯМА', await imaTablitsa(), false);
+
+    // ПОСЛЕДНИЯТ ИЗГЛЕД НЕ СЕ СКРИВА · и причината се КАЗВА, не се преглъща.
+    proveri('и вторият бутон вече е изключен',
+      await p.$eval('#smetki-kam-diagrama', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('а причината стои на екрана',
+      (await p.$eval('[data-izgled-na-delata] [data-posleden-izgled]',
+        (e) => e.textContent)).includes('празна'), true);
+
+    await deystvieSPrerisuvane(p, () => p.click('#smetki-kam-tablitsa'));
+    proveri('върнатата таблица я ИМА пак', await imaTablitsa(), true);
 }
 
 /** 46 · потоците и акумулаторите | 47 · месецът за агента | 49 · коефициентите | 50 · цветовете при въвеждане */
