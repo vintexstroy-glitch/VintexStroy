@@ -170,6 +170,30 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   if (poleTekst) await p.fill(`#${poleTekst.id}`, 'За закачане');
   await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
 
+  // ══ 130 · РАЗРЕЗЪТ ПО СОБСТВЕНА КОЛОНА (резен 59) ════════════════════════
+  proveri(
+    'без избор няма разрез · сметка не се появява сама',
+    await p.$$eval('[data-tablitsa=razrez]', (e) => e.length),
+    0,
+  );
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-razrez', '0'));
+  proveri(
+    'изборът вади таблицата на разреза',
+    await p.$$eval('[data-tablitsa=razrez] [data-grupa]', (e) => e.length > 0),
+    true,
+  );
+  proveri(
+    'и сверката цяло ↔ части излиза на НУЛА',
+    ((await p.textContent('#sverka-razrez')) ?? '').replace(/\s+/g, ' ').includes('разлика: 0'),
+    true,
+  );
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-razrez', ''));
+  proveri(
+    'и се прибира, щом изборът падне',
+    await p.$$eval('[data-tablitsa=razrez]', (e) => e.length),
+    0,
+  );
+
   await naEkran(p, 'tabove', '#izbor-tab');
   await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-a', 'red'));
   proveri(
