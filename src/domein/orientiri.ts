@@ -64,6 +64,17 @@ export const ORIENTIRI: Readonly<Record<string, Orientir>> = Object.freeze({
   ltv: Object.freeze({ posoka: 'pod' as const, ot: 80_00, do_: 80_00 }),
   // „под 3,50 при имоти"
   'dalg-kam-ebitda': Object.freeze({ posoka: 'pod' as const, ot: 3_50, do_: 3_50 }),
+  // ═══ СЕДЕМТЕ НОВИ (резен 51) · ориентирите на занаята ═══
+  // Ориентир се слага САМО там, където занаятът има число. Където няма, редът
+  // ЛИПСВА нарочно — и това е различно от „извън целта" (виж `Postizhka`).
+  // „под 60 % при имоти"
+  zadlazhnyalost: Object.freeze({ posoka: 'pod' as const, ot: 60_00, do_: 60_00 }),
+  // „под 2,00" · над него банката поскъпва кредита
+  'dalg-kam-kapital': Object.freeze({ posoka: 'pod' as const, ot: 2_00, do_: 2_00 }),
+  // „над 40 %" · огледалото на задлъжнялостта
+  'dyal-na-kapitala': Object.freeze({ posoka: 'nad' as const, ot: 40_00, do_: 40_00 }),
+  // „4 – 7 % при жилищни имоти"
+  dohodnost: Object.freeze({ posoka: 'mezhdu' as const, ot: 4_00, do_: 7_00 }),
 });
 
 export function orientiratNa(klyuch: string): Orientir | undefined {

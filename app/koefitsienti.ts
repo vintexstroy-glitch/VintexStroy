@@ -33,11 +33,19 @@ import {
   razbiyNaStapki,
   sDumiStoynost,
   smetniKoefitsient,
+  danniKamDnes,
+  IMENA_NA_REZULTATA,
+  IMENA_NA_VREMENATA,
+  KAKVO_POKAZVA,
+  CHAKA_PERIOD,
+  poVreme,
+  VIDOVE_REZULTAT,
   zaStapka,
   type Koefitsient,
   type Merka,
   type SmetnatKoefitsient,
   type Stapka,
+  type VidRezultat,
 } from '../src/domein/koefitsienti.js';
 import {
   dumiteNaPostizhkata,
@@ -86,6 +94,8 @@ let stapka = chetiEkranno<Stapka>('koef.stapka', 'mesets');
 let izbran = chetiEkranno('koef.koefitsient', 'noi');
 let vidD = chetiEkranno<VidDiagrama>('koef.diagrama', 'liniya');
 let kamGodina = chetiEkranno('koef.godishna', false);
+/** ПЪРВОТО от двете падащи менюта (негово, 30.08) · как да видиш резултата. */
+let vidR = chetiEkranno<VidRezultat>('koef.rezultat', 'diagrama');
 
 /** Подразбираният период · последните дванайсет месеца до днес. */
 function podrazbiranPeriod(dnes: string): { ot: string; do: string } {
@@ -110,10 +120,76 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
   const zaTseliya = smetniKoefitsient(k, danniZaPerioda(o, nachalo, kraj));
 
   return `
+    ${sastoyanieto(o, dnes)}
     ${lentata(nalichni, k, nachalo, kraj)}
     ${diagramata(redica, k)}
     ${podDiagramata(k, zaTseliya, o, nachalo, kraj)}
     ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes)}`;
+}
+
+/**
+ * СЪСТОЯНИЕТО · коефициентите, които имат число ПО ВСЯКО ВРЕМЕ.
+ *
+ * Негово, 30.08, дословно: „Показваш всички коефициенти и без графика, по
+ * всяко време, които са налични и **не са за период**. Тези за период седят и
+ * чакат да вкараш период и да покаже избрания резултат."
+ *
+ * Затова тук няма нито диаграма, нито период: това са СНИМКИ към днес. А под
+ * тях стои какво ЧАКА — поименно, не като празно място. Скрит коефициент учи
+ * човека, че го няма; казана причина го учи какво да направи (правило 15).
+ *
+ * Формулата стои до всяко число, както при останалите: „Всеки коефициент има
+ * формула с нужните данни и ти ги събираш, показваш данните участващи във
+ * формулите." Число без формула е усещане с цифра пред себе си.
+ */
+function sastoyanieto(o: Ogledalo, dnes: string): string {
+  const d = danniKamDnes(o, dnes);
+  const chakat = poVreme('period');
+  return `
+    <section class="karta" data-sektsiya="koef-sastoyanie">
+      <div class="dyalglava">
+        <h2>${ekraniraj(IMENA_NA_VREMENATA.sastoyanie)}</h2>
+        <span>без период и без графика · ${poVreme('sastoyanie').length} на брой</span>
+      </div>
+      <div class="otcheti">
+        ${poVreme('sastoyanie')
+          .map((k) => {
+            const s = smetniKoefitsient(k, d);
+            return `
+          <article class="pole-otchet" data-sastoyanie="${ekraniraj(k.klyuch)}">
+            <div class="glavata">
+              <span class="etiket">${ekraniraj(k.ime)}</span>
+              <span class="chislo" translate="no">${ekraniraj(sDumiStoynost(s, pishi))}</span>
+            </div>
+            <p class="kakvo">${ekraniraj(k.kakvo)}</p>
+            <ul class="formula" translate="no">
+              <li><span class="ime">${ekraniraj(k.formula)}</span></li>
+              ${s.parametri
+                .map(
+                  (x) => `<li>
+                <span class="ime">${ekraniraj(x.ime)}</span>
+                <span class="suma">${ekraniraj(
+                  sDumiStoynost(
+                    { koefitsient: { ...k, merka: x.merka }, stoynost: x.stoynost, zashto: '', parametri: [] },
+                    pishi,
+                  ),
+                )}</span>
+              </li>`,
+                )
+                .join('')}
+            </ul>
+            ${
+              s.zashto === ''
+                ? '<p class="drebno palno">Числото е пълно — нищо не липсва.</p>'
+                : `<p class="drebno chaka">${ekraniraj(s.zashto)}</p>`
+            }
+          </article>`;
+          })
+          .join('')}
+      </div>
+      <p class="drebno" data-chakat-period="${chakat.length}">Другите ${chakat.length}
+        ${ekraniraj(CHAKA_PERIOD)} и стоят по-долу: ${chakat.map((k) => ekraniraj(k.ime)).join(' · ')}.</p>
+    </section>`;
 }
 
 function lentata(
@@ -159,6 +235,15 @@ function lentata(
           </select>
         </div>
         <div class="pole">
+          <label for="koef-rezultat">Как да видиш резултата</label>
+          <select translate="no" id="koef-rezultat">
+            ${VIDOVE_REZULTAT.map(
+              (v) =>
+                `<option value="${v}"${v === vidR ? ' selected' : ''}>${IMENA_NA_REZULTATA[v]}</option>`,
+            ).join('')}
+          </select>
+        </div>
+        <div class="pole">
           <label for="koef-diagrama">Вид диаграма</label>
           <select translate="no" id="koef-diagrama">
             ${VIDOVE_DIAGRAMA.map(
@@ -173,6 +258,7 @@ function lentata(
           ? '<p class="drebno">Стъпка МЕСЕЦ · показани са и месечните коефициенти (събираемост, ДДС) — начисленото и ДДС-то са месечни понятия, не наш избор.</p>'
           : `<p class="drebno">При стъпка „${ekraniraj(IMENA_NA_TAKTOVETE[stapka])}" месечните коефициенти ги НЯМА — те нямат смисъл извън месец.</p>`
       }
+      <p class="drebno" id="kakvo-pokazva">${ekraniraj(IMENA_NA_REZULTATA[vidR])} · ${ekraniraj(KAKVO_POKAZVA[vidR])}</p>
       ${lazhe ? `<p class="drebno trevozhno" id="kade-lazhe">⚠ ${ekraniraj(lazhe)}</p>` : ''}
       <label class="vazm">
         <input type="checkbox" id="koef-godishna"${kamGodina ? ' checked' : ''}${
@@ -501,6 +587,10 @@ export function zakachiKoefitsientite(koren: HTMLElement, prerisuvay: () => Prom
   vrazhi('#koef-diagrama', (v) => {
     vidD = v as VidDiagrama;
     zapomniEkranno('koef.diagrama', vidD);
+  });
+  vrazhi('#koef-rezultat', (v) => {
+    vidR = v as VidRezultat;
+    zapomniEkranno('koef.rezultat', vidR);
   });
 
   koren.querySelector<HTMLInputElement>('#koef-godishna')?.addEventListener('change', async (e) => {

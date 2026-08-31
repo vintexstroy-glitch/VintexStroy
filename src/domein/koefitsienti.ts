@@ -44,7 +44,7 @@
 import { obshtOstatak, obshtoObezpechenie } from './krediti.js';
 import { deliZakragleno } from '../yadro/pari.js';
 import { razhodiZaPerioda, smetki } from './smetki.js';
-import { saldoNa, sumiZaObhvat } from './otcheti.js';
+import { aktiviIZadalzheniya, saldoNa, sumiZaObhvat, type VanshniZaKapitala } from './otcheti.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
 import { TAKTOVE_ZA_REZHENE, type Takt } from './vreme.js';
@@ -57,12 +57,18 @@ export class GreshkaKoefitsient extends Error {
 }
 
 /**
- * ПЕТТЕ вида · изброени ПОИМЕННО, защото от тях зависи приравняването.
+ * ШЕСТТЕ вида · изброени ПОИМЕННО, защото от тях зависи приравняването.
  *
  * Петият (`zapas-kam-potok`) дойде с Дълг/доход (резен 19): дълг ÷ доход е
  * ЗАПАС върху ПОТОК, и приравняването му към година не умножава, а ДЕЛИ.
  * Без свой вид той щеше да мине като „поток към запас" и „на годишна база"
  * щеше да умножи и запаса — число, което изглежда вярно и не е.
+ *
+ * Шестият (`suma-zapas`) дойде с Работния капитал (резен 51) по СЪЩАТА причина:
+ * той е СУМА, но сума от ЗАПАСИ — снимка в един миг, не натрупване. Сложен под
+ * `suma-potok`, той щеше да се умножи по 12 и да покаже дванайсет пъти повече
+ * пари, отколкото съществуват. Пети вид беше платен веднъж с находка; шестият
+ * се плаща предварително, защото причината вече е известна.
  */
 export const VIDOVE = [
   'suma-potok',
@@ -70,6 +76,7 @@ export const VIDOVE = [
   'potok-kam-zapas',
   'zapas-kam-potok',
   'otnoshenie-zapasi',
+  'suma-zapas',
 ] as const;
 
 export type Vid = (typeof VIDOVE)[number];
@@ -80,6 +87,7 @@ export const IMENA_NA_VIDOVETE: Readonly<Record<Vid, string>> = Object.freeze({
   'potok-kam-zapas': 'поток към запас',
   'zapas-kam-potok': 'запас към поток',
   'otnoshenie-zapasi': 'отношение на два запаса',
+  'suma-zapas': 'сума от запаси · снимка в един миг',
 });
 
 /** Четирите отговора на въпроса „а на годишна база?" */
@@ -91,6 +99,7 @@ export const PRIRAVNYAVANETO: Readonly<Record<Vid, Priravnyavane>> = Object.free
   'potok-kam-zapas': 'mnozhi',
   'zapas-kam-potok': 'deli',
   'otnoshenie-zapasi': 'nevazmozhno',
+  'suma-zapas': 'nevazmozhno',
 });
 
 /** Защо · с думи. Отказът трябва да УЧИ, не само да спира. */
@@ -108,6 +117,24 @@ const MERKI = ['protsent', 'pari', 'pati', 'dni'] as const;
 
 export type Merka = (typeof MERKI)[number];
 
+/**
+ * ДВЕТЕ ВРЕМЕНА на един коефициент.
+ *
+ * `sastoyanie` — чете се към ДНЕС и има число винаги (заетост, задлъжнялост).
+ * `period` — няма число, докато няма период (марж, събираемост, NOI).
+ */
+export const KOGATO = ['sastoyanie', 'period'] as const;
+
+export type Kogato = (typeof KOGATO)[number];
+
+export const IMENA_NA_VREMENATA: Readonly<Record<Kogato, string>> = Object.freeze({
+  sastoyanie: 'Състояние · към днес',
+  period: 'За период',
+});
+
+/** Какво чака един коефициент за период · думите, които стоят вместо число. */
+export const CHAKA_PERIOD = 'чака период';
+
 export interface Koefitsient {
   readonly klyuch: string;
   readonly ime: string;
@@ -120,6 +147,20 @@ export interface Koefitsient {
    * база, и се появяват само тогава").
    */
   readonly samoMesechen: boolean;
+  /**
+   * КОГА се смята · СЪСТОЯНИЕ или ЗА ПЕРИОД (негово, 30.08).
+   *
+   * „Показваш всички коефициенти и без графика, по всяко време, които са
+   * налични и не са за период. Тези за период седят и чакат да вкараш период
+   * и да покаже избрания резултат."
+   *
+   * Тоест разликата не е украса на екрана, а СВОЙСТВО на самия коефициент:
+   * заетостта е моментна снимка и има число още преди да си избрал период;
+   * маржът няма, докато не кажеш „за кога". Затова живее ТУК, при коефициента,
+   * а не в един `if` на екрана — иначе всеки нов екран щеше да го решава
+   * наново и двата щяха да се разминат.
+   */
+  readonly kogato: Kogato;
   /** едно изречение: какво КАЗВА това число */
   readonly kakvo: string;
   /** обичайното · празно, когато занаятът няма едно число */
@@ -142,6 +183,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'suma-potok' as const,
     merka: 'pari' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'Колко изкарва самият имот, преди банката.',
     obichayno: '',
   }),
@@ -152,6 +194,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'suma-potok' as const,
     merka: 'pari' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'Колко остава в джоба, след като всичко е платено.',
     obichayno: '',
   }),
@@ -162,6 +205,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-potoci' as const,
     merka: 'protsent' as const,
     samoMesechen: true,
+    kogato: 'period' as const,
     kakvo: 'Колко от дължимото наистина е влязло.',
     obichayno: 'цел 100 %',
   }),
@@ -172,6 +216,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-potoci' as const,
     merka: 'protsent' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'Колко от прихода изяжда поддръжката.',
     obichayno: 'под 50 %',
   }),
@@ -182,6 +227,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-potoci' as const,
     merka: 'protsent' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'Колко от всяко евро приход остава.',
     obichayno: '',
   }),
@@ -192,6 +238,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-potoci' as const,
     merka: 'protsent' as const,
     samoMesechen: true,
+    kogato: 'period' as const,
     kakvo: 'Колко от прихода заминава за данък.',
     obichayno: '',
   }),
@@ -202,6 +249,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-potoci' as const,
     merka: 'pati' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'Колко пъти доходът покрива вноската.',
     obichayno: 'банките искат 1,25 – 1,50',
   }),
@@ -212,6 +260,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-zapasi' as const,
     merka: 'protsent' as const,
     samoMesechen: false,
+    kogato: 'sastoyanie' as const,
     kakvo: 'Празният обект е загубен приход, не спестен разход.',
     obichayno: '',
   }),
@@ -222,6 +271,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-zapasi' as const,
     merka: 'pati' as const,
     samoMesechen: false,
+    kogato: 'sastoyanie' as const,
     kakvo: 'Стигат ли парите за онова, което се дължи сега.',
     obichayno: 'над 1,00',
   }),
@@ -232,6 +282,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'otnoshenie-zapasi' as const,
     merka: 'protsent' as const,
     samoMesechen: false,
+    kogato: 'sastoyanie' as const,
     kakvo: 'Каква част от обезпечението е още на банката.',
     obichayno: 'банките дават до 80 %',
   }),
@@ -242,6 +293,7 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'zapas-kam-potok' as const,
     merka: 'pati' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'За колко периода доходът изплаща целия дълг.',
     obichayno: 'под 3,50 при имоти',
   }),
@@ -252,8 +304,100 @@ export const KOEFITSIENTI: readonly Koefitsient[] = Object.freeze([
     vid: 'potok-kam-zapas' as const,
     merka: 'dni' as const,
     samoMesechen: false,
+    kogato: 'period' as const,
     kakvo: 'За колко дни средно се събира един наем.',
     obichayno: '',
+  }),
+  // ═══ ПОПУЛЯРНИТЕ, КОИТО ДОТУК ЛИПСВАХА (резен 51) ═══
+  //
+  // Негово, 30.08: „избираш всички популярни и най-използвани коефициенти за
+  // отчет… Аз не знам формулите наизуст — не ме питай мен за такива работи,
+  // които можеш да научиш."
+  //
+  // Затова формулите тук са НА ЗАНАЯТА, не измислени: те са учебникови и всяка
+  // стои с ДУМИТЕ СИ на един ред, за да може да се обори. Домът им извън кода е
+  // `.claude/skills/koefitsienti/` — там стои изворът на всяка, за да не се
+  // извежда наново при всеки резен.
+  //
+  // ЧЕТИРИ са СЪСТОЯНИЕ (имат число още преди да си избрал период) и ТРИ са за
+  // период. Нито един не е добавен, ако Огледалото не може да го нахрани днес —
+  // коефициент, който винаги казва „липсва", е надпис (ADR-041).
+  Object.freeze({
+    klyuch: 'zadlazhnyalost',
+    ime: 'Задлъжнялост',
+    formula: 'Задлъжнялост = задължения ÷ активи',
+    vid: 'otnoshenie-zapasi' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kogato: 'sastoyanie' as const,
+    kakvo: 'Каква част от всичко, което държиш, всъщност дължиш.',
+    obichayno: 'под 60 % при имоти',
+  }),
+  Object.freeze({
+    klyuch: 'dalg-kam-kapital',
+    ime: 'Дълг към собствен капитал',
+    formula: 'Д/СК = задължения ÷ собствен капитал',
+    vid: 'otnoshenie-zapasi' as const,
+    merka: 'pati' as const,
+    samoMesechen: false,
+    kogato: 'sastoyanie' as const,
+    kakvo: 'Колко чужди пари стоят зад всеки твой лев собствени.',
+    obichayno: 'под 2,00',
+  }),
+  Object.freeze({
+    klyuch: 'dyal-na-kapitala',
+    ime: 'Дял на собствения капитал',
+    formula: 'Дял = собствен капитал ÷ активи',
+    vid: 'otnoshenie-zapasi' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kogato: 'sastoyanie' as const,
+    kakvo: 'Каква част от всичко е наистина твоя.',
+    obichayno: 'над 40 %',
+  }),
+  Object.freeze({
+    klyuch: 'raboten-kapital',
+    ime: 'Работен капитал',
+    formula: 'Работен капитал = (средства + вземания) − текущи задължения',
+    vid: 'suma-zapas' as const,
+    merka: 'pari' as const,
+    samoMesechen: false,
+    kogato: 'sastoyanie' as const,
+    kakvo: 'Колко остава, ако утре всичко текущо се плати.',
+    obichayno: '',
+  }),
+  Object.freeze({
+    klyuch: 'roa',
+    ime: 'Възвръщаемост на активите',
+    formula: 'ROA = (приход − разход) ÷ активи',
+    vid: 'potok-kam-zapas' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kogato: 'period' as const,
+    kakvo: 'Колко изкарва всяко евро, вложено в каквото и да е.',
+    obichayno: '',
+  }),
+  Object.freeze({
+    klyuch: 'roe',
+    ime: 'Възвръщаемост на собствения капитал',
+    formula: 'ROE = (приход − разход) ÷ собствен капитал',
+    vid: 'potok-kam-zapas' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kogato: 'period' as const,
+    kakvo: 'Колко изкарва всяко евро, което е ТВОЕ.',
+    obichayno: '',
+  }),
+  Object.freeze({
+    klyuch: 'dohodnost',
+    ime: 'Доходност на имота',
+    formula: 'Доходност = NOI за периода ÷ стойност на състоянието',
+    vid: 'potok-kam-zapas' as const,
+    merka: 'protsent' as const,
+    samoMesechen: false,
+    kogato: 'period' as const,
+    kakvo: 'Колко процента годишно връща самият имот, преди банката.',
+    obichayno: '4–7 % при жилищни имоти',
   }),
 ]);
 
@@ -264,6 +408,48 @@ export function koefitsient(klyuch: string): Koefitsient {
   const k = PO_KLYUCH.get(klyuch);
   if (!k) throw new GreshkaKoefitsient(`Няма коефициент „${klyuch}".`);
   return k;
+}
+
+/**
+ * КАК ДА ВИДИШ РЕЗУЛТАТА · първото от двете падащи менюта (негово, 30.08).
+ *
+ * „Секция отчети в таба Сметки има 2 падащи менюта. През едното избираш как да
+ * видиш резултата: таблица, графика, диаграма."
+ *
+ * ТРИ са, не четири, и не са видове диаграма. Видовете диаграма (линия ·
+ * стълбове · площ · точки) са ДРУГ избор и живеят при чистата диаграма; тук се
+ * избира ФОРМАТА на резултата. Слети в едно меню, те щяха да дадат меню, в
+ * което „таблица" стои до „точки" — два въпроса, отговорени с един избор.
+ */
+export const VIDOVE_REZULTAT = ['tablitsa', 'grafika', 'diagrama'] as const;
+
+export type VidRezultat = (typeof VIDOVE_REZULTAT)[number];
+
+export const IMENA_NA_REZULTATA: Readonly<Record<VidRezultat, string>> = Object.freeze({
+  tablitsa: 'Таблица',
+  grafika: 'Графика',
+  diagrama: 'Диаграма',
+});
+
+/** Едно изречение за всеки · какво показва и кога лъже. */
+export const KAKVO_POKAZVA: Readonly<Record<VidRezultat, string>> = Object.freeze({
+  tablitsa: 'числата едно под друго · четат се точно, сравняват се трудно',
+  grafika: 'движението във времето · вижда се посоката, губи се точното число',
+  diagrama: 'дяловете един спрямо друг · вижда се кой води, не се вижда кога',
+});
+
+/**
+ * КОИ СЕ ПОКАЗВАТ ВЕДНАГА и КОИ ЧАКАТ ПЕРИОД (негово, 30.08).
+ *
+ * „Показваш всички коефициенти и без графика, по всяко време, които са налични
+ * и не са за период. Тези за период седят и чакат да вкараш период и да покаже
+ * избрания резултат."
+ *
+ * Чакащият НЕ се скрива — стои с думите си (правило 15). Скрит коефициент учи
+ * човека, че го няма; казана причина го учи какво да направи.
+ */
+export function poVreme(kogato: Kogato): readonly Koefitsient[] {
+  return KOEFITSIENTI.filter((k) => k.kogato === kogato);
 }
 
 /** Кои се показват при дадена стъпка · месечните само при месец (негово т.6). */
@@ -393,6 +579,16 @@ export interface DanniZaPerioda {
   readonly dni: number;
   /** цели месеци в периода · за приравняването */
   readonly mesetsi: number;
+  /**
+   * АКТИВИТЕ и СОБСТВЕНИЯТ КАПИТАЛ · четат се от `otcheti.aktiviIZadalzheniya`,
+   * не се смятат тук (правило 17). Преписани, те щяха да дадат ВТОРО „колко са
+   * активите" — и Отчетите, и коефициентите щяха да са прави поотделно и
+   * различни заедно.
+   */
+  readonly aktivi_st: number;
+  readonly sobstven_kapital_st: number;
+  /** стойността на състоянието · от Калкулатора · 0 значи „още не е смятана" */
+  readonly stoynost_st: number;
 }
 
 /**
@@ -402,7 +598,12 @@ export interface DanniZaPerioda {
  * разминават и точно това разминаване мери събираемостта. Слети в едно число,
  * тя щеше винаги да е 100 %.
  */
-export function danniZaPerioda(o: Ogledalo, ot: string, doo: string): DanniZaPerioda {
+export function danniZaPerioda(
+  o: Ogledalo,
+  ot: string,
+  doo: string,
+  vanshni: VanshniZaKapitala = {},
+): DanniZaPerioda {
   const dni = sumiZaObhvat(o, ot, doo);
   const prihod_st = dni.reduce((s, d) => s + d.prihod_st, 0);
   const razhod_st = dni.reduce((s, d) => s + d.razhod_st, 0);
@@ -427,6 +628,7 @@ export function danniZaPerioda(o: Ogledalo, ot: string, doo: string): DanniZaPer
   const naemi = [...o.naemi.values()].filter((n) => n.do === '' || n.do >= ot);
   const zaeti = new Set(naemi.map((n) => n.imotId)).size;
 
+  const balans = aktiviIZadalzheniya(o, vanshni);
   const razlikaDni =
     Math.round((Date.parse(`${doo}T00:00:00Z`) - Date.parse(`${ot}T00:00:00Z`)) / 86_400_000) + 1;
 
@@ -449,12 +651,52 @@ export function danniZaPerioda(o: Ogledalo, ot: string, doo: string): DanniZaPer
     vsichki_obekti: o.imoti.size,
     dni: razlikaDni,
     mesetsi: Math.max(1, Math.round(razlikaDni / 30)),
+    aktivi_st: balans.aktivi_st,
+    sobstven_kapital_st: balans.aktivi_st - balans.zadalzheniya_st,
+    stoynost_st: vanshni.stoynostNaSastoyanie_st ?? 0,
   };
+}
+
+/**
+ * ДАННИТЕ ЗА СЪСТОЯНИЕТО · към ЕДИН ден, без период.
+ *
+ * Коефициентите на състоянието четат само ЗАПАСИ — салда, вземания, задължения,
+ * обекти, активи, собствен капитал. Нито един от тях не зависи от прозореца на
+ * периода: те са снимка, не натрупване. Затова прозорецът тук е ЕДИН ДЕН и това
+ * не е хитрост, а следствие.
+ *
+ * И НЕ СЕ ПРИЕМА НА ДОВЕРИЕ: тест мени САМО полетата за поток и проверява, че
+ * нито един коефициент на състоянието не помръдва. Ако утре някой добави към
+ * тях коефициент, който чете приход, тестът пада — вместо числото тихо да
+ * зависи от ден, който никой не е избирал.
+ */
+export function danniKamDnes(
+  o: Ogledalo,
+  dnes: string,
+  vanshni: VanshniZaKapitala = {},
+): DanniZaPerioda {
+  return danniZaPerioda(o, dnes, dnes, vanshni);
 }
 
 /** Един параметър, готов за показване. */
 function p(ime: string, stoynost: number, merka: Merka): Parametar {
   return Object.freeze({ ime, stoynost, merka });
+}
+
+/**
+ * ТРИТЕ ЧИСЛА НА ТЕКУЩАТА КАРТИНА · средства, вземания, текущи задължения.
+ *
+ * Ликвидността ги ДЕЛИ, Работният капитал ги ВАДИ — но участващите числа са
+ * едни и същи и трябва да се четат еднакво. Изнесени тук, защото обходът за
+ * чистота ги преброи като дубликат в мига, в който вторият се появи: пет
+ * еднакви реда на две места (ADR-048).
+ */
+function tekushtataKartina(d: DanniZaPerioda): readonly Parametar[] {
+  return [
+    p('средства', d.sredstva_st, 'pari'),
+    p('вземания', d.vzemaniya_st, 'pari'),
+    p('текущи задължения', d.zadalzheniya_st, 'pari'),
+  ];
 }
 
 /**
@@ -517,11 +759,7 @@ export function smetniKoefitsient(k: Koefitsient, d: DanniZaPerioda): SmetnatKoe
     }
     case 'likvidnost': {
       const tekushti = d.sredstva_st + d.vzemaniya_st;
-      const par = [
-        p('средства', d.sredstva_st, 'pari'),
-        p('вземания', d.vzemaniya_st, 'pari'),
-        p('текущи задължения', d.zadalzheniya_st, 'pari'),
-      ];
+      const par = tekushtataKartina(d);
       return d.zadalzheniya_st === 0
         ? bez('Няма записани текущи задължения — ликвидността иска и двете страни.', par)
         : sas(deliZakragleno(tekushti * 100, d.zadalzheniya_st), par);
@@ -549,6 +787,70 @@ export function smetniKoefitsient(k: Koefitsient, d: DanniZaPerioda): SmetnatKoe
             par,
           )
         : sas(deliZakragleno(d.zadalzheniya_st * 10_000, d.obezpechenie_st), par);
+    }
+    // ═══ СЕДЕМТЕ НОВИ (резен 51) · формули на занаята ═══
+    case 'zadlazhnyalost': {
+      const par = [p('задължения', d.zadalzheniya_st, 'pari'), p('активи', d.aktivi_st, 'pari')];
+      return d.aktivi_st === 0
+        ? bez('Няма записани активи — отношение към нула не съществува.', par)
+        : sas(deliZakragleno(d.zadalzheniya_st * 10_000, d.aktivi_st), par);
+    }
+    case 'dalg-kam-kapital': {
+      const par = [
+        p('задължения', d.zadalzheniya_st, 'pari'),
+        p('собствен капитал', d.sobstven_kapital_st, 'pari'),
+      ];
+      // ОТРИЦАТЕЛЕН собствен капитал НЕ дава отрицателно отношение, а ЛИПСА:
+      // „минус 0,80 пъти" е число, което изглежда като отговор и не е. Когато
+      // дължиш повече, отколкото държиш, отношението няма смисъл — има име, и
+      // то се казва с думи.
+      return d.sobstven_kapital_st <= 0
+        ? bez('Собственият капитал е нула или отрицателен — дължимото надхвърля държаното.', par)
+        : sas(deliZakragleno(d.zadalzheniya_st * 100, d.sobstven_kapital_st), par);
+    }
+    case 'dyal-na-kapitala': {
+      const par = [
+        p('собствен капитал', d.sobstven_kapital_st, 'pari'),
+        p('активи', d.aktivi_st, 'pari'),
+      ];
+      return d.aktivi_st === 0
+        ? bez('Няма записани активи — отношение към нула не съществува.', par)
+        : sas(deliZakragleno(d.sobstven_kapital_st * 10_000, d.aktivi_st), par);
+    }
+    case 'raboten-kapital': {
+      const par = tekushtataKartina(d);
+      return sas(d.sredstva_st + d.vzemaniya_st - d.zadalzheniya_st, par);
+    }
+    case 'roa': {
+      const par = [
+        p('приход', d.prihod_st, 'pari'),
+        p('разход', d.razhod_st, 'pari'),
+        p('активи', d.aktivi_st, 'pari'),
+      ];
+      return d.aktivi_st === 0
+        ? bez('Няма записани активи — отношение към нула не съществува.', par)
+        : sas(deliZakragleno((d.prihod_st - d.razhod_st) * 10_000, d.aktivi_st), par);
+    }
+    case 'roe': {
+      const par = [
+        p('приход', d.prihod_st, 'pari'),
+        p('разход', d.razhod_st, 'pari'),
+        p('собствен капитал', d.sobstven_kapital_st, 'pari'),
+      ];
+      return d.sobstven_kapital_st <= 0
+        ? bez('Собственият капитал е нула или отрицателен — доходност върху него не се смята.', par)
+        : sas(deliZakragleno((d.prihod_st - d.razhod_st) * 10_000, d.sobstven_kapital_st), par);
+    }
+    case 'dohodnost': {
+      const par = [
+        p('NOI за периода', d.prihod_st - d.operativni_st, 'pari'),
+        p('стойност на състоянието', d.stoynost_st, 'pari'),
+      ];
+      // НУЛА ТУК НЕ Е НУЛА, а „още не е смятана". Калкулаторът дава стойността;
+      // без него доходността би излязла 0 % при напълно здрав имот.
+      return d.stoynost_st === 0
+        ? bez('Стойността на състоянието още не е смятана — Калкулаторът я дава.', par)
+        : sas(deliZakragleno((d.prihod_st - d.operativni_st) * 10_000, d.stoynost_st), par);
     }
     case 'dalg-kam-ebitda': {
       const noi = d.prihod_st - d.operativni_st;

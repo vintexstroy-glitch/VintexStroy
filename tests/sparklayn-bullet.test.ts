@@ -51,16 +51,18 @@ describe('ориентирите', () => {
   });
 
   it('сверката ги БРОИ · и нулата се записва', () => {
+    // ДЕСЕТ, бяха ШЕСТ: резен 51 донесе седем нови коефициента, четири от които
+    // занаятът мери с число (задлъжнялост · дълг/капитал · дял · доходност).
     const s = sveriOrientirite(KOGATO);
-    expect(s.vhod).toBe(6);
-    expect(s.izhod).toBe(6);
+    expect(s.vhod).toBe(10);
+    expect(s.izhod).toBe(10);
     expect(s.razlika).toBe(0);
     expect(s.nared).toBe(true);
   });
 
-  it('а ШЕСТТЕ без ориентир са ЧЕСТНИ · занаятът няма едно число за тях', () => {
+  it('а ДЕВЕТТЕ без ориентир са ЧЕСТНИ · занаятът няма едно число за тях', () => {
     const bez = KOEFITSIENTI.filter((k) => orientiratNa(k.klyuch) === undefined);
-    expect(bez).toHaveLength(6);
+    expect(bez).toHaveLength(9);
     // И нито един от тях НЕ обещава обичайно в изречението си.
     for (const k of bez) expect(k.obichayno).toBe('');
   });

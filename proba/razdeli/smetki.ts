@@ -338,7 +338,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // ФИНАНСИ" *(р80·[48])* слага Средства ПЪРВО. Дотук четирите стояха в един
     // ред без имена помежду си; сега са в двата поименни отчета, а вътре в
     // Финанси редът си остава онзи, който Отчетите връщат.
-    const poleta = await p.$$eval('.pole-otchet .etiket', (e) => e.map((x) => x.textContent.trim()));
+    // ОБХВАТ: ГНЕЗДОТО „ОТЧЕТИ" · резен 51 сложи и коефициентите на състоянието
+    // в карти `.pole-otchet`, тъй че гол селектор върху този белег вече хваща
+    // две различни неща. Точно клас Б от `docs/11` — и се лови от собствения му
+    // обход в мига, в който вторият ползвател се появи.
+    const poleta = await p.$$eval('[data-gnezdo="otcheti"] .pole-otchet .etiket',
+      (e) => e.map((x) => x.textContent.trim()));
     proveri('четирите полета, в двата поименни отчета', poleta.join(' · '),
       'СРЕДСТВА · КАПИТАЛ · ЛИКВИДНОСТ · ВЗЕМАНИЯ');
 
@@ -447,6 +452,49 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // но без име над себе си.
     proveri('гнездото „Пари" носи стълбовете на месеците',
       await p.$$eval('[data-gnezdo="pari"] .stalbove', (e) => e.length), 1);
+
+    // ══ 123 · ДВЕТЕ ПАДАЩИ МЕНЮТА и СЪСТОЯНИЕТО (резен 51) ═══════════════
+    //
+    // Негово, 30.08: „Секция отчети в таба Сметки има 2 падащи менюта. През
+    // едното избираш как да видиш резултата: таблица, графика, диаграма.
+    // Второто падащо меню избираш всички популярни и най-използвани
+    // коефициенти… Показваш всички коефициенти и без графика, по всяко време,
+    // които са налични и не са за период."
+    razdel = '123 · двете падащи менюта';
+
+    const vidoveRezultat = await p.$$eval('#koef-rezultat option',
+      (e) => e.map((x) => x.textContent.trim()));
+    proveri('първото меню дава ТРИ вида резултат, в неговия ред',
+      vidoveRezultat.join(' · '), 'Таблица · Графика · Диаграма');
+
+    // ДВЕ РАЗЛИЧНИ МЕНЮТА, не едно · видът резултат не е вид диаграма.
+    const vidoveDiagrama = await p.$$eval('#koef-diagrama option', (e) => e.length);
+    proveri('видът диаграма си остава ОТДЕЛНО меню', vidoveDiagrama, 4);
+
+    proveri('второто меню дава коефициентите за графика',
+      (await p.$$eval('#koef-koefitsient option', (e) => e.length)) > 10, true);
+
+    // СЪСТОЯНИЕТО се вижда БЕЗ период и БЕЗ графика.
+    proveri('състоянието показва СЕДЕМ коефициента, без нито една диаграма',
+      await p.$$eval('[data-sektsiya="koef-sastoyanie"] [data-sastoyanie]', (e) => e.length), 7);
+    // ИКОНАТА НЕ Е ДИАГРАМА · първото писане на тази проверка броеше всяко `svg`
+    // и падна върху тематичната икона на дяла (ADR-057). „Без графика" значи без
+    // ДИАГРАМА, а не без чертеж изобщо — затова се брои по белега на диаграмата.
+    proveri('и вътре в него НЯМА диаграма',
+      await p.$$eval('[data-sektsiya="koef-sastoyanie"] svg:not(.ikona)', (e) => e.length), 0);
+
+    // Всяко число носи ФОРМУЛАТА си · негово изрично искане.
+    // ОБХВАТ: СЕКЦИЯТА „СЪСТОЯНИЕ" · белегът `data-sastoyanie` живее в пет
+    // екрана, тъй че гол селектор върху него брои чужди неща (клас Б).
+    proveri('всеки от седемте носи формулата си',
+      await p.$$eval('[data-sektsiya="koef-sastoyanie"] [data-sastoyanie] .formula .ime',
+        (e) => e.length > 7), true);
+
+    // ЧАКАЩИТЕ СЕ КАЗВАТ ПОИМЕННО · скрит коефициент учи, че го няма.
+    proveri('и КАЗВА колко чакат период',
+      await p.$eval('[data-chakat-period]', (e) => e.getAttribute('data-chakat-period')), '12');
+    proveri('поименно, не като празно място',
+      (await p.$eval('[data-chakat-period]', (e) => e.textContent)).includes('Марж'), true);
 
     // ══ 24 · Гантът · решетката, лентите и диаграмата ════════════════════
 }
@@ -756,10 +804,12 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     // липси, които не се сливат.
     const postizhki = await p.$$eval('.red.koef-red [data-bullet]',
       (e) => e.map((x) => (x as any).dataset.postizhka));
-    proveri('шест коефициента нямат обичайно число · и го КАЗВАТ',
-      postizhki.filter((x) => x === 'nyama-orientir').length, 6);
-    proveri('а другите шест НЕ казват това · те имат цел',
-      postizhki.filter((x) => x !== 'nyama-orientir').length, 6);
+    // ДЕВЕТ без цел и ДЕСЕТ с цел · бяха шест и шест до резен 51, който донесе
+    // седем нови коефициента: четири от тях занаятът мери с число, три не.
+    proveri('девет коефициента нямат обичайно число · и го КАЗВАТ',
+      postizhki.filter((x) => x === 'nyama-orientir').length, 9);
+    proveri('а другите ДЕСЕТ НЕ казват това · те имат цел',
+      postizhki.filter((x) => x !== 'nyama-orientir').length, 10);
     proveri('NOI е сред първите · занаятът няма едно число за него',
       await p.$eval('.red.koef-red[data-koef=noi] [data-bullet]',
         (e) => (e as any).dataset.postizhka), 'nyama-orientir');
@@ -787,7 +837,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '113 · Ориентирите · изречение ↔ число, и нулата се записва';
     proveri('сверката стои на екрана',
       (await tekstNa(p, '[data-orientiri-sverka]')).replace(/\s+/g, ' ').trim(),
-      'Сверка вход↔изход: 6 изречения → 6 числа, разлика 0.');
+      'Сверка вход↔изход: 10 изречения → 10 числа, разлика 0.');
 
     razdel = '113 · Спарклайните не пишат НИЩО в Журнала';
     const predSpark = await broySabitiya(p);

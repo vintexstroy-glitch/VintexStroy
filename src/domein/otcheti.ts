@@ -270,6 +270,49 @@ export function kapital(o: Ogledalo, vanshni: VanshniZaKapitala = {}): Pole {
 }
 
 /**
+ * АКТИВИТЕ И ЗАДЪЛЖЕНИЯТА · ЕДИН ДОМ за двете числа (правило 17).
+ *
+ * Изнесено от `otcheti()` в резен 51, когато коефициентите поискаха същите две
+ * числа. Преписани там, те щяха да дадат ВТОРО „колко са активите" — и двете
+ * места щяха да са прави поотделно и различни заедно. Точно повредата, която
+ * правило 17 описва с „132 проверки".
+ *
+ * Това е ВТОРИЯТ ПЪТ на Капитала: брои от същите Огледала, но БЕЗ да минава
+ * през полетата. Ако `likvidnost` или `vzemaniya` пропусне джоб, забрави знак
+ * или преброи нещо два пъти, двата пътя се разминават и разликата светва.
+ *
+ * Какво ТОЗИ път НЕ хваща, казано на глас: грешка в самото Огледало (ако едно
+ * плащане изобщо не е стигнало до `o.plashtaniya`, липсва и в двата пътя).
+ * За това пази сверката при партидите — тя гледа файл ↔ Журнал.
+ */
+export function aktiviIZadalzheniya(
+  o: Ogledalo,
+  vanshni: VanshniZaKapitala = {},
+): { readonly aktivi_st: number; readonly zadalzheniya_st: number } {
+  let vlyazlo_st = 0;
+  for (const pl of o.plashtaniya.values()) vlyazlo_st += pl.suma_st;
+  let izlyazlo_st = 0;
+  for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
+  let vzemaniya_st = 0;
+  for (const v of o.vzemaniya.values()) vzemaniya_st += v.ostatak_st;
+  // И ВТОРИЯТ ПЪТ брои продажбите САМ · иначе сверката щеше да падне точно със
+  // сумата, която полето ВЗЕМАНИЯ вече показва — и това е доказателството, че
+  // тя не е алгебра: махне ли се този ред, разликата светва.
+  vzemaniya_st += vzemaniyaOtProdazhbi(o).sbor_st;
+
+  return Object.freeze({
+    aktivi_st:
+      (vanshni.stoynostNaSastoyanie_st ?? 0) +
+      saldoNa(o, 'banka') +
+      saldoNa(o, 'trezor') +
+      vlyazlo_st -
+      izlyazlo_st +
+      vzemaniya_st,
+    zadalzheniya_st: obshtOstatak(o),
+  });
+}
+
+/**
  * Всички полета за един период, плюс сверката вход↔изход на Капитала.
  *
  * Редът е нарочен: първо какво ИМАМЕ (Капитал), после от какво е съставен
@@ -286,40 +329,8 @@ export function otcheti(
   const vze = vzemaniya(o);
   const sre = sredstva(o, period, kogato);
 
-  // ВТОРИЯТ ПЪТ · Активи и Задължения, събрани ОТ ЖУРНАЛА наново.
-  //
-  // Дотук тук пишеше `stoynost + lik.sbor_st + vze.sbor_st` — тоест същите
-  // готови сборове, от които е направен и Капиталът, само с разместени скоби.
-  // Разликата излизаше нула по АЛГЕБРА, не по проверка: не можеше да хване
-  // нищо, а стоеше на екрана като доказана нула. Проверена нула, която не е
-  // проверена, е по-лоша от липсваща — тя носи доверие, което не е спечелено.
-  //
-  // Сега вторият път брои сам, от същите Огледала, но без да минава през
-  // полетата: ако `likvidnost` или `vzemaniya` пропусне джоб, забрави знак или
-  // преброи нещо два пъти, двата пътя се разминават и разликата светва.
-  //
-  // Какво ТОЗИ път НЕ хваща, казано на глас: грешка в самото Огледало (ако
-  // едно плащане изобщо не е стигнало до `o.plashtaniya`, липсва и в двата
-  // пътя). За това пази сверката при партидите — тя гледа файл ↔ Журнал.
-  let vlyazlo_st = 0;
-  for (const pl of o.plashtaniya.values()) vlyazlo_st += pl.suma_st;
-  let izlyazlo_st = 0;
-  for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
-  let vzemaniya_st = 0;
-  for (const v of o.vzemaniya.values()) vzemaniya_st += v.ostatak_st;
-  // И ВТОРИЯТ ПЪТ брои продажбите САМ · иначе сверката щеше да падне точно със
-  // сумата, която полето ВЗЕМАНИЯ вече показва — и това е доказателството, че
-  // тя не е алгебра: махне ли се този ред, разликата светва.
-  vzemaniya_st += vzemaniyaOtProdazhbi(o).sbor_st;
-
-  const aktivi_st =
-    (vanshni.stoynostNaSastoyanie_st ?? 0) +
-    saldoNa(o, 'banka') +
-    saldoNa(o, 'trezor') +
-    vlyazlo_st -
-    izlyazlo_st +
-    vzemaniya_st;
-  const zadalzheniya_st = obshtOstatak(o);
+  // ВТОРИЯТ ПЪТ · Активи и Задължения · домът им е `aktiviIZadalzheniya`.
+  const { aktivi_st, zadalzheniya_st } = aktiviIZadalzheniya(o, vanshni);
 
   return {
     period,

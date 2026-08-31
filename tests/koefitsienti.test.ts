@@ -31,88 +31,18 @@ import {
   razbiyNaStapki,
   type DanniZaPerioda,
 } from '../src/domein/koefitsienti.js';
-import { SHA } from './pomoshtni.js';
+import { mesetsSChisla, SHA, stend } from './pomoshtni.js';
 
 const OT = '2026-08-01';
 const DO = '2026-08-31';
 const KOGATO = '2026-08-25T09:00:00.000Z';
 
-function stend() {
-  const dnevnik = new DnevnikVPametta();
-  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
-  let tik = 0;
-  const deystviya = new Deystviya({
-    vrata,
-    dnevnik,
-    naematel: 'vintexstroy',
-    actor: 'vintexstroy@gmail.com',
-    chasovnik: () => new Date(Date.UTC(2026, 7, 25, 9, 0, tik++)).toISOString(),
-  });
-  return { deystviya };
-}
 
 /**
  * Числа, ИЗБРАНИ да се проверяват наум:
  *   начислено 1 000 · събрано 800 · оперативен разход 300 · кредит 200
  *   → NOI 500 · паричен поток 300 · събираемост 80 % · OER 37,5 % · DSCR 2,50×
  */
-async function mesetsSChisla(d: Deystviya): Promise<void> {
-  await d.dobaviImot('I-1', { adres: 'Малинова', edinitsa: 'бл. 1', ploshtad_kvsm: 0 }, {
-    opId: 'op-imot',
-  });
-  await d.dobaviNaem(
-    'N-1',
-    {
-      imotId: 'I-1',
-      naemetel: 'Наемател',
-      naem_st: stotinki(1000_00),
-      padezhDen: 5,
-      ot: '2024-01-01',
-      do: '',
-      depozit_st: 0,
-      sektor: 'naem-zhilishten',
-    },
-    { opId: 'op-naem' },
-  );
-  await nachisliZaPeriod({ deystviya: d, period: '2026-08', kogato: KOGATO });
-
-  const vzemane = [...(await d.ogledalo()).vzemaniya.values()][0]!;
-  await d.priemiPlashtane(
-    'P-1',
-    { vzemaneId: vzemane.id, suma_st: stotinki(800_00), nachin: 'банка', data: '2026-08-10' },
-    { opId: 'op-plashtane' },
-  );
-
-  await d.zapishiRazhod(
-    'R-op',
-    {
-      potok: 'fakturi',
-      dostavchik: 'Доставчик',
-      opis: 'поддръжка',
-      suma_st: stotinki(300_00),
-      sektor: 'pokupki-uslugi',
-      nachin: 'банка',
-      data: '2026-08-12',
-      dokument: 'Ф-1',
-      stavka: 20,
-    },
-    { opId: 'op-razhod-op' },
-  );
-  await d.zapishiRazhod(
-    'R-kredit',
-    {
-      potok: 'krediti',
-      dostavchik: 'Банка',
-      opis: 'вноска',
-      suma_st: stotinki(200_00),
-      sektor: 'krediti',
-      nachin: 'банка',
-      data: '2026-08-15',
-      dokument: '',
-    },
-    { opId: 'op-razhod-kredit' },
-  );
-}
 
 async function danni(): Promise<DanniZaPerioda> {
   const { deystviya } = stend();
@@ -337,6 +267,9 @@ describe('делител нула дава ЛИПСА, не нула', () => {
     vsichki_obekti: 0,
     dni: 31,
     mesetsi: 1,
+    aktivi_st: 0,
+    sobstven_kapital_st: 0,
+    stoynost_st: 0,
   };
 
   it('„събираемост 0 %" при нула начислено е ЛЪЖА — нищо не е било дължимо', () => {
@@ -411,9 +344,15 @@ describe('стъпките · режат периода без да лъжат',
 });
 
 describe('пинът · броят се твърди с ръка (резен 46 · група В)', () => {
-  it('коефициентите на Сметки са ДВАНАЙСЕТ', () => {
-    // ДВАНАЙСЕТ, не пет: съименникът в Калкулатора е ДРУГА константа, с друг
+  it('коефициентите на Сметки са ДЕВЕТНАЙСЕТ', () => {
+    // ДЕВЕТНАЙСЕТ, не пет: съименникът в Калкулатора е ДРУГА константа, с друг
     // брой и свой пин. Едно име, два дома — затова пинът е при своя тест.
-    expect(KOEFITSIENTI).toHaveLength(12);
+    // Бяха ДВАНАЙСЕТ до резен 51; седемте нови са популярните, които липсваха.
+    expect(KOEFITSIENTI).toHaveLength(19);
+  });
+
+  it('и се делят на СЕДЕМ състояния и ДВАНАЙСЕТ за период', () => {
+    const broy = (kogato: string): number => KOEFITSIENTI.filter((k) => k.kogato === kogato).length;
+    expect([broy('sastoyanie'), broy('period')]).toEqual([7, 12]);
   });
 });
