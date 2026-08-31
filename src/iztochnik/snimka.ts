@@ -15,7 +15,15 @@
 
 import type { Sha256 } from '../yadro/index.js';
 
-export type VidIzvor = 'csv' | 'xlsx' | 'pdf' | 'raka';
+/**
+ * ОТКЪДЕ Е ДОШЛА ТАБЛИЦАТА.
+ *
+ * `xlsb` дойде с резен 60: неговите работни файлове са двоични („приходи ·
+ * Винтекс Строй АД.xlsb"), а дотук програмата четеше само `.xlsx`. Отделен вид,
+ * не „xlsx с друго разширение": двата формата се четат по РАЗЛИЧЕН начин, и
+ * `.xlsb` не носи формули като текст.
+ */
+export type VidIzvor = 'csv' | 'xlsx' | 'xlsb' | 'pdf' | 'raka';
 type VidSnimka = 'razhodi' | 'naemi';
 
 export interface Izvor {

@@ -48,7 +48,7 @@ import {
   type VidKredit,
 } from '../src/domein/kredit-matematika.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
-import { otXLSX } from '../src/iztochnik/xlsx.js';
+import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
 import { bezPrazni } from '../src/iztochnik/tablitsa.js';
 import { prochetiKarta, sleiIzvlecheniya, saldoNaFayla, type SnimkaNaKarta } from '../src/iztochnik/karta.js';
 import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
@@ -888,11 +888,6 @@ async function zapishiPlana(lichen: Konteks, p: PlanZaVnos): Promise<void> {
     },
     { opId: `${partidaId}:razpiska` },
   );
-}
-
-async function tablitsiOtFayl(danni: Uint8Array, ime: string) {
-  if (ime.toLowerCase().endsWith('.xlsx')) return (await otXLSX(danni, ime)).map(bezPrazni);
-  return [bezPrazni(otCSV(tekstOtBaytove(danni), ime))];
 }
 
 /**

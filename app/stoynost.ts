@@ -33,7 +33,7 @@ import {
   zaVpisvane,
 } from '../src/kalkulator/sazdavane.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { otXLSX } from '../src/iztochnik/xlsx.js';
+import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
@@ -244,8 +244,8 @@ export function narisuvayStoynost(): string {
         конкретна сграда, а измислени дела за чужда са по-лоши от липсващи.</span>
       </div>`
       }
-      <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
-      <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
+      <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.xlsb,.csv" hidden>
+      <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.xlsb,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
       <p class="drebno"><b>А продава, Б оценява, В казва колко струва да се построи.</b>
       Съгласуваната ги ПРЕТЕГЛЯ по избрания случай — „професионалната практика не избира
@@ -836,10 +836,7 @@ async function tablitsiSasSito(
   sito: (t: Tablitsa) => boolean,
 ): Promise<Tablitsa[]> {
   const danni = await fayl.arrayBuffer();
-  const tablitsi = fayl.name.toLowerCase().endsWith('.csv')
-    ? [otCSV(new TextDecoder().decode(danni), fayl.name)]
-    : await otXLSX(new Uint8Array(danni), fayl.name);
-  const vsichki = tablitsi.map(bezPrazni);
+  const vsichki = await tablitsiteNa(new Uint8Array(danni), fayl.name);
   // Ситото е за книга с МНОГО листове: там „Sheet3" и „разбивка" носят друг
   // обект и биха добавили чужди квадрати. Файл с един лист е самият той —
   // изнесеното от човека рядко се казва „площо".

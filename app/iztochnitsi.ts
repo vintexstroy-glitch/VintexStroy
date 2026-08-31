@@ -16,6 +16,7 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
+import { tablitsiteNa, vidaNaFayla } from '../src/iztochnik/chetetsat.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import {
   belegNaPartida,
@@ -610,9 +611,8 @@ async function tablitsiOtFayl(
   ime: string,
   vid: VidIzvor,
 ): Promise<Tablitsa[]> {
-  if (vid === 'xlsx') return (await otXLSX(danni, ime)).map(bezPrazni);
   if (vid === 'pdf') return [bezPrazni(tablitsaOtPDF(await otPDF(danni), ime))];
-  return [bezPrazni(otCSV(tekstOtBaytove(danni), ime))];
+  return [...(await tablitsiteNa(danni, ime))];
 }
 
 /**
@@ -622,12 +622,7 @@ async function tablitsiOtFayl(
  * `kalkulator/chetene.ts` (апартамент · гараж · паркомясто). Два различни
  * въпроса с едно име се бъркат точно когато не бива.
  */
-function vidIzvorPoIme(ime: string): VidIzvor {
-  const dolu = ime.toLowerCase();
-  if (dolu.endsWith('.xlsx')) return 'xlsx';
-  if (dolu.endsWith('.pdf')) return 'pdf';
-  return 'csv';
-}
+const vidIzvorPoIme = vidaNaFayla;
 
 /** Един файл, прочетен ВЕДНЪЖ: същите байтове дават и отпечатъка, и листовете. */
 async function prochetiFayla(fayl: File): Promise<PodadenFayl> {

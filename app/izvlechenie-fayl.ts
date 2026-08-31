@@ -15,7 +15,7 @@
  */
 
 import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
-import { otXLSX } from '../src/iztochnik/xlsx.js';
+import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
 import { bezPrazni } from '../src/iztochnik/tablitsa.js';
 import { prochetiKarta, sleiIzvlecheniya, type SlyataKarta } from '../src/iztochnik/karta.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
@@ -27,11 +27,6 @@ import { sha256Web } from '../src/nositel/hash-web.js';
  * Празните редове падат ПРЕДИ четенето: те не са данни, а форматиране, и биха
  * се броили сред пропуснатите — число, което лъже за качеството на файла.
  */
-async function tablitsiOtFayl(danni: Uint8Array, ime: string) {
-  if (ime.toLowerCase().endsWith('.xlsx')) return (await otXLSX(danni, ime)).map(bezPrazni);
-  return [bezPrazni(otCSV(tekstOtBaytove(danni), ime))];
-}
-
 export interface ProchetenoIzvlechenie {
   readonly slyata: SlyataKarta;
   /** по един отпечатък на ФАЙЛ · следата кой файл е бил четен */
@@ -54,7 +49,7 @@ export async function prochetiIzvlecheniyata(
   for (const f of faylove) {
     const danni = new Uint8Array(await f.arrayBuffer());
     const otp = await otpechatak(danni, sha256Web);
-    for (const t of await tablitsiOtFayl(danni, f.name)) {
+    for (const t of await tablitsiteNa(danni, f.name)) {
       snimki.push(prochetiKarta({ tablitsa: t, ime: f.name, otpechatak: otp }));
     }
   }

@@ -25,8 +25,7 @@
 
 import { ekraniraj } from './obshto.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { otXLSXSFormuli } from '../src/iztochnik/xlsx.js';
-import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
+import { tablitsiSFormuli } from '../src/iztochnik/chetetsat.js';
 import {
   predlozhiTablitsa,
   sDumi,
@@ -56,6 +55,9 @@ let imeNaFayla = '';
 let otpechatakNaFayla = '';
 let greshka = '';
 
+/** ЗАЩО формули не са дошли · празно значи, че са дошли (правило 15). */
+let bezFormuli = '';
+
 /** КОЯ създадена таблица гледам · памет на екрана, не факт (ADR-022). */
 let izbranaTablitsa = '';
 
@@ -77,9 +79,10 @@ export function blokNaTablitsaOtFayl(o: Ogledalo): string {
 
       <div class="redditsa">
         <button type="button" id="izbor-tablitsa-fayl">Прочети таблица от папката</button>
-        <input translate="no" type="file" id="fayl-tablitsa" accept=".xlsx,.csv" hidden>
+        <input translate="no" type="file" id="fayl-tablitsa" accept=".xlsx,.xlsb,.csv" hidden>
       </div>
       <p class="greshka" id="greshka-tablitsa-fayl">${ekraniraj(greshka)}</p>
+      ${bezFormuli === '' ? '' : `<p class="drebno" id="bez-formuli">${ekraniraj(bezFormuli)}</p>`}
 
       ${predlozhenie === undefined ? '' : predlozhenieto(predlozhenie)}
     </section>
@@ -366,13 +369,14 @@ export function zakachiTablitsaOtFayl(
       const baytove = new Uint8Array(await fayl.arrayBuffer());
       otpechatakNaFayla = await otpechatak(baytove, sha256Web);
       imeNaFayla = fayl.name;
-      if (/\.csv$/i.test(fayl.name)) {
-        // CSV НЯМА формули · и това не е дефект, а свойство на формата.
-        predlozhenie = predlozhiTablitsa(otCSV(tekstOtBaytove(baytove), fayl.name), new Map());
-      } else {
-        const { tablitsi, formuli } = await otXLSXSFormuli(baytove, fayl.name);
-        predlozhenie = predlozhiTablitsa(tablitsi[0]!, formuli[0]!.poKolona);
-      }
+      // ЕДИН път за трите формата (правило 17). Липсата на формули не е дефект,
+      // а свойство на формата — и се КАЗВА с думите на своята причина.
+      const prochetenoto = await tablitsiSFormuli(baytove, fayl.name);
+      bezFormuli = prochetenoto.bezFormuli;
+      predlozhenie = predlozhiTablitsa(
+        prochetenoto.tablitsi[0]!,
+        prochetenoto.formuli[0]!.poKolona,
+      );
       greshka = '';
     } catch (err) {
       predlozhenie = undefined;
