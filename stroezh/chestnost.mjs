@@ -117,6 +117,28 @@ export function rabotni(redove, ot, kolko, posoka = 1) {
  * през ден, е по-скъп от липсващ (ADR-051).
  */
 /**
+ * РЕДОВЕТЕ, В КОИТО МОЖЕ ДА СТОИ ОБВИВКАТА на едно действие.
+ *
+ * Действие вътре в `dokatoStane(p, async () => { … })` е ЧАКАНО — чакането е
+ * условието на самия помощник. Но то стои НАД блока, а не до реда, и затова
+ * се търси до границата на блока: първият ред с по-малък отстъп го отваря.
+ *
+ * Връща този ред и двата над него — колкото заемат `dokatoStane(` · `p,` ·
+ * `async () => {`. Отвъд тях не се гледа: обвивка на пет реда разстояние вече
+ * не е обвивка на ТОВА действие.
+ */
+function obvivkata(redove, i) {
+  const otstap = (red) => red.length - red.trimStart().length;
+  const moyat = otstap(redove[i]);
+  for (let j = i - 1; j >= 0 && i - j < 40; j -= 1) {
+    const t = redove[j].trim();
+    if (t === '' || t.startsWith('//') || t.startsWith('*') || t.startsWith('/*')) continue;
+    if (otstap(redove[j]) < moyat) return [redove[j], ...rabotni(redove, j - 1, 2, -1)];
+  }
+  return rabotni(redove, i - 1, 3, -1);
+}
+
+/**
  * ЧАКАЩИТЕ · всичко, което дава на екрана да догони действието.
  *
  * ОБВИВКИТЕ се броят и когато стоят на ПРЕДИШНИЯ ред: `deystvieSPrerisuvane(p,
@@ -156,11 +178,18 @@ function obhodE() {
       // ДЕКЛАРАЦИЯТА не е викане · инак самият помощник се обявява за находка.
       if (/^\s*(export\s+)?(async\s+)?function\b/.test(red)) return;
       if (!deystvie.test(red) || CHAKA.test(red)) return;
-      // ОБВИВКАТА може да стои до ТРИ РАБОТЕЩИ реда НАД действието: едноредовите
-      // (`deystvieSPrerisuvane(p, () =>`) се хващат с два, но `dokatoStane` се
-      // пише на няколко — име, `p,`, `async () => {`. Мярка, която не стига до
-      // обвивката, обявява собствения си помощник за дефект.
-      if (rabotni(redove, i - 1, 3, -1).some((x) => CHAKA.test(x))) return;
+      // ОБВИВКАТА се търси до ГРАНИЦАТА НА БЛОКА, не на три реда.
+      //
+      // Три работещи реда стигаха, докато действието беше ЕДНО. Щом обвитото
+      // стане БЛОК (`dokatoStane(p, async () => { fill; selectOption; click })`),
+      // третата стъпка е на пет реда от обвивката и обходът обявява собствения
+      // си помощник за дефект — платено в резен 54, върху точно този блок.
+      //
+      // Затова: върви нагоре до първия ред с ПО-МАЛЪК отстъп (това е онзи, който
+      // отваря блока) и провери него и двата над него — колкото заема
+      // `dokatoStane(` · `p,` · `async () => {`. Границата е СТРУКТУРНА, не
+      // брой: разхлабен брой би замълчал и там, където чакане наистина няма.
+      if (obvivkata(redove, i).some((x) => CHAKA.test(x))) return;
       const opashka = rabotni(redove, i + 1, 3);
       if (opashka.some((x) => chete.test(x)) && !opashka.some((x) => CHAKA.test(x))) {
         nam.push(`${f}:${i + 1} — ${red.trim().slice(0, 62)}`);
