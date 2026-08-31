@@ -19,7 +19,12 @@ import { KLIPBORDAT_OTKAZA, kopirayKletkite } from './klaviatura.js';
 
 let otvorenoMenyu: HTMLElement | null = null;
 
+/** Слушателят на скрола се закача при отваряне и се маха при затваряне —
+ *  виж дългата бележка при отварянето защо не може да стои постоянно. */
+const SLUSHATEL = { capture: true, passive: true } as const;
+
 function zatvori(): void {
+  document.removeEventListener('scroll', zatvori, SLUSHATEL);
   otvorenoMenyu?.remove();
   otvorenoMenyu = null;
 }
@@ -109,7 +114,23 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
     menyu.style.left = `${Math.min(e.clientX, window.innerWidth - shirina - 8)}px`;
     menyu.style.top = `${Math.min(e.clientY, window.innerHeight - visochina - 8)}px`;
     otvorenoMenyu = menyu;
-    menyu.querySelector('button')?.focus();
+    // `preventScroll` по същата причина като в `grupa-deystviya.ts` (ADR-057):
+    // фокусът върху пресен възел вдига скрол, а скролът затваря менюто — тоест
+    // менюто изчезва в мига на отварянето.
+    menyu.querySelector('button')?.focus({ preventScroll: true });
+    // СКРОЛЪТ СЕ СЛУША ЧАК ОТ СЛЕДВАЩИЯ КАДЪР.
+    //
+    // Събитието `scroll` е АСИНХРОННО: браузърът го пуска на следващия кадър,
+    // не в мига на скролването. Значи скрол, случил се ПРЕДИ менюто да се
+    // отвори — например когато нещо придърпва клетката във видимото — пристига
+    // СЛЕД отварянето и затваря меню, което няма нищо общо с него.
+    //
+    // Дотук това не личеше, защото скролираше страницата. Резен 9а направи
+    // `.telo` скролиращата кутия и го извади наяве: проходът отваряше менюто,
+    // прочиташе го вярно, и на следващия ред не намираше нито един бутон.
+    requestAnimationFrame(() => {
+      if (otvorenoMenyu === menyu) document.addEventListener('scroll', zatvori, SLUSHATEL);
+    });
   });
 
   // Затваря се както в Уиндоус: клик другаде, Escape, скрол.
@@ -119,5 +140,4 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') zatvori();
   });
-  document.addEventListener('scroll', zatvori, { capture: true, passive: true });
 }

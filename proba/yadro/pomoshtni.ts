@@ -4,9 +4,8 @@
  * Четирите двойки, споделящи вътрешна логика (`naEkran`/`deystvieSPrerisuvane`,
  * `plochka`/`plochkaPod`, `chisloNaPoleto`/`chisloNaPoleto2`, и трите действия
  * `dobaviImot`/`dobaviNaem`/`plati`, преизползващи `sSabitie`), пазят СЪЩИТЕ
- * публични имена и подписи — местата, откъдето се викат (813-те проверки),
- * не се пипат. Само общото ПОВТОРЕНО тяло помежду им е извадено в частна
- * функция.
+ * публични имена и подписи — местата, откъдето се викат, не се пипат. Само
+ * общото ПОВТОРЕНО тяло помежду им е извадено в частна функция.
  */
 
 import type { Page } from 'playwright-core';
@@ -84,10 +83,27 @@ async function chakayPrerisuvane(p: Page, deystvie: () => Promise<unknown>): Pro
     if (shapka) shapka.dataset['beleg'] = 'staro';
   });
   await deystvie();
-  await p.waitForFunction(() => {
-    const shapka = document.querySelector('.shapka') as HTMLElement | null;
-    return Boolean(shapka) && !shapka!.dataset['beleg'];
-  });
+  try {
+    await p.waitForFunction(() => {
+      const shapka = document.querySelector('.shapka') as HTMLElement | null;
+      return Boolean(shapka) && !shapka!.dataset['beleg'];
+    });
+  } catch {
+    // ДИАГНОЗА С ЧИСЛО, НЕ С ТАЙМАУТ (ADR-071).
+    //
+    // Дотук провалът тук се четеше само като „Timeout 30000ms exceeded" и не
+    // казваше НИЩО: изчезнала ли е шапката, или белегът е още там, тоест
+    // прерисуване изобщо не е тръгнало. Двете искат различни поправки, а
+    // съобщението беше едно и също.
+    const sastoyanie = await p.evaluate(() => {
+      const shapka = document.querySelector('.shapka') as HTMLElement | null;
+      if (!shapka) return 'шапката я НЯМА в страницата';
+      return shapka.dataset['beleg'] === 'staro'
+        ? 'белегът „staro" стои — прерисуване НЕ е тръгнало'
+        : `белегът е „${String(shapka.dataset['beleg'])}"`;
+    });
+    throw new Error(`Прерисуването не стигна до екрана · ${sastoyanie}`);
+  }
 }
 
 /**
@@ -99,6 +115,40 @@ async function chakayPrerisuvane(p: Page, deystvie: () => Promise<unknown>): Pro
 export async function naEkran(p: Page, koy: string, znak: string): Promise<void> {
   await chakayPrerisuvane(p, () => p.click(`[data-ekran=${koy}]`));
   await p.waitForSelector(znak);
+}
+
+/**
+ * НАТИСКА бутон, който може да е СВИТ в група (ADR-057).
+ *
+ * Няколко действия на едно място стават един бутон със стрелкичка; видимият е
+ * онзи, който човекът е избрал последно. Затова проходът прави точно трите
+ * стъпки на човека: отваря стрелкичката, избира действието ПО ДУМАТА МУ, и
+ * чак тогава натиска. Ако бутонът вече се вижда, се натиска направо — както
+ * би направил и човек.
+ *
+ * Не е заобикаляне на групата, а проверка ПРЕЗ нея: скрит бутон не се натиска
+ * от Playwright, и точно това е причината да не може да се направи наум.
+ */
+export async function natisniVGrupata(p: Page, izbor: string): Promise<void> {
+  const svit = await p.$eval(izbor, (e) => (e as HTMLElement).hidden);
+  if (svit) {
+    const duma = await p.$eval(izbor, (e) =>
+      (e.querySelector('.duma')?.textContent ?? e.textContent ?? '').trim());
+    // `.first()` навсякъде · `page.click` също взема първото съвпадение, а
+    // локаторът иначе е строг и би отказал при няколко реда с еднакво действие.
+    await p
+      .locator(izbor)
+      .first()
+      .locator('xpath=ancestor::span[contains(@class,"grupa-deystviya")]')
+      .locator('.strelkichka')
+      .click();
+    await p.click(`.kontekstno-menyu [data-deystvie="${duma}"]`);
+    // Чака се с ЛОКАТОР, не с `querySelector` в страницата: изборът може да
+    // носи `:has-text(…)` — псевдоклас на Playwright, който браузърът не знае
+    // и отказва като невалиден селектор.
+    await p.locator(izbor).first().waitFor({ state: 'visible' });
+  }
+  await p.click(izbor);
 }
 
 /** Действие, което прерисува екрана, но не добавя събитие (бутон, отказ). */
@@ -296,6 +346,17 @@ async function tekstNaPoleto(p: Page, klyuch: string): Promise<string> {
   return p.$eval(`[data-pole="${klyuch}"] .chislo`, (e) => (e as HTMLElement).textContent!.trim());
 }
 
+/**
+ * СУРОВИЯТ текст на едно поле · за ЧАКАНЕ, не за твърдение (резен 30).
+ *
+ * Чака се ИЗХОДЪТ да мръдне — нещо, което само пресмятането може да направи.
+ * Чакането по ВХОДА (полето, което сам си написал с `fill`) минава веднага и
+ * не свидетелства за нищо: точно това остави §84 да трепка след ADR-087 §8.
+ */
+export async function tekstNaChisloto(p: Page, klyuch: string): Promise<string> {
+  return tekstNaPoleto(p, klyuch);
+}
+
 /** Цялото число от плочка · за броячи, които не са пари. */
 export async function chisloNaPoleto2(p: Page, klyuch: string): Promise<number> {
   const tekst = await tekstNaPoleto(p, klyuch);
@@ -319,11 +380,13 @@ export interface DeloVhod {
   readonly do: string;
   readonly otsenka: string;
   readonly nad?: string;
+  /** по избор · подразбраното е първото в менюто, „чака" (резен 30) */
+  readonly sastoyanie?: string;
 }
 
 export async function zapishiDelo(
   p: Page,
-  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad }: DeloVhod,
+  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie }: DeloVhod,
 ): Promise<void> {
   await p.fill('#d-myasto', myasto);
   await p.fill('#d-obekt', obekt);
@@ -332,6 +395,9 @@ export async function zapishiDelo(
   await p.fill('#d-ot', ot);
   await p.fill('#d-do', doData);
   await p.selectOption('#d-otsenka', otsenka);
+  // СЪСТОЯНИЕТО по избор · подразбраното е първото в менюто („чака"), тъй че
+  // старите викащи не се менят (резен 30).
+  if (sastoyanie) await p.selectOption('#d-sastoyanie', sastoyanie);
   if (nad) await p.selectOption('#d-nad', { label: nad });
   await sSabitie(p, () => p.click('#d-forma-delo button[type=submit]'));
 }
@@ -345,4 +411,125 @@ export async function smetni(p: Page, opis: string, suma: string, stavka: string
   await p.selectOption('#smyatane-stavka', stavka);
   await p.click('#forma-smyatane button[type=submit]');
   await p.waitForFunction((n) => document.querySelectorAll('.red.smyatane').length > (n as number), predi);
+}
+
+/**
+ * ПОВТАРЯ ДЕЙСТВИЕТО, ДОКАТО ПОСЛЕДИЦАТА НЕ СЕ ПОЯВИ · група Ж2 (`docs/11`).
+ *
+ * ЗАЩО НЕ СТИГА ЕДНО ЧАКАНЕ. Обвивката `deystvieSPrerisuvane` чака
+ * прерисуването СЛЕД действието — а опасното е прерисуването ПРЕДИ него: то
+ * подменя възела, връща старата стойност, и написаното изчезва, преди `change`
+ * изобщо да се вдигне. Тогава изходът не мърда НИКОГА и чакането изтича. Едно
+ * чакане, колкото и дълго, не може да поправи действие, което не е стигнало.
+ *
+ * ЗАЩО НЕ `napishiSigurno`. То чака полето да държи ДОСЛОВНО писаното. Има
+ * полета, които екранът пренаписва в СВОЙ вид („3500" → „3 500,00"): там
+ * дословното чакане не се сбъдва никога и проходът спира. Опитано и счупено
+ * веднъж (записът е в `smeniPoleto`), после проверено пак в резен 44.
+ *
+ * ЗАЩО НЕ Е ФЛЕЙК. Причината е НАЗОВАНА, а не изтърпяна: действието не е
+ * стигнало до екрана. Опитите са БРОЕНИ и свършват — пет по три секунди, после
+ * се пада с думи и с ИМЕТО на онова, което не е станало. Безкраен опит би бил
+ * премълчан отказ; гол таймаут казва „проходът се спъна" и нищо повече.
+ *
+ * ДЕЙСТВИЕТО ТРЯБВА ДА Е ПОВТОРИМО. Викащият дава `deystvie`, което може да се
+ * изпълни втори път без вреда — клик по превключвател се пази отвътре, а не тук.
+ */
+export async function dokatoStane(
+  p: Page,
+  deystvie: () => Promise<void>,
+  uslovie: () => Promise<boolean>,
+  kakvo: string,
+  opiti = 5,
+): Promise<void> {
+  for (let opit = 1; opit <= opiti; opit += 1) {
+    await deystvie();
+    for (let chakane = 0; chakane < 20; chakane += 1) {
+      if (await uslovie()) return;
+      await p.waitForTimeout(150);
+    }
+  }
+  throw new Error(`${kakvo} · не стана след ${opiti} опита`);
+}
+
+/**
+ * СМЕНЯ едно поле и чака САМАТА СТОЙНОСТ да се появи на екрана.
+ *
+ * `deystvieSPrerisuvane` чака ПРЕРИСУВАНЕТО. То свършва — но полето се
+ * пренаписва СЛЕД записа в паметта на екрана, и следващото попълване пада в
+ * МЪРТЪВ ВЪЗЕЛ: написаното се изтрива под ръцете, а проверката отдолу мери
+ * старото число.
+ *
+ * Капанът е платен ТРИ пъти — при базите (§84, ADR-034), при възрастта (§89,
+ * ADR-072 §7.4) и при обхвата на справките (§92). Първите два се поправиха НА
+ * МЯСТО, всеки със свое чакане; третият получи този дом (правило 17).
+ *
+ * ═══ И НЕ ВСЯКО ПОЛЕ ГО ТЪРПИ ═══
+ *
+ * Опитах да го сложа и на §84 — и го СЧУПИХ детерминирано: базата на
+ * Калкулатора се пренаписва от екрана в СВОЙ вид, значи чакането на дословната
+ * стойност не се сбъдва никога и проходът спира. Затова помощникът НЕ се
+ * налага навсякъде: ползва се там, където полето връща онова, което е приело.
+ * Обобщение, направено без мярка, е по-скъпо от повторението, което заменя.
+ */
+export async function smeniPoleto(p: Page, znak: string, stoynost: string): Promise<void> {
+  await deystvieSPrerisuvane(p, async () => {
+    await p.fill(znak, stoynost);
+    await p.dispatchEvent(znak, 'change');
+  });
+  await p.waitForFunction(
+    ([z, v]) => (document.querySelector(z as string) as HTMLInputElement | null)?.value === v,
+    [znak, stoynost],
+  );
+}
+
+/**
+ * ПИШЕ В ПОЛЕ И ИЗЛИЗА ОТ НЕГО · точно каквото прави човек (резен 29).
+ *
+ * ═══ ТРИ ПЪТЯ, И ДВАТА КЪСИ ПАДНАХА ═══
+ *
+ * Само `fill` НЕ пуска „change" изобщо — проходът увисва, чакайки прерисуване,
+ * което няма как да дойде (резен 25 · ADR-085 §7.3; после пак в резен 26).
+ * `fill` + ръчен `dispatchEvent` пуска ДВЕ събития: първото прерисува екрана, а
+ * второто стига до вече откачения възел, чието затваряне още помни празната
+ * стойност (268 срещу 269 събития).
+ *
+ * Остава третото — онова, което човекът наистина прави: пише и излиза.
+ *
+ * ═══ ЗАЩО ТУК, А НЕ ТРЕТО КОПИЕ ═══
+ *
+ * Дословно същите два реда живееха в `razdeli/sesii.ts` и `razdeli/plashtaniya-arhiv.ts`,
+ * всеки със своя половин обяснение. Трети викащ е моментът, в който копието се
+ * плаща (правило 17) — а поуката е скъпа и не бива да се разказва на части.
+ *
+ * НЕ Е `smeniPoleto`: онова чака прерисуване и СЛЕД това стойността на полето.
+ * Тук прерисуването е решение на викащия — понякога след писането се брои
+ * събитие, а не се чака екран.
+ */
+export async function napishiVPoleto(p: Page, znak: string, stoynost: string): Promise<void> {
+  await p.fill(znak, stoynost);
+  await p.$eval(znak, (e) => (e as HTMLElement).blur());
+}
+
+/**
+ * ПИШЕ И ЧАКА ПОЛЕТО ДА ГО ДЪРЖИ · група Е, трета форма (резен 44 · `docs/11`).
+ *
+ * `fill` слага стойността и вдига `input` — но НЕ обещава, че тя ще ОСТАНЕ:
+ * прерисуване, тръгнало преди или заедно с него, подменя възела и написаното
+ * изчезва. Тогава следващият клик подава ПРАЗНА форма, Вратата отказва, и
+ * докладът казва „иска име" — все едно записът е счупен, а счупено е ПИСАНЕТО.
+ *
+ * Платено с §95, който падаше веднъж на три пускания (резен 43). Тук чакането е
+ * ЕДНО и се вика отвсякъде, вместо всеки раздел да си пише свое.
+ *
+ * НЕ ЧАКА ПРЕРИСУВАНЕ · то е решение на викащия, точно както при
+ * `napishiVPoleto`. Тук се обещава само едно: полето наистина държи писаното.
+ */
+export async function napishiSigurno(p: Page, znak: string, stoynost: string): Promise<void> {
+  await p.fill(znak, stoynost);
+  await p.waitForFunction(
+    ([z, v]) => (document.querySelector(z as string) as HTMLInputElement | null)?.value === v,
+    [znak, stoynost],
+    { timeout: 5_000 },
+  );
 }

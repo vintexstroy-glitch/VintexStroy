@@ -30,69 +30,39 @@
  */
 
 import type { Drayv, FaylVDrayva } from '../src/nositel/drayv.js';
+import type { KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { GreshkaDrayv } from '../src/nositel/drayv.js';
-import { osiguriSkriptaNaGoogle } from './gis-skript.js';
+import { pitayGoogle, vzemiZhetonZaObhvat } from './gis-skript.js';
 
 const OBHVAT = 'https://www.googleapis.com/auth/drive.file';
-const KLIENT_NOMER =
-  '41382209788-ggjrn13mf5upp068flm6kup5u9usg5lg.apps.googleusercontent.com';
 
 const SPISAK = 'https://www.googleapis.com/drive/v3/files';
 const KACHVANE = 'https://www.googleapis.com/upload/drive/v3/files';
-
-interface ZhetonOtGoogle {
-  readonly access_token?: string;
-  readonly error?: string;
-}
-
-interface KlientZaZheton {
-  requestAccessToken(): void;
-}
-
-interface GoogleNaProzoretsa {
-  accounts?: {
-    oauth2?: {
-      initTokenClient(n: {
-        client_id: string;
-        scope: string;
-        callback: (o: ZhetonOtGoogle) => void;
-        error_callback?: (o: { type?: string }) => void;
-      }): KlientZaZheton;
-    };
-  };
-}
-
-function google(): GoogleNaProzoretsa['accounts'] {
-  return (window as unknown as { google?: GoogleNaProzoretsa }).google?.accounts;
-}
+/**
+ * КВОТАТА · `about.get`, и той работи с обхвата, който вече имаме.
+ *
+ * Google изброява `drive.file` сред обхватите на `about.get`; затова честната
+ * спирачка не струва НИТО ЕДНО ново разрешение. Ако някой ден откаже с 403,
+ * това ще е сигурно ЗНАНИЕ, не догадка — и екранът вече знае да го КАЖЕ с
+ * думи, вместо да замълчи (същият похват като при схемата на НАП, ADR-047:
+ * истинската проверка е ЖИВОТО повикване).
+ */
+const ZA_MEN = 'https://www.googleapis.com/drive/v3/about';
 
 /**
- * ИСКА СЪГЛАСИЕ и връща жетон · всеки път наново.
+ * ИСКА СЪГЛАСИЕ за ДРАЙВА · механиката е обща, ДУМИТЕ са тукашни.
  *
- * Не се кешира между натискания нарочно. Жетонът на Google живее около час, а
- * изтекъл жетон дава 401 в средата на пренасяне — тоест половин работа и
- * съобщение, което човек не свързва с изтекло разрешение.
+ * Машината (тегленето на скрипта, клиентът за жетон, двата вида отказ) живее
+ * ЕДИН път в `gis-skript.ts`. Тук остава само онова, което е СОБСТВЕНО на
+ * пренасянето: обхватът и трите изречения. „Прозорецът се затвори" тук значи
+ * „нищо не е пренесено", а при Календара — „покана НЕ е тръгнала"; общо
+ * съобщение би било вярно и безполезно.
  */
 export async function vzemiZheton(): Promise<string> {
-  await osiguriSkriptaNaGoogle(() => Boolean(google()?.oauth2), (t) => new GreshkaDrayv(t));
-  return new Promise<string>((gotovo, greshka) => {
-    const klient = google()!.oauth2!.initTokenClient({
-      client_id: KLIENT_NOMER,
-      scope: OBHVAT,
-      callback: (o) => {
-        if (o.access_token) gotovo(o.access_token);
-        else greshka(new GreshkaDrayv(`Google отказа достъп до Драйва: ${o.error ?? 'без причина'}.`));
-      },
-      error_callback: (o) =>
-        greshka(
-          new GreshkaDrayv(
-            o.type === 'popup_closed'
-              ? 'Прозорецът се затвори без съгласие — нищо не е пренесено.'
-              : `Достъпът до Драйва не се получи (${o.type ?? 'непозната пречка'}).`,
-          ),
-        ),
-    });
-    klient.requestAccessToken();
+  return vzemiZhetonZaObhvat(OBHVAT, (t) => new GreshkaDrayv(t), {
+    otkazan: (prichina) => `Google отказа достъп до Драйва: ${prichina}.`,
+    zatvoren: 'Прозорецът се затвори без съгласие — нищо не е пренесено.',
+    nepoluchen: (vid) => `Достъпът до Драйва не се получи (${vid}).`,
   });
 }
 
@@ -136,27 +106,44 @@ export class DrayvNaGoogle implements Drayv {
   }
 
   /**
+   * ТАВАНЪТ И ЗАЕТОТО · питаме доставчика, не човека (правило 14).
+   *
+   * `limit` липсва при акаунт БЕЗ ограничение (фирмен). Липсата се превежда на
+   * `-1` ТУК, при мястото ѝ, а домейнът я чете като „платено": прочетена като
+   * нула, тя щеше да обяви най-скъпия клиент за препълнен.
+   */
+  async kvota(): Promise<KvotaNaDrayva> {
+    const adres = `${ZA_MEN}?fields=${encodeURIComponent('storageQuota')}`;
+    const otgovor = await this.#pitay(adres, { method: 'GET' });
+    const danni = (await otgovor.json()) as {
+      storageQuota?: { limit?: string; usage?: string };
+    };
+    const k = danni.storageQuota ?? {};
+    return {
+      limit: k.limit === undefined ? -1 : Number(k.limit),
+      zaeto: Number(k.usage ?? 0),
+    };
+  }
+
+  /**
    * Едно място за жетона и за отказите · с ДУМИ, не с номер.
    *
    * „403" на екрана не казва нищо на човек. Трите чести случая си имат смисъл
    * и всеки води до различно действие.
    */
   async #pitay(adres: string, kak: RequestInit): Promise<Response> {
-    const otgovor = await fetch(adres, {
-      ...kak,
-      headers: { ...(kak.headers ?? {}), Authorization: `Bearer ${this.#zheton}` },
+    return pitayGoogle(this.#zheton, adres, kak, (sastoyanie) => {
+      if (sastoyanie === 401) {
+        return new GreshkaDrayv('Разрешението за Драйва изтече. Натисни пак — Google ще попита наново.');
+      }
+      if (sastoyanie === 403) {
+        return new GreshkaDrayv(
+          'Google отказа: или достъпът не е даден, или дневната бройка е изчерпана. ' +
+            'Журналът на устройството не е пипан.',
+        );
+      }
+      return new GreshkaDrayv(`Драйвът отговори с ${sastoyanie}. Нищо не е пренесено.`);
     });
-    if (otgovor.ok) return otgovor;
-    if (otgovor.status === 401) {
-      throw new GreshkaDrayv('Разрешението за Драйва изтече. Натисни пак — Google ще попита наново.');
-    }
-    if (otgovor.status === 403) {
-      throw new GreshkaDrayv(
-        'Google отказа: или достъпът не е даден, или дневната бройка е изчерпана. ' +
-          'Журналът на устройството не е пипан.',
-      );
-    }
-    throw new GreshkaDrayv(`Драйвът отговори с ${otgovor.status}. Нищо не е пренесено.`);
   }
 }
 

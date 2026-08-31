@@ -14,6 +14,24 @@ import { ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
 import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
+import {
+  broyNahodki,
+  BEZ_DOGOVOR,
+  dogovoriteVSverkata,
+  stesniPoDogovor,
+  sveriStesnyavaneto,
+  IMENA_NA_SADBITE,
+  spisatsiteZaSchetovodstvoto,
+  mesetsiSvetene,
+  sverkaPoMesetsi,
+  sverkataNaIzvlechenieto,
+  zapisiteNaKnigata,
+  type RedNaSverkata,
+  type RezultatNaSverkata,
+} from '../src/domein/sverka-izvlechenie.js';
+import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
+import { otpechatak } from '../src/iztochnik/snimka.js';
+import { sha256Web } from '../src/nositel/hash-web.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
 import {
   akumulator,
@@ -40,8 +58,15 @@ import {
 } from '../src/domein/otcheti.js';
 import { sboratZaKapitala } from './stoynost.js';
 import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
-import { podredi } from '../src/domein/dela.js';
-import { obobshtenRed, reshetka } from '../src/domein/gant.js';
+import { podredi, zhivite } from '../src/domein/dela.js';
+import {
+  dumataNaButona,
+  mozheDaSeSkrie,
+  obobshteniRedove,
+  prevkluchi,
+  reshetka,
+  type KoeSeVizhda,
+} from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import {
@@ -52,20 +77,34 @@ import {
   mesetsatKatoTablitsa,
   type RedNaMesetsa,
 } from '../src/domein/mesetsat.js';
+import { narisuvayKalendara } from './kalendarat.js';
+import { narisuvayPoletata, zakachiPoletata } from './pole-s-formula.js';
+import { narisuvaySpravkite, zakachiSpravkite } from './spravki-schetovodstvo.js';
 import { stalboveNaMesetsite } from './diagrami.js';
+import {
+  IMENA_NA_GNEZDATA,
+  KAKVO_E_GNEZDOTO,
+  REDAT_NA_GNEZDATA,
+  otchetite,
+  sveriGnezdata,
+} from '../src/domein/gnezda.js';
+import { registarZaMeseca, sboroveNaRegistara } from '../src/domein/registar-naemi.js';
 import { narisuvayKoefitsientite, zakachiKoefitsientite } from './koefitsienti.js';
 import { legendata, zakachiPole } from './vhodni-problemi.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';
 import { formaDelo, slozhiShirinite, tablitsataSOcveteniPoleta, zakachiFormataNaDelo } from './gant.js';
-import type { Ogledalo, Razhod } from '../src/ogledalo/ogledalo.js';
+import type { Ogledalo, PogasenZapis, Razhod } from '../src/ogledalo/ogledalo.js';
 import { opitajStorno, zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
+import { blokNaKreditite, redPodRazhodite, zakachiKreditite } from './krediti.js';
+import { blokNaZaplatite, zakachiZaplatite } from './zaplati.js';
+import { blokNaTablitsaOtFayl, zakachiTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import { butonSIkona } from './ikoni.js';
-import { safT } from '../src/iznos/saf-t.js';
-import { SHEMA } from '../src/iznos/saf-t-shema.js';
 import { oboroti } from '../src/domein/glavna-kniga.js';
 import { svaliFayl } from './obshto.js';
+import { CHAKA_DUMA_ZA_DDS } from '../src/domein/prodazhbi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
   menyuOtZhivi,
@@ -124,6 +163,17 @@ let period: string | null = chetiEkranno<string | null>('smetki.period', null);
  * ЕКРАНА и нищо друго (правило 23) — сборовете пак се смятат.
  */
 let sTsifrite = chetiEkranno('smetki.tsifrite', true);
+/**
+ * КОЕ СЕ ВИЖДА тук · негово, 31.08: „Да и на двете места. Да може да се крие."
+ *
+ * Паметта е СВОЯ (`smetki.*`), а не споделена с Управление: това са два ЕКРАНА,
+ * и човек, който крие таблицата в Сметки, не иска да я скрие и в Управление.
+ * Общ ключ би пренесъл едното решение върху другото — тих инцидент.
+ */
+let vizhdanoTuk: KoeSeVizhda = {
+  tablitsa: chetiEkranno('smetki.dela.tablitsa', true),
+  diagrama: chetiEkranno('smetki.dela.diagrama', true),
+};
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -133,8 +183,35 @@ interface RedNaSmyatane {
 }
 let smyatane: RedNaSmyatane[] = [];
 
+/**
+ * РЕЗУЛТАТЪТ ОТ СВЕРКАТА С ИЗВЛЕЧЕНИЕТО · ПОГЛЕД, не запис (ADR-022).
+ *
+ * Живее в паметта на модула и умира при затваряне на екрана — както черновата
+ * на разхода. В Журнала влиза само СВЕРКАТА, и то с натискане на човек
+ * (правило 18): машината чете и предлага, записва човекът.
+ *
+ * СПИСЪК, не един резултат: файлът е ОБХВАТ, не месец (човек тегли „последните
+ * 90 дни"), и всеки покрит месец си има своя сверка. Оттам се смята и „колко
+ * месеца свети" един и същ ненамерен запис — негови думи, 11.08.
+ */
+let sverkiteNaIzvlechenieto: readonly RezultatNaSverkata[] = [];
+/**
+ * ИЗБРАНИЯТ ДОГОВОР при сверката · ПАМЕТ НА ЕКРАНА, нула събития (резен 36).
+ *
+ * Филтърът е ПОГЛЕД — кой ред гледам сега — а не решение за данните. Записан,
+ * той щеше да значи, че сверката е направена „за този договор", а тя е за
+ * целия месец (правило 23 · ADR-022).
+ */
+let dogovorNaSverkata = chetiEkranno('izvlechenie.dogovor', '');
+let greshkaIzvlechenie = '';
+let opIdSverkaIzvlechenie = crypto.randomUUID();
+/** отпечатъците на прочетените файлове · влизат в записаната сверка */
+let izvoriteNaIzvlechenieto: readonly string[] = [];
+/** колко реда не се разчетоха · БРОЯТ СЕ, не се преглъщат */
+let propusnatiOtIzvlechenieto = 0;
+
 /** Колоните на списъка „Разходи" — фините филтри в стил Уиндоус. */
-const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
+export const KOLONI_RAZHODI: KolonaSFiltar<Razhod>[] = [
   // Петата глава пише „ДДС" и колоната Е ДДС (правило 20 · ADR-014): дотук
   // беше описана като ДАТА и филтърът под „ДДС" предлагаше „Днес · Вчера ·
   // Тази седмица" — глава, която лъже какво стои под нея. Дата-филтърът пада
@@ -204,7 +281,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${formaSalda(o)}
 
-    <section class="karta">
+    <section data-sektsiya="smetki-period" class="karta">
       <div class="dyalglava"><h2>Период</h2><span>сметките се смятат наново за всеки месец</span></div>
       <form id="forma-period">
         <div class="poleta tesni">
@@ -220,7 +297,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       </form>
     </section>
 
-    <section>
+    <section data-sektsiya="smetki-smetki">
       <div class="dyalglava">
         <h2>Сметки</h2><span>${ekraniraj(mesets)}</span>
       </div>
@@ -231,9 +308,20 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         </div>
         ${s.redove.map(redNaSmetka).join('')}
       </div>
+      <p class="drebno" data-sektsiya="prodazhbi-granitsa"><b>Потокът „Продажби"
+      се СМЯТА</b> от вноските по сделка, всяка по СВОЯТА дата — сделка от март
+      с вноска през август е приход за август. Нищо не се записва: записан, той
+      щеше да се удвои с реалното плащане от извлечението.
+      <b>Връщането и неустойката НЕ влизат</b> — „Неустойките се превеждат
+      отделно, никакво нетиране"; те стоят на своя ред в Продажби.</p>
+      <p class="drebno" data-chaka-dds="${CHAKA_DUMA_ZA_DDS.length}"><b>И НЕ влиза
+      в ДДС-основата.</b> Дали доставката е облагаема зависи от това нова ли е
+      сградата и коя част е земя (чл. 45 ЗДДС) — счетоводна преценка, не
+      аритметика. Тихо начислени 20 % върху продажба на имот са глоба, не
+      закръгляне. Чака се: ${CHAKA_DUMA_ZA_DDS.map((x) => ekraniraj(x)).join(' · ')}.</p>
     </section>
 
-    <section>
+    <section data-sektsiya="smetki-dds">
       <div class="dyalglava">
         <h2>ДДС</h2>
         <span>отделни акумулатори по държава и сектор — не един общ</span>
@@ -265,11 +353,12 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     ${blokNaSverkataDDS(s.ddsSverka)}
 
+    ${blokNaSverkataSIzvlechenie(o, mesets)}
+
     ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
 
-    ${blokNaOditniyaFayl(o, mesets)}
 
-    <section>
+    <section data-sektsiya="smetki-sverka">
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
         ${GLAVA_NA_SVERKATA}
@@ -289,16 +378,21 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
 
+    ${narisuvaySpravkite(o, dnes)}
     ${narisuvayKoefitsientite(o, dnes)}
 
+    ${narisuvayKalendara(o, mesets, dnes)}
+
     ${blokMesetsatZaAgenta(o, mesets)}
+
+    ${blokNaZaplatite(o, dnes)}
 
     ${formaRazhod(o, mesets)}
 
     ${
       razhodi.length === 0
         ? ''
-        : `<section>
+        : `<section data-sektsiya="smetki-razhodi">
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
       ${poleZaTarsene('razhodi')}
       <div class="tablitsa" data-tablitsa="razhodi">
@@ -308,107 +402,24 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         ${
           filtriraniRazhodi.redove.length === 0
             ? PRAZEN_FILTAR
-            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, redNaRazhod)
+            : grupiranaTablitsa('razhodi', filtriraniRazhodi.redove, KOLONI_RAZHODI, dnes, (r) =>
+                redNaRazhod(r, o),
+              )
         }
       </div>
       ${redZaSkritoto(filtriraniRazhodi, 'razhodi')}
+      ${blokNaPogasenite(o, mesets)}
     </section>`
     }
 
+    ${blokNaTablitsaOtFayl()}
+
+    ${redPodRazhodite(o, mesets, dnes)}
+
+    ${blokNaKreditite(o, dnes)}
+
     ${kalkulator()}
   `;
-}
-
-/**
- * ОДИТНИЯТ ФАЙЛ · Главната книга и месечният XML за НАП (И96 т.11 · ADR-047).
- *
- * ЗАЩО В СМЕТКИ, а не в Настройки: това е ЧИСЛО ЗА МЕСЕЦ, като справката до
- * него. Файлът за юли се прави от юлските данни и се сверява срещу тях —
- * човекът, който гледа сметките на месеца, е и онзи, който подава.
- *
- * ЗАЩО ПРЕЧКИТЕ СА ГОРЕ: файл, обявен за готов, когато не е, се разбира от
- * акта. Затова първото, което се вижда, е какво още липсва — поименно.
- */
-function blokNaOditniyaFayl(o: Ogledalo, mesets: string): string {
-  const r = safT(o, mesets, new Date().toISOString());
-  const ob = oboroti(r.kniga);
-  return `
-    <section class="karta" data-sektsiya="saf-t">
-      <div class="dyalglava">
-        <h2>Одитен файл (SAF-T)</h2>
-        <span>схема ${ekraniraj(SHEMA.versiya)} · в сила от ${ekraniraj(SHEMA.vSilaOt)} · ${ekraniraj(mesets)}</span>
-      </div>
-
-      <div class="plochki">
-        <div class="plochka">
-          <span class="etiket">Статии</span>
-          <span class="chislo" translate="no">${r.broiStatii}</span>
-          <span class="pod">двустранни · дебит = кредит</span>
-        </div>
-        <div class="plochka">
-          <span class="etiket">Продажби · покупки</span>
-          <span class="chislo" translate="no">${r.broiProdazhbi} · ${r.broiPokupki}</span>
-          <span class="pod">фактурите в SourceDocuments</span>
-        </div>
-        <div class="plochka">
-          <span class="etiket">Плащания</span>
-          <span class="chislo" translate="no">${r.broiPlashtaniya}</span>
-          <span class="pod">Payments</span>
-        </div>
-        <div class="plochka${r.prechki.length === 0 ? '' : ' trevoga'}">
-          <span class="etiket">Готовност</span>
-          <span class="chislo" translate="no">${r.prechki.length === 0 ? '—' : r.prechki.length}</span>
-          <span class="pod">${r.prechki.length === 0 ? 'няма пречки за подаване' : 'пречки · изброени долу'}</span>
-        </div>
-      </div>
-
-      ${
-        r.prechki.length === 0
-          ? ''
-          : `<ul class="prechki">${r.prechki.map((p) => `<li>${ekraniraj(p)}</li>`).join('')}</ul>`
-      }
-
-      <div class="tablitsa">
-        <div class="glava saft">
-          <span>Сметка</span><span>Национален код</span>
-          <span class="suma">Дебит</span><span class="suma">Кредит</span>
-        </div>
-        ${
-          ob.length === 0
-            ? '<p class="prazno">Няма статии за този месец.<br>Празният месец пак дава валиден по структура файл.</p>'
-            : ob
-                .map(
-                  (r2) => `
-          <div class="red saft" translate="no">
-            <span class="kletka"><b>${ekraniraj(r2.smetka.nomer)}</b><span>${ekraniraj(r2.smetka.ime)}</span></span>
-            <span>${r2.smetka.nra === '' ? '<em>не е мапната</em>' : ekraniraj(r2.smetka.nra)}</span>
-            <span class="suma" data-st="${r2.debit_st}">${pishi(r2.debit_st)}</span>
-            <span class="suma" data-st="${r2.kredit_st}">${pishi(r2.kredit_st)}</span>
-          </div>`,
-                )
-                .join('')
-        }
-        <div class="red saft sbor" translate="no">
-          <span class="kletka"><b>Общо</b><span>дебит ↔ кредит</span></span>
-          <span></span>
-          <span class="suma" data-st="${r.kniga.debit_st}">${pishi(r.kniga.debit_st)}</span>
-          <span class="suma${r.kniga.debit_st === r.kniga.kredit_st ? '' : ' duljimo'}" data-st="${r.kniga.kredit_st}">${pishi(r.kniga.kredit_st)}</span>
-        </div>
-      </div>
-
-      <div class="deystviya">
-        ${butonSIkona({
-          ikona: 'iznos',
-          tekst: 'Свали файла',
-          title: 'Сглобява XML-а и го сваля на устройството',
-          klas: 'vtorichen',
-          danni: { 'svali-saft': mesets },
-        })}
-        <p class="drebno">Файлът се сглобява МЕСТНО и се сваля — приложението не го изпраща наникъде.
-        Той НЕ е проверен срещу самата XSD-схема на НАП: истинската проверка е ТЕСТОВОТО подаване
-        през портала им. ${ekraniraj(ZASHTO_I_NULATA)}</p>
-      </div>
-    </section>`;
 }
 
 /**
@@ -423,7 +434,7 @@ function formaSalda(o: Ogledalo): string {
   const trezor_st = saldoNa(o, 'trezor');
   const lipsvat = !o.salda.has('banka') || !o.salda.has('trezor');
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-salda" class="karta">
       <div class="dyalglava">
         <h2>Салда</h2>
         <span>ръчно начало · движенията идват от Журнала</span>
@@ -461,13 +472,31 @@ function formaSalda(o: Ogledalo): string {
 }
 
 /**
- * ОТЧЕТИТЕ · всяко число с формулата си под него.
+ * ГНЕЗДАТА · Отчети · Пари · Регистър, слети на едно място.
  *
- * Негова поръчка (И90): „ще правиш полета в Секция Отчети където ще се сложар
- * полета които да покзват тези стойности с формули между всички таблици."
+ * Негови ДВЕ изречения от 11.08, дословно:
  *
- * Затова тук няма голо число: под всяко стои от какво е съставено и откъде се
- * чете. Число, което никой не може да разглоби, е усещане с цифра пред себе си.
+ *   „Слей ги в гнезда (Отчети · Пари · Регистър)" *(р80·[50])*
+ *   „ОТЧЕТ СРЕДСТВА/ОТЧЕТ ФИНАНСИ" *(р80·[48])*
+ *
+ * Дотук на този екран стояха ЕДИН дял „Отчети" с четири полета, стълбовете на
+ * месеците и полетата с формула — един до друг, без имена помежду си; а
+ * Регистърът беше на съвсем друг екран. Тоест нито гнезда, нито двата
+ * поименни отчета: описът го броеше с нула попадения и беше прав.
+ *
+ * Сега трите гнезда носят НЕГОВИТЕ имена, в НЕГОВИЯ ред, а вътре в първото —
+ * двата поименни отчета, пак в неговия ред („СРЕДСТВА/ФИНАНСИ"). Имената се
+ * четат от `src/domein/gnezda.ts` и се БРОЯТ там; тук няма нито един низ, който
+ * да може да се разсинхронизира тихо (правило 17).
+ *
+ * ГРАНИЦАТА, КАЗАНА НА ГЛАС. Гнездото „Регистър" показва парите на наемите за
+ * периода и НИЩО повече: пълният Регистър — трите изгледа, групирането,
+ * месецът — се пише на Имоти. Посоката е една (правило 20): тук се ЧЕТЕ.
+ * Изключено ≠ липсващо, затова го пише на екрана, а не само тук.
+ *
+ * Негова поръчка отпреди (И90) остава в сила вътре в първото гнездо: „ще
+ * правиш полета в Секция Отчети където ще се сложар полета които да покзват
+ * тези стойности с формули между всички таблици." Затова тук няма голо число.
  */
 function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
   // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
@@ -479,27 +508,84 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
     new Date().toISOString(),
     stoynost_st === undefined ? {} : { stoynostNaSastoyanie_st: stoynost_st },
   );
+  const g = sveriGnezdata(r.poleta);
+  const sborNaNaemite = sboroveNaRegistara(registarZaMeseca(o, mesets, dnes));
   return `
-    <section>
+    <section data-sektsiya="smetki-otcheti">
       <div class="dyalglava">
-        <h2>Отчети</h2>
-        <span>${ekraniraj(mesets)} · всяко число с формулата си</span>
+        <h2>${REDAT_NA_GNEZDATA.map((k) => ekraniraj(IMENA_NA_GNEZDATA[k])).join(' · ')}</h2>
+        <span>${ekraniraj(mesets)} · три гнезда, всяко число с формулата си</span>
       </div>
-      <div class="otcheti">
-        ${r.poleta.map(poleNaOtcheta).join('')}
-      </div>
-      ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
-      <div class="tablitsa">
-        ${GLAVA_NA_SVERKATA}
-        <div class="red sverka otchet-sverka" translate="no">
-          <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
-          <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
-          <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
-          <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
-          <span>${znachkaNaSverkata(r.sverka.razlika_st === 0)}</span>
+
+      <div class="gnezdo" data-gnezdo="otcheti">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.otcheti)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.otcheti)}</span>
         </div>
+        ${otchetite(r.poleta)
+          .map(
+            (ot) => `
+          <article class="otchet" data-otchet="${ekraniraj(ot.klyuch)}">
+            <div class="otchetglava">
+              <h4>${ekraniraj(ot.ime)}</h4>
+              <span>${ekraniraj(ot.kakvo)}</span>
+            </div>
+            <div class="otcheti">
+              ${ot.poleta.map(poleNaOtcheta).join('')}
+            </div>
+          </article>`,
+          )
+          .join('')}
+        <div class="tablitsa">
+          ${GLAVA_NA_SVERKATA}
+          <div class="red sverka otchet-sverka" translate="no">
+            <span class="kletka"><b>Капиталът, сметнат по два пътя</b><span>съставки ↔ активи−задължения</span></span>
+            <span class="suma" data-st="${r.sverka.ot_sastavki_st}">${pishi(r.sverka.ot_sastavki_st)}</span>
+            <span class="suma" data-st="${r.sverka.aktivi_st - r.sverka.zadalzheniya_st}">${pishi(r.sverka.aktivi_st - r.sverka.zadalzheniya_st)}</span>
+            <span class="suma${r.sverka.razlika_st === 0 ? '' : ' duljimo'}" data-st="${r.sverka.razlika_st}">${pishi(r.sverka.razlika_st)}</span>
+            <span>${znachkaNaSverkata(r.sverka.razlika_st === 0)}</span>
+          </div>
+        </div>
+        <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+        <p class="drebno" data-gnezda-sverka="${g.razlika}">Влизат ${g.vhod} полета, излизат ${g.izhod} по двата отчета · разлика ${g.razlika}.${
+          g.bez_otchet.length === 0 ? '' : ` Без отчет: ${g.bez_otchet.map(ekraniraj).join(' · ')}.`
+        }${g.bez_pole.length === 0 ? '' : ` Разпределение без поле: ${g.bez_pole.map(ekraniraj).join(' · ')}.`}
+          Кое поле в кой отчет влиза е НАШЕ решение, не негово изречение.</p>
       </div>
-      <p class="drebno">Разликата се показва и когато е нула — проверената нула е различна от нулата, за която никой не е питал.</p>
+
+      <div class="gnezdo" data-gnezdo="pari">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.pari)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.pari)}</span>
+        </div>
+        ${stalboveNaMesetsite(mesechnitePari(o, dnes))}
+        ${narisuvayPoletata(o, mesets, dnes)}
+      </div>
+
+      <div class="gnezdo" data-gnezdo="registar">
+        <div class="gnezdoglava">
+          <h3>${ekraniraj(IMENA_NA_GNEZDATA.registar)}</h3>
+          <span>${ekraniraj(KAKVO_E_GNEZDOTO.registar)}</span>
+        </div>
+        <div class="plochki">
+          <div class="plochka">
+            <span class="etiket">Начислено</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="nachisleno">${pishi(sborNaNaemite.nachisleno_st)}</span>
+            <span class="pod">${sborNaNaemite.redove} ${sborNaNaemite.redove === 1 ? 'ред' : 'реда'}</span>
+          </div>
+          <div class="plochka">
+            <span class="etiket">Събрано</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="plateno">${pishi(sborNaNaemite.plateno_st)}</span>
+            <span class="pod">по вземанията</span>
+          </div>
+          <div class="plochka${sborNaNaemite.ostatak_st === 0 ? '' : ' trevoga'}">
+            <span class="etiket">Остава</span>
+            <span class="chislo" translate="no" data-gnezdo-registar="ostatak">${pishi(sborNaNaemite.ostatak_st)}</span>
+            <span class="pod">${sborNaNaemite.prosrocheni === 0 ? 'нищо просрочено' : `${sborNaNaemite.prosrocheni} просрочени`}</span>
+          </div>
+        </div>
+        <p class="drebno">Пълният Регистър — трите изгледа, групирането и месецът — се пише на Имоти. Тук се ЧЕТЕ: посоката е една.</p>
+      </div>
     </section>`;
 }
 
@@ -513,6 +599,29 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
  * Копието се ЧЕТЕ: без форма, без филтри, без сгъвачи — посоката е една
  * (правило 20), пише се в Управление. Тактът е закован на месец: сверката
  * гледа месеци, не дни.
+ */
+/**
+ * ЗАЩО НЕ `.deystviya` за двата превключвателя на изгледа.
+ *
+ * Класът пуска ГРУПИРАНЕТО със стрелкичка (ADR-057) — няколко действия на едно
+ * място стават един бутон. Но това не са действия върху данни, а превключватели
+ * на ИЗГЛЕД: свити зад стрелка, те се скриват точно от онзи, който ги търси.
+ * Първото писане ги сложи в `.deystviya` и проходът ги намери СКРИТИ — намери и
+ * трети бутон, самата стрелкичка.
+ *
+ * И ЧЕТВЪРТИ, от същия род: обвивките на диаграмата и таблицата станаха преки
+ * деца на скролиращата кутия и носеха `.dyalglava`, но НЯМАХА ключ — тоест две
+ * секции без ключ, които проход §68 брои като изчезнали при разместване. Ключ
+ * им се даде: те наистина СА секции, щом се местят отделно.
+ *
+ * И ТРЕТИ: белегът им беше `data-sektsiya`, сложен ВЪТРЕ в секцията „Делата".
+ * Ключът на секцията е един на секция и един на екран (проход §68) — вложен, той
+ * дава два еднакви ключа. Изгледът получи СВОЙ белег.
+ *
+ * И втори капан, платен веднага след първия: обяснението стоеше като HTML
+ * коментар ВЪТРЕ в шаблонния низ и носеше обратни апострофи. Те затварят низа —
+ * страницата падна с „.deystviya is not a function". Обяснението за кода живее
+ * в кода, не в разметката.
  */
 /**
  * МЕСЕЦЪТ ЗА АГЕНТА · това, и НИЩО друго, тръгва навън (резен 15б · ADR-005).
@@ -533,7 +642,7 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
 function blokMesetsatZaAgenta(o: Ogledalo, mesets: string): string {
   const t = mesetsatKatoTablitsa(o, mesets, new Date().toISOString());
   return `
-    <section>
+    <section data-sektsiya="smetki-mesetsat">
       <div class="dyalglava">
         <h2>Месецът за агента</h2>
         <span>това — и нищо друго — напуска устройството</span>
@@ -581,16 +690,18 @@ function redNaMesetsa(r: RedNaMesetsa): string {
 }
 
 function blokDelata(o: Ogledalo, dnes: string): string {
-  const dela = podredi([...o.dela.values()], dnes);
+  const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '';
   const r = reshetka(dela, 'mesets', dnes);
   const parvata = r.koloni[0]!;
   const poslednata = r.koloni[r.koloni.length - 1]!;
-  const sumi = obobshtenRed(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  // КОПИЕТО в Сметки чете БЕЗ разбивка: разрезът е лост на Управление, а тук
+  // таблицата е за сверка (И92 т.4). Един ред влиза, един ред излиза.
+  const sumi = obobshteniRedove(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
   // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
   // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `
-    <section>
+    <section data-sektsiya="smetki-dela">
       <div class="dyalglava">
         <h2>Делата · копието от Управление</h2>
         <span>същата таблица · със същата форма за ново дело (И95)</span>
@@ -600,9 +711,24 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         <span class="vazm-tyalo"><b>Приходите и Разходите в решетката</b>
         <span>скриването пипа екрана и нищо друго — сборовете ПАК се смятат (правило 23)</span></span>
       </label>
+      <div class="lostove" data-izgled-na-delata>
+        <button type="button" id="smetki-kam-diagrama" class="vtorichen"${
+          mozheDaSeSkrie(vizhdanoTuk, 'diagrama') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona(vizhdanoTuk, 'diagrama'))}</button>
+        <button type="button" id="smetki-kam-tablitsa" class="vtorichen"${
+          mozheDaSeSkrie(vizhdanoTuk, 'tablitsa') ? '' : ' disabled'
+        }>${ekraniraj(dumataNaButona(vizhdanoTuk, 'tablitsa'))}</button>
+        ${
+          mozheDaSeSkrie(vizhdanoTuk, 'tablitsa') && mozheDaSeSkrie(vizhdanoTuk, 'diagrama')
+            ? ''
+            : `<span class="drebno" data-posleden-izgled>${ekraniraj(
+                prevkluchi(vizhdanoTuk, vizhdanoTuk.tablitsa ? 'tablitsa' : 'diagrama').otkaz,
+              )}</span>`
+        }
+      </div>
     </section>
-    ${narisuvayDiagrama(dela, r, dnes)}
-    ${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}
+    ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes)}</div>` : ''}
+    ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
     ${formaDelo(o, dnes)}`;
 }
 
@@ -619,7 +745,7 @@ function poleNaOtcheta(p: Pole): string {
           .map(
             (c) => `<li>
               <span class="ime">${ekraniraj(c.ime)}</span>
-              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}">${pishi(c.suma_st)}</span>
+              <span class="suma${c.suma_st < 0 ? ' duljimo' : ''}" data-st="${c.suma_st}">${pishi(c.suma_st)}</span>
               <span class="otkade">${ekraniraj(c.otkade)}</span>
             </li>`,
           )
@@ -643,7 +769,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
     ]),
   );
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-nov-razhod" class="karta">
       <div class="dyalglava"><h2>Нов разход</h2><span>сумата е обща цена с ДДС — както при наема</span></div>
       <form id="forma-razhod">
         <div class="poleta">
@@ -735,7 +861,68 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
     </section>`;
 }
 
-function redNaRazhod(r: Razhod): string {
+/**
+ * СТОРНИРАНОТО СЕ ВИЖДА · „Сиво + зачертано + малък знак ★" (резен 27 · ADR-087).
+ *
+ * Журналът пази и записа, и сторното му завинаги, но Огледалото ПРЕСКАЧА
+ * погасеното — и на екрана редът просто изчезваше. Човек не можеше да различи
+ * „сторнирано" от „никога не е било записано".
+ *
+ * ═══ ТЕ НЕ СА В СБОРА, И ТОВА Е СТРУКТУРНО ═══
+ *
+ * Сборът чете от `o.razhodi`, който НЕ ги съдържа. Тоест инвариантът не се
+ * пази с дисциплина, а с устройство: няма как да влязат, дори да се опита.
+ *
+ * ═══ ПОКАЗВАТ СЕ ПО ПОДРАЗБИРАНЕ ═══
+ *
+ * Негово е „сиво + зачертано", не „скрито". Скриването е ЛИЧНО и минава през
+ * паметта на екрана — нула събития (ADR-022 · правило 23).
+ */
+function blokNaPogasenite(o: Ogledalo, mesets: string): string {
+  const nashite = o.pogasenite.filter(
+    // ПО ДАТАТА НА ЗАПИСА, не по времето на записването · разход с дата 12.11,
+    // въведен днес, принадлежи на НОЕМВРИ (ADR-087 §7).
+    (x) => x.vid === 'razhod' && x.data.slice(0, 7) === mesets,
+  );
+  const pokazani = chetiEkranno('razhodi.pogasenite', true);
+  if (nashite.length === 0) {
+    return `<p class="drebno" data-pogaseni="0">Нито един сторниран разход за този
+    месец. Нулата се КАЗВА — иначе „няма сторнирани" е неразличимо от „не е
+    гледано".</p>`;
+  }
+  return `
+    <div class="deystviya" data-sektsiya="razhodi-pogasenite" data-pogaseni="${nashite.length}">
+      <button type="button" class="vtorichen malak" id="pogaseni-prevkl">${
+        pokazani ? 'Скрий сторнираните' : 'Покажи сторнираните'
+      }</button>
+      <span class="drebno">${nashite.length} ${
+        nashite.length === 1 ? 'сторниран ред' : 'сторнирани реда'
+      } · НЕ влизат в сбора</span>
+    </div>
+    ${
+      pokazani
+        ? `<div class="tablitsa" data-tablitsa="razhodi-pogaseni">
+      ${nashite.map(redNaPogasen).join('')}
+    </div>`
+        : ''
+    }`;
+}
+
+/** Един зачертан ред · трите носителя стоят в CSS-а, думите — тук. */
+function redNaPogasen(x: PogasenZapis): string {
+  return `<div class="red razhod pogasen" translate="no" data-pogasen="${x.seq}">
+    <span class="kletka"><b>${ekraniraj(x.opis === '' ? x.type : x.opis)}</b><span>★ сторниран${
+      x.storniranOt > 0 ? ` с № ${x.storniranOt}` : ''
+    }${x.prichina === '' ? '' : ` · „${ekraniraj(x.prichina)}"`}</span></span>
+    <span class="suma">${x.suma_st === undefined ? '' : pishi(x.suma_st)}</span>
+    <span>${ekraniraj(x.data)}</span>
+    <span>${ekraniraj(x.actor)}</span>
+    <span></span>
+    <span></span>
+  </div>`;
+}
+
+function redNaRazhod(r: Razhod, o: Ogledalo): string {
   const a = akumulator(r.sektor);
   // Ставката е НА РЕДА; секторът само подсказва, когато редът мълчи.
   const stavka = stavkaNaReda(r.sektor, r.stavka);
@@ -753,6 +940,7 @@ function redNaRazhod(r: Razhod): string {
       <span class="suma" data-st="${razbivka.dds_st}">${kakvoPishe(razbivka.dds_st)}</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-razhod': String(r.seq) } })}
+        ${butonNaDokumentite('razhod', r.id, broyDokumenti(o, 'razhod', r.id))}
         ${butonIstoriya('razhod', r.id)}
       </span>
     </div>`;
@@ -783,7 +971,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
   const razlikaPlateno = spravka ? plateno_st - spravka.deklarirano_st : 0;
 
   return `
-    <section class="karta${zakluchen ? ' izbrana' : ''}">
+    <section data-sektsiya="smetki-spravka" class="karta${zakluchen ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>Справка и внасяне</h2>
         <span>${
@@ -897,7 +1085,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
     r.dds_ot_fakturi_st === 0 && r.dds_ot_izvlecheniya_st === 0 && r.nesvarsheni.length === 0;
 
   return `
-    <section class="karta${r.svereno || bezDvizheniya ? '' : ' izbrana'}">
+    <section data-sektsiya="smetki-sverka-dds" class="karta${r.svereno || bezDvizheniya ? '' : ' izbrana'}">
       <div class="dyalglava">
         <h2>Сверка на ДДС</h2>
         <span>фактури ↔ извлечения ↔ внесено</span>
@@ -966,7 +1154,7 @@ function blokNaSverkataDDS(r: RezultatSverka): string {
 
 function redNaSmetka(r: RedSmetka): string {
   return `
-    <div class="red smetka" translate="no">
+    <div class="red smetka" translate="no" data-potok="${ekraniraj(r.klyuch)}">
       <span class="kletka"><b>${ekraniraj(r.ime)}</b><span>${ekraniraj(r.belezhka)}</span></span>
       <span><span class="znachka ${r.posoka === 'приход' ? 'dobre' : 'tiha'}">${r.posoka}</span></span>
       <span>${r.broi}</span>
@@ -1000,7 +1188,7 @@ function kalkulator(): string {
   const sborObshta = redove.reduce((s, r) => s + r.razbivka.obshta_st, 0);
 
   return `
-    <section class="karta">
+    <section data-sektsiya="smetki-kalkulator" class="karta">
       <div class="dyalglava"><h2>Калкулатор</h2><span>обща цена → основа и ДДС</span></div>
       <form id="forma-smyatane">
         <div class="poleta">
@@ -1068,26 +1256,18 @@ export function zakachiSmetki(
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
 
-  /**
-   * ОДИТНИЯТ ФАЙЛ (И96 т.11) · сглобява се при НАТИСКАНЕ, не при рисуване.
-   *
-   * XML-ът за месец с хиляди записи е мегабайти низ; сглобен при всяко
-   * прерисуване, той щеше да струва на всяко натискане на клавиш. Числата
-   * горе идват от същата функция, но екранът ги иска и без да се сваля —
-   * затова се сглобява два пъти само когато човекът наистина поиска файла.
-   */
-  koren.querySelector<HTMLButtonElement>('[data-svali-saft]')?.addEventListener('click', async (e) => {
-    const mesets = (e.currentTarget as HTMLElement).dataset['svaliSaft']!;
-    const r = safT(await k.deystviya.ogledalo(), mesets, new Date().toISOString());
-    svaliFayl(new Blob([r.xml], { type: 'application/xml' }), r.ime);
-    k.vest(
-      r.prechki.length === 0 ? 'dobre' : 'zle',
-      r.prechki.length === 0
-        ? `Файлът ${r.ime} е свален · ${r.broiStatii} статии`
-        : `Файлът е свален, но ${r.prechki.length} пречки още стоят — виж описа над бутона.`,
-    );
-  });
-  zakachiKoefitsientite(koren, prerisuvay);
+  zakachiKoefitsientite(koren, k, prerisuvay);
+  zakachiSpravkite(koren, prerisuvay);
+  // СВОИТЕ ПОЛЕТА С ФОРМУЛА · „с формули между всички таблици" (резен 42).
+  // Месецът е СЪЩИЯТ като на Сметки: изворите се смятат за конкретен период,
+  // и поле, проверено срещу друг месец, не е проверено.
+  zakachiPoletata(koren, k, period ?? new Date().toISOString().slice(0, 7), prerisuvay);
+  // КРЕДИТИТЕ · таблицата, планът по дати и плащането (резен 19 · ADR-079).
+  zakachiKreditite(koren, k, prerisuvay);
+  // ЗАПЛАТИТЕ · седмицата, кешът и следата (резен 20 · ADR-080).
+  zakachiZaplatite(koren, k, prerisuvay);
+  // ТАБЛИЦА ОТ ФАЙЛ · експериментът с Фактури (резен 21 · ADR-081).
+  zakachiTablitsaOtFayl(koren, k, prerisuvay);
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · доставчикът и „за какво".
   zakachiMenyuta(koren, rechnitsite(RECHNIK_RAZHOD));
 
@@ -1102,9 +1282,111 @@ export function zakachiSmetki(
 
   // И95 · същата форма за дело работи и оттук — един механизъм, два екрана.
   zakachiFormataNaDelo(koren, k, prerisuvay);
+  // ── СВЕРКАТА С ИЗВЛЕЧЕНИЕТО (резен 17в · ADR-074) ───────────────────────
+  //
+  // Бутонът само ОТВАРЯ прозорчето: файлът се избира поотделно, от човек.
+  // Нищо не се обхожда и нищо не тръгва навън.
+  koren.querySelector<HTMLButtonElement>('#izbor-izvlechenie')?.addEventListener('click', () => {
+    koren.querySelector<HTMLInputElement>('#fayl-izvlechenie')?.click();
+  });
+
+  koren
+    .querySelector<HTMLInputElement>('#fayl-izvlechenie')
+    ?.addEventListener('change', async (e) => {
+      const vhod = e.target as HTMLInputElement;
+      const faylove = [...(vhod.files ?? [])];
+      if (faylove.length === 0) return;
+      try {
+        const prochetenoto = await prochetiIzvlecheniyata(faylove);
+        const slyata = prochetenoto.slyata;
+        const o = await k.deystviya.ogledalo();
+        sverkiteNaIzvlechenieto = sverkaPoMesetsi({
+          zapisiNaMesetsa: (m) => zapisiteNaKnigata(o, m),
+          izvlechenie: slyata.redove,
+          ot: slyata.ot,
+          do: slyata.do,
+        });
+        // НОВ ключ на ново четене · същият ключ би върнал СТАРАТА сверка при
+        // втори файл (правило 20: `opId` носи ДЕЙСТВИЕТО).
+        opIdSverkaIzvlechenie = crypto.randomUUID();
+        greshkaIzvlechenie = '';
+        izvoriteNaIzvlechenieto = prochetenoto.otpechatatsi;
+        propusnatiOtIzvlechenieto = prochetenoto.propusnati;
+      } catch (err) {
+        sverkiteNaIzvlechenieto = [];
+        greshkaIzvlechenie = dumiZaGreshka(err);
+      }
+      vhod.value = '';
+      await prerisuvay();
+    });
+
+  koren
+    .querySelector<HTMLButtonElement>('#zapishi-sverka-izvlechenie')
+    ?.addEventListener('click', async () => {
+      const r = sverkataNaPokazaniyaMesets();
+      if (!r) return;
+      const s = sverkataNaIzvlechenieto(r, new Date().toISOString());
+      try {
+        await k.deystviya.zapishiSverka(
+          `sverka-izvlechenie-${r.period}-${opIdSverkaIzvlechenie}`,
+          {
+            buton: 'Сверка с извлечението',
+            period: r.period,
+            vhod_st: r.vhod_st,
+            izhod_st: r.izhod_st,
+            razlika_st: s.razlika,
+            izvori: izvoriteNaIzvlechenieto,
+            propusnati: propusnatiOtIzvlechenieto,
+          },
+          { opId: `sverka-izvlechenie:${opIdSverkaIzvlechenie}` },
+        );
+        greshkaIzvlechenie = '';
+        k.vest('dobre', `Сверката е записана · разлика ${pishi(s.razlika)}`);
+      } catch (err) {
+        greshkaIzvlechenie = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+
+  koren.querySelector<HTMLButtonElement>('#zabravi-izvlechenie')?.addEventListener('click', async () => {
+    // МАХА се от ЕКРАНА, не от Журнала: записаната сверка си остава записана.
+    sverkiteNaIzvlechenieto = [];
+    greshkaIzvlechenie = '';
+    await prerisuvay();
+  });
+
+  // ФИЛТЪРЪТ ПО ДОГОВОР · ПОГЛЕД, не решение: нула събития (правило 23).
+  koren
+    .querySelector<HTMLSelectElement>('#izvlechenie-dogovor')
+    ?.addEventListener('change', async (e) => {
+      dogovorNaSverkata = (e.target as HTMLSelectElement).value;
+      zapomniEkranno('izvlechenie.dogovor', dogovorNaSverkata);
+      await prerisuvay();
+    });
+
   koren.querySelector<HTMLInputElement>('#klyuch-tsifrite')?.addEventListener('change', async (e) => {
     sTsifrite = (e.target as HTMLInputElement).checked;
     zapomniEkranno('smetki.tsifrite', sTsifrite);
+    await prerisuvay();
+  });
+
+  // ДВАТА БУТОНА · същото решение като в Управление (`prevkluchi`), друга памет.
+  const skriyTuk = (koe: 'tablitsa' | 'diagrama') => async () => {
+    const r = prevkluchi(vizhdanoTuk, koe);
+    if (r.otkaz !== '') return;
+    vizhdanoTuk = r.sled;
+    zapomniEkranno('smetki.dela.tablitsa', vizhdanoTuk.tablitsa);
+    zapomniEkranno('smetki.dela.diagrama', vizhdanoTuk.diagrama);
+    await prerisuvay();
+  };
+  koren.querySelector<HTMLButtonElement>('#smetki-kam-diagrama')
+    ?.addEventListener('click', skriyTuk('diagrama'));
+  koren.querySelector<HTMLButtonElement>('#smetki-kam-tablitsa')
+    ?.addEventListener('click', skriyTuk('tablitsa'));
+
+  // СКРИВАНЕТО НА СТОРНИРАНИТЕ Е ЛИЧНО · памет на екрана, нула събития.
+  koren.querySelector<HTMLButtonElement>('#pogaseni-prevkl')?.addEventListener('click', async () => {
+    zapomniEkranno('razhodi.pogasenite', !chetiEkranno('razhodi.pogasenite', true));
     await prerisuvay();
   });
 
@@ -1310,3 +1592,253 @@ export function zakachiSmetki(
   // ── сторно на разход · същата обиколка като в Имоти и Пари ───────────────
   zakachiStornoButoni(koren, k, [['data-storno-razhod', 'разходът']], prerisuvay);
 }
+
+/**
+ * СВЕРКАТА С ИЗВЛЕЧЕНИЕТО · книгата срещу банката (резен 17в · ADR-074).
+ *
+ * Файлът се ЧЕТЕ и се забравя: нищо от извлечението не влиза в Журнала —
+ * банката го казва, не ние (същото решение като при отговора на Google,
+ * ADR-064). В Журнала влиза само СВЕРКАТА, и то през събитието, което вече
+ * съществува.
+ *
+ * „Ако не ги намира в сверката в Извлечение СВЕТВА" — негови думи, 11.08.
+ * Затова находката не е ред в списък, а ЧИСЛО горе, и редът носи цвят.
+ */
+function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
+  const zapisi = zapisiteNaKnigata(o, mesets);
+  const r = sverkiteNaIzvlechenieto.find((x) => x.period === mesets) ?? null;
+  if (r === null) {
+    return `
+    <section data-sektsiya="smetki-izvlechenie">
+      <div class="dyalglava">
+        <h2>Сверка с извлечението</h2>
+        <span>книгата срещу банката · ${zapisi.length} ${zapisi.length === 1 ? 'запис' : 'записа'} за ${ekraniraj(mesets)}</span>
+      </div>
+      <p class="drebno">Извлечението се ЧЕТЕ и се забравя — нито един негов ред не
+      влиза в Журнала. Банката е ЧУЖД факт; в Журнала влиза само сверката, с
+      разликата, дори когато е нула.</p>
+      <p class="drebno">Търсят се <b>по банка</b> и <b>с карта</b>. Платеното
+      <b>в брой</b> НЕ се търси и не свети — то няма банкова следа и отива в
+      списъка за счетоводството.</p>
+      ${
+        greshkaIzvlechenie === ''
+          ? ''
+          : `<p class="greshka" id="greshka-izvlechenie">${ekraniraj(greshkaIzvlechenie)}</p>`
+      }
+      ${butonSIkona({
+        ikona: 'vnos',
+        tekst: 'Избери извлечение',
+        title: 'Чете файла · нищо не се качва и нищо не се пази',
+        klas: 'glaven',
+        id: 'izbor-izvlechenie',
+      })}
+      <input translate="no" type="file" id="fayl-izvlechenie" multiple hidden>
+    </section>`;
+  }
+
+  const nahodki = broyNahodki(r);
+  const spisatsi = spisatsiteZaSchetovodstvoto(r);
+  const s = sverkataNaIzvlechenieto(r, new Date().toISOString());
+
+  // ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР *(р84·[28])* · стеснява ПОГЛЕДА, не сверката.
+  const dogovori = dogovoriteVSverkata(r, (id) => o.naemi.get(id)?.naemetel ?? '');
+  // Изборът може да сочи договор, който този месец го няма — тогава пада на
+  // „всички", вместо да остави празен екран без обяснение.
+  const izbran = dogovori.some((d) => d.id === dogovorNaSverkata) ? dogovorNaSverkata : BEZ_DOGOVOR;
+  const stesnena = stesniPoDogovor(r, izbran);
+  const svChasti = sveriStesnyavaneto(r, dogovori, new Date().toISOString());
+
+  return `
+    <section data-sektsiya="smetki-izvlechenie" class="karta${nahodki === 0 ? '' : ' izbrana'}">
+      <div class="dyalglava">
+        <h2>Сверка с извлечението</h2>
+        <span>${ekraniraj(r.ot)} → ${ekraniraj(r.do)} · ${r.redove.length} ${r.redove.length === 1 ? 'запис' : 'записа'}</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka${nahodki === 0 ? '' : ' duljimo'}" data-plochka="Находки">
+          <span class="ime">НАХОДКИ</span>
+          <b data-nahodki>${nahodki}</b>
+          <span class="pod">${nahodki === 0 ? 'всичко се среща' : 'светят и чакат човек'}</span>
+        </div>
+        <div class="plochka" data-plochka="Вход">
+          <span class="ime">ВХОД · КНИГАТА</span>
+          <b data-st="${r.vhod_st}">${pishi(r.vhod_st)}</b>
+          <span class="pod">целият месец, кешът включен</span>
+        </div>
+        <div class="plochka" data-plochka="Изход">
+          <span class="ime">ИЗХОД · ОБЯСНЕНОТО</span>
+          <b data-st="${r.izhod_st}">${pishi(r.izhod_st)}</b>
+          <span class="pod">сверено + в брой</span>
+        </div>
+        <div class="plochka${s.nared ? '' : ' duljimo'}" data-plochka="Разлика">
+          <span class="ime">РАЗЛИКА</span>
+          <b data-st="${s.razlika}">${pishi(s.razlika)}</b>
+          <span class="pod">${s.nared ? 'сверката затваря' : 'необяснени пари'}</span>
+        </div>
+      </div>
+
+      <p class="drebno">${ekraniraj(ZASHTO_I_NULATA)}</p>
+
+      ${
+        dogovori.length === 0
+          ? ''
+          : `<div class="poleta tesni">
+              <div class="pole">
+                <label for="izvlechenie-dogovor">Договор</label>
+                <select translate="no" id="izvlechenie-dogovor" data-broy-dogovori="${dogovori.length}">
+                  <option value=""${izbran === BEZ_DOGOVOR ? ' selected' : ''}>всички</option>
+                  ${dogovori
+                    .map(
+                      (d) =>
+                        `<option value="${ekraniraj(d.id)}"${d.id === izbran ? ' selected' : ''}>${ekraniraj(
+                          d.ime || d.id,
+                        )} · ${d.broy}</option>`,
+                    )
+                    .join('')}
+                </select>
+              </div>
+            </div>
+            <p class="drebno" data-chasti-sverka>Сверка вход↔изход: частите по договор плюс онова
+            БЕЗ договор дават ${pishi(svChasti.izhod)} срещу ${pishi(svChasti.vhod)} в книгата,
+            разлика ${pishi(svChasti.razlika)}.</p>`
+      }
+
+      <div class="tablitsa" data-tablitsa="izvlechenie">
+        <div class="glava izvlechenie">
+          <span data-kolona="koy" data-ime="Кой">Кой</span>
+          <span data-kolona="data" data-ime="Дата">Дата</span>
+          <span data-kolona="nachin" data-ime="Начин">Начин</span>
+          <span data-kolona="suma" data-ime="Сума">Сума</span>
+          <span data-kolona="sadba" data-ime="Какво казва извлечението">Какво казва извлечението</span>
+        </div>
+        ${stesnena.redove.map((x) => redNaSverkataSIzvlechenie(x, mesetsiSvetene(sverkiteNaIzvlechenieto, x.zapis.klyuch))).join('')}
+      </div>
+
+      ${
+        izbran === BEZ_DOGOVOR
+          ? ''
+          : `<p class="drebno" data-stesneno>Показан е САМО договорът
+             „${ekraniraj(o.naemi.get(izbran)?.naemetel ?? izbran)}" ·
+             <b data-stesnen-vhod="${stesnena.vhod_st}">${pishi(stesnena.vhod_st)}</b> от
+             <b>${pishi(r.vhod_st)}</b>${
+               stesnena.skritiOtBankata === 0
+                 ? ''
+                 : ` · <b data-skriti-ot-bankata="${stesnena.skritiOtBankata}">${stesnena.skritiOtBankata}</b>
+                    ${stesnena.skritiOtBankata === 1 ? 'ред' : 'реда'} само в банката ${
+                      stesnena.skritiOtBankata === 1 ? 'е скрит' : 'са скрити'
+                    }: банков ред без насрещен запис няма договор`
+             }.</p>`
+      }
+
+      ${
+        r.samoVBankata.length === 0
+          ? ''
+          : `<p class="drebno"><b data-samo-v-bankata>${r.samoVBankata.length}</b>
+             ${r.samoVBankata.length === 1 ? 'ред е' : 'реда са'} в извлечението, но
+             ${r.samoVBankata.length === 1 ? 'няма' : 'нямат'} насреща си запис в книгата.
+             Това е ДРУГА находка: пари са минали, а книгата мълчи.</p>
+             <div class="tablitsa" data-tablitsa="samo-v-bankata">
+               <div class="glava izvlechenie">
+                 <span data-kolona="koy" data-ime="Кой">Кой</span>
+                 <span data-kolona="data" data-ime="Дата">Дата</span>
+                 <span data-kolona="nachin" data-ime="Посока">Посока</span>
+                 <span data-kolona="suma" data-ime="Сума">Сума</span>
+                 <span data-kolona="sadba" data-ime="Какво казва книгата">Какво казва книгата</span>
+               </div>
+               ${r.samoVBankata
+                 .map(
+                   (x) => `
+                 <div class="red izvlechenie duljimo" translate="no">
+                   <span class="kletka"><b>${ekraniraj(x.koy)}</b></span>
+                   <span class="kletka"><span>${ekraniraj(x.data)}</span></span>
+                   <span class="kletka"><span>${x.posoka === 'prihod' ? 'навътре' : 'навън'}</span></span>
+                   <span class="suma" data-st="${x.suma_st}">${pishi(x.suma_st)}</span>
+                   <span class="kletka"><span>няма такъв запис</span></span>
+                 </div>`,
+                 )
+                 .join('')}
+             </div>`
+      }
+
+      <div class="dyalglava">
+        <h2>Списъците за счетоводството</h2>
+        <span>платеното без банкова следа · негови думи</span>
+      </div>
+      <p class="drebno">„За останалите се прави списък за счетоводството — единият
+      за платени фактури на ръка без карта, и приход на ръка от наем без банка."
+      Критерият е ЕДИН — платено без банкова следа; посоката само казва накъде
+      са тръгнали парите.</p>
+      <div class="plochki">
+        <div class="plochka" data-plochka="Платено на ръка">
+          <span class="ime">ПЛАТЕНИ ФАКТУРИ НА РЪКА</span>
+          <b data-st="${spisatsi.platenoNaRaka_st}" data-plateno-na-raka="${spisatsi.platenoNaRaka.length}">${pishi(spisatsi.platenoNaRaka_st)}</b>
+          <span class="pod">${spisatsi.platenoNaRaka.length} ${spisatsi.platenoNaRaka.length === 1 ? 'ред' : 'реда'} · без карта</span>
+        </div>
+        <div class="plochka" data-plochka="Приход на ръка">
+          <span class="ime">ПРИХОД НА РЪКА ОТ НАЕМ</span>
+          <b data-st="${spisatsi.prihodNaRaka_st}" data-prihod-na-raka="${spisatsi.prihodNaRaka.length}">${pishi(spisatsi.prihodNaRaka_st)}</b>
+          <span class="pod">${spisatsi.prihodNaRaka.length} ${spisatsi.prihodNaRaka.length === 1 ? 'ред' : 'реда'} · без банка</span>
+        </div>
+      </div>
+
+      <span class="butoni">
+        ${butonSIkona({
+          ikona: 'sverka',
+          tekst: 'Запиши сверката',
+          title: 'Записва вход, изход и разликата · дори когато е нула',
+          klas: 'glaven',
+          id: 'zapishi-sverka-izvlechenie',
+        })}
+        ${butonSIkona({
+          ikona: 'mahni',
+          tekst: 'Затвори',
+          title: 'Маха резултата от екрана · нищо не се трие',
+          id: 'zabravi-izvlechenie',
+        })}
+      </span>
+      ${
+        greshkaIzvlechenie === ''
+          ? ''
+          : `<p class="greshka" id="greshka-izvlechenie">${ekraniraj(greshkaIzvlechenie)}</p>`
+      }
+      <input translate="no" type="file" id="fayl-izvlechenie" multiple hidden>
+    </section>`;
+}
+
+function redNaSverkataSIzvlechenie(x: RedNaSverkata, mesetsi: number): string {
+  const sveti = x.sadba === 'lipsva' || x.sadba === 'nyakolko';
+  return `
+    <div class="red izvlechenie${sveti ? ' duljimo' : ''}" translate="no" data-sadba="${x.sadba}">
+      <span class="kletka"><b>${ekraniraj(x.zapis.koy)}</b><span>${x.zapis.posoka === 'prihod' ? 'приход' : 'разход'}</span></span>
+      <span class="kletka"><span>${ekraniraj(x.zapis.data)}</span></span>
+      <span class="kletka"><span>${ekraniraj(imeNaNachina(x.zapis.nachin))}</span></span>
+      <span class="suma" data-st="${x.zapis.suma_st}">${pishi(x.zapis.suma_st)}</span>
+      <span class="kletka"><span>${ekraniraj(IMENA_NA_SADBITE[x.sadba])}${
+        x.sadba === 'nyakolko' ? ` (${x.sreshtu.length})` : ''
+      }</span>${
+        // „и броя мрюесеци се смятат" · вторият месец подред вече не е случайност
+        mesetsi > 1
+          ? `<span class="znachka trevoga" data-svetene="${mesetsi}">свети ${mesetsi} месеца</span>`
+          : ''
+      }</span>
+    </div>`;
+}
+
+/**
+ * СВЕРКАТА НА ПОКАЗАНИЯ МЕСЕЦ · записва се ТОЙ, не целият файл.
+ *
+ * Файл за три месеца дава ТРИ сверки. Записани наведнъж, те биха дали едно
+ * число за три месеца — и когато не затвори, никой няма да знае кой месец е
+ * счупеният (същата причина като при партидите в `sveryavane.ts`).
+ */
+function sverkataNaPokazaniyaMesets(): RezultatNaSverkata | null {
+  const mesets = period ?? new Date().toISOString().slice(0, 7);
+  return sverkiteNaIzvlechenieto.find((x) => x.period === mesets) ?? null;
+}
+
+/** Надписът на начина · от единствения му дом (правило 17). */
+function imeNaNachina(klyuch: string): string {
+  return NACHINI_NA_PLASHTANE.find((n) => n.klyuch === klyuch)?.ime ?? klyuch;
+}
+

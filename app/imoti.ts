@@ -10,6 +10,7 @@
  */
 
 import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { broySPapka, povtoreniPapki, sveriPapkite } from '../src/domein/papki.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
@@ -17,8 +18,21 @@ import { akumulator, sektoriNaNaem } from '../src/domein/dds.js';
 import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
 import { poImot } from '../src/ogledalo/izgledi.js';
+import {
+  grupirano,
+  IMENA_NA_IZGLEDITE,
+  IMENA_NA_STAPKITE,
+  IZGLEDI,
+  registarZaGodina,
+  registarZaMeseca,
+  sboroveNaRegistara,
+  VAPROSAT_NA_IZGLEDA,
+  type IzgledNaRegistara,
+} from '../src/domein/registar-naemi.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
+import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { butonSIkona } from './ikoni.js';
 import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
 import {
@@ -78,7 +92,7 @@ function novOpId(): string {
 /** Колоните на таблицата „Имоти" — фините филтри важат и тук (вълна 2).
  *  Картата е с ЖИВИТЕ наеми, сметната веднъж — `vzemi` се вика от търсене,
  *  подредба и групиране, и филтриране на всяко повикване би било разточително. */
-function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
+export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
   const zhiviNa = (i: Imot) => zhiviPoImot.get(i.id) ?? [];
   return [
     { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
@@ -100,11 +114,51 @@ function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFilta
         return broy > 1 ? `${broy} наема` : broy === 1 ? 'отдаден' : 'свободен';
       },
     },
+    // ПАПКАТА · филтрира се по „има/няма", не по самия адрес: адресът е дълъг
+    // низ, който никой не помни наизуст, а въпросът е „кои обекти нямат папка".
+    {
+      klyuch: 'papka',
+      ime: 'Папка',
+      vid: 'tekst',
+      vzemi: (i) => (i.papka === '' ? 'без папка' : 'има папка'),
+    },
   ];
 }
 
+/**
+ * ПАПКИТЕ НА ОБЕКТИТЕ · честен брой и находката „една и съща папка" (резен 37).
+ *
+ * „Различни за различни обекти, но те са гоогле драйва и има достъп от имейлите
+ * които влизат в програмата." *(р57·[110])*
+ *
+ * Втората половина на изречението НЕ е задача за приложението: достъпът е при
+ * доставчика (правило 14). Тук се пази адресът — и точно това се КАЗВА, за да
+ * не остане човек с чувството, че програмата раздава права.
+ */
+function blokNaPapkite(imoti: readonly Imot[], dnes: string): string {
+  if (imoti.length === 0) return '';
+  const sPapka = broySPapka(imoti);
+  const povtoreni = povtoreniPapki(imoti);
+  const sv = sveriPapkite(imoti, dnes);
+  return `
+    <p class="drebno" data-papki-broy="${sPapka}" data-papki-vsichki="${imoti.length}">
+      <b>${sPapka} от ${imoti.length}</b> ${imoti.length === 1 ? 'обект носи' : 'обекта носят'} своя папка.
+      Приложението пази АДРЕСА; кой го отваря, решава доставчикът — тук не се
+      раздава и не се отнема достъп.
+      ${
+        povtoreni.length === 0
+          ? ''
+          : `<b data-povtoreni-papki="${povtoreni.length}">${povtoreni.length}</b>
+             ${povtoreni.length === 1 ? 'папка стои' : 'папки стоят'} на повече от един обект —
+             не е грешка, но най-честата причина е копирано поле.`
+      }
+    </p>
+    <p class="drebno" data-papki-sverka>Сверка вход↔изход: ${sv.vhod} обекта → ${sv.izhod} реда,
+    разлика ${sv.razlika}.</p>`;
+}
+
 /** Колоните на таблицата „Наеми" — за фините филтри в стил Уиндоус. */
-function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
+export function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   return [
     { klyuch: 'koy', ime: 'Наемател', vid: 'tekst', vzemi: (n) => n.naemetel },
     {
@@ -191,7 +245,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
 
     ${prekratyavan ? formaPrekratyavane(prekratyavan) : ''}
 
-    <section class="karta${popravyanImot ? ' izbrana' : ''}">
+    <section data-sektsiya="imoti-nov" class="karta${popravyanImot ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>${popravyanImot ? 'Поправи имота' : 'Нов имот'}</h2>
         <span>${
@@ -217,6 +271,14 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             <input translate="no" id="imot-ploshtad" name="ploshtad" inputmode="decimal" placeholder="72,40" autocomplete="off"
                    value="${popravyanImot && popravyanImot.ploshtad_kvsm > 0 ? kvSmVM2(popravyanImot.ploshtad_kvsm) : ''}">
           </div>
+          <div class="pole">
+            <label for="imot-papka">Линк към папката (по избор)</label>
+            <input translate="no" type="url" id="imot-papka" name="papka" autocomplete="off"
+                   placeholder="адресът от бутона „Сподели" в Драйва"
+                   value="${popravyanImot ? ekraniraj(popravyanImot.papka) : ''}">
+            <span class="drebno">„Различни за различни обекти" · достъпът е при доставчика,
+            тук се пази само адресът.</span>
+          </div>
           ${popravyanImot ? polePrichina('imot') : ''}
         </div>
         <p class="greshka" id="greshka-imot"></p>
@@ -232,7 +294,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       </form>
     </section>
 
-    <section class="karta${popravyanNaem ? ' izbrana' : ''}">
+    <section data-sektsiya="imoti-naem-nov" class="karta${popravyanNaem ? ' izbrana' : ''}">
       <div class="dyalglava">
         <h2>${popravyanNaem ? 'Поправи наема' : 'Нов наем'}</h2>
         <span>${
@@ -338,7 +400,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       }
     </section>
 
-    <section>
+    <section data-sektsiya="imoti-spisak">
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
       ${imoti.length ? poleZaTarsene('imoti') : ''}
       <div class="tablitsa" data-tablitsa="imoti">
@@ -350,16 +412,17 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? PRAZEN_FILTAR
-              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? []))
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? [], ogledalo))
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
+      ${blokNaPapkite(imoti, dnes)}
     </section>
 
     ${
       naemi.length === 0
         ? ''
-        : `<section>
+        : `<section data-sektsiya="imoti-naemi">
       <div class="dyalglava">
         <h2>Наеми</h2>
         <span>${zhivi.length} ${zhivi.length === 1 ? 'жив' : 'живи'}${
@@ -380,8 +443,136 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       ${redZaSkritoto(filtriraniNaemi, 'naemi')}
     </section>`
     }
+    ${sektsiyaNaRegistara(ogledalo, dnes)}
     ${sektsiyaPoImot(ogledalo)}
   `;
+}
+
+/**
+ * РЕГИСТЪРЪТ НА НАЕМИТЕ · отчитане и събиране (резен 13б · И43 · ADR-070).
+ *
+ * ═══ НЕГОВАТА ПОРЪЧКА ═══
+ *
+ *   „Ти предложи най-модерната таблица, използвана в такива програми за
+ *    отчитане и събиране на наеми, и предложи решения като варианти."
+ *
+ * Затова тук НЕ се избира вместо него: и трите варианта се рисуват, и той ги
+ * превключва с един бутон. Разликата се ВИЖДА, вместо да се описва.
+ *
+ * ═══ ЗАЩО ИЗГЛЕДИ, А НЕ ТРИ ТАБЛИЦИ ═══
+ *
+ * Три отделни таблици биха дали ТРИ ЧИСЛА за едни и същи пари — и точно тогава
+ * той не би могъл да ги сравни. Изгледите са ГРУПИРОВКИ на едни и същи редове;
+ * сборът им е равен и това се брои от тест, не се обещава тук.
+ *
+ * ═══ ИЗБОРЪТ Е ПОГЛЕД ═══
+ *
+ * Кой изглед и кой месец се помнят в паметта на екрана, не в Журнала (ADR-022 ·
+ * правило 23): това е какво гледам аз, не какво е вярно за всички. Затова
+ * превключването добавя НУЛА събития — и проходът го брои.
+ *
+ * ЗАПАЗЕНАТА ГРАНИЦА: този регистър само ЧЕТЕ. Негова дума (р57·[14]): „в наеми
+ * само наема да регистрираш и статуса, нямаш добавяне" — въвеждането става от
+ * формите горе, не оттук.
+ */
+function sektsiyaNaRegistara(o: Ogledalo, dnes: string): string {
+  if (o.naemi.size === 0) return '';
+  const izgled = chetiEkranno<IzgledNaRegistara>('registar.izgled', 'naemateli');
+  const mesets = chetiEkranno('registar.mesets', dnes.slice(0, 7));
+  // „По месец" иска дванайсетте месеца ДО избрания; другите два — само него.
+  const redove =
+    izgled === 'mesetsi' ? registarZaGodina(o, mesets, dnes) : registarZaMeseca(o, mesets, dnes);
+  const sbor = sboroveNaRegistara(redove);
+  const grupi = grupirano(redove, izgled);
+
+  return `
+    <section data-sektsiya="naemi-registar">
+      <div class="dyalglava">
+        <h2>Регистър на наемите</h2>
+        <span>${VAPROSAT_NA_IZGLEDA[izgled]}</span>
+      </div>
+
+      <div class="registar-lostove">
+        <div class="izgledi" role="group" aria-label="изглед на регистъра">
+          ${IZGLEDI.map(
+            (i) => `<button type="button" class="chip-izgled" data-registar-izgled="${i}"
+              aria-pressed="${i === izgled}">${IMENA_NA_IZGLEDITE[i]}</button>`,
+          ).join('')}
+        </div>
+        <label class="pole tesen">
+          <span>${izgled === 'mesetsi' ? 'До месец' : 'Месец'}</span>
+          <input translate="no" type="month" id="registar-mesets" value="${ekraniraj(mesets)}">
+        </label>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">Начислено</span>
+          <span class="chislo" translate="no" data-registar="nachisleno">${pishi(sbor.nachisleno_st)}</span>
+          <span class="pod">${sbor.redove} ${sbor.redove === 1 ? 'ред' : 'реда'}</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Събрано</span>
+          <span class="chislo" translate="no" data-registar="plateno">${pishi(sbor.plateno_st)}</span>
+          <span class="pod">по вземанията</span>
+        </div>
+        <div class="plochka${sbor.ostatak_st === 0 ? '' : ' trevoga'}">
+          <span class="etiket">Остава</span>
+          <span class="chislo" translate="no" data-registar="ostatak">${pishi(sbor.ostatak_st)}</span>
+          <span class="pod">${sbor.prosrocheni === 0 ? 'нищо просрочено' : `${sbor.prosrocheni} просрочени`}</span>
+        </div>
+      </div>
+
+      ${
+        grupi.length === 0
+          ? '<p class="prazno">Няма живо наемане за този месец.<br>Регистърът чете Журнала — той не добавя наеми.</p>'
+          : grupi
+              .map(
+                (g) => `<div class="registar-grupa" data-grupa="${ekraniraj(g.klyuch)}">
+        <div class="grupa-glava">
+          <b translate="no">${ekraniraj(g.ime)}</b>
+          <span class="suma" data-st="${g.sborove.ostatak_st}">${
+            g.sborove.ostatak_st === 0 ? 'събрано' : `остава ${pishi(g.sborove.ostatak_st)}`
+          }</span>
+        </div>
+        <div class="tablitsa" data-tablitsa="registar-${ekraniraj(g.klyuch)}">
+          <div class="glava registar">
+            <span data-kolona="koy" data-ime="Наемател">Наемател</span>
+            <span data-kolona="imot" data-ime="Имот">Имот</span>
+            <span data-kolona="mesets" data-ime="Месец">Месец</span>
+            <span class="suma" data-kolona="nachisleno" data-ime="Начислено">Начислено</span>
+            <span class="suma" data-kolona="plateno" data-ime="Платено">Платено</span>
+            <span class="suma" data-kolona="ostatak" data-ime="Остава">Остава</span>
+            <span data-kolona="stapka" data-ime="Стъпка">Стъпка</span>
+          </div>
+          ${g.redove
+            .map(
+              (r) => `<div class="red registar" translate="no" data-red-naem="${ekraniraj(r.naemId)}">
+            <span>${ekraniraj(r.naemetel)}</span>
+            <span>${ekraniraj(r.imot)}</span>
+            <span>${ekraniraj(r.mesets)}</span>
+            <span class="suma" data-st="${r.nachisleno_st}">${pishi(r.nachisleno_st)}</span>
+            <span class="suma" data-st="${r.plateno_st}">${pishi(r.plateno_st)}</span>
+            <span class="suma${r.ostatak_st === 0 ? '' : ' duljimo'}" data-st="${r.ostatak_st}">${pishi(r.ostatak_st)}</span>
+            <span><span class="znachka ${r.stapka === 'sabran' ? 'dobre' : r.dniZakasnenie > 0 ? 'trevoga' : 'tiha'}"
+              data-stapka="${r.stapka}">${IMENA_NA_STAPKITE[r.stapka]}</span>${
+                r.dniZakasnenie > 0
+                  ? `<span class="zakasnenie">${r.dniZakasnenie} ${r.dniZakasnenie === 1 ? 'ден' : 'дни'}</span>`
+                  : ''
+              }</span>
+          </div>`,
+            )
+            .join('')}
+        </div>
+      </div>`,
+              )
+              .join('')
+      }
+
+      <p class="drebno">Регистърът само ЧЕТЕ Журнала — наем се добавя от формите горе,
+      плащане се приема в Пари. Смяната на изглед и на месец е ПОГЛЕД: тя не влиза в
+      Журнала и не мени нито едно число.</p>
+    </section>`;
 }
 
 /**
@@ -453,7 +644,7 @@ function polePrichina(koe: string): string {
 
 function formaPrekratyavane(naem: Naem): string {
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="imoti-prekrati" class="karta izbrana">
       <div class="dyalglava">
         <h2>Прекрати наема</h2>
         <span>${ekraniraj(naem.naemetel)} · вече начисленото остава дължимо</span>
@@ -479,7 +670,7 @@ function formaPrekratyavane(naem: Naem): string {
     </section>`;
 }
 
-function redImot(imot: Imot, naemi: readonly Naem[]): string {
+function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
   // Всички живи наеми, не само първият — нищо не изчезва тихо.
   const zhivi = naemi.filter((n) => !n.prekraten);
   const sbor = zhivi.reduce((s, n) => s + n.naem_st, 0);
@@ -503,9 +694,15 @@ function redImot(imot: Imot, naemi: readonly Naem[]): string {
             ? '<span class="znachka dobre">отдаден</span>'
             : '<span class="znachka tiha">свободен</span>'
       }</span>
+      <span class="kletka" data-papka="${ekraniraj(imot.id)}" data-ima="${imot.papka === '' ? 'ne' : 'da'}">${
+        imot.papka === ''
+          ? '<span class="drebno">без папка</span>'
+          : `<a href="${ekraniraj(imot.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
+      }</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
+        ${butonNaDokumentite('imot', imot.id, broyDokumenti(o, 'imot', imot.id))}
         ${butonIstoriya('imot', imot.id)}
       </span>
     </div>`;
@@ -544,6 +741,25 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
   // ЗАКОНЪТ ЗА МЕНЮТАТА (И97 · ADR-040 · ADR-042) · наемателят е живо поле.
   zakachiMenyuta(koren, rechnitsite(RECHNIK_NAEM));
 
+  /**
+   * ДВАТА ЛОСТА НА РЕГИСТЪРА · и двата са ПОГЛЕД (резен 13б · ADR-070).
+   *
+   * Изгледът и месецът живеят в паметта на екрана, не в Журнала: те казват
+   * какво гледам АЗ, не какво е вярно за всички (ADR-022 · правило 23).
+   * Затова тук няма нито едно повикване към Вратата — превключването добавя
+   * НУЛА събития, и проходът брои точно това.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-registar-izgled]')) {
+    b.addEventListener('click', async () => {
+      zapomniEkranno('registar.izgled', b.dataset['registarIzgled']!);
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLInputElement>('#registar-mesets')?.addEventListener('change', async (e) => {
+    zapomniEkranno('registar.mesets', (e.target as HTMLInputElement).value);
+    await prerisuvay();
+  });
+
   // ── имот: нов или поправен ───────────────────────────────────────────────
   const formaImot = koren.querySelector<HTMLFormElement>('#forma-imot');
   formaImot?.addEventListener('submit', async (sabitie) => {
@@ -570,6 +786,10 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
       adres: String(danni.get('adres')).trim(),
       edinitsa: String(danni.get('edinitsa')).trim(),
       ploshtad_kvsm,
+      // ПАПКАТА ВИНАГИ СЕ ПОДАВА от формата · и празната също. Тя е ВИДИМА в
+      // полето: изтрит от човека линк е негово решение и трябва да се запише,
+      // а не да се пропусне като „не съм я пипал" (резен 37).
+      papka: String(danni.get('papka') ?? '').trim(),
     };
 
     buton.disabled = true;

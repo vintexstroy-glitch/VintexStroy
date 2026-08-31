@@ -60,6 +60,8 @@ function nizNaKlyuch(k: KlyuchNaObekt): string {
 
 /** Един имот от Журнала, сведен до каквото свързването иска. */
 interface ImotZaSvarzvane {
+  /** самоличността на имота · нужна на действията, не на оценката */
+  readonly id: string;
   /** единицата, както е записана: „АП. № 1" */
   readonly edinitsa: string;
   /** месечният наем в стотинки; 0 значи „няма действащ наем" */
@@ -84,6 +86,36 @@ export function kartaNaNaemite(
     izhod.set(nizNaKlyuch(k), i.naem_mesechen_st);
   }
   return izhod;
+}
+
+/**
+ * КАРТАТА обект → `imotId` · за действията, които раждат запис.
+ *
+ * Наемът пътува по СТОЙНОСТ; тук трябва САМОЛИЧНОСТТА на имота: „Продаден" от
+ * Калкулатора отваря сделка, а сделката иска имот, не число. Свързването е
+ * СЪЩОТО (вид + номер) и се вика от същия дом — второ разчитане на името щеше
+ * да се разминава с първото при първата поправка (правило 17).
+ */
+export function kartaNaImotite(
+  imoti: readonly ImotZaSvarzvane[],
+): ReadonlyMap<string, string> {
+  const izhod = new Map<string, string>();
+  for (const i of imoti) {
+    const k = klyuchOtIme(i.edinitsa);
+    if (!k) continue;
+    // ПЪРВИЯТ печели · дубликат по вид и номер е находка за човек, не тих избор
+    if (!izhod.has(nizNaKlyuch(k))) izhod.set(nizNaKlyuch(k), i.id);
+  }
+  return izhod;
+}
+
+/** Имотът на един обект от таблицата, ако Журналът го знае. */
+export function imotatNaObekta(
+  obekt: string,
+  karta: ReadonlyMap<string, string>,
+): string | undefined {
+  const k = klyuchOtIme(obekt);
+  return k ? karta.get(nizNaKlyuch(k)) : undefined;
 }
 
 /** Действителният наем на един обект от таблицата, ако Журналът го знае. */

@@ -33,22 +33,7 @@ import {
   type VhodBezParola,
 } from '../src/yadro/index.js';
 import { svediImeyl } from '../src/domein/akaunt.js';
-import { osiguriSkriptaNaGoogle } from './gis-skript.js';
-
-/**
- * КЛИЕНТСКИЯТ НОМЕР · публичен по устройство.
- *
- * Стои в кода нарочно и това не е пропуск: номерът се вижда в адреса при всяко
- * влизане и не отваря нищо сам. Какво се приема, решават АДРЕСИТЕ, вписани в
- * конзолата на Google — чужд сайт с този номер получава отказ.
- *
- * Тайната (`client_secret`) не влиза тук и не се ползва никъде. Приложение,
- * което живее в браузър, не може да пази тайна — затова и няма такава.
- */
-const KLIENT_NOMER =
-  '41382209788-ggjrn13mf5upp068flm6kup5u9usg5lg.apps.googleusercontent.com';
-
-const ADRES_NA_SKRIPTA = 'https://accounts.google.com/gsi/client';
+import { KLIENT_NOMER, osiguriSkriptaNaGoogle } from './gis-skript.js';
 
 /** Къде се помни влезлият · местно, не в Журнала: това е състояние на устройството. */
 const KLYUCH_ZA_POMNENE = 'masterbook:vlezal';
@@ -149,7 +134,9 @@ export class VhodSGoogle implements VhodBezParola {
       dostavchik: 'google',
       imeyl: svediImeyl(tvardeniya.email),
       ime: tvardeniya.name?.trim() || svediImeyl(tvardeniya.email),
-      hranilishte: 'безплатно',
+      // НЕ ЗАКОВАВАМЕ вида: влизането дава САМОЛИЧНОСТ, не квота. Питането
+      // на Драйва е отделно съгласие и става с натискане (резен Д · ADR-076).
+      hranilishte: 'не е питано',
       nachin: 'dostavchik',
       // Влезлият е собственик на СВОЯ Журнал — ключът е неговият имейл
       // (ADR-020). Служителят при чужд акаунт идва със споделянето на папката.

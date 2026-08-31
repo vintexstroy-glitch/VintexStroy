@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +27,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
     razdel = '9 · верига';
-    await p.click('#proveri');
+    await natisniVGrupata(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е'));
     // Един бутон, ДВА отговора (ADR-055): „цяла ли е моята верига" и
     // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
@@ -39,7 +39,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 10 · износ ═══════════════════════════════════════════════════════
     razdel = '10 · износ';
-    const [svaleno] = await Promise.all([p.waitForEvent('download'), p.click('#iznesi')]);
+    const [svaleno] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#iznesi')]);
     const patyat = await svaleno.path();
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
     proveri('изнесени 12 събития + откриващото', izneseni.length, 12 + OTKRIVASHTOTO);
@@ -199,7 +199,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     await p.reload();
     await p.waitForSelector('#proveri');
-    await p.click('#proveri');
+    await natisniVGrupata(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата се къса'));
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
@@ -336,7 +336,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('внесено докрай', await p.evaluate(() => document.body.innerText.includes('внесено докрай')), true);
 
     // архивът за Ексел се сваля и е истински .xlsx (PK отпред)
-    const [arhiv] = await Promise.all([p.waitForEvent('download'), p.click('#arhiv')]);
+    const [arhiv] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#arhiv')]);
     const arhivPat = await arhiv.path();
     const parviBajtove = new Uint8Array((await readFile(arhivPat)).buffer).slice(0, 2);
     proveri('архивът е ZIP (PK)', String.fromCharCode(...parviBajtove), 'PK');

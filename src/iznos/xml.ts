@@ -34,19 +34,3 @@ export function el(ime: string, tekst: string | number): string {
   return `<${ime}>${ekvXML(String(tekst))}</${ime}>`;
 }
 
-/**
- * Сумата, както я иска XML-схемата: точка за десетичен знак, две цифри след
- * нея, без паузи за хиляди.
- *
- * НЕ минава през `kakvoPishe`: онова пише по НОРМИТЕ на валутата (`1 234,56 €`)
- * и е за човешко око. Файлът за НАП чете машина и иска един-единствен формат,
- * какъвто и да е езикът на устройството.
- */
-export function sumaXML(st: number): string {
-  if (!Number.isSafeInteger(st)) {
-    throw new TypeError(`Сумата за XML е цели стотинки; получено: ${String(st)}`);
-  }
-  const znak = st < 0 ? '-' : '';
-  const abs = Math.abs(st);
-  return `${znak}${Math.floor(abs / 100)}.${String(abs % 100).padStart(2, '0')}`;
-}

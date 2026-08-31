@@ -17,6 +17,7 @@
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import { akumulator, ddsOtObshta, stavkaNaReda, type Akumulator } from './dds.js';
+import { prihodOtProdazhbi } from './prodazhbi.js';
 import { sveriDDS, type Dvizhenie, type RezultatSverka } from './sverka-dds.js';
 import type { Stotinki } from '../yadro/pari.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
@@ -46,6 +47,7 @@ export const POTOTSI: readonly Potok[] = Object.freeze([
   { klyuch: 'naemi', ime: 'Наеми', posoka: 'приход', sbira: true, belezhka: 'начислено за периода · обща цена с ДДС' },
   { klyuch: 'kesh', ime: 'КЕШ', posoka: 'приход', sbira: false, belezhka: 'прието в брой' },
   { klyuch: 'banka', ime: 'БАНКА', posoka: 'приход', sbira: false, belezhka: 'прието по банка' },
+  { klyuch: 'prodazhbi', ime: 'Продажби', posoka: 'приход', sbira: true, belezhka: 'вноски по сделка · по датата на вноската · без ДДС' },
   { klyuch: 'zaplati', ime: 'Заплати', posoka: 'разход', sbira: true, belezhka: 'заплати и осигуровки · без ДДС' },
   { klyuch: 'krediti', ime: 'Кредити', posoka: 'разход', sbira: true, belezhka: 'вноски по кредит · без ДДС' },
   { klyuch: 'fakturi', ime: 'Фактури', posoka: 'разход', sbira: true, belezhka: 'покупки с документ · оттук идва входящият ДДС' },
@@ -89,8 +91,18 @@ interface Smetki {
   readonly period: Period;
   readonly redove: readonly RedSmetka[];
   readonly dds: readonly RedDDS[];
-  /** начисленото за периода — основата на изходящия ДДС */
+  /** начисленото за периода — основата на изходящия ДДС · САМО наеми */
   readonly prihod_st: number;
+  /**
+   * ВНОСКИТЕ ПО СДЕЛКА за периода · приход, който НЕ е ДДС-основа.
+   *
+   * Стои ОТДЕЛНО от `prihod_st` нарочно: то е основата, върху която се смята
+   * изходящият ДДС, а ДДС-то при продажба на сграда е счетоводна преценка, не
+   * аритметика (`CHAKA_DUMA_ZA_DDS`). Слети, четирите ДДС-сверки щяха да
+   * почнат да не затварят — или, по-лошо, да затварят с начислен данък, който
+   * никой не е решил.
+   */
+  readonly prihodProdazhbi_st: number;
   /** какво реално е влязло за периода (кеш + банка) */
   readonly sabrano_st: number;
   readonly razhod_st: number;
@@ -124,6 +136,7 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
     (p) => p.data.slice(0, 7) === period,
   );
   const razhodi = razhodiZaPerioda(o, period);
+  const prodazhbi = prihodOtProdazhbi(o, period);
 
   const kesh = plashtaniya.filter((p) => p.nachin === 'в брой');
   const banka = plashtaniya.filter((p) => p.nachin !== 'в брой');
@@ -142,6 +155,7 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
     naemi: { suma_st: prihod_st, broi: vzemaniya.length },
     kesh: { suma_st: kesh_st, broi: kesh.length },
     banka: { suma_st: banka_st, broi: banka.length },
+    prodazhbi: { suma_st: prodazhbi.suma_st, broi: prodazhbi.broy },
   };
 
   const redove: RedSmetka[] = POTOTSI.map((p) => {
@@ -210,12 +224,33 @@ export function smetki(o: Ogledalo, period: Period, kogato: string): Smetki {
     ),
   );
 
+  // ПЕТАТА СВЕРКА · приходната страна на таблицата ↔ двете ѝ числа.
+  //
+  // Приходът вече е ДВЕ числа: `prihod_st` (наеми · ДДС-основа) и вноските по
+  // сделка. Ако някой ден се появи трети приходен поток, който СЪБИРА, и никой
+  // не му даде число, редът му ще стои с нула и никоя от четирите горни сверки
+  // няма да мигне — те гледат ДДС-акумулаторите, не таблицата. Тази гледа
+  // самата таблица.
+  const prihodPoRedove_st = redove
+    .filter((r) => r.posoka === 'приход' && POTOTSI.find((p) => p.klyuch === r.klyuch)?.sbira)
+    .reduce((s, r) => s + r.suma_st, 0);
+  dnevnik.zapishi(
+    sverka(
+      `Сметки ${period} · приход по редовете ↔ наеми + продажби`,
+      prihodPoRedove_st,
+      prihod_st + prodazhbi.suma_st,
+      kogato,
+      MERKA.pari,
+    ),
+  );
+
   return {
     period,
     redove,
     dds,
     ddsSverka: sveriDDSZaPerioda(o, period),
     prihod_st,
+    prihodProdazhbi_st: prodazhbi.suma_st,
     sabrano_st: kesh_st + banka_st,
     razhod_st,
     zaVnasyane_st: dds_izhod_st - dds_vhod_st,

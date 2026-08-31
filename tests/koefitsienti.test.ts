@@ -10,6 +10,7 @@
  *   · месечните се появяват САМО при стъпка месец.
  */
 
+import { IMENA_NA_TAKTOVETE } from '../src/domein/vreme.js';
 import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
@@ -26,99 +27,104 @@ import {
   sDumiStoynost,
   smetniKoefitsient,
   zaStapka,
-  IMENA_NA_STAPKITE,
   STAPKI,
   razbiyNaStapki,
   type DanniZaPerioda,
 } from '../src/domein/koefitsienti.js';
-import { SHA } from './pomoshtni.js';
+import { mesetsSChisla, SHA, stend } from './pomoshtni.js';
 
 const OT = '2026-08-01';
 const DO = '2026-08-31';
 const KOGATO = '2026-08-25T09:00:00.000Z';
 
-function stend() {
-  const dnevnik = new DnevnikVPametta();
-  const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
-  let tik = 0;
-  const deystviya = new Deystviya({
-    vrata,
-    dnevnik,
-    naematel: 'vintexstroy',
-    actor: 'vintexstroy@gmail.com',
-    chasovnik: () => new Date(Date.UTC(2026, 7, 25, 9, 0, tik++)).toISOString(),
-  });
-  return { deystviya };
-}
 
 /**
  * Числа, ИЗБРАНИ да се проверяват наум:
  *   начислено 1 000 · събрано 800 · оперативен разход 300 · кредит 200
  *   → NOI 500 · паричен поток 300 · събираемост 80 % · OER 37,5 % · DSCR 2,50×
  */
-async function mesetsSChisla(d: Deystviya): Promise<void> {
-  await d.dobaviImot('I-1', { adres: 'Малинова', edinitsa: 'бл. 1', ploshtad_kvsm: 0 }, {
-    opId: 'op-imot',
-  });
-  await d.dobaviNaem(
-    'N-1',
-    {
-      imotId: 'I-1',
-      naemetel: 'Наемател',
-      naem_st: stotinki(1000_00),
-      padezhDen: 5,
-      ot: '2024-01-01',
-      do: '',
-      depozit_st: 0,
-      sektor: 'naem-zhilishten',
-    },
-    { opId: 'op-naem' },
-  );
-  await nachisliZaPeriod({ deystviya: d, period: '2026-08', kogato: KOGATO });
-
-  const vzemane = [...(await d.ogledalo()).vzemaniya.values()][0]!;
-  await d.priemiPlashtane(
-    'P-1',
-    { vzemaneId: vzemane.id, suma_st: stotinki(800_00), nachin: 'банка', data: '2026-08-10' },
-    { opId: 'op-plashtane' },
-  );
-
-  await d.zapishiRazhod(
-    'R-op',
-    {
-      potok: 'fakturi',
-      dostavchik: 'Доставчик',
-      opis: 'поддръжка',
-      suma_st: stotinki(300_00),
-      sektor: 'pokupki-uslugi',
-      nachin: 'банка',
-      data: '2026-08-12',
-      dokument: 'Ф-1',
-      stavka: 20,
-    },
-    { opId: 'op-razhod-op' },
-  );
-  await d.zapishiRazhod(
-    'R-kredit',
-    {
-      potok: 'krediti',
-      dostavchik: 'Банка',
-      opis: 'вноска',
-      suma_st: stotinki(200_00),
-      sektor: 'krediti',
-      nachin: 'банка',
-      data: '2026-08-15',
-      dokument: '',
-    },
-    { opId: 'op-razhod-kredit' },
-  );
-}
 
 async function danni(): Promise<DanniZaPerioda> {
   const { deystviya } = stend();
   await mesetsSChisla(deystviya);
   return danniZaPerioda(await deystviya.ogledalo(), OT, DO);
 }
+
+/**
+ * КРЕДИТЪТ СТИГА ЛИ ДО КОЕФИЦИЕНТИТЕ · резен 19.
+ *
+ * ═══ ЗАЩО ГО ИМА ═══
+ *
+ * `danniZaPerioda` дълго връщаше `zadalzheniya_st: 0` — закована нула, защото
+ * нямаше откъде да дойде число. Резен 19 ѝ даде източник, и СЧУПВАНЕТО НА
+ * ТОЗИ ИЗТОЧНИК МИНА: върнах нулата, цялата порта остана зелена.
+ *
+ * Значи нищо не пазеше половината от резена. Тези четири проверки я пазят, и
+ * падат с ЧИСЛА, не с „нещо не е наред".
+ */
+describe('кредитът стига до коефициентите · счупването МИНА, преди да го има', () => {
+  const KREDIT = {
+    kreditId: 'KR-1',
+    ime: 'Ипотека',
+    vid: 'ipoteka',
+    proektId: '',
+    ostatak_st: 50_000_00,
+    ot: '2026-01-15',
+    lihva_bp: 345,
+    vnoska_st: 612_34,
+    den: 15,
+    otgovornik: 'vintexstroy@gmail.com',
+    obezpechenie_st: 100_000_00,
+  };
+
+  async function sKredit(): Promise<DanniZaPerioda> {
+    const { deystviya } = stend();
+    await mesetsSChisla(deystviya);
+    await deystviya.zapishiKredit(KREDIT, { opId: 'op-kredit' });
+    return danniZaPerioda(await deystviya.ogledalo(), OT, DO);
+  }
+
+  it('ЗАДЪЛЖЕНИЯТА вече НЕ са закована нула · те са остатъчната главница', async () => {
+    expect((await danni()).zadalzheniya_st).toBe(0);
+    const d = await sKredit();
+    expect(d.zadalzheniya_st).toBe(50_000_00);
+    expect(d.obezpechenie_st).toBe(100_000_00);
+  });
+
+  it('ЛИКВИДНОСТТА спира да мълчи · тя иска и двете страни', async () => {
+    expect(smetniKoefitsient(koefitsient('likvidnost'), await danni()).zashto).toContain(
+      'Няма записани текущи задължения',
+    );
+    const s = smetniKoefitsient(koefitsient('likvidnost'), await sKredit());
+    expect(s.stoynost).toBeDefined();
+    expect(s.zashto).toBe('');
+  });
+
+  it('LTV е остатък ÷ обезпечение · и без обезпечение КАЗВА защо', async () => {
+    const s = smetniKoefitsient(koefitsient('ltv'), await sKredit());
+    // ВТОРИЯТ ПЪТ, на ръка: 50 000 ÷ 100 000 = 50,00 % = 5 000 базисни пункта.
+    expect(s.stoynost).toBe(5_000);
+    const bez = smetniKoefitsient(koefitsient('ltv'), await danni());
+    expect(bez.stoynost).toBeUndefined();
+    expect(bez.zashto).toContain('обезпечението');
+  });
+
+  it('Дълг/доход е ЗАПАС към ПОТОК · и на година се ДЕЛИ, не се умножава', async () => {
+    const d = await sKredit();
+    const s = smetniKoefitsient(koefitsient('dalg-kam-ebitda'), d);
+    const noi = d.prihod_st - d.operativni_st;
+    expect(noi).toBeGreaterThan(0);
+    // ВТОРИЯТ ПЪТ: остатък ÷ NOI, в стотни от „пъти".
+    expect(s.stoynost).toBe(Math.round((50_000_00 * 100) / noi));
+
+    expect(koefitsient('dalg-kam-ebitda').vid).toBe('zapas-kam-potok');
+    expect(mozheDaSePriravni(koefitsient('dalg-kam-ebitda'))).toBe(true);
+    // ЕДИН месец в периода → делене на 12 ÷ 1, тоест стойност × 1 ÷ 12.
+    expect(priravniKamGodina(s, 1)).toBe(Math.round(s.stoynost! / 12));
+    // И НЕ е умножение · обратната посока би дала 144 пъти по-голямо число.
+    expect(priravniKamGodina(s, 1)).not.toBe(s.stoynost! * 12);
+  });
+});
 
 describe('изборът · най-основните, без бройка', () => {
   it('всеки носи формулата НА ЕДИН РЕД (негово т.5)', () => {
@@ -256,10 +262,14 @@ describe('делител нула дава ЛИПСА, не нула', () => {
     sredstva_st: 0,
     vzemaniya_st: 0,
     zadalzheniya_st: 0,
+    obezpechenie_st: 0,
     zaeti: 0,
     vsichki_obekti: 0,
     dni: 31,
     mesetsi: 1,
+    aktivi_st: 0,
+    sobstven_kapital_st: 0,
+    stoynost_st: 0,
   };
 
   it('„събираемост 0 %" при нула начислено е ЛЪЖА — нищо не е било дължимо', () => {
@@ -292,7 +302,10 @@ describe('делител нула дава ЛИПСА, не нула', () => {
 describe('стъпките · режат периода без да лъжат', () => {
   it('петте са изброени поименно и всяка има име', () => {
     expect([...STAPKI]).toEqual(['den', 'sedmitsa', 'mesets', 'trimesechie', 'godina']);
-    for (const st of STAPKI) expect(IMENA_NA_STAPKITE[st], st).not.toBe('');
+    for (const st of STAPKI) expect(IMENA_NA_TAKTOVETE[st], st).not.toBe('');
+    // ЕДИН РЕЧНИК (резен 13а): стъпката на Калкулатора Е тактът на Ганта, без
+    // „свой" — там периодът вече е избран отвън и няма какво да реже.
+    expect(STAPKI.includes('trimesechie' as never)).toBe(true);
   });
 
   it('месец по месец · всеки етикет е самият месец', () => {
@@ -327,5 +340,19 @@ describe('стъпките · режат периода без да лъжат',
   it('един ден дава едно парче, а обърнат период се отказва С ДУМИ', () => {
     expect(razbiyNaStapki('2026-05-05', '2026-05-05', 'mesets')).toHaveLength(1);
     expect(() => razbiyNaStapki('2026-05-05', '2026-05-01', 'den')).toThrow(/преди началото/);
+  });
+});
+
+describe('пинът · броят се твърди с ръка (резен 46 · група В)', () => {
+  it('коефициентите на Сметки са ДЕВЕТНАЙСЕТ', () => {
+    // ДЕВЕТНАЙСЕТ, не пет: съименникът в Калкулатора е ДРУГА константа, с друг
+    // брой и свой пин. Едно име, два дома — затова пинът е при своя тест.
+    // Бяха ДВАНАЙСЕТ до резен 51; седемте нови са популярните, които липсваха.
+    expect(KOEFITSIENTI).toHaveLength(19);
+  });
+
+  it('и се делят на СЕДЕМ състояния и ДВАНАЙСЕТ за период', () => {
+    const broy = (kogato: string): number => KOEFITSIENTI.filter((k) => k.kogato === kogato).length;
+    expect([broy('sastoyanie'), broy('period')]).toEqual([7, 12]);
   });
 });

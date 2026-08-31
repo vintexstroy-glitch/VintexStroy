@@ -20,15 +20,20 @@
  * с начина, по който НАП иска корекция: НОВ, заместващ файл за периода, не
  * кръпка върху стария.
  *
- * ═══ КАКВО Е ПРЕДЛОЖЕНИЕ И КАКВО Е ЗАКОН ═══
+ * ═══ МАПИНГЪТ КЪМ НАП ОТПАДНА (резен 53) ═══
  *
- * Сметкопланът долу и мапингът към националните кодове са СЧЕТОВОДНА ПРЕЦЕНКА,
- * не аритметика. Правило 18: агентът предлага, човекът записва. Затова всяка
- * сметка носи `nra` — националният код — и празният код значи „ОЩЕ НЕ Е
- * МАПНАТА", а не „няма". Екранът го показва; тест го брои.
+ * Негово, 31.08: „НАП отпада" — пада ПОДАВАНЕТО, не счетоводството. Затова
+ * Главната книга остава цяла, а полето `nra` — националният код на всяка сметка
+ * — падна с нея: то съществуваше САМО за да носи мапинга към номенклатурите на
+ * НАП, стоеше празно във всички сметки и чакаше сваляне от `nra.bg`.
  *
- * Онова, което НЕ е преценка, е равенството: всяка статия има равни страни, и
- * това се проверява, не се вярва.
+ * С него падна и последният ред от описа на дълга по тази тема. Празно поле,
+ * което участва в проверка, е дефект с праг нула (`npm run chistota`, ADR-048) —
+ * а тук то беше и обещание, което вече никой не дава.
+ *
+ * Сметкопланът остава СЧЕТОВОДНА ПРЕЦЕНКА (правило 18): агентът предлага,
+ * човекът записва. Онова, което НЕ е преценка, е равенството: всяка статия има
+ * равни страни, и това се проверява, не се вярва.
  */
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
@@ -60,7 +65,6 @@ interface Smetka {
    * по-скъп от липсващ: файлът минава автоматична валидация при НАП и грешен
    * код е глоба по чл. 277а, докато липсващият се вижда на екрана предварително.
    */
-  readonly nra: string;
 }
 
 /**
@@ -70,19 +74,19 @@ interface Smetka {
  * сметка в SAF-T е ред, който НАП чака да обясниш.
  */
 export const SMETKOPLAN: readonly Smetka[] = Object.freeze([
-  { nomer: '411', ime: 'Клиенти', vid: 'aktiv', nra: '' },
-  { nomer: '401', ime: 'Доставчици', vid: 'pasiv', nra: '' },
-  { nomer: '501', ime: 'Каса', vid: 'aktiv', nra: '' },
-  { nomer: '503', ime: 'Разплащателна сметка', vid: 'aktiv', nra: '' },
-  { nomer: '4531', ime: 'Начислен данък за покупките', vid: 'aktiv', nra: '' },
-  { nomer: '4532', ime: 'Начислен данък за продажбите', vid: 'pasiv', nra: '' },
-  { nomer: '4538', ime: 'Данък за възстановяване', vid: 'aktiv', nra: '' },
-  { nomer: '4539', ime: 'Данък за внасяне', vid: 'pasiv', nra: '' },
-  { nomer: '601', ime: 'Разходи за материали', vid: 'razhod', nra: '' },
-  { nomer: '602', ime: 'Разходи за външни услуги', vid: 'razhod', nra: '' },
-  { nomer: '604', ime: 'Разходи за заплати', vid: 'razhod', nra: '' },
-  { nomer: '621', ime: 'Разходи за лихви', vid: 'razhod', nra: '' },
-  { nomer: '703', ime: 'Приходи от продажби на услуги', vid: 'prihod', nra: '' },
+  { nomer: '411', ime: 'Клиенти', vid: 'aktiv' },
+  { nomer: '401', ime: 'Доставчици', vid: 'pasiv' },
+  { nomer: '501', ime: 'Каса', vid: 'aktiv' },
+  { nomer: '503', ime: 'Разплащателна сметка', vid: 'aktiv' },
+  { nomer: '4531', ime: 'Начислен данък за покупките', vid: 'aktiv' },
+  { nomer: '4532', ime: 'Начислен данък за продажбите', vid: 'pasiv' },
+  { nomer: '4538', ime: 'Данък за възстановяване', vid: 'aktiv' },
+  { nomer: '4539', ime: 'Данък за внасяне', vid: 'pasiv' },
+  { nomer: '601', ime: 'Разходи за материали', vid: 'razhod' },
+  { nomer: '602', ime: 'Разходи за външни услуги', vid: 'razhod' },
+  { nomer: '604', ime: 'Разходи за заплати', vid: 'razhod' },
+  { nomer: '621', ime: 'Разходи за лихви', vid: 'razhod' },
+  { nomer: '703', ime: 'Приходи от продажби на услуги', vid: 'prihod' },
 ]);
 
 const PO_NOMER = new Map(SMETKOPLAN.map((s) => [s.nomer, s]));
@@ -91,11 +95,6 @@ export function smetka(nomer: string): Smetka {
   const s = PO_NOMER.get(nomer);
   if (!s) throw new GreshkaKniga(`Сметка ${nomer} я няма в сметкоплана.`);
   return s;
-}
-
-/** Кои сметки още чакат национален код · показва се, не се крие. */
-export function nemapnati(): readonly Smetka[] {
-  return SMETKOPLAN.filter((s) => s.nra === '');
 }
 
 /**
@@ -163,12 +162,6 @@ const DNEVNITSI = ['prodazhbi', 'pokupki', 'pari', 'dds'] as const;
 
 type VidDnevnik = (typeof DNEVNITSI)[number];
 
-export const IMENA_NA_DNEVNITSITE: Readonly<Record<VidDnevnik, string>> = Object.freeze({
-  prodazhbi: 'Продажби · начислени вземания',
-  pokupki: 'Покупки · записани разходи',
-  pari: 'Пари · каса и банка',
-  dds: 'ДДС · справки и внасяне',
-});
 
 /**
  * ИЗТОЧНИК БЕЗ ДВИЖЕНИЕ НЕ РАЖДА СТАТИЯ · и това НЕ е дефект.
@@ -374,8 +367,6 @@ export interface GlavnaKniga {
   readonly kredit_st: number;
   readonly sverki: readonly Sverka[];
   readonly nared: boolean;
-  /** сметките без национален код · честна дума, не мълчание */
-  readonly nemapnati: readonly Smetka[];
   /**
    * Колко източника НЕ раждат статия, защото не местят пари (нула или
    * повредена сума). Нула е обичайното; всяко друго число иска поглед.
@@ -510,7 +501,6 @@ export function glavnaKniga(o: Ogledalo, period: Period, kogato: string): Glavna
     kredit_st,
     sverki: dnevnik.vsichki,
     nared: dnevnik.nezatvoreni.length === 0,
-    nemapnati: nemapnati(),
     bezDvizhenie,
   };
 }

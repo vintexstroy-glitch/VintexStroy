@@ -41,6 +41,35 @@ function hostoveVKoda(): string[] {
   return [...hostove].sort();
 }
 
+/**
+ * ВСЕКИ ПЪТ, до който кодът посяга · хост И първи сегмент.
+ *
+ * Хостът сам НЕ стига. `www.googleapis.com` е ЕДИН хост с ТРИ различни
+ * предназначения (ключове · Драйв · и утре Календар), а стената и списъкът ѝ
+ * говорят за него в единствено число. Проверка на ниво хост пуска мълчешком
+ * всеки нов изходящ път към вече отворен адрес — точно обратната половина на
+ * находката от И101 т.4: тогава стената спираше собствения ни изход, а сега
+ * изходът минава, без нито един обявен ред.
+ */
+function patishtaVKoda(): string[] {
+  const patishta = new Set<string>();
+  const papki: string[] = ['app', 'src', 'src/yadro', 'src/domein', 'src/nositel', 'src/iztochnik'];
+  for (const papka of papki) {
+    for (const f of readdirSync(papka).filter((x) => x.endsWith('.ts'))) {
+      const tekst = readFileSync(`${papka}/${f}`, 'utf8');
+      for (const m of tekst.matchAll(/https:\/\/([a-z0-9.-]+)(\/[a-z0-9-]+)?/gi)) {
+        patishta.add(`https://${m[1]!.toLowerCase()}${(m[2] ?? '').toLowerCase()}`);
+      }
+    }
+  }
+  return [...patishta].sort();
+}
+
+/** Обявените поименно в списъка на стената · редовете с „· https://… — защо". */
+function obyaveni(): string[] {
+  return [...HTML.matchAll(/·\s+(https:\/\/[a-z0-9./-]+)\s+—/gi)].map((m) => m[1]!.toLowerCase());
+}
+
 describe('стената · какво НЕ пуска', () => {
   it('няма звезда и няма голо „https:" · отворена изобщо значи свалена', () => {
     expect(csp()).not.toContain('*;');
@@ -81,6 +110,27 @@ describe('стената срещу кода · сверка вход↔изхо
     const vStenata = [...csp().matchAll(/https:\/\/([a-z0-9.*-]+)/gi)].map((m) => m[1]!.toLowerCase());
     const izlishni = [...new Set(vStenata)].filter((h) => !vKoda.has(h) && !IZKLYUCHENIYA.has(h));
     expect(izlishni).toEqual([]);
+  });
+
+  /**
+   * ВТОРАТА ПОЛОВИНА на находката от И101 т.4 · сега с обратен знак.
+   *
+   * Тогава стената спираше собствения ни изход. Тук се пази обратното: изход,
+   * който минава БЕЗ да е обявен, защото хостът вече е отворен за друго.
+   * Списъкът в стената е обещание пред човек — а обещание без пазач се
+   * разминава при първия нов път.
+   */
+  it('всеки ПЪТ, до който кодът посяга, е ОБЯВЕН в списъка · не само хостът', () => {
+    const spisak = obyaveni();
+    const neobyaveni = patishtaVKoda().filter((p) => !spisak.includes(p));
+    expect(neobyaveni).toEqual([]);
+  });
+
+  it('и обратното · обявен път, който никой не ползва, пада от списъка', () => {
+    const vKoda = new Set(patishtaVKoda());
+    // Снимката на профила идва от доставчика, не от нас — тя няма път в кода.
+    const IZKLYUCHENIYA = new Set(['https://lh3.googleusercontent.com']);
+    expect(obyaveni().filter((p) => !vKoda.has(p) && !IZKLYUCHENIYA.has(p))).toEqual([]);
   });
 
   it('api.anthropic.com е там ПОИМЕННО · находката от И101 т.4', () => {

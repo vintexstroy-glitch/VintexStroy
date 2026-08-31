@@ -118,15 +118,22 @@ describe('проверката · отказът е С ДУМИ', () => {
     await expect(grah).rejects.toThrow(/не съвпада/);
   });
 
+  it('животът е ПЕТНАЙСЕТ минути · числото се твърди, не се чете', () => {
+    // Границите отдолу се пишат с РЪКА (15 и 16). Смятани от самата константа
+    // (`ZHIVOT_V_MINUTI + 1`), те се местят ЗАЕДНО с нея: разтегната на час,
+    // тя оставя и двете проверки зелени — тоест те мерят себе си, не кода.
+    expect(ZHIVOT_V_MINUTI).toBe(15);
+  });
+
   it('изтеклият казва „изтекло" — човекът иска НОВО писмо, не нов опит', async () => {
-    const grah = proveri(await iskane(), '123456', sled(ZHIVOT_V_MINUTI + 1), sha256Node);
+    const grah = proveri(await iskane(), '123456', sled(16), sha256Node);
     await expect(grah).rejects.toThrow(/изтекло/);
   });
 
   it('изтичането е точно на границата, не преди нея', async () => {
     const i = await iskane();
-    expect(eIzteklo(i, sled(ZHIVOT_V_MINUTI))).toBe(false);
-    expect(eIzteklo(i, sled(ZHIVOT_V_MINUTI + 1))).toBe(true);
+    expect(eIzteklo(i, sled(15))).toBe(false);
+    expect(eIzteklo(i, sled(16))).toBe(true);
   });
 
   it('счупено време брои за изтекло — неясното не пуска', async () => {

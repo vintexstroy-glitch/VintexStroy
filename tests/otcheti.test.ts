@@ -32,6 +32,32 @@ const NAEMATEL = 'vintexstroy';
 const KOGATO = '2026-08-22T09:00:00.000Z';
 const PERIOD = '2026-08';
 
+/**
+ * ЗАПИСВА КРЕДИТ · 50 000 € остатък.
+ *
+ * Дотук числото се ПОДАВАШЕ като параметър, който никой не пълнеше. Резен 19
+ * му даде източник: остатъкът се смята от Журнала, значи и тестът минава през
+ * Вратата, вместо да си го измисли.
+ */
+async function sKredit(deystviya: Deystviya, opId = 'op-kredit'): Promise<void> {
+  await deystviya.zapishiKredit(
+    {
+      kreditId: 'k1',
+      ime: 'Ипотека · Пощенска',
+      vid: 'ipoteka',
+      proektId: '',
+      ostatak_st: 50_000_00,
+      ot: '2026-01-15',
+      lihva_bp: 345,
+      vnoska_st: 612_34,
+      den: 15,
+      otgovornik: 'vintexstroy@gmail.com',
+      obezpechenie_st: 100_000_00,
+    },
+    { opId },
+  );
+}
+
 function stend() {
   const dnevnik = new DnevnikVPametta();
   const vrata = new Vrata({ dnevnik, pravata: new VsichkoRazresheno(), sha: SHA });
@@ -196,11 +222,14 @@ describe('ВЗЕМАНИЯ · два вида, които не се сливат
     ]);
     // начислени са 500 + 1200, нищо не е платено
     expect(p.sastavki[0]!.suma_st).toBe(1700_00);
+    // Без нито една сделка вторият ред е НУЛА — и пак СТОИ. Празният ред е
+    // факт („няма сделки"), а махнатият би направил Вземанията да изглеждат
+    // пълни, когато са наполовина (правило 15).
     expect(p.sastavki[1]!.suma_st).toBe(0);
+    expect(p.sastavki[1]!.otkade).toContain('таблица Продажби');
     expect(p.sbor_st).toBe(naRaka(p));
-    // правило 15 · изключено ≠ липсващо: редът стои и казва какво чака
-    expect(p.chaka.length).toBe(1);
-    expect(p.chaka[0]).toContain('Продажби');
+    // И вече НЕ чака нищо: таблица Продажби я има (резен 23 · ADR-083).
+    expect(p.chaka).toEqual([]);
   });
 
   it('плащането маха точно толкова от вземането', async () => {
@@ -253,7 +282,7 @@ describe('СРЕДСТВА · и защо не е Капитал', () => {
     );
     const o = await deystviya.ogledalo();
 
-    const kap = kapital(o, { stoynostNaSastoyanie_st: 160_700_00, kredititeOstatak_st: 50_000_00 });
+    const kap = kapital(o, { stoynostNaSastoyanie_st: 160_700_00 });
     const sre = sredstva(o, PERIOD, KOGATO);
 
     expect(kap.sbor_st).not.toBe(sre.sbor_st);
@@ -274,12 +303,10 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
       { kade: 'trezor', saldo_st: stotinki(500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
     );
+    await sKredit(deystviya);
     const o = await deystviya.ogledalo();
 
-    const p = kapital(o, {
-      stoynostNaSastoyanie_st: 160_700_00,
-      kredititeOstatak_st: 50_000_00,
-    });
+    const p = kapital(o, { stoynostNaSastoyanie_st: 160_700_00 });
 
     // ВТОРИЯТ ПЪТ, на ръка:
     //   активи      160 700 + (10 000 + 500) + 1 700
@@ -295,14 +322,50 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
     const p = kapital(await deystviya.ogledalo());
     expect(p.sastavki.find((c) => c.ime === 'Стойност на Състояние')!.suma_st).toBe(0);
     expect(p.chaka.some((c) => c.includes('Калкулатора'))).toBe(true);
-    expect(p.chaka.some((c) => c.includes('кредит'))).toBe(true);
+    // КРЕДИТИТЕ ВЕЧЕ НЕ ЧАКАТ · остатъкът се смята от Журнала (резен 19), и
+    // нула кредита значи НУЛА дълг — истинско число, не липсващо.
+    expect(p.chaka.some((c) => c.includes('кредит'))).toBe(false);
+    expect(p.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(0);
   });
 
   it('кредитът се ВАДИ — знакът е в съставката, не в сбирача', async () => {
     const { deystviya } = stend();
-    const p = kapital(await deystviya.ogledalo(), { kredititeOstatak_st: 50_000_00 });
+    await sKredit(deystviya);
+    const p = kapital(await deystviya.ogledalo());
     expect(p.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(-50_000_00);
     expect(p.sbor_st).toBe(-50_000_00);
+  });
+
+  it('платената ГЛАВНИЦА сваля дълга · сторното го вдига обратно', async () => {
+    const { deystviya } = stend();
+    await sKredit(deystviya);
+    await deystviya.zapishiPlashtanePoKredit(
+      {
+        plashtaneId: 'p1',
+        kreditId: 'k1',
+        data: '2026-02-15',
+        suma_st: 612_34,
+        glavnitsa_st: 468_59,
+        lihva_st: 143_75,
+        taksa_st: 0,
+        belezhka: '',
+      },
+      { opId: 'op-pl' },
+    );
+    const predi = await deystviya.ogledalo();
+    expect(kapital(predi).sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(
+      -(50_000_00 - 468_59),
+    );
+
+    await deystviya.storniraj(
+      'ST-K1',
+      { pogasyavaSeq: predi.plashtaniyaPoKrediti[0]!.seq, prichina: 'сгрешена дата' },
+      { opId: 'op-st' },
+    );
+    const podir = kapital(await deystviya.ogledalo());
+    // ОСТАТЪКЪТ СЕ СМЯТА · нито един ред код не го „връща" — сторнираното
+    // плащане просто вече не е в Огледалото.
+    expect(podir.sastavki.find((c) => c.ime.startsWith('Кредити'))!.suma_st).toBe(-50_000_00);
   });
 });
 
@@ -336,7 +399,14 @@ describe('цифрите за календара · числото е готов
     const dni = sumiZaDen(await deystviya.ogledalo(), PERIOD);
     expect(dni.length).toBe(1);
     // ден с 500 приход и 500 разход НЕ е празен ден — неттото би го скрило
-    expect(dni[0]).toEqual({ data: '2026-08-10', prihod_st: 500_00, razhod_st: 500_00 });
+    expect(dni[0]).toEqual({
+      data: '2026-08-10',
+      prihod_st: 500_00,
+      razhod_st: 500_00,
+      // БЕЗ разрез · празният ключ значи „целият свят в една кофа" (резен 13б)
+      razrez: '',
+      nadpis: '',
+    });
   });
 
   it('подрежда дните по дата и не пуска чужд месец', async () => {
@@ -374,10 +444,7 @@ describe('сверката вход↔изход на Капитала (прав
     );
     const o = await deystviya.ogledalo();
 
-    const r = otcheti(o, PERIOD, KOGATO, {
-      stoynostNaSastoyanie_st: 160_700_00,
-      kredititeOstatak_st: 50_000_00,
-    });
+    const r = otcheti(o, PERIOD, KOGATO, { stoynostNaSastoyanie_st: 160_700_00 });
 
     expect(r.sverka.razlika_st).toBe(0);
     expect(r.sverka.ot_sastavki_st).toBe(r.sverka.aktivi_st - r.sverka.zadalzheniya_st);
@@ -488,5 +555,123 @@ describe('сумите за обхват от дни', () => {
     // Границите са включителни, и извън тях не изтича нищо.
     expect(sumiZaObhvat(o, '2026-07-15', '2026-07-15')).toHaveLength(1);
     expect(sumiZaObhvat(o, '2026-07-16', '2026-07-31')).toHaveLength(0);
+  });
+});
+
+// ── ПРОДАЖБАТА СТИГА ДО ОТЧЕТИТЕ (резен 23 · ADR-083) ─────────────────────
+
+/** Сделка с едно платено капаро · 24 000 договор, 5 000 платени. */
+async function sSdelka(d: Deystviya): Promise<void> {
+  await d.zapishiProdazhba(
+    {
+      prodazhbaId: 'PR-1',
+      imotId: 'I-1',
+      kupuvach: 'Иван Петров',
+      telefon: '0888123456',
+      tsena_st: stotinki(25_000_00),
+      prodazhba_st: stotinki(24_000_00),
+      smr_st: stotinki(14_000_00),
+      pd_st: stotinki(10_000_00),
+      sastoyanie: 'tekushta',
+    },
+    { opId: 'op-sdelka' },
+  );
+  await d.zapishiDvizhenieNaProdazhba(
+    {
+      dvizhenieId: 'PRD-1',
+      prodazhbaId: 'PR-1',
+      vid: 'Капаро',
+      suma_st: stotinki(5_000_00),
+      data: '2026-08-10',
+      belezhka: 'капаро',
+      nachin: 'банка',
+    },
+    { opId: 'op-dvizhenie' },
+  );
+}
+
+describe('ВЗЕМАНИЯ · вторият ред вече има източник', () => {
+  it('показва неплатеното по сделката, а не закована нула', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await sSdelka(deystviya);
+
+    const p = vzemaniya(await deystviya.ogledalo());
+    expect(p.sastavki[1]!.suma_st).toBe(24_000_00 - 5_000_00);
+    expect(p.sastavki[1]!.otkade).toContain('1 сделка');
+    expect(p.sbor_st).toBe(naRaka(p));
+    expect(p.chaka).toEqual([]);
+  });
+
+  it('надплатената сделка се КАЗВА, вместо да се извади наум', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await sSdelka(deystviya);
+    await deystviya.zapishiDvizhenieNaProdazhba(
+      {
+        dvizhenieId: 'PRD-2',
+        prodazhbaId: 'PR-1',
+        vid: 'НС',
+        suma_st: stotinki(25_000_00),
+        data: '2026-08-20',
+        belezhka: 'преведено с повече',
+        nachin: 'банка',
+      },
+      { opId: 'op-dvizhenie-2' },
+    );
+
+    const p = vzemaniya(await deystviya.ogledalo());
+    // 30 000 платени по договор за 24 000 → вземане НЯМА, но и нула не мълчи
+    expect(p.sastavki[1]!.suma_st).toBe(0);
+    expect(p.chaka).toHaveLength(1);
+    expect(p.chaka[0]).toContain('надплатени');
+  });
+});
+
+describe('СВЕРКАТА на Капитала по два пътя · продажбата минава и по двата', () => {
+  it('затваря на нула, когато сделката влезе', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await sSdelka(deystviya);
+
+    const r = otcheti(await deystviya.ogledalo(), PERIOD, KOGATO);
+    expect(r.sverka.razlika_st).toBe(0);
+    // и вземането от сделката ГО ИМА в двете страни · нула по алгебра щеше да
+    // затвори и без него, затова се проверява самото число
+    const vze = r.poleta.find((p) => p.klyuch === 'vzemaniya')!;
+    expect(vze.sastavki[1]!.suma_st).toBe(19_000_00);
+    expect(r.sverka.aktivi_st).toBeGreaterThanOrEqual(19_000_00);
+  });
+});
+
+describe('СРЕДСТВА · третата съставка', () => {
+  it('носи вноските по сделка, отделно от начисления наем', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await sSdelka(deystviya);
+
+    const p = sredstva(await deystviya.ogledalo(), PERIOD, KOGATO);
+    expect(p.sastavki.map((c) => c.ime)).toEqual([
+      'Приход · начислено',
+      'Приход · продажби',
+      'Разход',
+    ]);
+    expect(p.sastavki[0]!.suma_st).toBe(1700_00);
+    expect(p.sastavki[1]!.suma_st).toBe(5_000_00);
+    expect(p.sbor_st).toBe(naRaka(p));
+  });
+
+  it('и ДДС-основата НЕ мърда · тя е само наемите', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    const predi = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
+    await sSdelka(deystviya);
+    const sled = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
+
+    expect(sled.prihod_st).toBe(predi.prihod_st);
+    expect(sled.zaVnasyane_st).toBe(predi.zaVnasyane_st);
+    expect(sled.prihodProdazhbi_st).toBe(5_000_00);
+    // и петте сверки пак затварят
+    expect(sled.sverki.every((s) => s.nared)).toBe(true);
   });
 });

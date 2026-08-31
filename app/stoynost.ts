@@ -25,6 +25,13 @@
 import { pishi } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj, svaliFayl } from './obshto.js';
+import {
+  opIdNaObekta,
+  ploshttaZaImota,
+  proveriImetoNaSgradata,
+  sveriSazdavaneto,
+  zaVpisvane,
+} from '../src/kalkulator/sazdavane.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { otXLSX } from '../src/iztochnik/xlsx.js';
 import { otCSV } from '../src/iztochnik/csv.js';
@@ -51,7 +58,7 @@ import {
   prochetiTsenovaLista,
   type KoyaTsena,
 } from '../src/kalkulator/tsenova-lista.js';
-import { kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
+import { imotatNaObekta, kartaNaImotite, kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import {
   nastroykiteNaKalkulatora,
@@ -59,7 +66,7 @@ import {
   sektsiyaKalkulator,
   zakachiKalkulator,
 } from './kalkulator.js';
-import { matritsaOtNastroyki } from '../src/kalkulator/nastroyki.js';
+import { matritsaOtNastroyki, sluchay } from '../src/kalkulator/nastroyki.js';
 import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -68,8 +75,19 @@ let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 /** Последният прочит на „ЦЕНИ МД" · носи цените и белега ПРОДАДЕН — за
  *  вписването в Имоти и делата (И92). */
 let otMD: ProchetenoTseniMD | null = null;
+/**
+ * ИМЕТО НА СГРАДАТА · памет на ЕКРАНА, нула събития (резен 29).
+ *
+ * Живее тук, а не в Журнала: докато сградата не е създадена, това е чернова —
+ * записано, то щеше да е решение, което човекът не е взел.
+ */
+let imeNaSgradata = '';
 let smetnato: StoynostNaSastoyanie | null = null;
 let naemiOtZhurnala: ReadonlyMap<string, number> = new Map();
+/** обект → `imotId` · „Продаден" от менюто иска САМОЛИЧНОСТ, не число (29.08) */
+let imotiPoObekt: ReadonlyMap<string, string> = new Map();
+/** кои обекти вече имат сделка · продаденото се чете И от Журнала */
+let prodadeniOtZhurnala: ReadonlySet<string> = new Set();
 /** Коя цена се пуска при износ. Негов отговор: „и двете" · изборът се помни. */
 let koyaTsena: KoyaTsena = chetiEkranno<KoyaTsena>('stoynost.koyaTsena', 'dvete');
 let vest = '';
@@ -143,6 +161,26 @@ export function narisuvayStoynost(): string {
             : 'оценката · годишен наем ÷ доходност'
         }</span>
       </div>
+      <div class="plochka golyama" data-pole="stoynost-v">
+        <span class="etiket">В · по разход</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.razhod_st) : '—'}</span>
+        <span class="pod">${
+          smetnato
+            ? `земя + строителство − овехтяване · закръглено ${sZnak(smetnato.razlika_razhod_st)}`
+            : 'себестойността · земята НЕ овехтява'
+        }</span>
+      </div>
+      <div class="plochka golyama" data-pole="stoynost-saglasuvana">
+        <span class="etiket">Съгласуваната</span>
+        <span class="chislo" translate="no">${smetnato ? pishi(smetnato.saglasuvana_st) : '—'}</span>
+        <span class="pod">${
+          smetnato
+            ? `${ekraniraj(sluchay(n.sluchay).ime)} · ${vProtsent(n.tegla.pazaren_bt)} / ${vProtsent(
+                n.tegla.dohoden_bt,
+              )} / ${vProtsent(n.tegla.razhoden_bt)} · закръглено ${sZnak(smetnato.razlika_saglasuvana_st)}`
+            : 'трите подхода, претеглени'
+        }</span>
+      </div>
       <div class="plochka">
         <span class="etiket">Матрица</span>
         <span class="chislo malka" translate="no">${ekraniraj(n.rayon)}</span>
@@ -164,7 +202,7 @@ export function narisuvayStoynost(): string {
         <label class="pole tyasno">
           <span>Кои цени се пускат</span>
           <select translate="no" id="koya-tsena">
-            ${(['dvete', 'plosht', 'sastoyanie'] as const)
+            ${(['dvete', 'plosht', 'sastoyanie', 'razhod', 'saglasuvana'] as const)
               .map(
                 (k) =>
                   `<option value="${k}"${k === koyaTsena ? ' selected' : ''}>${IMENA_NA_IZBORA[k]}</option>`,
@@ -179,17 +217,48 @@ export function narisuvayStoynost(): string {
             : ''
         }
       </div>
+      ${
+        /**
+         * „СЪЗДАЙ СГРАДА" · Калкулаторът и РАЖДА (резен 29 · ADR-089).
+         *
+         * Негово: „да ще е най интересно да има създай сграда там . Качваш
+         * таблицата и управлваш" *(р83·[20])*, и обхватът от същия ден: „всипки
+         * се създават от Упрсвление. Само от там.. При сгради ще е от
+         * калкулатова" *(р83·[18])*.
+         *
+         * Редът се ЯВЯВА чак когато има прочетени обекти: бутон, който няма
+         * какво да роди, е надпис (ADR-041).
+         */
+        obekti.length === 0
+          ? ''
+          : `<div class="deystviya" data-sektsiya="sazday-sgrada">
+        <label class="pole">
+          <span>Име на сградата</span>
+          <input translate="no" type="text" id="ime-sgrada" value="${ekraniraj(imeNaSgradata)}"
+                 placeholder="ул. Иван Вазов 12, Пловдив">
+        </label>
+        <button type="button" class="glaven" id="sazday-sgrada">Създай сграда · ${obekti.length} обекта</button>
+        <span class="drebno">Обектите стават <b>Имоти</b> под това име. Второто
+        натискане не удвоява нищо: адресът на действието е сградата и обектът,
+        не случайно число. <b>Дела не се раждат</b> — те са негов сценарий за
+        конкретна сграда, а измислени дела за чужда са по-лоши от липсващи.</span>
+      </div>`
+      }
       <input translate="no" type="file" id="fayl-ploshti" accept=".xlsx,.csv" hidden>
       <input translate="no" type="file" id="fayl-tseni" accept=".xlsx,.csv" hidden>
       <p class="drebno">Площообразуването дава <b>обект · етаж · чиста и обща площ</b>; общите части се смятат от разликата. Ценовата листа дава <b>изложение, стаи и тераси</b> и казва кое е <b>ПРОДАДЕН</b>. Таблицата не се пресъздава — взима се само нужното.</p>
-      <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
+      <p class="drebno"><b>А продава, Б оценява, В казва колко струва да се построи.</b>
+      Съгласуваната ги ПРЕТЕГЛЯ по избрания случай — „професионалната практика не избира
+      един подход, а ги претегля". Подход с нулева стойност отпада и теглото му се
+      пренормира; редът го КАЗВА, вместо цената да падне мълчаливо.</p>
+    <p class="drebno"><b>А продава, Б оценява.</b> А е площ × база × коефициенти за етаж и изложение; Б е годишен наем ÷ доходност. За имотите с наем в Журнала Б ползва <b>действителния</b> наем, не очаквания — и редът го казва. При износ неговите единайсет колони остават непокътнати; сравнението се долепя отдясно.</p>
     </section>
 
     ${smetnato ? tablitsaNaStoynostta(smetnato) : ''}`;
 }
 
 /** Колоните на обектите — фините филтри важат и тук (ADR-022 · вълна 2). */
-function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
+export function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number]>[] {
   return [
     { klyuch: 'obekt', ime: 'Обект', vid: 'tekst', vzemi: (r) => r.obekt },
     {
@@ -205,6 +274,13 @@ function koloniNaObektite(): KolonaSFiltar<StoynostNaSastoyanie['redove'][number
     { klyuch: 'a', ime: 'А · по площ', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.tsena_st) },
     { klyuch: 'b', ime: 'Б · по състояние', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.sastoyanie_st) },
     { klyuch: 'delta', ime: 'Разлика', vid: 'chislo', vzemi: (r) => (r.prodaden ? '' : r.razlika_bt) },
+    { klyuch: 'v', ime: 'В · по разход', vid: 'evro', vzemi: (r) => (r.prodaden ? '' : r.razhod_st) },
+    {
+      klyuch: 'saglasuvana',
+      ime: 'Съгласувана',
+      vid: 'evro',
+      vzemi: (r) => (r.prodaden ? '' : r.saglasuvana_st),
+    },
   ];
 }
 
@@ -213,7 +289,7 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
   const koloni = koloniNaObektite();
   const f = filtriray('stoynost', s.redove, koloni, dnes);
   return `
-    <section>
+    <section data-sektsiya="stoynost-obektite">
       <div class="dyalglava">
         <h2>Обектите</h2>
         <span>${s.redove.length} реда · сборът отгоре е стойността на състоянието</span>
@@ -234,11 +310,38 @@ function tablitsaNaStoynostta(s: StoynostNaSastoyanie): string {
           <span class="suma plateno" data-st="${s.obshto_st}">${pishi(s.obshto_st)}</span>
           <span class="suma plateno" data-st="${s.sastoyanie_st}">${pishi(s.sastoyanie_st)}</span>
           <span class="suma">${vBT(s.razlika_na_metodite_bt)}</span>
+          <span class="suma plateno" data-st="${s.razhod_st}">${pishi(s.razhod_st)}</span>
+          <span class="suma plateno" data-st="${s.saglasuvana_st}">${pishi(s.saglasuvana_st)}</span>
         </div>
       </div>
       ${redZaSkritoto(f, 'stoynost')}
+      <p class="greshka" id="greshka-prodaden"></p>
+      <p class="drebno">Трите точки на реда отварят неговите функции. Днес там
+      има ЕДНА: <b>Продаден</b> — праща реда от цените в таб <b>Продажби</b> и
+      сделката застава в „Продажби Активни", червена, докато не ѝ се зададе
+      състояние.</p>
       <p class="drebno">Цената на всеки обект е закръглена <b>нагоре до стотица</b>; сборът се смята от <b>точните</b> цени и се закръгля веднъж — закръгленото никога не влиза в сбор. Скритото от филтъра ПАК влиза в сбора отгоре — той е стойността на състоянието, не на екрана (правило 23).</p>
     </section>`;
+}
+
+/**
+ * ТРИТЕ ВЕРТИКАЛНИ ТОЧКИ на един ред · неговата поръчка от 29.08.
+ *
+ *   „Всеки имот след като е вкаран в Калкулатора да има избор на всеки имот с
+ *    3 вертикални точки за различни функции които да се вкарат там ако има
+ *    смисъл и е по добре за кода. Там избираш продаден и го праща от цени в
+ *    таб Продажби."
+ *
+ * ЕДНА функция днес, и тя е неговата: „Продаден". Менюто е ОТВОРЕНО за още —
+ * но празни пунктове „скоро" не се слагат: надпис върху непостроено е точно
+ * онова, което ADR-041 брои като дефект.
+ *
+ * ПРОДАДЕНИЯТ РЕД НЕ ГО ПОКАЗВА · там вече няма какво да се избира.
+ */
+function tochkiteNaReda(r: StoynostNaSastoyanie['redove'][number]): string {
+  if (r.prodaden) return '';
+  return `<button type="button" class="tochki" data-prodaden="${ekraniraj(r.obekt)}"
+          title="Продаден · праща реда в Продажби">⋮</button>`;
 }
 
 function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
@@ -246,7 +349,7 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
     <div class="red stoynost${r.prodaden ? ' mahnata' : ''}" translate="no">
       <span class="kletka"><b>${ekraniraj(r.obekt)}</b>${
         r.terasi_kvsm ? `<span>тераса ${kvSmVM2(r.terasi_kvsm)} м²</span>` : ''
-      }</span>
+      }${tochkiteNaReda(r)}</span>
       <span class="kletka"><span>${ekraniraj(r.etazh) || '—'}</span><span>${IMENA_NA_VIDOVETE_OBEKT[r.vid]}${
         r.stai ? ` · ${r.stai} стаи` : ''
       }</span></span>
@@ -263,6 +366,20 @@ function redNaObekt(r: StoynostNaSastoyanie['redove'][number]): string {
         r.prodaden ? '' : pishi(r.sastoyanie_st)
       }</span>
       <span class="suma">${r.prodaden ? '' : vBT(r.razlika_bt)}</span>
+      <span class="suma${r.prodaden ? '' : ' plateno'}"${r.prodaden ? '' : ` data-st="${r.razhod_st}"`}>${
+        r.prodaden ? '' : pishi(r.razhod_st)
+      }</span>
+      <span class="kletka suma"${r.prodaden ? '' : ` data-st="${r.saglasuvana_st}"`}>${
+        r.prodaden
+          ? ''
+          : `<span>${pishi(r.saglasuvana_st)}</span>${
+              // ОТПАДНАЛИЯТ ПОДХОД СЕ КАЗВА НА РЕДА · инак теглото му се яде и
+              // цената пада, без нищо на екрана да го обяснява (правило 15).
+              r.otpadnali.length
+                ? `<span class="znachka tiha" data-otpadnali>без ${ekraniraj(r.otpadnali.join(' · '))}</span>`
+                : ''
+            }`
+      }</span>
     </div>`;
 }
 
@@ -299,6 +416,54 @@ export function zakachiStoynost(
   prerisuvay: () => Promise<void>,
 ): void {
   /**
+   * ТРИТЕ ТОЧКИ · „Там избираш продаден и го праща от цени в таб Продажби."
+   *
+   * ЕДНО СЪБИТИЕ, не две: сделката се отваря в състояние „не е зададено" и
+   * стои ЧЕРВЕНА в Продажби, докато човек не ѝ каже какво е (ADR-078 §6).
+   * Купувачът и числата още не се знаят — измислени тук, те щяха да влязат в
+   * книгата като факт.
+   *
+   * ОТКАЗЪТ СЕ КАЗВА: обект, чието име не се връзва с имот (вид + номер), няма
+   * какво да продаде — и екранът го обяснява, вместо да мълчи (правило 15).
+   */
+  for (const b of koren.querySelectorAll<HTMLElement>('[data-prodaden]')) {
+    b.addEventListener('click', async () => {
+      const obekt = b.dataset['prodaden'] ?? '';
+      const kazhi = koren.querySelector<HTMLElement>('#greshka-prodaden');
+      if (kazhi) kazhi.textContent = '';
+      const imotId = imotatNaObekta(obekt, imotiPoObekt);
+      if (imotId === undefined) {
+        if (kazhi) {
+          kazhi.textContent =
+            `„${obekt}" не се връзва с имот по вид и номер. Сделката иска имот — ` +
+            'от него се четат „Обект" и „Място".';
+        }
+        return;
+      }
+      try {
+        await k.deystviya.zapishiProdazhba(
+          {
+            prodazhbaId: `PR:${crypto.randomUUID()}`,
+            imotId,
+            kupuvach: '',
+            telefon: '',
+            tsena_st: 0,
+            prodazhba_st: 0,
+            smr_st: 0,
+            pd_st: 0,
+            sastoyanie: 'nezadadeno',
+          },
+          { opId: `prodazhba-ot-kalkulatora:${crypto.randomUUID()}` },
+        );
+        k.vest('dobre', `${obekt} е продаден · сделката чака да ѝ се зададе състояние.`);
+        await prerisuvay();
+      } catch (err) {
+        if (kazhi) kazhi.textContent = dumiZaGreshka(err);
+      }
+    });
+  }
+
+  /**
    * ЛИСТАТА СЕ СМЯТА С НАСТРОЙКИТЕ ОТ СЕКЦИЯ „КАЛКУЛАТОР".
    *
    * Това е връзката между двете секции и целият смисъл на разделянето: смени
@@ -318,6 +483,7 @@ export function zakachiStoynost(
       otLista,
       matritsaOtNastroyki(nastroykiteNaKalkulatora()),
       naemiOtZhurnala,
+      prodadeniOtZhurnala,
     );
     const parvi = smetnato.redove.find((r) => !r.prodaden) ?? smetnato.redove[0];
     if (parvi) {
@@ -337,9 +503,24 @@ export function zakachiStoynost(
     const og = await k.deystviya.ogledalo();
     const imoti = [...og.imoti.values()].map((i) => {
       const naem = [...og.naemi.values()].find((n) => n.imotId === i.id && !n.prekraten);
-      return { edinitsa: i.edinitsa, naem_mesechen_st: naem?.naem_st ?? 0 };
+      return { id: i.id, edinitsa: i.edinitsa, naem_mesechen_st: naem?.naem_st ?? 0 };
     });
     naemiOtZhurnala = kartaNaNaemite(imoti);
+    imotiPoObekt = kartaNaImotite(imoti);
+    /**
+     * ПРОДАДЕНОТО СЕ ЧЕТЕ И ОТ ЖУРНАЛА, не само от неговия файл (29.08).
+     *
+     * Негово: „Там избираш продаден и го праща от цени в таб Продажби."
+     * Значи щом за един имот вече има сделка, Калкулаторът трябва да го знае —
+     * инак изборът щеше да е бутон без последица на екрана, от който тръгва.
+     */
+    const sImot = new Map<string, string>();
+    for (const [obekt, imotId] of imotiPoObekt) sImot.set(imotId, obekt);
+    prodadeniOtZhurnala = new Set(
+      [...og.prodazhbi.values()]
+        .map((pr) => sImot.get(pr.imotId))
+        .filter((x): x is string => x !== undefined),
+    );
   };
 
   // Секция „Калкулатор" · всяка промяна горе преизчислява листата долу.
@@ -353,6 +534,42 @@ export function zakachiStoynost(
 
   koren.querySelector<HTMLButtonElement>('#cheti-ploshti')?.addEventListener('click', () => {
     poleto('fayl-ploshti')?.click();
+  });
+
+  // ── „СЪЗДАЙ СГРАДА" · Калкулаторът и РАЖДА (резен 29 · ADR-089) ──────────
+  koren.querySelector<HTMLInputElement>('#ime-sgrada')?.addEventListener('change', (e) => {
+    imeNaSgradata = (e.target as HTMLInputElement).value;
+  });
+
+  koren.querySelector<HTMLButtonElement>('#sazday-sgrada')?.addEventListener('click', async (e) => {
+    const buton = e.target as HTMLButtonElement;
+    buton.disabled = true;
+    try {
+      const adres = proveriImetoNaSgradata(imeNaSgradata);
+      const { novi, veche } = zaVpisvane(obekti, adres, await k.deystviya.ogledalo());
+
+      for (const ob of novi) {
+        await k.deystviya.dobaviImot(
+          `I:${crypto.randomUUID()}`,
+          { adres, edinitsa: ob.obekt, ploshtad_kvsm: ploshttaZaImota(ob) },
+          // АДРЕСЪТ НА ДЕЙСТВИЕТО, не случайно число: второто натискане връща
+          // същия резултат, вместо да роди втори имот със същото име.
+          { opId: opIdNaObekta(adres, ob.obekt) },
+        );
+      }
+
+      // Партида без сверка не се приема · и нулата се КАЗВА (правило 7).
+      const sv = sveriSazdavaneto(obekti.length, 0, novi.length, veche, new Date().toISOString());
+      k.vest(
+        sv.nared ? 'dobre' : 'zle',
+        `„${adres}": ${novi.length} нови имота${veche > 0 ? ` · ${veche} вече ги имаше` : ''}. ` +
+          `Сверка вход↔изход: ${sv.vhod} → ${sv.izhod}, разлика ${sv.razlika}. ` +
+          'Дела не се раждат — те са сценарий за конкретна сграда.',
+      );
+    } catch (err) {
+      k.vest('zle', err instanceof Error ? err.message : String(err));
+    }
+    await prerisuvay();
   });
   koren.querySelector<HTMLButtonElement>('#cheti-tseni')?.addEventListener('click', () => {
     poleto('fayl-tseni')?.click();

@@ -273,6 +273,19 @@
   --mastilo: #2A2521;
   --mastilo2: #6E645B;
   --liniya: #E3DACE;
+  /* ЗЕБРАТА И ПОСОЧЕНИЯТ РЕД · измерени, не подбрани на око (резен 9в).
+     Негово: „сиво и бяло с ДОБЪР КОНТРАСТ за окото".
+
+       зебра ↔ бяло          1,136 : 1   ивицата се вижда
+       посочен ↔ бяло        1,274 : 1   (беше 1,03 — практически невидим)
+       посочен ↔ зебра       1,122 : 1   личи и върху ивица
+       мастило2 върху зебра  5,08  : 1   AA
+       мастило2 върху посочен 4,53 : 1   AA
+
+     ЗЕБРАТА НЕ Е `--panel`. Панелът вече значи „това е глава, сбор или шапка
+     на група"; ивица със същия тон би откраднала точно това. */
+  --zebra: #F4F0E9;
+  --posochen: #EAE3D8;
   --aktsent: #B25E38;
   --aktsent-tumen: #8E4526;
   --zeleno: #2E7D5E;
@@ -283,6 +296,12 @@
      2 дниу свети в червено." Тези четири не са палитра — те са правило. */
   --srok-normalno: #7A9E8E;
   --srok-zhalto: #C99A2E;
+  /* ЖЪЛТОТО ИМА ДВЕ ЛИЦА, защото има две задачи (резен 9в).
+     `--srok-zhalto` пълни ЛЕНТАТА и си остава негово. Като ТЕКСТ върху бяло
+     обаче то дава 2,58 : 1 — пада и AA (4,5), и дори 3 : 1. Затова текстът
+     получава свой, по-тъмен тон: 5,33 : 1 върху бяло, 4,65 върху панела.
+     Прагът не е избран — той е записан и се ПЕЧАТА от прохода. */
+  --srok-zhalto-tekst: #8C6408;
   --srok-cherveno: #C0442A;
   --srok-prosrocheno: #8E2A16;
   /* „всички проекти с един цвят тъмно графитено" (р52·[221]) */
@@ -300,7 +319,19 @@
      „по-голям текст" на системата) и расте леко на широк екран (vw
      компонентът). Числата пазят ТОЧНИЯ стар пропорционален мащаб (базата си
      остава 14px = 1rem) — само единицата стана адаптивна. */
-  --text-base: clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem);
+  /* РАЗМЕРЪТ НА ТЕКСТА · лост, видим по всяко време (резен 10 · негова дума,
+     27.08: „Бутоните за размера на текста да е видим по всяко време горе в
+     дясно, на всеки прозорец").
+
+     Числото е МНОЖИТЕЛ, не нова скала: `clamp(…rem…)` следва настройката на
+     устройството (резен 1) и остава. Човек със слабо зрение, който си е вдигнал
+     шрифта в браузъра, инак би загубил своето при първото натискане.
+
+     Стои на КОРЕНА нарочно: изскачащият прозорец виси на `body`, значи
+     наследява същото число. Сложено на `.telo`, то щеше да спре точно на
+     границата на прозореца. */
+  --golemina: 1;
+  --text-base: calc(clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem) * var(--golemina));
   --text-xs: calc(var(--text-base) * 0.79);
   --text-sm: calc(var(--text-base) * 0.89);
   --text-md: var(--text-base);
@@ -331,9 +362,30 @@ body {
 a { color: var(--aktsent); text-decoration: none; }
 a:hover { color: var(--aktsent-tumen); }
 
-.ekran { display: flex; min-height: 100vh; }
+/* ── ЕДНА СКРОЛИРАЩА КУТИЯ НА ЕКРАН (резен 9а) ──────────────────────────
+   Негово: „Хедърите също при скрол ТРЯБВАШЕ ДА СЕ ЗАДЪРЖАТ."
 
-/* ── страничната лента ───────────────────────────────────────────── */
+   ПРЕМЕРЕНОТО, което наложи този избор (1440×900, Имоти с 14 реда): страницата
+   е 2323px, а главата пада 929 → 429 — ОТИВА СИ, дори когато таблицата скролва
+   САМА. Причината: `sticky top:0` брои спрямо СВОЯ скролиращ предшественик, а
+   окото гледа страницата. Две вложени кутии не могат едновременно да залепят
+   глава за окото.
+
+   Затова кутията е ЕДНА и това е `.telo`. Оттам и главата (`top:0`), и
+   замразената първа колона (`left:0`) залепват за ОКОТО, а не за таблицата.
+
+   ЗАЩО НЕ „само хоризонтален скрол на таблицата": `overflow-x: auto` с
+   `overflow-y: visible` е НЕВЪЗМОЖНО в CSS — `visible` се смята на `auto`, щом
+   другата ос не е `visible`. Тоест всяко `overflow` върху таблицата я прави
+   скролираща кутия и главата пак се лепи за нея. Няма трети път.
+
+   ЦЕНАТА, приета: широка таблица влачи настрани целия екран, не само себе си —
+   поведението на Ексел вътре в лист. */
+.ekran { display: flex; height: 100dvh; position: relative; }
+
+/* ── страничната лента · свива се и се застопорява (ADR-058) ────────
+   Разтворената при минаване с мишка ЛЯГА върху екрана, не бута таблицата:
+   местен ред под курсора значи натиснато друго, не което човек е гледал. */
 .strana {
   width: 232px;
   flex-shrink: 0;
@@ -341,8 +393,57 @@ a:hover { color: var(--aktsent-tumen); }
   border-right: 1px solid var(--liniya);
   display: flex;
   flex-direction: column;
+  /* СВОЙ скрол (резен 9а): при единайсет пункта с падащи редове лентата става
+     по-висока от екрана — премерено 1003px при видими 900 — и БУТАШЕ цялата
+     страница, с което главата на таблицата пак си отиваше. */
+  overflow-y: auto;
 }
 .marka { padding: 24px 20px 20px; display: flex; flex-direction: column; gap: 2px; }
+/* СВИТАТА ЛЕНТА · остават само знаците. */
+.strana.svita { width: 52px; }
+.strana.svita .marka { padding: 18px 8px 12px; align-items: center; }
+.strana.svita .marka b { font-size: 1rem; }
+.strana.svita { overflow: hidden; }
+.strana.svita .marka span,
+.strana.svita .navime,
+.strana.svita .broyach,
+.strana.svita .strelka-dolu,
+.strana.svita .nastroyki-red,
+.strana.svita .ekran-red,
+/* СТРЕЛКИТЕ СИ ОТИВАТ СЪС СВИВАНЕТО · в 52 пиксела няма къде да застанат, а
+   стърчащи ▲▼ изглеждат като счупен екран, не като свита лента. */
+.strana.svita .navmesti,
+.strana.svita .veriga { display: none; }
+/* …и се връщат, щом лентата се разтвори при минаване. */
+.strana.svita:hover .navmesti, .strana.svita:focus-within .navmesti { display: flex; }
+/* Марката се свива до първата буква · цялото име не се побира в 52px и
+   стърчащият му остатък изглежда като счупен екран, не като свита лента. */
+.strana.svita .marka b { font-size: 0; }
+.strana.svita .marka b::first-letter { font-size: 1.214rem; }
+.strana.svita .navred { justify-content: center; padding: 9px 0; }
+/* Разтваря се при минаване с мишка и при фокус ВЪТРЕ — иначе клавиатурата
+   стига до пункт, чието име не се вижда. */
+.strana.svita:hover, .strana.svita:focus-within {
+  position: absolute; top: 0; bottom: 0; left: 0; z-index: 40;
+  width: 232px; box-shadow: 6px 0 20px rgba(42, 37, 33, 0.12);
+}
+.strana.svita:hover .marka, .strana.svita:focus-within .marka { padding: 24px 20px 20px; align-items: stretch; }
+.strana.svita:hover, .strana.svita:focus-within { overflow: visible; }
+.strana.svita:hover .marka b, .strana.svita:focus-within .marka b { font-size: 1.214rem; }
+.strana.svita:hover .marka span, .strana.svita:focus-within .marka span,
+.strana.svita:hover .navime, .strana.svita:focus-within .navime,
+.strana.svita:hover .broyach, .strana.svita:focus-within .broyach,
+.strana.svita:hover .strelka-dolu, .strana.svita:focus-within .strelka-dolu,
+.strana.svita:hover .veriga, .strana.svita:focus-within .veriga { display: revert; }
+.strana.svita:hover .navred, .strana.svita:focus-within .navred { justify-content: flex-start; padding: 9px 10px; }
+/* Копчето · дребно, в шапката на лентата. */
+.svivach {
+  background: none; border: none; border-radius: 4px; padding: 4px;
+  color: var(--mastilo2); align-self: flex-end; margin-top: -4px;
+}
+.svivach:hover, .svivach:focus-visible { background: #EAE2D6; }
+.svivach[aria-pressed="false"] svg { opacity: 0.5; }
+.strana.svita .svivach { align-self: center; }
 .marka b { font-family: Literata, Georgia, serif; font-size: 1.214rem; font-weight: 600; letter-spacing: -0.01em; }
 .marka span { font-size: 0.786rem; color: var(--mastilo2); letter-spacing: 0.08em; text-transform: uppercase; }
 
@@ -373,7 +474,35 @@ a:hover { color: var(--aktsent-tumen); }
 .shapka p { margin: 0; font-size: 0.929rem; color: var(--mastilo2); }
 .desno-gore { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 
-.telo { flex-grow: 1; padding: var(--space-lg); display: flex; flex-direction: column; gap: var(--space-md); }
+/* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
+   показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
+   шапката, а лост зад воала е лост, който го няма. */
+.goleminata { display: inline-flex; align-items: baseline; gap: 2px; }
+.goleminata button {
+  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
+  border-radius: 4px; padding: 2px 8px; line-height: 1.2; cursor: pointer;
+  font-family: inherit;
+}
+.goleminata button:hover { background: var(--panel); color: var(--mastilo); }
+.goleminata button[aria-pressed='true'] {
+  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
+}
+/* Размерите са ЗАКОВАНИ в px, а не в rem: това е ЛЕГЕНДАТА на лоста, а не текст
+   от приложението. Расте ли и тя с избора, трите „A" остават еднакви помежду
+   си и лостът престава да казва кое какво е. */
+.goleminata .golemina-drebno { font-size: 11px; }
+.goleminata .golemina-normalno { font-size: 14px; }
+.goleminata .golemina-edro { font-size: 18px; }
+
+/* В ПРОЗОРЕЦА · горе вдясно, до заглавието. */
+.istoriya-karta { position: relative; }
+.istoriya-karta > .goleminata { position: absolute; top: 14px; right: 14px; }
+
+.telo {
+  flex-grow: 1; min-width: 0; padding: var(--space-lg);
+  display: flex; flex-direction: column; gap: var(--space-md);
+  overflow: auto;
+}
 
 /* ── бутони ──────────────────────────────────────────────────────── */
 button { font-family: inherit; cursor: pointer; }
@@ -393,15 +522,45 @@ button { font-family: inherit; cursor: pointer; }
 a.kato-buton { display: inline-flex; align-items: center; text-decoration: none; }
 
 /* ── плочки ──────────────────────────────────────────────────────── */
-.plochki { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+/* ── ОБОБЩЕНИТЕ ЧИСЛА · числото и думата на ЕДИН ред (ADR-058 §Б) ──────────
+   Негови думи: „полетата където дават цифри… да са по ниски, с текста НЕ над и
+   под цифрата, А ДА Е ДО. Тогава няма да има празни пространства… да се събират
+   повече на ред… и да НЕ ЗАКРИВАТ важността на информацията долу."
+
+   Плочката е капната на 240px и редът НЕ се разтяга (`justify-content: start`)
+   — същият урок като при таблиците в резен 3: `1fr` разтяга пътеките и прави
+   от четири плочки четири широки петна вместо шест събрани. */
+.plochki {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+  justify-content: start; gap: 10px;
+}
+/* Числото ВЛЯВО, етикетът и подтекстът вдясно един под друг · три реда стават
+   един. Разметката на 68-те плочки не се пипа: и трите деца си стоят както са,
+   само мястото им се сменя. */
 .plochka {
   background: #FFFFFF; border: 1px solid var(--liniya); border-radius: 5px;
-  padding: var(--space-sm) var(--space-md) var(--space-sm); display: flex; flex-direction: column; gap: 6px;
+  padding: 6px 10px;
+  display: grid; grid-template-columns: minmax(0, auto) minmax(0, 1fr);
+  grid-template-areas: "chislo etiket" "chislo pod";
+  align-items: center; column-gap: 10px; row-gap: 0;
+}
+.plochka > .etiket { grid-area: etiket; }
+.plochka > .chislo { grid-area: chislo; }
+.plochka > .pod { grid-area: pod; }
+/* ДУМА, НЕ ЧИСЛО · плочките на Таблото носят име, имейл и роля в мястото на
+   числото (`.chislo.malak`). Дума до дума не се чете — там трите реда си
+   остават един под друг. Той каза „полетата където дават ЦИФРИ", и това е
+   точно границата, не изключение от нея. */
+.plochka:has(> .chislo.malak) {
+  display: flex; flex-direction: column; gap: 2px;
 }
 .etiket { font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+/* Числото слиза от 1,929rem: то е ОБОБЩЕНИЕ, а важното стои в таблицата отдолу
+   (негова дума). Мащабът си остава `rem`-базиран (резен 1), значи следва
+   настройката на устройството — числото расте с текста, не отделно от него. */
 .chislo {
-  font-family: Literata, Georgia, serif; font-size: 1.929rem; font-weight: 600;
-  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.05;
+  font-family: Literata, Georgia, serif; font-size: 1.5rem; font-weight: 600;
+  letter-spacing: -0.02em; font-variant-numeric: tabular-nums; line-height: 1.1;
 }
 .pod { font-size: 0.857rem; color: var(--mastilo2); }
 
@@ -410,39 +569,104 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .dyalglava h2 { font-family: Literata, Georgia, serif; font-size: 1.107rem; font-weight: 600; margin: 0; }
 .dyalglava span { font-size: 0.857rem; color: var(--mastilo2); }
 
-/* Таблицата скролва ВЪТРЕ в себе си, като лист на Excel: главата и първата
-   колона стоят замразени, а страницата не подскача. Менюто на филтъра остава
-   достижимо — то е вътре в същия скрол. */
-.tablitsa { border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF; overflow: auto; max-height: 72vh; }
+/* Таблицата НЯМА свой скрол (резен 9а — виж `.ekran` по-горе): скролира
+   `.telo`, и затова главата се лепи за ОКОТО. `width: max-content` държи
+   рамката около редовете ѝ, когато те са по-широки от екрана; `min-width: 100%`
+   я държи цяла, когато не са. */
+.tablitsa {
+  border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
+  width: max-content; min-width: 100%;
+}
 .glava { position: sticky; top: 0; z-index: 3; }
+/* ЖИВАТА ГЛАВА · онази, чиято таблица държи горния ръб (M15 · резен 49).
+   Тя стои НАД останалите, за да не я покрие съседна залепена глава при бърз
+   скрол. Само това — цвят не се мени: смяната трябва да е незабележима, а не
+   да мига. */
+[data-zhiv-hedar] .glava, [data-zhiv-hedar] thead { z-index: 4; }
 .glava > :first-child, .red > :first-child { position: sticky; left: 0; z-index: 1; }
 .glava > :first-child { background: var(--panel); }
 .red > :first-child { background: #FFFFFF; }
-.red:hover > :first-child { background: #FDFBF7; }
 .glava, .red {
   display: grid;
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.6fr) 130px 120px 120px;
-  align-items: center; gap: 16px; padding: 13px 18px;
+  /* `justify-content: start` е ЗАДЪЛЖИТЕЛЕН след капването на fr → px:
+     grid по подразбиране РАЗТЯГА пътеките без `fr`, за да запълни свободното
+     място (justify-content: normal ⇒ stretch за grid) — капнатият max иначе
+     е без ефект, и празнината просто се мести от колоната в опашката. */
+  justify-content: start;
+  grid-template-columns: minmax(0, 440px) minmax(0, 320px) 130px 120px 120px;
+  /* ПЛЪТНОСТТА НА РЕДА · като в Проджект и Ексел (негова дума, 27.08):
+     „да не са толкова високи… максимално без празни пространства колкото е
+     текста". Височината на реда я дава ТЕКСТЪТ, а подложката само го отлепя
+     от линията. Затова 4px отгоре-отдолу, не 13, и по-стегнат интерлиниаж. */
+  align-items: center; gap: 10px; padding: 4px 10px;
+  line-height: 1.35;
   min-width: 720px;
+}
+/* ЕДНА ВИСОЧИНА ЗА ЦЯЛАТА ТАБЛИЦА (резен 9б · негова дума, 27.08):
+   „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ РЕДОВЕ
+   височината, ЗА КОЛОНИТЕ НЕ ВАЖИ."
+
+   Числото стои на ТАБЛИЦАТА, не на реда: така „една за всички" е свойство на
+   едно място, а не обещание, което трябва да се повтори за всеки нов ред.
+   `min-height`, не `height` — ред с повече текст расте, вместо да го отреже;
+   правило от резен 8 („височината я дава ТЕКСТЪТ") остава долната граница.
+
+   КОЛОНИТЕ НЕ СЕ ПИПАТ. Тук няма нито един `grid-template-columns` — всяка
+   таблица си остава със своите ширини (ADR-013: видът и ширината живеят в
+   колоната). */
+.tablitsa { --red-visochina: 48px; }
+.tablitsa .red { min-height: var(--red-visochina); }
+/* ДРЪЖКАТА · долните шест пиксела на реда.
+   Тя е `::after`, а не свой възел: воал-елемент върху всеки ред би застанал
+   между пръста и клетката, а клетката се редактира с двойно натискане (резен
+   „Удобството"). Псевдоелементът получава СВОЙ курсор и се вижда с очи, преди
+   да се натисне — курсорът казва „тук се дърпа", вместо човек да го открива. */
+.tablitsa .red { position: relative; }
+.tablitsa .red::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  cursor: row-resize;
+}
+
+/* ТРИТЕ ГЪСТОТИ · в главата на секцията, до стрелките за подредба. */
+.gastotata { display: inline-flex; gap: 2px; margin-left: 6px; }
+.gastotata button {
+  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
+  border-radius: 4px; padding: 1px 6px; font-size: 0.786rem; line-height: 1.4;
+  cursor: pointer;
+}
+.gastotata button:hover { background: var(--panel); color: var(--mastilo); }
+/* Отбелязаната гъстота е ЕДНА и се смята от числото (`gastotaNa`), не се пази
+   втори път — две памети за едно нещо се разминават при първото влачене. */
+.gastotata button[aria-pressed='true'] {
+  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
 }
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;
-  color: var(--mastilo2); padding-top: 10px; padding-bottom: 10px;
+  color: var(--mastilo2); padding-top: 5px; padding-bottom: 5px;
 }
 .red { border-bottom: 1px solid #EFE8DD; }
 .red:last-child { border-bottom: none; }
-.red:hover { background: #FDFBF7; }
-.kletka { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.kletka b { font-weight: 500; font-size: 0.964rem; }
-.kletka span { font-size: 0.857rem; color: var(--mastilo2); overflow: hidden; text-overflow: ellipsis; }
+/* ЗЕБРАТА стои ПРЕДИ посочването и преди `.red.sbor` НАРОЧНО: така смисловият
+   цвят я надвива сам, по ред на правилата, без нито един `!important`.
+   Ивица, която гаси предупреждение, е по-лоша от липсваща. */
+.red.zebra, .red.zebra > :first-child { background: var(--zebra); }
+.red:hover, .red:hover > :first-child { background: var(--posochen); }
+/* ТЯСНАТА КОЛОНА ПРЕНАСЯ НА НОВ РЕД, не реже с многоточие (негова дума):
+   „ако колоната е тясна минава на следваш ред". Многоточието СКРИВА текст и
+   не казва колко — а в счетоводна книга отрязаното име на доставчик изглежда
+   точно като цяло. `anywhere` реже и вътре в дума, когато думата сама по себе
+   си не се побира (дълъг ЕИК, адрес без интервали). */
+.kletka { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.kletka b { font-weight: 500; font-size: 0.964rem; overflow-wrap: anywhere; }
+.kletka span { font-size: 0.857rem; color: var(--mastilo2); overflow-wrap: anywhere; }
 .suma { font-variant-numeric: tabular-nums; font-size: 1rem; font-weight: 500; text-align: right; }
 
 .znachka { display: inline-flex; align-items: center; gap: 5px; border-radius: 3px; padding: 3px 8px; font-size: 0.821rem; font-weight: 500; white-space: nowrap; }
 .znachka.dobre { background: #E6F0EA; color: var(--zeleno); }
 .znachka.tiha { background: var(--panel); color: var(--mastilo2); }
 
-.prazno { padding: 34px 18px; text-align: center; color: var(--mastilo2); font-size: 0.964rem; line-height: 1.6; }
+.prazno { padding: 18px; text-align: center; color: var(--mastilo2); font-size: 0.964rem; line-height: 1.6; }
 
 /* ── форми ───────────────────────────────────────────────────────── */
 .karta {
@@ -485,7 +709,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 
 /* ── навигация между екраните ───────────────────────────────────────── */
-.nav { display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; }
+/* ДВЕ КОЛОНИ · пунктът и стрелките му падат на ЕДИН ред сами, без обвивка
+   (резен 15). Обвивка би счупила `.nav > [data-ekran]` — селекторът, с който
+   падащият ред на екрана си намира пункта. */
+.nav { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 2px; padding: 8px 12px; }
 .navred {
   display: flex; align-items: center; gap: 10px;
   padding: 9px 10px; border: none; border-radius: 4px;
@@ -493,6 +720,18 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
+/* „Да е СКРИТО с дребни бутончета" — негово (И101). Стрелките се появяват при
+   минаване с мишка ВЪРХУ ЛЕНТАТА и при фокус вътре: клавиатурата стига до тях,
+   без да ги държи пред очите през цялото време. `opacity`, не `display`, за да
+   не скача ширината на реда при всяко минаване. */
+.navmesti { display: flex; flex-direction: column; opacity: 0; transition: opacity 0.12s; }
+.nav:hover .navmesti, .nav:focus-within .navmesti { opacity: 1; }
+.navstrelka {
+  border: none; background: transparent; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.6rem; line-height: 1;
+  padding: 1px 4px; border-radius: 3px;
+}
+.navstrelka:hover { background: #EAE2D6; color: var(--mastilo); }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
 .navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
@@ -507,13 +746,18 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 
 /* ── редове за вземания и плащания ──────────────────────────────────── */
 .glava.plashtane, .red.plashtane {
-  grid-template-columns: 130px minmax(0, 2fr) minmax(0, 110px) 120px 100px;
+  grid-template-columns: 130px minmax(0, 400px) minmax(0, 110px) 120px 100px;
   min-width: 700px;
 }
 .zakasnenie { color: var(--aktsent); font-size: 0.821rem; }
 .suma.duljimo { color: var(--aktsent); }
 .suma.plateno { color: var(--zeleno); }
 .vtorichen.malak { padding: 6px 11px; min-height: 32px; font-size: 0.893rem; }
+/* В РЕД НА ТАБЛИЦА бутонът не бива да вдига реда · иначе редът с бутон е с
+   една трета по-висок от реда без, и таблицата „подскача". Цената е казана:
+   по-малка мишена от препоръчаните 44px — приета за ГЪСТА таблица на десктоп,
+   каквато той поиска („като Проджект и Ексел"); на тесен екран важи медията. */
+.red .vtorichen.malak, .red .strelkichka { min-height: 24px; padding: 2px 8px; }
 
 /* ── ТЕМАТИЧНИТЕ ИКОНИ · знак до всяко управление (И101 т.2 · ADR-045) ───
    Един стил за всички: само контур, цветът идва от текста до тях. Икона със
@@ -544,25 +788,51 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   .desno-gore button.sIkona .duma { display: none; }
   .butoni button.sIkona, .desno-gore button.sIkona { padding: 6px 9px; gap: 0; }
 }
-/* ── ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045) ────────────────── */
-.menyu-nastroyki { display: flex; flex-direction: column; gap: 2px; }
-.menyu-nastroyki .strelka-dolu { margin-left: auto; font-size: 0.786rem; color: var(--mastilo2); }
-.menyu-nastroyki.otvoreno .strelka-dolu { transform: rotate(180deg); }
-.nastroyki-red {
+/* ── ПАДАЩИТЕ РЕДОВЕ В ЛЕНТАТА (И101 т.2 · ADR-045 · ADR-057в) ─────────
+   ЕДИН вид за двата реда: темите на Настройки и секциите на всеки екран.
+   Копие би се разминало при първата смяна на палитрата — обходът за чистота
+   брои точно такива копия. */
+.menyu-nastroyki, .padasht-menyu { display: flex; flex-direction: column; gap: 2px; }
+.menyu-nastroyki .strelka-dolu,
+.padasht-menyu .strelka-dolu { margin-left: auto; font-size: 0.786rem; color: var(--mastilo2); }
+.menyu-nastroyki.otvoreno .strelka-dolu,
+.padasht-menyu > [aria-expanded="true"] .strelka-dolu { transform: rotate(180deg); }
+.nastroyki-red, .padasht-red {
   display: flex; flex-direction: column; gap: 1px;
   margin: 2px 0 6px 8px; padding-left: 8px;
   border-left: 2px solid var(--liniya);
 }
-.nastroyki-red .za-kogo { margin: 2px 0 4px; }
-.nastroyki-red .tema {
+/* ПРИБРАНОТО СЕ ПРИБИРА НАИСТИНА.
+   `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а авторското
+   `display: flex` отгоре я бие — независимо от тежестта на селектора. Значи
+   редът СЕ Е ПРАВИЛ на прибран: атрибутът казваше „скрит", а на екрана си
+   стоеше. Това е било вярно за реда на Настройки от ADR-045 насам и не се е
+   виждало, защото и тестът, и проходът четяха АТРИБУТА, не екрана. */
+.nastroyki-red[hidden], .padasht-red[hidden] { display: none; }
+.nastroyki-red .za-kogo, .padasht-red .za-kogo { margin: 2px 0 4px; }
+/* ГРУПАТА · заглавие и темите под него (ADR-057б).
+   Обвивката е `role="group"` и затова трябва СВОЙ flex: инак темите ѝ спират
+   да наследяват колоната на реда и застават една до друга. */
+.nastroyki-red > [role="group"] { display: flex; flex-direction: column; gap: 1px; }
+/* Заглавието е НАДПИС, не бутон · дребно, разредено, приглушено. Групата
+   „МОЕТО" носи и тема „Моето" — главните букви и разредката ги различават,
+   без да се променя нито едно от двете имена. */
+.nastroyki-red .grupa-zaglavie {
+  margin: 8px 0 2px; padding: 0 8px;
+  font-size: 0.714rem; font-weight: 600; letter-spacing: 0.08em;
+  color: var(--mastilo2);
+}
+.nastroyki-red > [role="group"]:first-of-type .grupa-zaglavie { margin-top: 2px; }
+.nastroyki-red .tema, .padasht-red .tema {
   display: flex; align-items: flex-start; gap: 8px; text-align: left;
   background: none; border: none; border-radius: 4px; padding: 6px 8px;
   color: var(--mastilo); font-family: inherit; font-size: 0.893rem;
 }
-.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible { background: var(--panel); }
+.nastroyki-red .tema:hover, .nastroyki-red .tema:focus-visible,
+.padasht-red .tema:hover, .padasht-red .tema:focus-visible { background: var(--panel); }
 .nastroyki-red .tema .ikona { margin-top: 2px; color: var(--mastilo2); }
-.nastroyki-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.nastroyki-red .dvete b { font-weight: 600; }
+.nastroyki-red .dvete, .padasht-red .dvete { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.nastroyki-red .dvete b, .padasht-red .dvete b { font-weight: 600; }
 
 /* Темата, до която редът те е завел · подчертава се за миг, за да се види
    къде е стигнало окото. Изчезва сама — постоянен белег би останал да лъже. */
@@ -570,7 +840,7 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · осемте параметъра (И96 т.1 · ADR-046) ──── */
 .glava.parametar, .red.parametar {
-  grid-template-columns: minmax(0, 1.4fr) 84px 150px minmax(0, 2fr) 120px;
+  grid-template-columns: minmax(0, 280px) 84px 150px minmax(0, 400px) 120px;
   min-width: 760px;
 }
 .red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
@@ -596,16 +866,16 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── редове с действия ───────────────────────────────────────────────── */
 .glava.imot, .red.imot {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.6fr) 96px 120px 108px 168px;
-  min-width: 860px;
+  grid-template-columns: minmax(0, 360px) minmax(0, 280px) 96px 120px 108px 96px 168px;
+  min-width: 960px;
 }
 .glava.naem, .red.naem {
-  grid-template-columns: minmax(0, 1.7fr) minmax(0, 1.5fr) minmax(0, 1.2fr) 120px 136px 292px;
+  grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;
   min-width: 1040px;
 }
 .butoni { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .glava.vzemane, .red.vzemane {
-  grid-template-columns: minmax(0, 2fr) 92px minmax(0, 130px) 120px 216px;
+  grid-template-columns: minmax(0, 400px) 92px minmax(0, 130px) 120px 216px;
   min-width: 800px;
 }
 
@@ -617,24 +887,72 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ── сметки, ДДС, сверка, калкулатор ────────────────────────────────── */
 .glava.smetka, .red.smetka {
-  grid-template-columns: minmax(0, 2.2fr) 110px 90px 140px;
+  grid-template-columns: minmax(0, 440px) 110px 90px 140px;
   min-width: 640px;
 }
 .glava.dds, .red.dds {
-  grid-template-columns: 92px minmax(0, 2fr) 90px minmax(150px, 190px) 130px;
+  grid-template-columns: 92px minmax(0, 400px) 90px minmax(150px, 190px) 130px;
   min-width: 760px;
 }
 .glava.razhod, .red.razhod {
-  grid-template-columns: minmax(0, 2.2fr) 110px minmax(0, 1.4fr) 130px 110px 108px;
+  grid-template-columns: minmax(0, 440px) 110px minmax(0, 280px) 130px 110px 108px;
   min-width: 900px;
 }
+/* СВЕРКАТА С ИЗВЛЕЧЕНИЕТО (резен 17в) · пет колони, петата носи ДУМИТЕ. */
+/* СПРАВКИТЕ ЗА СЧЕТОВОДСТВОТО (резен 17г) · шест колони, две за двете оси. */
+.glava.spravkared, .red.spravkared {
+  grid-template-columns: minmax(0, 240px) minmax(0, 240px) 90px 130px 130px 140px;
+  min-width: 960px;
+}
+.glava.chakapodavane, .red.chakapodavane {
+  grid-template-columns: 120px 100px 140px;
+  min-width: 360px;
+}
+.glava.izvlechenie, .red.izvlechenie {
+  grid-template-columns: minmax(0, 320px) 110px 110px 130px minmax(0, 260px);
+  min-width: 860px;
+}
 .glava.sverka, .red.sverka {
-  grid-template-columns: minmax(0, 2.4fr) 100px 100px 100px 128px;
+  grid-template-columns: minmax(0, 480px) 100px 100px 100px 128px;
   min-width: 700px;
 }
+/* ПРОДАЖБИ (резен 18б) · ПЕТНАЙСЕТ колони, неговите, в неговия ред.
+   Тясната решетка е нарочна: таблицата се СКРОЛИРА, а не се свива — колона,
+   стисната до нечетимост, е по-лоша от колона, до която се стига с плъзгане. */
+.glava.prodazhbared, .red.prodazhbared {
+  grid-template-columns:
+    minmax(0, 130px) minmax(0, 170px) minmax(0, 150px) 110px
+    108px 108px 108px 108px 108px 108px 108px 108px 108px 108px minmax(0, 130px);
+  min-width: 1720px;
+}
+.red.prodazhbared { cursor: pointer; }
+.red.prodazhbared.izbran { background: var(--toplo); }
+.glava.dvizhenieprodazhba, .red.dvizhenieprodazhba {
+  grid-template-columns: 120px 120px 90px 100px 120px minmax(0, 280px);
+  min-width: 830px;
+}
+/* ТРИТЕ ВЕРТИКАЛНИ ТОЧКИ на ред в Калкулатора (29.08) · дръжка, не бутон с
+   дума: редът е тесен, а функциите ще станат повече. */
+.tochki {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 0 4px;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--mastilo2);
+}
+.tochki:hover { color: var(--aktsent); }
+
+/* ЕТАПИТЕ · номенклатурата в Настройки (29.08 · „да може всеки да рзвие своя бизнес"). */
+.glava.etapred, .red.etapred {
+  grid-template-columns: minmax(0, 240px) 130px 160px;
+  min-width: 530px;
+}
+
 /* Одитният файл (И96 т.11) · оборотната ведомост под секцията SAF-T. */
 .glava.saft, .red.saft {
-  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1.2fr) 130px 130px;
+  grid-template-columns: minmax(0, 440px) minmax(0, 240px) 130px 130px;
   min-width: 680px;
 }
 /* ПРЕЧКИТЕ · какво още спира подаването. Изречения, не флагове — затова
@@ -650,12 +968,96 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   line-height: 1.55;
 }
 .prechki li + li { margin-top: 5px; }
+
+/* РЕГИСТЪРЪТ НА НАЕМИТЕ (резен 13б · ADR-070) · три изгледа върху едни редове. */
+.registar-lostove {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
+.izgledi { display: flex; gap: 2px; }
+/* Превключвателят е ЕДИН ред бутони, не падащо меню: и трите варианта трябва
+   да се ВИЖДАТ наведнъж — той ги сравнява, а скритото не се сравнява. */
+.chip-izgled {
+  font: inherit;
+  font-size: 0.929rem;
+  padding: 6px 14px;
+  cursor: pointer;
+  background: var(--hartiya);
+  color: var(--mastilo2);
+  border: 1px solid var(--liniya);
+}
+.chip-izgled:first-child { border-radius: 6px 0 0 6px; }
+.chip-izgled:last-child { border-radius: 0 6px 6px 0; }
+.chip-izgled:hover { color: var(--mastilo); border-color: var(--mastilo2); }
+.chip-izgled[aria-pressed='true'] {
+  background: var(--mastilo);
+  color: var(--hartiya);
+  border-color: var(--mastilo);
+}
+.registar-grupa { margin-bottom: var(--space-md); }
+.grupa-glava {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-sm);
+  padding: 6px 10px;
+  background: var(--panel);
+  border-radius: 6px 6px 0 0;
+  font-size: 0.964rem;
+}
+.grupa-glava .suma { color: var(--mastilo2); font-size: 0.893rem; }
+.glava.registar, .red.registar {
+  grid-template-columns: minmax(0, 200px) minmax(0, 260px) 92px 120px 120px 120px minmax(0, 210px);
+  min-width: 900px;
+}
+/* Дните закъснение стоят ДО думата, не вместо нея: числото без дума е упрек,
+   а думата без число не казва колко (ADR-032 §1 — състояние никога само с цвят). */
+.zakasnenie {
+  margin-left: 6px;
+  font-size: 0.821rem;
+  color: var(--srok-prosrocheno);
+  font-variant-numeric: tabular-nums;
+}
+
+/* КАКВО НАПУСКА УСТРОЙСТВОТО (резен 17в · ADR-068 · ADR-030 §4).
+   Разгънатите подробности са ТРИ и всяка носи бройка в заглавието си: човек,
+   който не отвори нито една, пак вижда КОЛКО имена ще носи файлът. */
+.opis-imena {
+  margin: 8px 0 0;
+  padding-left: 26px;
+  list-style: disc;
+  font-size: 0.964rem;
+  line-height: 1.55;
+  columns: 260px 3;
+}
+.opis-imena li.trevoga { color: var(--aktsent); font-weight: 600; }
+[data-sektsiya=nap-napuska] details {
+  margin-bottom: 10px;
+  padding: 10px 14px;
+  border: 1px solid var(--liniya);
+  border-radius: 8px;
+  background: var(--panel);
+}
+[data-sektsiya=nap-napuska] summary {
+  cursor: pointer;
+  font-size: 0.964rem;
+  color: var(--mastilo2);
+}
+[data-sektsiya=nap-napuska] details ul { margin: 8px 0 0; padding-left: 26px; line-height: 1.55; }
+/* Достъпът за счетоводителя · две колони, втората носи цяло изречение. */
+[data-sektsiya=nap-dostap] .glava.opis, [data-tablitsa=nap-dostap] .red.opis {
+  grid-template-columns: 200px minmax(0, 1fr);
+  min-width: 560px;
+}
 .glava.kontragent, .red.kontragent {
-  grid-template-columns: minmax(0, 2.2fr) 120px 130px 140px minmax(0, 1.4fr);
+  grid-template-columns: minmax(0, 440px) 120px 130px 140px minmax(0, 280px);
   min-width: 820px;
 }
 .glava.smyatane, .red.smyatane {
-  grid-template-columns: minmax(0, 2fr) 90px 120px 120px 120px;
+  grid-template-columns: minmax(0, 400px) 90px 120px 120px 120px;
   min-width: 640px;
 }
 .red.sbor {
@@ -697,79 +1099,82 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 .filtar { display: flex; gap: 6px; flex-wrap: wrap; }
 .vtorichen.malak.tuk { background: var(--mastilo); color: var(--hartiya); border-color: var(--mastilo); }
 .glava.razlika, .red.razlika {
-  grid-template-columns: 104px minmax(0, 2.2fr) 108px 116px 116px;
+  grid-template-columns: 104px minmax(0, 440px) 108px 116px 116px;
   min-width: 720px;
 }
 .glava.propusnat, .red.propusnat {
-  grid-template-columns: 84px minmax(0, 1fr);
+  grid-template-columns: 84px minmax(0, 200px);
   min-width: 360px;
 }
 .red.propusnat span:last-child { color: var(--aktsent); font-size: 0.893rem; }
 
 /* ── Настройки · бутоните са модели на пътища ────────────────────────── */
 .glava.buton, .red.buton {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 96px minmax(0, 1.8fr) 168px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 96px minmax(0, 360px) 168px;
   min-width: 760px;
 }
 .glava.model, .red.model {
-  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1.8fr) 130px minmax(0, 1.6fr);
+  grid-template-columns: minmax(0, 280px) minmax(0, 360px) 130px minmax(0, 320px);
   min-width: 700px;
 }
 /* Стойност на Състояние · Калкулаторът */
+/* ЕДИНАЙСЕТ КОЛОНИ от резен 16б: трите подхода плюс съгласуваната. Решетката
+   се брои с колоните в `koloniNaObektite` — разминат брой оставя клетки да
+   преливат на втори ред, а сборът долу да се измести с една колона. */
 .glava.stoynost, .red.stoynost {
-  grid-template-columns: minmax(0, 1.6fr) 130px 84px 84px 96px 118px 128px 128px 78px;
-  min-width: 1040px;
+  grid-template-columns: minmax(0, 320px) 130px 84px 84px 96px 118px 128px 128px 78px 128px 140px;
+  min-width: 1320px;
 }
 
 /* ── Личният таб · преносът и достъпите (И98 · И99) ─────────────────── */
 .glava.prenos, .red.prenos {
-  grid-template-columns: 44px minmax(0, 1.8fr) minmax(0, 1.4fr) 190px;
+  grid-template-columns: 44px minmax(0, 360px) minmax(0, 280px) 190px;
   min-width: 640px;
 }
 .glava.dostap, .red.dostap {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.6fr) 130px minmax(0, 1.4fr) 110px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 320px) 130px minmax(0, 280px) 110px;
   min-width: 780px;
 }
 
 /* ── Личните ПАРИ · теми, редове, кредити, план, партиди (И96 т.10) ─── */
 .glava.tema, .red.tema {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 130px 130px 90px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 130px 130px 90px;
   min-width: 700px;
 }
 .glava.tema-opis, .red.tema-opis {
-  grid-template-columns: minmax(0, 1.6fr) minmax(0, 1.2fr) 190px;
+  grid-template-columns: minmax(0, 320px) minmax(0, 240px) 190px;
   min-width: 560px;
 }
 .glava.dvizhenie, .red.dvizhenie {
-  grid-template-columns: 110px minmax(0, 1.8fr) 190px minmax(0, 1.4fr) 110px;
+  grid-template-columns: 110px minmax(0, 360px) 190px minmax(0, 280px) 110px;
   min-width: 820px;
 }
 .glava.kredit, .red.kredit {
-  grid-template-columns: minmax(0, 1.6fr) 130px 90px 130px 140px 140px;
+  grid-template-columns: minmax(0, 320px) 130px 90px 130px 140px 140px;
   min-width: 820px;
 }
 .glava.plan, .red.plan {
-  grid-template-columns: 150px 110px minmax(0, 1.6fr) 150px minmax(0, 1.4fr);
+  grid-template-columns: 150px 110px minmax(0, 320px) 150px minmax(0, 280px);
   min-width: 820px;
 }
 .glava.partida, .red.partida {
-  grid-template-columns: minmax(0, 1.6fr) 90px 90px 130px 130px 130px;
+  grid-template-columns: minmax(0, 320px) 90px 90px 130px 130px 130px;
   min-width: 780px;
 }
 
 /* ── Журналът от таблица · промените и свръзките (И96 т.8) ──────────── */
 .glava.zhurnal-promyana, .red.zhurnal-promyana {
-  grid-template-columns: 70px minmax(0, 1fr) minmax(0, 1.4fr) minmax(0, 1.4fr);
+  grid-template-columns: 70px minmax(0, 200px) minmax(0, 280px) minmax(0, 280px);
   min-width: 560px;
 }
 .glava.svrazka, .red.svrazka {
-  grid-template-columns: 120px minmax(0, 1.4fr) 130px 120px minmax(0, 1.8fr) 90px;
+  grid-template-columns: 120px minmax(0, 280px) 130px 120px minmax(0, 360px) 90px;
   min-width: 860px;
 }
 
 /* ── секция „Калкулатор" · входът, легендата и разбивката (И96 т.2) ──── */
 .glava.kalk-koef, .red.kalk-koef {
-  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.6fr) 100px 140px 110px;
+  grid-template-columns: minmax(0, 240px) minmax(0, 320px) 100px 140px 110px;
   min-width: 700px;
 }
 .red.kalk-koef select {
@@ -812,7 +1217,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
   /* Колона · Вид · СТОЙНОСТ · Номенклатура · Готово меню · бутони.
      „Стойност" е новата: тя казва дали сборът на колоната отива в Приходи и
      Разходи (ADR-014), а дотук се задаваше само с гадаене при внасяне. */
-  grid-template-columns: minmax(0, 1.5fr) 118px 150px minmax(0, 1.2fr) minmax(0, 1.4fr) 260px;
+  grid-template-columns: minmax(0, 300px) 118px 150px minmax(0, 240px) minmax(0, 280px) 260px;
   min-width: 980px;
 }
 .red.redaktor input {
@@ -830,15 +1235,15 @@ table.razbivka .drebno { font-size: 0.75rem; }
    „евро" и „число" изглеждат като разлика в надпис, а не в поведение. */
 .red.redaktor .kletka > span { font-size: 0.75rem; color: var(--mastilo2); }
 .glava.opis, .red.opis {
-  grid-template-columns: minmax(0, 1.6fr) 120px minmax(0, 1.4fr) minmax(0, 1.6fr);
+  grid-template-columns: minmax(0, 320px) 120px minmax(0, 280px) minmax(0, 320px);
   min-width: 700px;
 }
 .glava.zapisanasverka, .red.zapisanasverka {
-  grid-template-columns: minmax(0, 2fr) 116px 116px 116px 128px;
+  grid-template-columns: minmax(0, 400px) 116px 116px 116px 128px;
   min-width: 640px;
 }
 .glava.deystvie, .red.deystvie {
-  grid-template-columns: 40px minmax(0, 2fr) 96px 120px;
+  grid-template-columns: 40px minmax(0, 400px) 96px 120px;
   min-width: 440px;
 }
 
@@ -869,7 +1274,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .legenda-vhod { margin: 10px 0; }
 .legenda-vhod summary { cursor: pointer; font-size: 0.929rem; color: var(--mastilo2); }
 .glava.legenda, .red.legenda {
-  grid-template-columns: 56px minmax(0, 1.2fr) 150px minmax(0, 2.4fr);
+  grid-template-columns: 56px minmax(0, 240px) 150px minmax(0, 480px);
   min-width: 720px;
 }
 
@@ -889,47 +1294,103 @@ table.razbivka .drebno { font-size: 0.75rem; }
 }
 .trevozhno { color: var(--aktsent); }
 .glava.koef-parametar, .red.koef-parametar {
-  grid-template-columns: minmax(0, 1fr) 160px;
+  grid-template-columns: minmax(0, 200px) 160px;
   min-width: 380px;
 }
 .red.koef-rezultat { background: var(--panel); }
 .glava.koef-red, .red.koef-red {
-  grid-template-columns: minmax(0, 1.5fr) minmax(0, 2fr) 140px 130px;
-  min-width: 820px;
+  grid-template-columns: minmax(0, 260px) minmax(0, 300px) 150px 130px minmax(0, 220px) 120px;
+  min-width: 1120px;
 }
 .red.koef-red .koef-formula { background: none; border: none; padding: 0; font-size: 0.857rem; }
 
+/* ── СПАРКЛАЙН и BULLET (резен 35 · „Петте + спарклайни + bullet") ─────── */
+/* Спарклайнът стои ВЪТРЕ в реда, до числото: той дава ПОСОКАТА, а числото —
+   размера. Затова е малък, без ос и без етикети — порасне ли, си иска ос. */
+.spark-kutiya { display: flex; align-items: center; gap: 6px; }
+.spark { display: block; overflow: visible; }
+.spark-liniya { fill: none; stroke: var(--aktsent); stroke-width: 1.5; stroke-linejoin: round; }
+.spark-tochka { fill: var(--aktsent); }
+
+/* BULLET · стойността срещу обичайното за занаята. Целта е ИВИЦА, не черта:
+   „банките искат 1,25 – 1,50" е диапазон, и една черта би скрила едната му
+   половина. Дяловете се слагат от JS (CSP отказва inline стил). */
+.bullet-kutiya { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bullet {
+  position: relative; display: block; height: 10px; width: 100%;
+  background: var(--zebra); border-radius: 2px; overflow: hidden;
+}
+.bullet-tsel {
+  position: absolute; top: 0; bottom: 0;
+  left: var(--ot, 0%); width: max(2px, calc(var(--do, 0%) - var(--ot, 0%)));
+  background: var(--mastilo2); opacity: 0.35;
+}
+.bullet-stoynost {
+  position: absolute; top: 3px; bottom: 3px; left: 0; width: var(--dyal, 0%);
+  border-radius: 2px;
+}
+.bullet-stoynost.v-tsel { background: var(--zeleno); }
+.bullet-stoynost.vun { background: var(--aktsent); }
+
 /* ── Гантът · таблицата И диаграмата, диаграмата ОТДЯСНО (И96 т.4) ────── */
+/* ПОДВИЖНАТА ГРАНИЦА между таблицата и диаграмата (резен 12 · негова дума,
+   27.08): „Диаграмата се вижда 2 ТРЕТИ от екрана, и също границата между
+   таблицата и диаграмата до нея СЕ МЕСТИ С МИШКАТА."
+
+   `--dyal` е колко от ширината взима ДИАГРАМАТА. Подразбраното е 2/3 — по-късна
+   дума от „при старт е разделено на 2" (ADR-018 §4 · правило 28). */
 .gant-dvete {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-  gap: 14px;
+  --dyal: 0.667;
+  grid-template-columns: minmax(0, calc((100% - 20px) * (1 - var(--dyal)))) 6px minmax(0, 1fr);
+  gap: 7px;
   align-items: start;
 }
 .gant-dvete.bez-diagrama { grid-template-columns: minmax(0, 1fr); }
+.gant-dvete.bez-diagrama .gant-granitsa { display: none; }
+/* Дръжката е СВОЙ възел, защото стои МЕЖДУ двете половини, в процепа — няма чий
+   ръб да заеме. При реда беше обратното (резен 9б): там воал върху реда би
+   застанал между пръста и клетката. */
+.gant-granitsa {
+  align-self: stretch; min-height: 120px; border-radius: 3px;
+  background: var(--liniya); cursor: col-resize;
+}
+.gant-granitsa:hover, .gant-granitsa:focus-visible {
+  background: var(--aktsent); outline: none;
+}
 .gant-tablitsata, .gant-diagramata { min-width: 0; }
-/* На тесен екран двете една до друга не се четат — падат една под друга,
-   таблицата първа, защото тя носи числата. */
+/* НА ТЕСЕН ЕКРАН · неговите ДВА режима, не един (27.08): „на телефона
+   диаграмата може да я пускаш в този режим на 1/3 ИЛИ ДА Я СКРИЕШ".
+
+   Затова тук двете НЕ падат една под друга: диаграмата стои до таблицата на
+   една трета, а другият режим е бутонът „Скрий диаграмата", който вече го има.
+   Дръжката се прибира — на тесен екран съотношението е заковано на неговото
+   число, а не се влачи с пръст върху шест пиксела. */
 @media (max-width: 1100px) {
-  .gant-dvete { grid-template-columns: minmax(0, 1fr); }
+  .gant-dvete {
+    --dyal: 0.333;
+    grid-template-columns: minmax(0, calc((100% - 7px) * (1 - var(--dyal)))) minmax(0, 1fr);
+    gap: 7px;
+  }
+  .gant-granitsa { display: none; }
 }
 
 /* ── месецът за агента · това напуска устройството (резен 15б) ────────── */
 .glava.mesetsat, .red.mesetsat {
-  grid-template-columns: 116px minmax(0, 2fr) 124px 124px 148px 64px;
+  grid-template-columns: 116px minmax(0, 400px) 124px 124px 148px 64px;
   min-width: 860px;
 }
 .red.mesetsat .suma .drebno { font-size: 0.75rem; }
 
 /* ── задачите на агента · разписание, потвърждение, пускане (И94 т.1) ─── */
 .glava.zadacha, .red.zadacha {
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.4fr) 124px 72px 232px;
+  grid-template-columns: minmax(0, 400px) minmax(0, 280px) 124px 72px 232px;
   min-width: 900px;
 }
 
 /* ── двата задължителни сбора · Приход /+/ и Разход /−/ ──────────────── */
 .glava.znak, .red.znak {
-  grid-template-columns: 64px minmax(0, 2fr) minmax(0, 1.2fr) 130px 132px;
+  grid-template-columns: 64px minmax(0, 400px) minmax(0, 240px) 130px 132px;
   min-width: 640px;
 }
 .red.znak.mahnata { opacity: 0.55; }
@@ -938,7 +1399,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── сверката на ДДС · КЪДЕ е разликата, не само колко ───────────────── */
 .glava.nesvarshen, .red.nesvarshen {
-  grid-template-columns: 132px minmax(0, 2.4fr) 108px 120px;
+  grid-template-columns: 132px minmax(0, 480px) 108px 120px;
   min-width: 600px;
 }
 .karta.izbrana .tablitsa { background: #FFFFFF; }
@@ -1055,7 +1516,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .vazm.nyama:hover { background: transparent; border-color: transparent; }
 
 .glava.planred, .red.planred {
-  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.2fr) minmax(0, 1.4fr) minmax(0, 0.9fr);
+  grid-template-columns: minmax(0, 480px) minmax(0, 240px) minmax(0, 280px) minmax(0, 180px);
 }
 .red.planred.tuk { background: var(--toplo); }
 
@@ -1071,16 +1532,57 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: var(--toplo); border: 1px dashed var(--liniya);
 }
 .pravo {
-  display: flex; align-items: center; gap: 7px;
-  padding: 6px 9px; border-radius: 4px; cursor: pointer;
+  display: grid; grid-template-columns: 1fr auto; align-items: center;
+  gap: 3px 9px;
+  padding: 6px 9px; border-radius: 4px;
   background: var(--hartiya); border: 1px solid var(--liniya); font-size: 0.893rem;
 }
-.pravo input { width: 15px; height: 15px; accent-color: var(--aktsent); flex-shrink: 0; }
-.pravo .drebno { font-size: 0.786rem; color: var(--mastilo2); }
-/* Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
+.pravo select { font: inherit; max-width: 230px; }
+/* Едното изречение под двете · то носи и вида, и „защо не действа". */
+.pravo .drebno { grid-column: 1 / -1; font-size: 0.786rem; color: var(--mastilo2); }
+.pravo .drebno b { color: var(--aktsent); font-weight: 600; }
+/* ТРИТЕ СЪСТОЯНИЯ СЕ РАЗЛИЧАВАТ И БЕЗ ЧЕТЕНЕ · но НИКОГА само с цвят
+   (ADR-032 §1): думата стои в самото меню, това тук е втори белег.
+   Скритата избелява, но НЕ изчезва — числото ѝ пак се смята и това трябва
    да се вижда, вместо да се помни. */
-.pravo.skrita { opacity: 0.5; }
-.pravo.skrita > span:first-of-type { text-decoration: line-through; }
+.pravo.pravo-skrito { opacity: 0.55; }
+.pravo.pravo-skrito > span:first-of-type { text-decoration: line-through; }
+.pravo.pravo-vizhda { border-left: 3px solid var(--toplo); }
+
+/* ── ГРУПАТА ХЕДЪРИ · подредени по табовете на менюто (И103) ────────────────
+   Негови думи: „подредени както са по табовете в менюто И ОТДЕЛЕНИ ПРИ СКРОЛ."
+   „Отделени" е залепването: заглавието на таба остава горе, докато под него
+   текат неговите хедъри, и се сменя на границата между два таба.
+
+   ЗАЩО `top: 0` ЛЕПИ ЗА ОКОТО: единствената скролираща кутия е `.telo`
+   (резен 9а), значи `sticky` брои спрямо нея, а не спрямо някаква вътрешна.
+   Втора скролираща кутия тук щеше да залепи заглавието за нещо, което човек
+   не гледа.
+
+   ЗАГЛАВИЕТО Е НАДПИС, НЕ БУТОН (`role="presentation"`) — клавиатурата не бива
+   да спира на нещо, което не прави нищо. Лостът ДО него е бутонът. */
+.grupa-hedari { margin: 18px 0; }
+/* СВОЕ ИМЕ, не назаем: `.grupa-zaglavie` вече е заето от заглавията в падащия
+   ред на Настройки (резен 6). Взето назаем, залепването щеше да се приложи и
+   ТАМ — стил, който пътува до чужд екран, без някой да го е искал. Проходът го
+   намери: първият `.grupa-zaglavie` на страницата беше НЕ моят. */
+.hedari-zaglavie {
+  position: sticky; top: 0; z-index: 2;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px;
+  padding: 7px 10px; margin-bottom: 8px;
+  background: var(--panel); border: 1px solid var(--liniya); border-radius: 5px;
+  font-weight: 600; letter-spacing: 0.02em;
+}
+/* Лостът на обхвата · дума + падащо меню, същият вид и на групата, и на
+   таблицата: двата обхвата се различават по МЯСТО, не по вид. */
+.obhvat { display: flex; align-items: center; gap: 6px; font-weight: 400; }
+.obhvat select { font: inherit; font-size: var(--text-sm); }
+.hedar-glava {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 8px; margin-bottom: 6px;
+}
+.hedar-glava > b { font-size: 0.929rem; font-weight: 500; }
 
 /* ── ОТЧЕТИТЕ · всяко число с формулата си ──────────────────────────────────
    Негова поръчка (И90): „полета в Секция Отчети… които да покзват тези
@@ -1089,6 +1591,19 @@ table.razbivka .drebno { font-size: 0.75rem; }
    Затова формулата НЕ е в подсказка при посочване и не е скрита зад бутон:
    тя стои под числото, винаги. Число, което трябва да се разглобява с клик,
    се чете като готово — а половината от тези числа още не са пълни. */
+/* ГНЕЗДАТА · именуваните групи на Сметки (резен 50 · негово: „Слей ги в гнезда
+   (Отчети · Пари · Регистър)"). Гнездото е ГРУПА, не карта: то само отделя с
+   линия отляво и заглавие, за да се вижда докъде стига. Влагане в рамка вътре в
+   рамка би направило три кутии в кутия за нищо. */
+.gnezdo { margin: 14px 0; padding-left: 12px; border-left: 3px solid var(--liniya); }
+.gnezdoglava { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 6px; }
+.gnezdoglava h3 { font-family: Literata, Georgia, serif; font-size: 1rem; font-weight: 600; margin: 0; }
+.gnezdoglava span { font-size: 0.821rem; color: var(--mastilo2); }
+.otchet { margin: 10px 0; }
+.otchetglava { display: flex; align-items: baseline; gap: 10px; }
+.otchetglava h4 { font-size: 0.857rem; font-weight: 600; margin: 0; letter-spacing: 0.04em; text-transform: uppercase; }
+.otchetglava span { font-size: 0.821rem; color: var(--mastilo2); }
+
 .otcheti {
   display: grid; gap: 10px; margin: 12px 0;
   grid-template-columns: repeat(auto-fit, minmax(255px, 1fr));
@@ -1142,7 +1657,24 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--mastilo2);
 }
+/* КОЛОНАТА Е СТАНДАРТНА, не разтеглива (резен 12 · негова дума, 27.08): „да
+   запази ЕДНА СТАНДАРТНА КОЛОНА като ширина в диаграмата, и там ако местиш
+   една колона местиш ширината на ВСИЧКИ колони".
+
+   Дотук беше `repeat(N, minmax(34px, 1fr))`. `1fr` значи РАЗТЯГАНЕ: при такт
+   „година" дванайсетте колони се разпъват да напълнят мястото, и хоризонтален
+   скрол НЯМА КАКВО да скролва. Тоест „стандартна колона" и „скрол за периода"
+   се чупеха от една и съща дума.
+
+   „Местиш една, местиш всички" излиза ДАРОМ: числото е ЕДНО, на решетката. */
+.gant { --kolona: 34px; }
 .gant-glava-vreme { display: grid; grid-template-columns: var(--vreme); padding: 0; }
+/* Десните шест пиксела на всяка глава са дръжка · курсорът го КАЗВА. */
+.gant-glava-vreme span { position: relative; }
+.gant-glava-vreme span::after {
+  content: ''; position: absolute; top: 0; bottom: 0; right: 0; width: 6px;
+  cursor: col-resize;
+}
 .gant-glava-vreme span {
   display: flex; align-items: center; justify-content: center;
   font-size: 0.75rem; border-left: 1px solid var(--liniya); white-space: nowrap;
@@ -1164,13 +1696,31 @@ table.razbivka .drebno { font-size: 0.75rem; }
   height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
   border-bottom: 1px solid var(--liniya); font-size: 0.893rem;
 }
-/* „задачите с редуващи се цветове, бял и светло сив, за да се открояват" */
-.gant-delo:nth-of-type(even) { background: var(--panel); }
-.gant-delo.poddelo { padding-left: 34px; font-size: 0.857rem; }
+/* „задачите с редуващи се цветове, бял и светло сив, за да се открояват"
+   *(р52·[221] · 08.08)*, а ивицата се сменя при СМЯНА НА МЯСТОТО *(27.08)*.
+   Дотук тук стоеше `:nth-of-type(even)` — и беше счупена: `nth-of-type` брои
+   по ТИП елемент, а в лентата с имената децата са смесени (глава, шапки на
+   Места, дела), значи паритетът се местеше и редуването излизаше с произволна
+   фаза. Кой ред носи ивица, решава `app/zebra.ts`. */
+.gant-delo.zebra { background: var(--zebra); }
+/* ОТСТЪПЪТ РАСТЕ СЪС СТЕПЕНТА (резен 12б · негова дума, р52·[231] · 08.08):
+   „Направи името на всеки проект в първа колона, а на задачите следващите
+   редове да започват от ВТОРА КОЛОНА." И от 27.08: „да се прибира при всяка
+   степен с ЕДНА КОЛОНА."
+
+   Стъпката е ВЪТРЕ в колоната с имената, не нова колона на екрана: дърво от
+   шест нива инак изяжда шест колони и на телефон не остава нищо. */
+.gant-delo { padding-left: calc(18px + var(--stepen, 0) * 16px); }
+.gant-delo.poddelo { font-size: 0.857rem; }
+/* Номерът на степента · 1 · 1.1 · 1.2.3. Смята се от реда, не се записва. */
+.gant-delo .nomer-stepen {
+  color: var(--mastilo2); font-size: 0.75rem; font-variant-numeric: tabular-nums;
+  min-width: 34px; flex-shrink: 0;
+}
 .gant-delo b { font-weight: 500; }
 .gant-delo .drebno { margin-left: auto; white-space: nowrap; }
 /* „С Удебелен Проекта и Задачите с по налък шрифт и не удебеллени" (р48·[99]) */
-.gant-delo.zhalto b { color: var(--srok-zhalto); }
+.gant-delo.zhalto b { color: var(--srok-zhalto-tekst); }
 .gant-delo.cherveno b { color: var(--srok-cherveno); }
 .gant-delo.prosrocheno b { color: var(--srok-prosrocheno); font-weight: 600; }
 .sgavach {
@@ -1178,10 +1728,71 @@ table.razbivka .drebno { font-size: 0.75rem; }
   background: none; border: none; cursor: pointer; color: var(--mastilo2); font-size: 0.714rem;
 }
 .sgavach.prazen { cursor: default; }
+/* ДРЪЖКАТА НА РЕДА · „задръж на полето и го движи" *(ред 1982)* (резен 34).
+   Стои ВИНАГИ видима, не на hover като копчето за задача: тя е път, който
+   човек трябва да намери, а не второстепенно действие върху вече намерен ред. */
+.drazhka-red {
+  width: 14px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1;
+  background: none; border: none; cursor: grab;
+  color: var(--mastilo2); font-size: 0.714rem;
+}
+.drazhka-red:hover, .drazhka-red:focus { color: var(--aktsent); }
+.gant-delo.vlacha-se { opacity: 0.5; }
+.gant-delo.vlacha-se .drazhka-red { cursor: grabbing; }
+/* КОЛОНАТА „ПОРЕДНОСТ" *(ред 1496)* · само когато ръчен ред ИМА. */
+.porednost {
+  min-width: 14px; text-align: right; flex-shrink: 0;
+  color: var(--aktsent); font-size: 0.714rem; font-variant-numeric: tabular-nums;
+}
+/* КОПЧЕТО НА ВСЯКО ДЕЛО (резен 14а · р57·[160] „копче за всяко дело… ръчно").
+   Стои свито като степенките: три бутона на всеки ред е шум, а редът, върху
+   който е ръката, е точно онзи, който се праща. */
+.prati-zadacha {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1; margin-left: 4px;
+  background: none; border: none; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.714rem;
+  opacity: 0; transition: opacity 0.12s;
+}
+.gant-delo:hover .prati-zadacha,
+.prati-zadacha:focus { opacity: 1; }
+.prati-zadacha:hover { color: var(--aktsent); }
+/* КОПЧЕТО ЗА ДОКУМЕНТИ В ГАНТА · числото стои, думата е в подсказката.
+   Колоната с имената е 180px с `overflow: hidden`: цял бутон там се реже, а
+   рязан бутон не се натиска — нито от човек, нито от прохода. */
+.gant-delo .butoncheto-dokumenti { flex-shrink: 0; margin-left: auto; padding: 0 5px; height: 18px; }
+
+/* СЪСТОЯНИЕТО НА ЗАДАЧАТА · дума И цвят, никога само цвят (ADR-032 §1). */
+.red.zadacha-prieta { box-shadow: inset 3px 0 0 var(--srok-normalno); }
+.red.zadacha-otkazana { box-shadow: inset 3px 0 0 var(--aktsent); }
+.red.zadacha-chaka { box-shadow: inset 3px 0 0 var(--srok-zhalto); }
+
+/* СТЕПЕНКИТЕ · навътре и навън (резен 12б · „вкараш нова степен от главното
+   дърво"). Стоят СВИТИ, докато редът не се посочи: два бутона на всеки ред са
+   шум, а редът, върху който е ръката, е точно онзи, който се мести. */
+.stepenki {
+  display: inline-flex; gap: 2px; margin-left: 6px;
+  opacity: 0; transition: opacity 0.12s;
+}
+.gant-delo:hover .stepenki,
+.stepenki:focus-within { opacity: 1; }
+.stepenki button {
+  width: 16px; height: 16px; padding: 0; flex-shrink: 0; line-height: 1;
+  background: none; border: none; cursor: pointer;
+  color: var(--mastilo2); font-size: 0.643rem;
+}
+.stepenki button:hover { color: var(--aktsent); }
 .gant-sbor, .gant-red.sumi {
   height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
 }
-.gant-sbor { display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2); }
+.gant-sbor {
+  display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2);
+  /* Дългото име на контрагент реже с многоточие ТУК и само тук: цялото стои в
+     `title`. Пренасяне би вдигнало реда и щеше да разчете двете колони. */
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+/* РАЗБИВКАТА (резен 13б) · само ПЪРВИЯТ ред носи дебелата черта отгоре, инак
+   всеки контрагент изглежда като нов сбор. */
+.gant-sbor ~ .gant-sbor, .gant-red.sumi ~ .gant-red.sumi { border-top: 1px solid var(--liniya); }
 
 .gant-red {
   position: relative; height: 26px; display: grid; grid-template-columns: var(--vreme);
@@ -1191,6 +1802,17 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .gant-kletka { border-left: 1px solid var(--liniya); }
 .gant-kletka.dnes { background: var(--toplo); }
 .gant-red.prazen .gant-kletka.dnes { background: rgba(178, 94, 56, 0.35); }
+
+/* ПАРИТЕ В ПОЛЕТО НА ДИАГРАМАТА (резен 13г · И102 · „да се разпредели в полето
+   от нея и пресято спрямо такта").
+
+   Приходът и разходът НЕ вземат цветовете на светофара: там цветът значи СРОК
+   (ADR-032 §1 · състояние никога само с цвят). Тук се различават по ПОСОКА —
+   нагоре и надолу от нулевата линия — а цветът е само подсилване. */
+.diagrama-nula { stroke: var(--liniya); stroke-width: 1; }
+.diagrama-pari.prihod { fill: var(--srok-normalno); }
+.diagrama-pari.razhod { fill: var(--aktsent); }
+.diagrama-parichna .diagrama-ime { fill: var(--mastilo2); }
 
 /* ЛЕНТАТА · „ЦВЕТОВЕТЕ СПОРЕД СРОКА КАТО ПЛЪТНА ЛЕНТА" (р59·[41], главните са
    негови). Не се влачи — негова забрана (р83·[35]). */
@@ -1209,11 +1831,22 @@ table.razbivka .drebno { font-size: 0.75rem; }
    ТЕКСТА И САМАТА ДАТА" — затова еднодневното носи и рамка, не само запълване. */
 .gant-lenta.ednodnevno { box-shadow: inset 0 0 0 2px rgba(251, 248, 243, 0.55); }
 .gant-lenta b { font-weight: 500; }
+/* ОБОБЩЕНАТА ЛЕНТА · родителят (резен 12б · MS Project).
+   По-тънка и с ръбове надолу, като скоба: тя не е СВОЙ срок, а обхватът на
+   децата. Различава се по ФОРМА, не само по цвят — цветът тук вече значи срок
+   (ADR-032 §1: състояние никога само с цвят). */
+.gant-lenta.obobshtena {
+  box-shadow: inset 0 -5px 0 rgba(38, 34, 30, 0.45);
+  border-radius: 3px 3px 0 0;
+}
 
 .gant-suma {
   display: flex; flex-direction: column; align-items: center; justify-content: center;
   border-left: 1px solid var(--liniya); font-size: 0.679rem; line-height: 1.25;
   font-variant-numeric: tabular-nums;
+  /* ОБХВАТЪТ · при такт „ден" осемте часа са ЕДИН ден, а парите нямат час:
+     сумата се разпъва над тях вместо да се повтори осем пъти (резен 13а). */
+  grid-column: span var(--obhvat, 1);
 }
 .gant-suma.dnes { background: var(--toplo); }
 .gant-suma b { color: var(--zeleno); font-weight: 500; }
@@ -1264,6 +1897,29 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .stalbove-nadpis { fill: var(--mastilo2); font-size: 0.714rem; font-variant-numeric: tabular-nums; }
 
 
+/* ── ГРУПАТА ДЕЙСТВИЯ · един бутон с дума и стрелкичка (ADR-057) ─────────
+   Двата бутона се долепват в един лост: думата отляво, стрелкичката отдясно.
+   Менюто ѝ е СЪЩОТО като контекстното (виж по-долу) — вид, който живее на две
+   места, се разминава при първата смяна на палитрата. */
+.grupa-deystviya { display: inline-flex; align-items: stretch; }
+/* СКРИТОТО В ГРУПАТА СЕ СКРИВА НАИСТИНА.
+   `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а всяко авторско
+   правило за `display` я бие — независимо от тежестта на селектора. Бутонът с
+   знак носи `display: inline-flex` (`button.sIkona`), значи скритите оставаха
+   да се виждат: групата изглеждаше като четири бутона и една стрелкичка.
+   Проходът четеше СВОЙСТВОТО `hidden` и казваше „скрит е"; окото каза друго. */
+.grupa-deystviya > [hidden] { display: none; }
+.grupa-deystviya > button:not(.strelkichka) {
+  border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;
+}
+/* Стрелкичката НЕ носи дума и затова не се свива на тесен екран — тя е
+   дръжката, а дръжка без ширина не се хваща с пръст. */
+.grupa-deystviya .strelkichka {
+  border-top-left-radius: 0; border-bottom-left-radius: 0;
+  padding-left: 7px; padding-right: 7px; line-height: 1;
+}
+.grupa-deystviya .strelkichka[aria-expanded="true"] { background: var(--panel); }
+
 /* ── контекстното меню · десният бутон, както в Уиндоус ─────────────────── */
 .kontekstno-menyu {
   position: fixed; z-index: 60; min-width: 180px;
@@ -1302,12 +1958,40 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .istoriya-sabitie .koga { grid-column: 2; font-size: 0.857rem; color: var(--mastilo2); }
 .istoriya-sabitie .opis { grid-column: 2; font-size: 0.893rem; }
 .istoriya-zatvori { margin-top: 14px; }
-.butoncheto-istoriya {
-  background: none; border: 1px solid var(--liniya); border-radius: 4px;
-  cursor: pointer; font-size: 0.857rem; color: var(--mastilo2);
-  padding: 4px 8px; min-height: 28px;
+
+/* ── закачените документи · ЕДИН блок за трите екрана (резен 17б) ───────── */
+.dokument-red {
+  display: grid;
+  grid-template-columns: 1fr 110px 150px auto;
+  align-items: center;
+  gap: 4px 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--liniya);
+  font-size: 0.929rem;
 }
-.butoncheto-istoriya:hover { background: var(--panel); color: var(--mastilo); }
+.dokument-ime { display: flex; flex-direction: column; }
+.dokument-ime span { font-size: 0.857rem; color: var(--mastilo2); }
+.dokument-otpechatak { font-variant-numeric: tabular-nums; color: var(--mastilo2); font-size: 0.857rem; }
+.dokumenti-forma {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--liniya);
+}
+.dokumenti-forma label { display: flex; flex-direction: column; gap: 4px; font-size: 0.893rem; }
+.dokumenti-forma button[type='submit'] { align-self: end; }
+.dokumenti-forma .greshka { grid-column: 1 / -1; }
+/* Тесен екран: редът на документа се разгъва надолу, вместо да прелива. */
+@media (max-width: 620px) {
+  .dokument-red { grid-template-columns: 1fr auto; }
+  .dokument-otpechatak, .dokument-vrazka { grid-column: 1 / -1; }
+}
+/* „История" вече е второстепенен бутон като всички (`vtorichen malak`) и не
+   носи свой вид: ръчният близнак се разминаваше при всяка смяна на палитрата
+   и — по-лошо — държеше бутона ИЗВЪН групата действия. Класът остава само
+   като закачалка за прохода. */
 
 /* ── избраната клетка · клавиатурната карта (ADR-022 · вълна 2) ─────────── */
 .kletka-izbrana {
@@ -1351,11 +2035,90 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── Още огледала · по обект и по контрагент (ADR-041) ────────────────── */
 .glava.po-imot, .red.po-imot {
-  grid-template-columns: minmax(0, 2fr) 110px 140px 140px 140px;
+  grid-template-columns: minmax(0, 400px) 110px 140px 140px 140px;
   min-width: 760px;
 }
 .glava.po-kontragent, .red.po-kontragent {
-  grid-template-columns: minmax(0, 1.8fr) 120px 140px 140px 140px 120px;
+  grid-template-columns: minmax(0, 360px) 120px 140px 140px 140px 120px;
   min-width: 840px;
 }
 .red.po-imot.sbor { font-weight: 600; border-top: 2px solid var(--liniya); }
+
+/* ── ПЛАЩАНИЯ АРХИВ (резен 22 · ADR-082) · неговите тринайсет колони ──────
+   Таблицата се СКРОЛИРА, а не се свива: тринайсет колони, стиснати до
+   нечетимост, са по-лоши от тринайсет, до които се стига с плъзгане. */
+.glava.plashtred, .red.plashtred {
+  grid-template-columns:
+    112px minmax(0, 200px) minmax(0, 150px) minmax(0, 190px) 116px 96px
+    82px minmax(0, 220px) 110px 62px 124px 118px 118px minmax(0, 170px);
+  min-width: 1790px;
+}
+
+/* ── Категорията в Плащания Архив (резен 25 · ADR-085) ────────────────────
+   ЕДИНСТВЕНАТА клетка на този екран, която се ПИШЕ. Изглежда като клетка, не
+   като поле: рамка се появява при посочване и при фокус, иначе редът щеше да
+   изглежда като четиринайсет полета вместо като таблица. */
+.kletka-kategoriya {
+  width: 100%; min-height: 26px; padding: 2px 6px;
+  border: 1px solid transparent; border-radius: 4px;
+  background: transparent; color: inherit;
+  font: inherit; font-size: 0.893rem;
+}
+.red:hover .kletka-kategoriya { border-color: var(--liniya); }
+.kletka-kategoriya:focus {
+  border-color: var(--aktsent); background: #FFFFFF; outline: none;
+}
+
+/* ── Сторнираното СЕ ВИЖДА (резен 27 · ADR-087) ──────────────────────────
+   Негово, прието: „Сиво + зачертано + малък знак ★". Трите носителя са ТРИ,
+   не един: цвят, черта и знак. Онзи, който не различава сивото, вижда чертата;
+   онзи, който гледа на телефон в слънце, вижда ★ (ADR-032 · цветът НАМИРА,
+   знакът ОБЯСНЯВА). */
+.red.pogasen {
+  color: var(--mastilo2);
+  text-decoration: line-through;
+  text-decoration-thickness: 1px;
+  background: repeating-linear-gradient(
+    135deg, transparent, transparent 6px, rgba(42, 37, 33, 0.03) 6px, rgba(42, 37, 33, 0.03) 12px
+  );
+}
+/* Обяснението до реда НЕ се зачертава — то е онова, което трябва да се ЧЕТЕ. */
+.red.pogasen .kletka > span { text-decoration: none; }
+
+/* ═══ КАЛЕНДАРЪТ · месечната мрежа с цифрите (резен 40 · И90) ═══
+   Седем колони, винаги — понеделник първи, българската норма. Мрежата се пише
+   с `repeat(7, …)`, а не с брой от кода: клетките са СЕДЕМ по устройство, не по
+   сметка, и число от кода тук би могло да се разбие с число от домейна. */
+.kalendar {
+  border: 1px solid var(--liniya); border-radius: 6px; overflow: hidden;
+  background: #FFFFFF; margin-bottom: 10px;
+}
+.kalendar-glava, .kalendar-sedmitsa { display: grid; grid-template-columns: repeat(7, 1fr); }
+.kalendar-glava {
+  background: var(--hartiya); border-bottom: 1px solid var(--liniya);
+  font-size: 0.75rem; color: var(--mastilo2);
+}
+.kalendar-glava span { padding: 5px 8px; text-align: right; }
+.kalendar-sedmitsa + .kalendar-sedmitsa { border-top: 1px solid var(--liniya); }
+.kalendar-den {
+  min-height: 58px; padding: 4px 6px; border-left: 1px solid var(--liniya);
+  display: flex; flex-direction: column; align-items: flex-end; gap: 2px;
+}
+.kalendar-den:first-child { border-left: none; }
+.kalendar-chislo { font-size: 0.75rem; color: var(--mastilo2); font-variant-numeric: tabular-nums; }
+/* ЧУЖДИЯТ ДЕН държи решетката права и нищо друго — сив, без числа. */
+.kalendar-den.chuzhd { background: var(--hartiya); }
+.kalendar-den.chuzhd .kalendar-chislo { opacity: 0.4; }
+.kalendar-den.dnes { background: var(--toplo); }
+.kalendar-den.dnes .kalendar-chislo { font-weight: 600; }
+.kalendar-pari {
+  display: flex; flex-direction: column; align-items: flex-end;
+  font-size: 0.679rem; line-height: 1.25; font-variant-numeric: tabular-nums;
+}
+/* ДВЕТЕ ЧИСЛА НЕ СЕ СЛИВАТ · същите два цвята като под решетката на Ганта. */
+.kalendar-pari b, .kalendar-sbor b { color: var(--zeleno); font-weight: 500; }
+.kalendar-pari i, .kalendar-sbor i { color: var(--aktsent); font-style: normal; }
+.kalendar-sbor {
+  display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
+  font-variant-numeric: tabular-nums; margin-bottom: 6px;
+}

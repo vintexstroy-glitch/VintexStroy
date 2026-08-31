@@ -15,7 +15,7 @@
  */
 
 import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js';
-import { VID } from './sabitiya.js';
+import { VID, type NachinNaPlashtane } from './sabitiya.js';
 import { sborNaSnimka, type RedOtSnimka, type Snimka } from '../iztochnik/snimka.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
 import type { Deystviya } from './deystviya.js';
@@ -44,7 +44,7 @@ export interface Plan {
 export interface Nastroyki {
   readonly potok: string;
   readonly sektor: string;
-  readonly nachin: 'банка' | 'в брой';
+  readonly nachin: NachinNaPlashtane;
 }
 
 const TEZHEST: Record<KakvoStava, number> = {

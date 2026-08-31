@@ -21,58 +21,25 @@
  */
 
 import type { Delo } from './dela.js';
-
-/** Четирите му мащаба, дословно *(р57·[174]·08.08)*: „Ден · Седмица · Месец · Година". */
-export const TAKTOVE = ['den', 'sedmitsa', 'mesets', 'godina'] as const;
-export type Takt = (typeof TAKTOVE)[number];
-
-export const IMENA_NA_TAKTOVETE: Readonly<Record<Takt, string>> = Object.freeze({
-  den: 'Ден',
-  sedmitsa: 'Седмица',
-  mesets: 'Месец',
-  godina: 'Година',
-});
+import { BEZ_STOYNOST } from './otcheti.js';
+import {
+  koloniNaTakta,
+  kolkoSeVizhdat,
+  type KolonaNaTakta,
+  type SvoyPeriod,
+  type Takt,
+} from './vreme.js';
 
 /**
- * КОЛКО КОЛОНИ СЕ ВИЖДАТ и колко дни носи всяка.
+ * ТАКТЪТ ЖИВЕЕ В `vreme.ts` · тук се СТРОИ решетката от него.
  *
- * Негови числа, дословно *(р75·[64]·11.08)*:
- *
- *   „нека тогава да има бутон за избор на период. 1 година с стъпка месец,
- *    1 месец с стъпка 31 и 1 седмица със стъпка 7, и 1ден с стъпка 1 ден."
- *
- * „1 месец с стъпка 31" значи месец, показан по ДНИ — 31 колони. Не 31 месеца.
+ * Дотук този файл беше единият от четирите дома на времето (`TAKTOVE` тук,
+ * `STAPKI` при коефициентите, дванайсетте месеца при диаграмите, четирите думи
+ * за давност при филтрите). Правило 17: един факт, един дом — и домът е
+ * `vreme.ts`, защото Калкулаторът реже период със същите имена, а той няма
+ * работа да внася от Ганта.
  */
-export const RESHETKA: Readonly<Record<Takt, { vidimi: number }>> = Object.freeze({
-  den: { vidimi: 1 },
-  sedmitsa: { vidimi: 7 },
-  mesets: { vidimi: 31 },
-  // При „година" колоната е календарен месец; при другите три — ден.
-  // Кой такт колко дни носи, решава `koloni()` — не таблица, която никой не чете.
-  godina: { vidimi: 12 },
-});
-
-/**
- * ОБХВАТЪТ Е ПЕТ ПЪТИ ВИДИМОТО · негово число *(р51·[141]·07.08)*:
- *
- *   „Графиката когато избереш стъпка от време да покзава толкова видима част, а
- *    реално овеличава с пети пъти стъпката и реално за стъпка 1 година видима
- *    на екрана да се скролва до 5 години вдиаграмата."
- *
- * Тоест: виждаш една година, скролваш пет. Числото е негово и не се „оптимизира".
- */
-export const KRATNOST_NA_OBHVATA = 5;
-
-interface KolonaNaGanta {
-  /** YYYY-MM-DD · първият ден на колоната */
-  readonly ot: string;
-  /** YYYY-MM-DD · последният ден, включително */
-  readonly do: string;
-  /** какво пише в главата ѝ */
-  readonly nadpis: string;
-  /** тази колона ли е днешният ден/период */
-  readonly dnes: boolean;
-}
+export type { Takt } from './vreme.js';
 
 /** Лентата на едно дело върху решетката. */
 interface Lenta {
@@ -88,89 +55,10 @@ interface Lenta {
 
 export interface Reshetka {
   readonly takt: Takt;
-  readonly koloni: readonly KolonaNaGanta[];
+  readonly koloni: readonly KolonaNaTakta[];
   /** колко от тях се побират на екран — останалите са зад скрола */
   readonly vidimi: number;
   readonly lenti: readonly Lenta[];
-}
-
-const DEN = 86_400_000;
-
-function naData(ms: number): string {
-  return new Date(ms).toISOString().slice(0, 10);
-}
-
-/**
- * Денят в милисекунди · за смятане на разстояния по решетката.
- *
- * НЕ се казва `otData` нарочно: това име вече значи друго в `yadro/data.ts` —
- * там то ПРОВЕРЯВА, че текстът е ден от календара, и хвърля, ако не е. Две
- * функции с едно име и различно поведение са капан: викащият чете „otData" и
- * очаква проверка, а получава мълчалив NaN.
- */
-function vMilisekundi(d: string): number {
-  return Date.parse(`${d}T00:00:00Z`);
-}
-
-/**
- * Построява колоните · първата е ДНЕС, останалите напред във времето.
- *
- * Скролът наляво показва историята, затова решетката носи и НАЗАД толкова,
- * колкото напред: без това „скрол наляво" би опирал в стена на първия ден.
- */
-export function koloni(takt: Takt, dnes: string): KolonaNaGanta[] {
-  const { vidimi } = RESHETKA[takt];
-  const obshto = vidimi * KRATNOST_NA_OBHVATA;
-  const nazad = vidimi; // една видима крачка история — толкова, колкото се вижда
-  const spisak: KolonaNaGanta[] = [];
-
-  if (takt === 'godina') {
-    const [g, m] = dnes.split('-').map(Number) as [number, number];
-    for (let i = -nazad; i < obshto; i++) {
-      const d = new Date(Date.UTC(g, m - 1 + i, 1));
-      const kray = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 0));
-      spisak.push({
-        ot: d.toISOString().slice(0, 10),
-        do: kray.toISOString().slice(0, 10),
-        nadpis: `${MESETSI[d.getUTCMonth()]} ${String(d.getUTCFullYear()).slice(2)}`,
-        dnes: i === 0,
-      });
-    }
-    return spisak;
-  }
-
-  const nula = vMilisekundi(dnes);
-  for (let i = -nazad; i < obshto; i++) {
-    const ot = nula + i * DEN;
-    spisak.push({
-      ot: naData(ot),
-      do: naData(ot),
-      nadpis: nadpisNaDen(ot),
-      dnes: i === 0,
-    });
-  }
-  return spisak;
-}
-
-const MESETSI = [
-  'яну',
-  'фев',
-  'мар',
-  'апр',
-  'май',
-  'юни',
-  'юли',
-  'авг',
-  'сеп',
-  'окт',
-  'ное',
-  'дек',
-];
-const DNI = ['нд', 'пн', 'вт', 'ср', 'чт', 'пт', 'сб'];
-
-function nadpisNaDen(ms: number): string {
-  const d = new Date(ms);
-  return `${DNI[d.getUTCDay()]} ${d.getUTCDate()}`;
 }
 
 /**
@@ -183,7 +71,7 @@ function nadpisNaDen(ms: number): string {
  * Дело изцяло извън решетката не дава лента — то не е скрито, а просто не е в
  * този прозорец от време; таблицата отляво пак го показва.
  */
-export function lentaNa(d: Delo, k: readonly KolonaNaGanta[]): Lenta | null {
+export function lentaNa(d: Delo, k: readonly KolonaNaTakta[]): Lenta | null {
   if (k.length === 0) return null;
   const parva = k[0]!;
   const posledna = k[k.length - 1]!;
@@ -191,8 +79,14 @@ export function lentaNa(d: Delo, k: readonly KolonaNaGanta[]): Lenta | null {
 
   let ot = k.findIndex((x) => x.do >= d.ot);
   if (ot < 0) ot = 0;
-  let doIndeks = k.findIndex((x) => x.do >= d.do);
-  if (doIndeks < 0) doIndeks = k.length - 1;
+  // КРАЯТ се търси ОТЗАД-НАПРЕД, не отпред. При такт „ден" осем колони носят
+  // ЕДИН и същ ден (осемте му работни часа): търсено отпред, еднодневното дело
+  // заемаше ПЪРВИЯ час и изглеждаше като „час работа", а то трае целия ден.
+  let doIndeks = -1;
+  for (let i = k.length - 1; i >= 0; i -= 1) {
+    if (k[i]!.ot <= d.do) { doIndeks = i; break; }
+  }
+  if (doIndeks < ot) doIndeks = ot;
 
   return {
     deloId: d.id,
@@ -204,14 +98,19 @@ export function lentaNa(d: Delo, k: readonly KolonaNaGanta[]): Lenta | null {
 }
 
 /** Цялата решетка за едно множество дела. */
-export function reshetka(dela: readonly Delo[], takt: Takt, dnes: string): Reshetka {
-  const k = koloni(takt, dnes);
+export function reshetka(
+  dela: readonly Delo[],
+  takt: Takt,
+  dnes: string,
+  svoy?: SvoyPeriod,
+): Reshetka {
+  const k = koloniNaTakta(takt, dnes, svoy);
   const lenti: Lenta[] = [];
   for (const d of dela) {
     const l = lentaNa(d, k);
     if (l) lenti.push(l);
   }
-  return { takt, koloni: k, vidimi: RESHETKA[takt].vidimi, lenti };
+  return { takt, koloni: k, vidimi: kolkoSeVizhdat(takt, dnes, svoy), lenti };
 }
 
 /**
@@ -230,21 +129,156 @@ export function reshetka(dela: readonly Delo[], takt: Takt, dnes: string): Reshe
 interface SumaVKolona {
   readonly prihod_st: number;
   readonly razhod_st: number;
+  /**
+   * КОЛКО КОЛОНИ покрива клетката · нула значи „тук няма клетка".
+   *
+   * ПАРИТЕ НЯМАТ ЧАС. Плащането и разходът носят ДАТА — в Журнала няма поле за
+   * час и няма да има, защото банковото извлечение също не го носи. При такт
+   * „ден" осемте колони са часове от ЕДИН ден: сумата му стои ВЕДНЪЖ, разпъната
+   * над осемте, вместо да се повтори осем пъти (осемкратна лъжа) или да се
+   * размаже по часове (измислено число).
+   */
+  readonly obhvat: number;
 }
 
-export function obobshtenRed(
-  k: readonly KolonaNaGanta[],
-  poDni: readonly { data: string; prihod_st: number; razhod_st: number }[],
+/** Един ред с пари · дневната сума, вече отнесена към своя разрез. */
+interface DenevnaSuma {
+  readonly data: string;
+  readonly prihod_st: number;
+  readonly razhod_st: number;
+  readonly razrez?: string;
+  readonly nadpis?: string;
+}
+
+/** Клетките на един ред · ЕДИН дом за логиката, два входа към нея. */
+function kletkiNaKolonite(
+  k: readonly KolonaNaTakta[],
+  redove: readonly DenevnaSuma[],
 ): SumaVKolona[] {
-  return k.map((kol) => {
+  return k.map((kol, i) => {
+    // Колона, която дели деня си с предишната (часовете на такт „ден"), не носи
+    // своя клетка: сумата вече е разпъната над нея.
+    const predishna = k[i - 1];
+    if (kol.chas !== undefined && predishna?.ot === kol.ot) {
+      return { prihod_st: 0, razhod_st: 0, obhvat: 0 };
+    }
+    let obhvat = 1;
+    if (kol.chas !== undefined) {
+      while (k[i + obhvat]?.ot === kol.ot) obhvat += 1;
+    }
     let prihod_st = 0;
     let razhod_st = 0;
-    for (const d of poDni) {
+    for (const d of redove) {
       if (d.data >= kol.ot && d.data <= kol.do) {
         prihod_st += d.prihod_st;
         razhod_st += d.razhod_st;
       }
     }
-    return { prihod_st, razhod_st };
+    return { prihod_st, razhod_st, obhvat };
   });
+}
+
+export function obobshtenRed(
+  k: readonly KolonaNaTakta[],
+  poDni: readonly DenevnaSuma[],
+): SumaVKolona[] {
+  return kletkiNaKolonite(k, poDni);
+}
+
+/** Един ред от разбивката · своя ключ, свой надпис, свои клетки. */
+export interface RedNaRazrez {
+  readonly klyuch: string;
+  readonly nadpis: string;
+  readonly kletki: readonly SumaVKolona[];
+}
+
+/**
+ * РАЗБИВКАТА · по ред на разрез (резен 13б · И102).
+ *
+ * Негов въпрос, 27.08: „…разбивки по контрагенти от банковите извлечения и да
+ * се покажат в таблицата **сумирано за такта на диаграмата**."
+ *
+ * Тук е втората половина на отговора. Първата е в `otcheti.ts`: там всеки ред
+ * получава КЛЮЧ по избрания разрез. Тук ключовете стават РЕДОВЕ върху същата
+ * решетка — значи разбивката и общият сбор се смятат от едно и също място и не
+ * могат да се разминат.
+ *
+ * СВЕРКАТА ВХОД↔ИЗХОД (правило 7) излиза даром и се пази с тест: всеки ред пада
+ * в ТОЧНО една кофа, значи сборът на разрезите Е неразбитият сбор. Ако някой ден
+ * не е — това е дефект, не закръгление.
+ *
+ * Подредбата: по надпис, а кофата „(няма)" пада НАКРАЯ — тя е остатъкът, не
+ * контрагент.
+ */
+export function obobshteniRedove(
+  k: readonly KolonaNaTakta[],
+  poDni: readonly DenevnaSuma[],
+): RedNaRazrez[] {
+  const po = new Map<string, { nadpis: string; redove: DenevnaSuma[] }>();
+  for (const d of poDni) {
+    const klyuch = d.razrez ?? '';
+    let v = po.get(klyuch);
+    if (!v) {
+      v = { nadpis: d.nadpis ?? '', redove: [] };
+      po.set(klyuch, v);
+    }
+    v.redove.push(d);
+  }
+  return [...po.entries()]
+    .map(([klyuch, v]) => ({ klyuch, nadpis: v.nadpis, kletki: kletkiNaKolonite(k, v.redove) }))
+    .sort((a, b) => tezhest(a.nadpis) - tezhest(b.nadpis) || a.nadpis.localeCompare(b.nadpis, 'bg'));
+}
+
+/** Остатъчната кофа върви последна · тя не е контрагент, а „нищо от това". */
+function tezhest(nadpis: string): number {
+  return nadpis === BEZ_STOYNOST ? 1 : 0;
+}
+
+/**
+ * КОЕ СЕ ВИЖДА · таблицата, диаграмата, или двете.
+ *
+ * Негово, 31.08, за таблицата на Ганта: „**Да и на двете места. Да може да се
+ * крие.**" Тоест таблицата остава И в Управление, И в Сметки, а скриването е
+ * ЛИЧЕН избор на екрана, не решение на кода.
+ *
+ * ЗАЩО ЧИСТА ФУНКЦИЯ, А НЕ ДВА `if`-а НА ДВА ЕКРАНА. Правилото има ЕДНО място,
+ * където може да сгреши: и двете скрити наведнъж оставят празна секция, в която
+ * човекът вижда изчезнала работа, а не скрит изглед. Затова последното видимо
+ * не се скрива, и отказът се КАЗВА (правило 15) — вместо да се преглътне.
+ *
+ * Скриването пипа САМО екрана: нито сбор, нито Журнал, нито износ (правило 23).
+ */
+export interface KoeSeVizhda {
+  readonly tablitsa: boolean;
+  readonly diagrama: boolean;
+}
+
+export type KoePrevkluchva = 'tablitsa' | 'diagrama';
+
+export interface Prevkluchvane {
+  readonly sled: KoeSeVizhda;
+  /** празно, когато е станало · иначе ПРИЧИНАТА с думи */
+  readonly otkaz: string;
+}
+
+export function prevkluchi(sega: KoeSeVizhda, koe: KoePrevkluchva): Prevkluchvane {
+  const sled = { ...sega, [koe]: !sega[koe] };
+  if (!sled.tablitsa && !sled.diagrama) {
+    return Object.freeze({
+      sled: sega,
+      otkaz: 'Последният изглед не се скрива — иначе секцията остава празна.',
+    });
+  }
+  return Object.freeze({ sled: Object.freeze(sled), otkaz: '' });
+}
+
+/** Думите на бутона · казват какво ще СТАНЕ, не какво е сега. */
+export function dumataNaButona(sega: KoeSeVizhda, koe: KoePrevkluchva): string {
+  const ime = koe === 'tablitsa' ? 'таблицата' : 'диаграмата';
+  return `${sega[koe] ? 'Скрий' : 'Покажи'} ${ime}`;
+}
+
+/** Може ли изобщо · за да не се предлага избор, който ще бъде отказан. */
+export function mozheDaSeSkrie(sega: KoeSeVizhda, koe: KoePrevkluchva): boolean {
+  return prevkluchi(sega, koe).otkaz === '';
 }

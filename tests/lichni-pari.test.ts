@@ -15,21 +15,24 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { NASTAVKA_LICHEN } from '../src/domein/akaunt.js';
 import { VID } from '../src/domein/sabitiya.js';
 import {
-  BAZISNI_ZA_MESETS,
   GreshkaLichniPari,
-  lihvaZaMesetsa,
   napraviTema,
   obshtoPari,
   ostatakNaKredita,
   pogasenLiE,
   predlaganiTemi,
-  predlozhiVnoska,
   prihodnaChast,
   razhodnaChast,
   sborovePoTemi,
   temiPoGrupi,
   type LichnoDvizhenie,
 } from '../src/domein/lichni-pari.js';
+import {
+  BAZISNI_ZA_MESETS,
+  GreshkaKredit,
+  lihvaZaMesetsa,
+  predlozhiVnoska,
+} from '../src/domein/kredit-matematika.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { SHA } from './pomoshtni.js';
 
@@ -352,8 +355,8 @@ describe('лихвата за месеца · цели центове, ника�
   });
 
   it('дробна лихва или дробен остатък се отказват С ДУМИ', () => {
-    expect(() => lihvaZaMesetsa(100_00, 3.45)).toThrow(GreshkaLichniPari);
-    expect(() => lihvaZaMesetsa(100.5, 345)).toThrow(GreshkaLichniPari);
+    expect(() => lihvaZaMesetsa(100_00, 3.45)).toThrow(GreshkaKredit);
+    expect(() => lihvaZaMesetsa(100.5, 345)).toThrow(GreshkaKredit);
   });
 });
 
@@ -374,11 +377,18 @@ describe('предложението за вноска · агентът смя�
     expect(p.lihva_st).toBe(100_00);
   });
 
-  it('ПОСЛЕДНАТА вноска не надхвърля остатъка', () => {
-    // остават 50 €, а вноската е 612,34 — главницата се реже до остатъка
+  it('ПОСЛЕДНАТА вноска се СВИВА · лихвата остава онова, което е', () => {
+    // Остават 50 €, а договорната вноска е 612,34. Главницата се реже до
+    // остатъка — и вноската СЛЕДВА я надолу.
+    //
+    // ТОЗИ ТЕСТ ПАЗЕШЕ ДЕФЕКТ. Искаше „трите се събират до 612,34" и затова
+    // приемаше лихва от 597,90 € върху дълг от 50 € — число, което човек чете
+    // като истина и записва в книгата. Планът по дати (резен 19) го извади
+    // наяве с „лихва 193,94 €" върху остатък 106,06 €.
     const p = predlozhiVnoska(50_00, 345, 612_34);
     expect(p.glavnitsa_st).toBe(50_00);
-    expect(p.lihva_st + p.glavnitsa_st).toBe(612_34);
+    expect(p.lihva_st).toBe(lihvaZaMesetsa(50_00, 345));
+    expect(p.lihva_st + p.glavnitsa_st).toBeLessThan(612_34);
   });
 });
 

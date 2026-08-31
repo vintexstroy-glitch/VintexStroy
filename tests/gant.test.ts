@@ -7,11 +7,17 @@
  * следваща ръка би закръглила.
  */
 
+import {
+  koloniNaTakta as koloni,
+  kolkoSeVizhdat,
+  KRATNOST_NA_OBHVATA,
+  TAKTOVE,
+} from '../src/domein/vreme.js';
 import { describe, expect, it } from 'vitest';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import {
-  dniDoKraya,
+  dniDoSroka,
   eEdnodnevno,
   IMENA_NA_OTSENKITE,
   OTSENKI,
@@ -21,13 +27,9 @@ import {
   type Delo,
 } from '../src/domein/dela.js';
 import {
-  KRATNOST_NA_OBHVATA,
-  koloni,
   lentaNa,
   obobshtenRed,
-  RESHETKA,
   reshetka,
-  TAKTOVE,
 } from '../src/domein/gant.js';
 import { SHA } from './pomoshtni.js';
 
@@ -46,6 +48,8 @@ function delo(p: Partial<Delo> & { id: string }): Delo {
     sastoyanie: 'чака',
     nadDelo: '',
     dokument: '',
+    promeneno: '2026-08-27T09:00:00.000Z',
+    promeniGo: 'vintexstroy@gmail.com',
     ...p,
   };
 }
@@ -145,7 +149,7 @@ describe('светофарът · неговите две числа, 7 и 2', (
 
   it('просрочено е СВОЕ състояние, не просто червено', () => {
     expect(svetofar(delo({ id: 'A', do: '2026-08-22' }), DNES)).toBe('prosrocheno');
-    expect(dniDoKraya(delo({ id: 'A', do: '2026-08-22' }), DNES)).toBe(-1);
+    expect(dniDoSroka('2026-08-22', DNES)).toBe(-1);
   });
 
   it('завършеното не гори, колкото и да е просрочено', () => {
@@ -182,30 +186,37 @@ describe('сгъването · само дела и поддела (И88)', () 
   });
 });
 
-describe('решетката · първата колона е ДНЕС', () => {
-  it('за всеки такт колоната на днес е там, където се очаква', () => {
+describe('решетката · днес е вътре, а вляво има история', () => {
+  it('всеки такт носи днешна колона · и НЕ я слага първа', () => {
+    // Дотук се мереше „днес е на индекс `vidimi`" — вярно само докато крачката
+    // беше прозорец от дни. С неговото „месец с дните от календара за месеца"
+    // крачката става ПЕРИОД и денят стои там, където пада в своя месец. Затова
+    // мярката е СМИСЪЛЪТ: има какво да покаже скролът наляво.
     for (const takt of TAKTOVE) {
+      if (takt === 'svoy') continue;
       const k = koloni(takt, DNES);
       const dnesni = k.filter((x) => x.dnes);
-      expect(dnesni.length, takt).toBe(1);
-      // назад стои точно една видима крачка история — за да има какво да покаже
-      // скролът наляво, без да опира в стена
-      expect(k.indexOf(dnesni[0]!), takt).toBe(RESHETKA[takt].vidimi);
+      expect(dnesni.length > 0, takt).toBe(true);
+      expect(k.indexOf(dnesni[0]!) >= 1, takt).toBe(true);
     }
   });
 
-  it('носи ПЕТ ПЪТИ видимото напред — негово число', () => {
+  it('и напред остава поне една цяла видима крачка', () => {
     for (const takt of TAKTOVE) {
-      const vid = RESHETKA[takt].vidimi;
-      expect(koloni(takt, DNES).length, takt).toBe(vid * KRATNOST_NA_OBHVATA + vid);
+      if (takt === 'svoy') continue;
+      const k = koloni(takt, DNES);
+      const posleden = k.findIndex((x) => x.dnes);
+      expect(k.length - posleden > kolkoSeVizhdat(takt, DNES), takt).toBe(true);
     }
   });
 
-  it('неговите числа за тактовете стоят непокътнати', () => {
-    expect(RESHETKA.den.vidimi).toBe(1);
-    expect(RESHETKA.sedmitsa.vidimi).toBe(7);
-    expect(RESHETKA.mesets.vidimi).toBe(31); // „1 месец с стъпка 31"
-    expect(RESHETKA.godina.vidimi).toBe(12);
+  it('неговите числа стоят непокътнати · и трите нови са СМЯТАНИ', () => {
+    expect(kolkoSeVizhdat('den', DNES)).toBe(8); // „ДЕН с 8 часа"
+    expect(kolkoSeVizhdat('sedmitsa', DNES)).toBe(7);
+    expect(kolkoSeVizhdat('mesets', DNES)).toBe(31); // август има 31
+    expect(kolkoSeVizhdat('mesets', '2026-02-10')).toBe(28); // а февруари — 28
+    expect(kolkoSeVizhdat('trimesechie', DNES)).toBe(92); // юли · авг · сеп
+    expect(kolkoSeVizhdat('godina', DNES)).toBe(12);
     expect(KRATNOST_NA_OBHVATA).toBe(5);
   });
 
@@ -268,8 +279,8 @@ describe('обобщеният ред · „в зависимост от вре�
       { data: '2026-09-01', prihod_st: 0, razhod_st: 700_00 },
     ]);
     const avgust = k.findIndex((x) => x.ot === '2026-08-01');
-    expect(redove[avgust]).toEqual({ prihod_st: 1500_00, razhod_st: 200_00 });
-    expect(redove[avgust + 1]).toEqual({ prihod_st: 0, razhod_st: 700_00 });
+    expect(redove[avgust]).toEqual({ prihod_st: 1500_00, razhod_st: 200_00, obhvat: 1 });
+    expect(redove[avgust + 1]).toEqual({ prihod_st: 0, razhod_st: 700_00, obhvat: 1 });
   });
 
   it('при такт СЕДМИЦА същите движения падат в РАЗНИ колони', () => {
@@ -300,6 +311,7 @@ describe('подредбата при непозната оценка', () => {
       id, seq: 1, myasto: 'Малинова', obekt: '', ime: id, otgovornik: '',
       ot: '2026-08-20', do: '2026-09-20',
       otsenka: otsenka as Delo['otsenka'], sastoyanie: 'чака', nadDelo: '', dokument: '',
+      promeneno: '', promeniGo: '',
     });
     const podredeni = podredi(
       [delo('чуждо', 'измислена-оценка'), delo('спешното', 'спешно-важно'), delo('обикновено', 'нито-едно')],

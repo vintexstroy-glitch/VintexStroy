@@ -44,6 +44,12 @@ import {
 } from '../src/domein/planove.js';
 import { sDumiZaAkaunta } from '../src/domein/akaunt.js';
 import { ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
+import { butonSIkona } from './ikoni.js';
+import { kolkoMyasto } from '../src/nositel/hranilishte.js';
+import { presmetni, sDumi, type KvotaNaDrayva } from '../src/domein/spiratchka.js';
+import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
+import { dumiteNaProbvaneto, probvanetoEIzteklo, type Probvane } from '../src/domein/probvane.js';
 
 const KLYUCH = 'masterbook:izbor';
 
@@ -97,6 +103,7 @@ const RED: readonly Vazmozhnost[] = [
   'poveche-hranilishte',
   'individualni-razrabotki',
   'svarzhi-ii',
+  'kalendar',
 ];
 
 function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya: Rolya): string {
@@ -125,7 +132,13 @@ function kartaKoySam(koj: Samolichnost, akaunt: string, stopanin: string, rolya:
         </div>
         <div class="plochka">
           <div class="etiket">Хранилище</div>
-          <div class="chislo malak" translate="no">${koj.hranilishte === 'платено' ? 'Платено' : 'Безплатно'}</div>
+          <div class="chislo malak" translate="no" data-hranilishte="${ekraniraj(koj.hranilishte)}">${
+            koj.hranilishte === 'платено'
+              ? 'Платено'
+              : koj.hranilishte === 'безплатно'
+                ? 'Безплатно'
+                : 'Не е питано'
+          }</div>
           <div class="pod">при ${IMENA_NA_DOSTAVCHITSITE[koj.dostavchik]}, не при нас</div>
         </div>
         <div class="plochka">
@@ -218,7 +231,7 @@ function kartaOtmetki(izbor: Izbor): string {
   const izklyucheni = RED.filter((v) => eIzklyuchena(izbor, v)).length;
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tablo-vazmozhnosti" class="karta">
       <div class="dyalglava">
         <h2>Възможности</h2>
         <span>${
@@ -232,6 +245,91 @@ function kartaOtmetki(izbor: Izbor): string {
         Изключената възможност изчезва от лентата и от бутоните веднага. Тя не е
         отнета — планът пак я дава и отметката я връща. Затова „изключена" и
         „няма я в този план" са различни думи тук.
+      </p>
+    </section>`;
+}
+
+/**
+ * КАРТАТА „МЕНЮТО" · тук се ВРЪЩА скритото и оттук се ПУБЛИКУВА редът (И111).
+ *
+ * ═══ ЗАЩО ТЯ Е ЕДНА, А ДЕЙСТВИЯТА СА ТРИ ═══
+ *
+ * Редът се подрежда В ЛЕНТАТА — там са стрелките и там го гледа човекът.
+ * Тук стоят ДРУГИТЕ три неща, които в лентата нямат място:
+ *
+ *   · ВИДИМОСТТА · отметка на всеки пункт, ЛИЧНА. Скритият пункт го няма в
+ *     лентата — значи няма и къде да се върне от нея. Затова картата изрежда
+ *     ВСИЧКИ, не само видимите (правило 15: изключено ≠ липсващо).
+ *   · „ЗАБРАВИ МОЯ РЕД" · връща реда на Стопанина. Без него човек, разместил
+ *     веднъж, няма как да се върне към общия — а „върни както беше" е първото,
+ *     което се търси след разместване.
+ *   · „ЗАПИШИ НАЧАЛНИЯ РЕД" · САМО за Стопанина. Взима РЕДА, който той вижда в
+ *     момента, и го записва като началния за ВСИЧКИ. Едно събитие, при натиснат
+ *     бутон — не при всяко местене: инак Журналът щеше да се пълни с междинни
+ *     подредби, а те не са решения, а движение на ръката.
+ *
+ * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (лентата) и се
+ * ПУБЛИКУВА на друго. Дотук същият похват е в `kontekstno-menyu.ts`: „менюто е
+ * втора дръжка на същата врата, не втора врата."
+ */
+function kartaLenta(
+  punktove: readonly { readonly klyuch: string; readonly ime: string; readonly skrit: boolean }[],
+  negov: boolean,
+  moyatRedEPipnat: boolean,
+): string {
+  const skriti = punktove.filter((p) => p.skrit).length;
+  return `
+    <section data-sektsiya="tablo-lenta" class="karta">
+      <div class="dyalglava">
+        <h2>Менюто</h2>
+        <span>${
+          skriti === 0
+            ? `${punktove.length} пункта · нищо не е скрито`
+            : `${skriti} ${skriti === 1 ? 'скрит пункт' : 'скрити пункта'} от ${punktove.length}`
+        }</span>
+      </div>
+      <div class="vazmozhnosti" data-sektsiya="lenta-punktove">
+        ${punktove
+          .map(
+            (p) => `
+          <label class="vazm${p.skrit ? ' izklyuchena' : ''}">
+            <input type="checkbox" data-punkt="${ekraniraj(p.klyuch)}"${p.skrit ? '' : ' checked'}${
+              NESKRIVAEMI.includes(p.klyuch) ? ' disabled' : ''
+            }>
+            <span class="vazm-tyalo">
+              <b>${ekraniraj(p.ime)}</b>
+              <span>${
+                NESKRIVAEMI.includes(p.klyuch)
+                  ? p.klyuch === 'tablo'
+                    ? 'не се скрива — оттук се връща скритото'
+                    : 'не се скрива — темите му са различни за всяка роля'
+                  : p.skrit
+                    ? 'скрит от МОЯТА лента · другите не са пипнати'
+                    : 'вижда се'
+              }</span>
+            </span>
+          </label>`,
+          )
+          .join('')}
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="zabravi-moya-red"${
+          moyatRedEPipnat ? '' : ' disabled'
+        }>Забрави моя ред</button>
+        ${
+          negov
+            ? `<button type="button" class="glaven" id="zapishi-nachalniya-red">Запиши началния ред за всички</button>`
+            : ''
+        }
+      </div>
+      <p class="drebno">
+        Редът се мести със стрелките В ЛЕНТАТА и е <b>твой</b> — нула записа в
+        Журнала. ${
+          negov
+            ? 'Бутонът горе взима реда, който виждаш СЕГА, и го записва като НАЧАЛНИЯ за всички; всеки после може да го пренарежда за себе си.'
+            : 'Началният ред идва от Стопанина; твоите размествания стоят върху него и не го менят.'
+        }
+        Скриването е лично и също не влиза в Журнала.
       </p>
     </section>`;
 }
@@ -275,7 +373,7 @@ function kartaSravnenie(izbor: Izbor, koj: Samolichnost): string {
   }).join('');
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tablo-planovete" class="karta">
       <div class="dyalglava">
         <h2>Плановете</h2>
         <span>нагоре расте КАПАЦИТЕТЪТ, не функциите</span>
@@ -413,6 +511,88 @@ function kartaVrashtane(): string {
  * (`ekranite.ts`). Показва се и на него, когато няма нито един свой таб: тогава
  * тя е покана, а не отчет.
  */
+/**
+ * ПРОБВАНЕТО · тридесет дни, СМЯТАНИ от книгата (резен 32 · ADR-092).
+ *
+ * „с 30 дн[и] б[ез]платно пробване" *(р83·[57])*, потвърдено с „da wavi" (И86)
+ * и разчетено там: „пробването е СРОК преди плащането, не безплатен план".
+ *
+ * ═══ ЧЕСТНА СПИРАЧКА, НЕ КЛЮЧАЛКА ═══
+ *
+ * Изтеклият срок КАЗВА, че е изтекъл — и нищо повече. Нито един бутон не
+ * изчезва, Журналът не се заключва, износът работи. Приложение, което заключва
+ * данните на човека при изтекъл срок, е взело за заложник неговата книга.
+ *
+ * Затова и картата няма червено: тя е покана, не заплаха.
+ */
+function kartaProbvane(p: Probvane): string {
+  return `
+    <section class="karta" data-sektsiya="tablo-probvane" data-sastoyanie="${p.sastoyanie}">
+      <div class="dyalglava">
+        <h2>Пробване</h2>
+        <span>срок преди плащането · не безплатен план</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="ostavat-dni">
+          <div class="etiket">${probvanetoEIzteklo(p) ? 'Изтекло преди' : 'Остават'}</div>
+          <div class="chislo malak" translate="no">${Math.abs(p.ostavat)}</div>
+          <div class="pod">${Math.abs(p.ostavat) === 1 ? 'ден' : 'дни'}${
+            p.nachalo === '' ? '' : ` · от ${ekraniraj(p.nachalo)}`
+          }</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <p class="drebno">${ekraniraj(dumiteNaProbvaneto(p))}</p>
+      </div>
+    </section>`;
+}
+
+/**
+ * ГОДИНИТЕ · и нулата се КАЗВА (резен 28 · ADR-088).
+ *
+ * Негово: „Става на календарна година автоматично прави пълен годишен архив"
+ * *(р85·[51])*. Автоматичен ЗАПИС няма — в целия код няма запис без човешки
+ * жест. Автоматично е ЯВЯВАНЕТО: щом дойде 1 януари, миналата година застава
+ * ТУК, вместо да чака някой да си спомни за нея.
+ *
+ * Картата стои и когато няма какво да каже: проверената нула е различна от
+ * нулата, за която никой не е питал (правило 7).
+ */
+function kartaGodinite(godini: {
+  readonly chakat: readonly string[];
+  readonly razminavat: readonly string[];
+}): string {
+  const chakat = godini.chakat.length;
+  const razminavat = godini.razminavat.length;
+  return `
+    <section class="karta" data-sektsiya="tablo-godini">
+      <div class="dyalglava">
+        <h2>Годините</h2>
+        <span>приключилата година се явява сама · затварянето е негово решение</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka" data-pole="chakat-godini">
+          <div class="etiket">Чакат затваряне</div>
+          <div class="chislo malak" translate="no">${chakat}</div>
+          <div class="pod">${chakat === 0 ? 'всички приключили са затворени' : godini.chakat.join(' · ')}</div>
+        </div>
+        <div class="plochka" data-pole="razminavat-godini">
+          <div class="etiket">Разминават се</div>
+          <div class="chislo malak" translate="no">${razminavat}</div>
+          <div class="pod">${razminavat === 0 ? 'нито една затворена не е мръднала' : godini.razminavat.join(' · ')}</div>
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" data-ekran="nastroyki">Отвори Годините</button>
+        <p class="drebno">
+          Затворената година <b>не отказва записи</b> — негово е „променяш само през
+          журнала назад". Онова, което затварянето добавя, е <b>мярката</b>: колко се е
+          променила годината оттогава, и в коя посока.
+        </p>
+      </div>
+    </section>`;
+}
+
 function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
   if (!tozi) return '';
   return `
@@ -440,6 +620,23 @@ function kartaTabove(tozi: boolean, broy: number, dobaveni: number): string {
     </section>`;
 }
 
+/**
+ * КВОТАТА · ПОГЛЕД, не запис (ADR-022 · ADR-064).
+ *
+ * Живее в паметта на модула и умира с раздела. Отговорът на Google е ЧУЖД
+ * факт — той се пита наново, не се помни като наш. Записан в Журнала, той
+ * щеше да остарее мълчаливо в деня, в който човек си купи място.
+ */
+let kvotata: KvotaNaDrayva | null = null;
+let greshkaSpiratchka = '';
+
+/** Питането минава ОТТУК · подава се от `main.ts`, за да няма мрежа в екрана. */
+let pitayDrayvaZaKvota: (() => Promise<KvotaNaDrayva>) | null = null;
+
+export function svarzhiPitanetoNaDrayva(f: () => Promise<KvotaNaDrayva>): void {
+  pitayDrayvaZaKvota = f;
+}
+
 export function narisuvayTablo(
   koj: Samolichnost,
   izbor: Izbor,
@@ -458,15 +655,47 @@ export function narisuvayTablo(
   zapasen: { readonly imeyl: string; readonly poslednite: string } | null = null,
   /** табовете · брой всички и брой ДОБАВЕНИ (И101 т.1) */
   tabove: { readonly vsichki: number; readonly dobaveni: number } = { vsichki: 0, dobaveni: 0 },
+  /** пунктовете на лентата · подредени и с това кой е скрит (резен 15 · И111) */
+  lenta: {
+    readonly punktove: readonly { readonly klyuch: string; readonly ime: string; readonly skrit: boolean }[];
+    readonly moyatRedEPipnat: boolean;
+  } = { punktove: [], moyatRedEPipnat: false },
+  /**
+   * КОЛКО ЗАЕМА ЖУРНАЛЪТ · МЕРЕНО от браузъра, не питано (резен Д).
+   *
+   * Подава се, защото мярката идва от `navigator.storage.estimate()`, а тя
+   * живее в `main.ts` заедно с останалото за носителя.
+   */
+  nuzhnoZaZhurnala = 0,
+  /**
+   * ГОДИНИТЕ · кои приключили чакат затваряне и кои се РАЗМИНАВАТ (резен 28).
+   *
+   * Подават се СМЕТНАТИ, не се четат тук: Таблото не познава Огледалото, и
+   * това е нарочно — то показва, не смята.
+   */
+  godini: { readonly chakat: readonly string[]; readonly razminavat: readonly string[] } = {
+    chakat: [],
+    razminavat: [],
+  },
+  /**
+   * ПРОБВАНЕТО · СМЯТА се от книгата и деня, подава се СМЕТНАТО (резен 32).
+   *
+   * Таблото не познава Журнала и не бива да го научава: то показва, не смята.
+   */
+  probvane: Probvane = { sastoyanie: 'ne-e-zapochnalo', nachalo: '', do_: '', ostavat: 30 },
 ): string {
   const negov = stopanin !== '' && stopanin === koj.imeyl;
   return (
     kartaKoySam(koj, akaunt, stopanin, rolya) +
     kartaTabove(negov, tabove.vsichki, tabove.dobaveni) +
+    kartaGodinite(godini) +
+    kartaProbvane(probvane) +
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
     kartaLichno(lichnoVklyucheno, lichnoPipnato) +
+    kartaLenta(lenta.punktove, negov, lenta.moyatRedEPipnat) +
     kartaOtmetki(izbor) +
+    kartaSpiratchka(izbor, koj, nuzhnoZaZhurnala) +
     kartaSravnenie(izbor, koj)
   );
 }
@@ -522,6 +751,34 @@ export function zakachiTablo(
   sloji: (izbor: Izbor) => void,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * ПИТАЙ ДРАЙВА · единственото действие на честната спирачка (резен Д).
+   *
+   * Пита и ПОКАЗВА. Нищо не записва в Журнала и нищо не забранява — отговорът
+   * е чужд факт и живее в паметта на раздела (ADR-064).
+   *
+   * Липсващата връзка НЕ е грешка: офлайн изданието няма свързваща част, и
+   * тогава бутонът казва защо, вместо да мълчи (правило 15).
+   */
+  koren.querySelector<HTMLButtonElement>('#pitay-drayva')?.addEventListener('click', async () => {
+    const buton = koren.querySelector<HTMLButtonElement>('#pitay-drayva')!;
+    buton.disabled = true;
+    try {
+      if (!pitayDrayvaZaKvota) {
+        throw new Error(
+          'Това издание няма свързваща част към Драйва — то работи изцяло офлайн. ' +
+            'Спирачката остава непитана, и това е състояние, не повреда.',
+        );
+      }
+      kvotata = await pitayDrayvaZaKvota();
+      greshkaSpiratchka = '';
+    } catch (err) {
+      kvotata = null;
+      greshkaSpiratchka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
   for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-vazmozhnost]')) {
     kutiya.addEventListener('change', async () => {
       const v = kutiya.dataset['vazmozhnost'] as Vazmozhnost;
@@ -532,6 +789,19 @@ export function zakachiTablo(
     });
   }
 
+  // ВИДИМОСТТА НА ПУНКТ · лична, паметта на екрана, НУЛА събития (И111).
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-punkt]')) {
+    kutiya.addEventListener('change', async () => {
+      prevklyuchiPunkt(kutiya.dataset['punkt']!);
+      await prerisuvay();
+    });
+  }
+
+  koren.querySelector<HTMLButtonElement>('#zabravi-moya-red')?.addEventListener('click', async () => {
+    zabraviMoyaRed();
+    await prerisuvay();
+  });
+
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-plan]')) {
     b.addEventListener('click', async () => {
       const nov = smeniPlan(vzemi(), b.dataset['plan']!);
@@ -540,4 +810,94 @@ export function zakachiTablo(
       await prerisuvay();
     });
   }
+}
+
+/**
+ * ДРАЙВЪТ И ПЛАНЪТ · ЧЕСТНАТА СПИРАЧКА (резен Д · ADR-076).
+ *
+ * `CLAUDE.md`: „Защитата е честна спирачка, не ключалка. Заявка за плана +
+ * проверка на драйва ловят НЕВОЛНАТА грешка. Нарочна измама иска сървър."
+ *
+ * Затова тази карта има ЕДИН бутон, който ПИТА, и нула бутона, които
+ * забраняват. Онова, което тя прави, е да покаже числата и да каже какво
+ * значат — включително когато не са питани.
+ */
+function kartaSpiratchka(izbor: Izbor, koj: Samolichnost, nuzhno: number): string {
+  const p = presmetni({
+    plan: izbor.plan,
+    kvota: kvotata,
+    nuzhno,
+    vidOtSamolichnostta: koj.hranilishte,
+  });
+  const znachka =
+    p.otsenka === 'stiga' ? 'dobre' : p.otsenka === 'ne e pitano' ? 'tiha' : 'trevoga';
+
+  return `
+    <section class="karta" data-sektsiya="tablo-spiratchka">
+      <div class="dyalglava">
+        <h2>Драйвът и планът</h2>
+        <span>спирачка, не ключалка · нищо тук не забранява нищо</span>
+      </div>
+
+      <div class="plochki">
+        <div class="plochka">
+          <div class="etiket">Акаунтът при ${ekraniraj(IMENA_NA_DOSTAVCHITSITE[koj.dostavchik])}</div>
+          <div class="chislo malak" translate="no" data-vid-hranilishte="${ekraniraj(p.vid)}">${ekraniraj(
+            p.vid === 'не е питано' ? 'Не е питано' : p.vid === 'платено' ? 'Платено' : 'Безплатно',
+          )}</div>
+          <div class="pod">${p.vid === 'не е питано' ? 'докато не питаме, не твърдим' : 'МЕРИ се от тавана'}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Свободно в Драйва</div>
+          <div class="chislo malak" translate="no" data-svobodno="${p.svobodno}">${
+            p.svobodno < 0 ? '—' : kolkoMyasto(p.svobodno)
+          }</div>
+          <div class="pod">${p.svobodno < 0 ? 'няма число, защото не е питано' : 'таван минус заето'}</div>
+        </div>
+        <div class="plochka">
+          <div class="etiket">Нужно за Журнала</div>
+          <div class="chislo malak" translate="no" data-nuzhno="${nuzhno}">${kolkoMyasto(nuzhno)}</div>
+          <div class="pod">МЕРЕНО от браузъра, не питано</div>
+        </div>
+      </div>
+
+      <p class="drebno">
+        <span class="znachka ${znachka}" data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(
+          p.otsenka === 'ne e pitano'
+            ? 'не е питано'
+            : p.otsenka === 'stiga'
+              ? 'стига'
+              : p.otsenka === 'tyasno'
+                ? 'тясно'
+                : 'не стига',
+        )}</span>
+        ${ekraniraj(sDumi(p))}
+      </p>
+
+      ${
+        greshkaSpiratchka === ''
+          ? ''
+          : `<p class="greshka" id="greshka-spiratchka">${ekraniraj(greshkaSpiratchka)}</p>`
+      }
+
+      ${butonSIkona({
+        ikona: 'veriga',
+        tekst: kvotata === null ? 'Питай Драйва' : 'Питай пак',
+        title: 'Пита доставчика за тавана и заетото · нищо не се качва и нищо не се записва',
+        klas: 'glaven',
+        id: 'pitay-drayva',
+      })}
+
+      <p class="drebno">Питането иска СЪГЛАСИЕ за Драйва — второ разрешение, не
+      второ влизане. Използва се обхватът, който вече имаме
+      (<code translate="no">drive.file</code>): честната спирачка не струва нито
+      едно ново разрешение. Отговорът НЕ влиза в Журнала — той е чужд факт и се
+      пита наново (същото решение като при отговора на Google, ADR-064).</p>
+
+      <p class="drebno"><b>И нищо не се заключва.</b> Приложението е в браузъра;
+      който иска да заобиколи това число, отваря конзолата и го заобикаля.
+      Спирачката лови НЕВОЛНАТА грешка — човек, който тръгва да пренася повече,
+      отколкото има къде да се събере. Нарочната измама иска сървър, и това е
+      казано, вместо да се прави, че не е така.</p>
+    </section>`;
 }

@@ -25,6 +25,33 @@ import { MOZHE, ne, type Otgovor } from './otgovor.js';
 
 export type { Otgovor };
 
+/**
+ * КОИ ЗВЕНА СА ПОГАСЕНИ · смятано ПРЯКО от книгата (правило 17).
+ *
+ * Огледалото си има свой обход и не минава оттук — нарочно: сверката на
+ * годината (резен 28) сравнява своя брой с НЕГОВИЯ и трябва да е ВТОРИ,
+ * независим път, иначе би сравнявала едно число със себе си.
+ *
+ * Но „втори път" не значи „преписан път". Дотук същите пет реда живееха на две
+ * места (сверката и годишният файл) и броячът на чистотата ги хвана веднага:
+ * преписаното се разминава — а тук разминаването значи ред, който в единия
+ * изглед е жив, а в другия го няма.
+ *
+ * Ключът е `верига#seq`, не голо `seq`: всяка верига тръгва от 1 и сторно на
+ * seq 5 в едната щеше да гаси seq 5 в другите (ADR-055).
+ */
+export function pogaseniteZvena(sabitiya: readonly Sabitie[]): ReadonlySet<string> {
+  const pogaseni = new Set<string>();
+  for (const s of sabitiya) {
+    if (s.type !== 'Сторно') continue;
+    const p = s.payload as unknown as { pogasyavaSeq: number; pogasyavaVeriga?: string };
+    pogaseni.add(klyuchNaZveno({ naematel: p.pogasyavaVeriga ?? s.naematel, seq: p.pogasyavaSeq }));
+    // И САМОТО СТОРНО · то е поправката, не поправеното (резен 27).
+    pogaseni.add(klyuchNaZveno(s));
+  }
+  return pogaseni;
+}
+
 function broy(n: number, edno: string, mnogo: string): string {
   return `${n} ${n === 1 ? edno : mnogo}`;
 }

@@ -34,6 +34,13 @@ import * as mnogotoVerigi from './razdeli/mnogoto-verigi.ts';
 import * as ii from './razdeli/ii.ts';
 import * as tabove from './razdeli/tabove.ts';
 import * as lichno from './razdeli/lichno.ts';
+import * as prodazhbi from './razdeli/prodazhbi.ts';
+import * as krediti from './razdeli/krediti.ts';
+import * as zaplati from './razdeli/zaplati.ts';
+import * as tablitsaOtFayl from './razdeli/tablitsa-ot-fayl.ts';
+import * as plashtaniyaArhiv from './razdeli/plashtaniya-arhiv.ts';
+import * as prodazhbiIzhod from './razdeli/prodazhbi-izhod.ts';
+import * as sesii from './razdeli/sesii.ts';
 
 async function main(): Promise<void> {
   const server = pusniServer();
@@ -99,19 +106,56 @@ async function main(): Promise<void> {
     await stoynost.blok3(ctx);
     await nastroyki.blok4(ctx);
     const lichniyat = await lichno.blok1(ctx);
+    await udobstvoto.blok3(ctx);
+    await udobstvoto.blok4(ctx);
     await menyuta.blok2(ctx);
     await lichno.blok2(ctx, lichniyat);
     await menyuta.blok3(ctx);
     await smetki.blok8(ctx);
     await nastroyki.blok5(ctx);
     await smetki.blok9(ctx);
+    await smetki.blok10(ctx);
+    await smetki.blok11(ctx);
+    await smetki.blok12(ctx);
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
+    /**
+     * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
+     *
+     * §95 иска НАСТРОЙКИ, а те не са гол бутон, а ПАДАЩ РЕД (ADR-066): пунктът
+     * отваря менюто, екранът се сменя чак от ТЕМАТА. Освен това редът не е
+     * достъпен навсякъде в прохода — по-късните блокове менят лентата, и
+     * чакането там виси трийсет секунди с „на екрана: Имоти".
+     *
+     * `nastroyki.blok6` (§63) току-що е доказал, че редът се отваря — затова
+     * мястото е точно след него. Редът на блоковете е ЧАСТ ОТ ДОГОВОРА им.
+     */
+    await prodazhbi.blok1(ctx);
+    await prodazhbi.blok2(ctx);
+    await prodazhbi.blok3(ctx);
+    await krediti.blok1(ctx);
+    await krediti.blok2(ctx);
+    await zaplati.blok1(ctx);
+    await zaplati.blok2(ctx);
+    await tablitsaOtFayl.blok1(ctx);
+    // §102 стои СЛЕД §99: заплатата, която то брои, се записва там.
+    await plashtaniyaArhiv.blok1(ctx);
+    // §103 стои СЛЕД §94: сделката и двете ѝ движения се записват там.
+    await prodazhbiIzhod.blok1(ctx);
+    // §104 иска ПАДАЩИЯ РЕД на Настройки · `nastroyki.blok6` (§63) вече е
+    // доказал, че се отваря, и мястото е след него, не преди.
+    await sesii.blok1(ctx);
     await tablo.blok2(ctx);
+    await tablo.blok3(ctx);
     await vhodISamolichnost.blok2(ctx);
     await infrastruktura.blok4(ctx);
     await mnogotoVerigi.blok2(ctx);
     await infrastruktura.blok5(ctx);
+    // §71 стои НАКРАЯ нарочно: обхожда лентата, отваря редове и мени екрана,
+    // а дотогава всеки друг блок вече си е взел своето. Блок, който мести
+    // състояние под следващия, е по-скъп от липсващ.
+    await menyuta.blok4(ctx);
+    await udobstvoto.blok5(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,
@@ -119,12 +163,38 @@ async function main(): Promise<void> {
       vidyano: String(greshka).split('\n')[0] ?? String(greshka),
       ochakvano: 'да мине',
     });
+    // ЦЕЛИЯТ дневник на Playwright, не само първият ред. Първият ред казва
+    // „page.click: Timeout" и НИЩО повече — а долните редове казват КОЙ
+    // локатор и защо („element is not visible"). Струваше четири пуска на
+    // прохода, за да се разбере, че спънатият бутон не е онзи, чийто раздел
+    // пише отгоре: разделът изостава с една проверка.
+    console.log(`\n  ЦЯЛАТА ГРЕШКА:\n  ${String(greshka).replace(/\n/g, '\n  ')}\n`);
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
     // не казва нищо, а снимката се гледа чак после.
     const naEkrana = await p
       .evaluate(() => document.getElementById('ekran')?.innerText?.slice(0, 300) ?? 'няма екран')
       .catch(() => 'екранът не се чете');
     console.log(`\n  НА ЕКРАНА В МИГА НА СПЪВАНЕТО:\n  ${naEkrana.replace(/\n/g, '\n  ')}\n`);
+
+    // НАСЛОЕНОТО · менютата и прозорците висят на `body`, ИЗВЪН `#ekran`.
+    // Дъмпът горе не ги вижда, и точно затова „менюто го няма" изглеждаше
+    // еднакво с „менюто е там, но е празно". Платено с един пуск на прохода.
+    const nasloeno = await p
+      .evaluate(() =>
+        [...document.body.children]
+          .filter((e) => e.id !== 'ekran')
+          .map((e) => {
+            const r = e.getBoundingClientRect();
+            return `${e.tagName.toLowerCase()}.${e.className || '—'} · ${Math.round(r.width)}×${Math.round(
+              r.height,
+            )} на ${Math.round(r.left)},${Math.round(r.top)} · ${(e as HTMLElement).innerText
+              ?.replace(/\s+/g, ' ')
+              .slice(0, 120)}`;
+          })
+          .join('\n') || 'нищо не виси на body извън екрана',
+      )
+      .catch(() => 'наслоеното не се чете');
+    console.log(`\n  НАСЛОЕНО ВЪРХУ BODY:\n  ${nasloeno.replace(/\n/g, '\n  ')}\n`);
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
   }
 

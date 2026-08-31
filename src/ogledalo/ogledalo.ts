@@ -20,19 +20,46 @@ import {
 } from '../domein/vhodni-problemi.js';
 import type { Sabitie } from '../yadro/index.js';
 import { klyuchNaZveno } from '../yadro/sabitie.js';
+import { svedenotoMyasto, type Myasto } from '../domein/mesta.js';
+import { dataNaZapisa, godinataNaZapisa, opisaNaZapisa, sumataNaZapisa } from '../domein/opis-na-zapisa.js';
 import { chetiRolya } from '../yadro/samolichnost.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { Buton } from '../domein/butoni.js';
 import type { PravaZaModel } from '../domein/kolonno.js';
-import { klyuchNaPravo } from '../domein/kolonno.js';
+import { klyuchNaPravo, pravaOtZhurnala } from '../domein/kolonno.js';
+import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
+import { klyuchNaDokumenti } from '../domein/dokumenti.js';
+import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
+import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
+import type { Otsenka } from '../domein/dela.js';
+import type { PoleSFormula } from '../domein/pole-s-formula.js';
+import type { DeystvieNaFormula } from '../domein/formuli.js';
+import type {
+  PrehvarlenaSedmitsa,
+  RedNaZaplata,
+  ZahranvaneNaKesha,
+} from '../domein/zaplati.js';
+import { redOtZhurnala } from '../domein/lenta.js';
+import { rachniyatRedOtZhurnala } from '../domein/porednost.js';
+import {
+  svedenoIme,
+  type Kontakt,
+  type Prepiska,
+  type SastoyanieNaPrepiska,
+  type SastoyanieNaSreshta,
+  type Sreshta,
+  type VidNaZakachaneto,
+} from '../domein/kontakti.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
+import type { SvoyKoefitsient } from '../domein/svoy-koefitsient.js';
 import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
 import type { LichenDostap } from '../domein/lichen-dostap.js';
 import type { LichenKredit, LichnaTema, LichnoDvizhenie } from '../domein/lichni-pari.js';
+import type { Izprashtane, OtgovorNaZadacha } from '../domein/zadachi-kam-hora.js';
 import type { Kontragent, VidKontragent } from '../domein/kontragenti.js';
 import { klyuchNaKontragent } from '../domein/kontragenti.js';
 import type {
@@ -61,6 +88,26 @@ import type {
   PayloadZapasenKontaktZapisan,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
+  PayloadLentaPodredena,
+  PayloadDelaPodredeni,
+  PayloadKontaktZapisan,
+  PayloadPrepiskaZapisana,
+  PayloadSreshtaZapisana,
+  PayloadPoleZapisano,
+  PayloadDokumentiZakacheni,
+  PayloadDvizhenieProdazhba,
+  PayloadEtapNaProdazhbaZapisan,
+  PayloadKreditZapisan,
+  PayloadPlashtanePoKredit,
+  PayloadKeshZahranen,
+  PayloadSedmitsaPrehvarlena,
+  PayloadTablitsaOtFaylSazdadena,
+  PayloadGodinaZatvorena,
+  PayloadMyastoZapisano,
+  PayloadKategoriyaZadadena,
+  PayloadZaplataZapisana,
+  PayloadProdazhbaZapisana,
+  PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
   PayloadLichnaTemaZapisana,
@@ -81,6 +128,14 @@ export interface Imot {
   readonly adres: string;
   readonly edinitsa: string;
   readonly ploshtad_kvsm: number;
+  /**
+   * ЛИНК КЪМ ПАПКАТА на този обект · празно значи „още няма" (резен 37).
+   *
+   * „Различни за различни обекти, но те са гоогле драйва и има достъп от
+   * имейлите които влизат в програмата." *(р57·[110])* — пази се АДРЕСЪТ;
+   * достъпът е при доставчика (правило 14).
+   */
+  readonly papka: string;
 }
 
 export interface Naem {
@@ -234,12 +289,92 @@ export interface Ogledalo {
   /** имейл → служителят с ролята му; вж. `src/domein/sluzhiteli.ts` */
   readonly sluzhiteli: ReadonlyMap<string, PayloadSluzhitelZapisan>;
   /**
+   * ЗАДАЧИТЕ КЪМ ХОРАТА (резен 14а · И110) · изпратените и отговорите им.
+   *
+   * Две карти, не една: изпращането и отговорът идват от РАЗЛИЧНИ вериги, а
+   * Огледалото чете всички (ADR-055). Състоянието „чака" НЕ се пази — то е
+   * липсата на отговор и се смята (`sastoyanieNaZadacha`).
+   */
+  readonly izprateniZadachi: ReadonlyMap<string, Izprashtane>;
+  readonly otgovoriNaZadachi: ReadonlyMap<string, OtgovorNaZadacha>;
+  /**
    * „<имейл>|<модел>" → скритите за него колони в този хедър.
    *
    * Ключът е двоен, защото правото важи за ДВОЙКА: един човек в един хедър.
    * Вж. `src/domein/kolonno.ts`.
    */
   readonly prava: ReadonlyMap<string, PravaZaModel>;
+  /**
+   * „<към какво>|<id>" → закачените за ТОЗИ запис документи.
+   *
+   * Влиза ОТПЕЧАТЪКЪТ на файла, не байтовете му: име · големина · час · sha256.
+   * Последният запис за същността бие — както при правата и при лентата.
+   * Вж. `src/domein/dokumenti.ts`.
+   */
+  readonly dokumenti: ReadonlyMap<string, ZakacheniDokumenti>;
+  /**
+   * `prodazhbaId` → сделката с петнайсетте му колони (резен 18б).
+   *
+   * Последният запис за същността бие — поправка е НОВ запис на цялата сделка.
+   * Вж. `src/domein/prodazhbi.ts`.
+   */
+  readonly prodazhbi: ReadonlyMap<string, Prodazhba>;
+  /**
+   * Движенията по продажбите · вноска · връщане · неустойка.
+   *
+   * СПИСЪК, не карта: те се ДОБАВЯТ и нито едно не заменя друго. „Развалянето
+   * е ТРИ отделни движения… никакво нетиране" (И97) — карта с ключ по вид щеше
+   * да слее втората вноска с първата и да изяде датата ѝ.
+   */
+  readonly dvizheniyaNaProdazhbi: readonly DvizhenieNaProdazhba[];
+  /**
+   * `klyuch` → етапът, добавен от Стопанина (29.08).
+   *
+   * Последният запис за ключа бие — преименуване е нов запис, не втори етап.
+   * Базовите седем НЕ са тук: те са негови от начало и живеят в кода
+   * (`VIDOVE_DVIZHENIE`); тази карта носи само РАСТЕЖА.
+   */
+  readonly etapiNaProdazhbite: ReadonlyMap<string, PayloadEtapNaProdazhbaZapisan>;
+
+  /**
+   * КРЕДИТИТЕ · договорните данни (резен 19 · ADR-079).
+   *
+   * Остатъкът НЕ е тук — той се СМЯТА от платените главници (`krediti.ts`).
+   * Записан като поле, той щеше да се разминава точно в деня, в който някой
+   * сторнира плащане.
+   */
+  readonly krediti: ReadonlyMap<string, Kredit>;
+
+  /** Плащанията по кредити · ДОБАВЯТ се; сторнираното вече го няма тук. */
+  readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
+
+  /**
+   * ЗАПЛАТИТЕ · редовете по седмици (резен 20 · ADR-080).
+   *
+   * Седмичната заплата НЕ е тук — тя е ставка × дни и се СМЯТА (`zaplati.ts`).
+   */
+  readonly zaplati: ReadonlyMap<string, RedNaZaplata>;
+
+  /** Прехвърлените седмици · следата „коя, кога, кой разход роди". */
+  readonly prehvarleniSedmitsi: ReadonlyMap<string, PrehvarlenaSedmitsa>;
+
+  /** Захранванията на общия кеш-джоб · ДОБАВЯТ се; сторнираното го няма тук. */
+  readonly zahranvaniyaNaKesha: readonly ZahranvaneNaKesha[];
+
+  /**
+   * ТАБЛИЦИТЕ, СЪЗДАДЕНИ ОТ ФАЙЛ (резен 21 · ADR-081).
+   *
+   * Последният запис за едно име БИЕ: второ четене на същия файл ПОПРАВЯ
+   * таблицата, не ражда втора с това име.
+   */
+  readonly tablitsiOtFayl: ReadonlyMap<string, PayloadTablitsaOtFaylSazdadena>;
+  /**
+   * КАТЕГОРИИТЕ на плащанията · `KAT:<вид>:<id>` → думата (резен 25).
+   *
+   * Последната дума е в сила: повторно задаване е НОВО събитие, а не поправка
+   * на старото, тъй че историята „кога какво съм я мислел" остава цяла.
+   */
+  readonly kategorii: ReadonlyMap<string, string>;
   /**
    * „<модел>|<колона>|<период>" → сборът, изпратен към Приходи или Разходи.
    *
@@ -258,6 +393,13 @@ export interface Ogledalo {
   readonly dela: ReadonlyMap<string, Delo>;
   /** ключ → табът със секциите му; последният запис ПОПРАВЯ (И92 т.9) */
   readonly tabove: ReadonlyMap<string, Tab>;
+  /**
+   * СВОИТЕ КОЕФИЦИЕНТИ · последната дума за всеки ключ, махнатите ВКЛЮЧИТЕЛНО.
+   *
+   * Махнатите НЕ се изхвърлят тук: „нямаше го" и „махнахме го" са различни неща,
+   * и второто трябва да се вижда. Кой се показва, решава екранът.
+   */
+  readonly koefitsienti: ReadonlyMap<string, SvoyKoefitsient>;
   /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
   readonly agenti: ReadonlyMap<string, Agent>;
   /**
@@ -297,6 +439,28 @@ export interface Ogledalo {
    * ЛИЧНОТО · включено ли е (И98). Смисъл има само в ЛИЧЕН Журнал: пита се
    * от последното `ЛичноПревключено`; празният Журнал е „не е активирано".
    */
+  /**
+   * НАЧАЛНИЯТ РЕД НА ЛЕНТАТА · решението на Стопанина (резен 15 · И111).
+   *
+   * Празен списък значи „още никой не е подреждал" — и тогава важи редът, в
+   * който екраните са ОБЯВЕНИ в регистъра. Празното НЕ значи „скрий всичко":
+   * сливането е `podredi`, а тя слага непознатите НАКРАЯ.
+   */
+  /**
+   * НАП · включена ли е връзката, и КОЙ е дал съгласието (резен 17).
+   *
+   * Празен имейл значи „не е включвана" — трето състояние няма нужда: прибраната
+   * връзка пази съгласието, за да се вижда кой го е дал, ако се включи пак.
+   */
+  readonly redNaLentata: readonly string[];
+  /**
+   * РЪЧНИЯТ РЕД НА ДЕЛАТА · идентификаторите, в реда на човека (резен 34).
+   *
+   * Празно значи „никой не е местил" — и тогава подредбата е изцяло сметната.
+   * Тук НЕ се сверява срещу живите дела: Огледалото не знае кои дела ще стигнат
+   * до екрана след филтрите (дословният прецедент на `redNaLentata`).
+   */
+  readonly rachniyatRedNaDelata: readonly string[];
   readonly lichnoVklyucheno: boolean;
   /**
    * МЯСТОТО в личния драйв, с което личното е активирано (И99).
@@ -332,6 +496,65 @@ export interface Ogledalo {
    * от 1, тъй че число само по себе си сочи по едно събитие във всяка от тях.
    */
   readonly pogaseni: ReadonlySet<string>;
+  /**
+   * ПОГАСЕНИТЕ ЗАПИСИ · за да СЕ ВИЖДАТ (резен 27 · ADR-087).
+   *
+   * Негово, прието: „Сиво + зачертано + малък знак ★" *(р82·[37])*. Журналът
+   * пази и записа, и сторното му завинаги — но Огледалото ПРЕСКАЧА погасеното
+   * и на екрана редът просто изчезваше. Човек не можеше да различи „сторнирано"
+   * от „никога не е било записано".
+   *
+   * ОТДЕЛЕН СПИСЪК, не връщане в картите. Върнати там, погасените щяха да
+   * влязат във ВСЕКИ сбор — тихо и навсякъде. Тук сумите не ги виждат:
+   * екраните ги искат ПОИМЕННО.
+   */
+  readonly pogasenite: readonly PogasenZapis[];
+  /**
+   * КОЛКО НОСИ ВСЯКА ГОДИНА · '2025' → брой и сбор (резен 28).
+   *
+   * СМЯТА се в същия обход (резен 24 ги сля в един и този не отваря нов).
+   * Годината на един запис е `dataNaZapisa(s)`, тоест СОБСТВЕНАТА му дата, а не
+   * часът на натискането: разход от 12.11, въведен днес, принадлежи на ноември
+   * (поуката на резен 27 §7).
+   */
+  readonly godinite: ReadonlyMap<string, number>;
+  /**
+   * ЗАТВОРЕНИТЕ ГОДИНИ · '2025' → мигът на затварянето.
+   *
+   * Единственото от годината, което НЕ може да се смята. Сторно на затварянето
+   * я връща в „чака" — и тя пак се предлага.
+   */
+  readonly zatvorenite: ReadonlyMap<string, ZatvorenaGodina>;
+  /**
+   * МЕСТАТА (проектите) · сведеното име → записът (резен 31).
+   *
+   * Ключът е СВЕДЕНОТО име, защото делата сочат мястото по име, а „Малинова
+   * Долина" и „малинова долина " са едно място. Последният запис БИЕ:
+   * поправката на фирмата е ново събитие върху същата същност.
+   */
+  readonly mesta: ReadonlyMap<string, Myasto>;
+  /**
+   * КОНТАКТИТЕ · сведеното име → записът (резен 38 · M10).
+   *
+   * Ключът е СВЕДЕНОТО име, по същата причина като при местата: преписките
+   * сочат контакта по ИМЕ, а „Иван Петров" и „иван петров " са един човек.
+   */
+  readonly kontakti: ReadonlyMap<string, Kontakt>;
+  /** ПРЕПИСКИТЕ · по свой `id`, защото един контакт носи много (резен 38). */
+  readonly prepiski: ReadonlyMap<string, Prepiska>;
+  /** СРЕЩИТЕ · по свой `id`, по същата причина като преписките (резен 39). */
+  readonly sreshti: ReadonlyMap<string, Sreshta>;
+  /** ПОЛЕТАТА С ФОРМУЛА в Отчети · по свой `id` (резен 42). */
+  readonly poletaSFormula: ReadonlyMap<string, PoleSFormula>;
+}
+
+/** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
+export interface ZatvorenaGodina {
+  readonly godina: string;
+  readonly broySabitiya: number;
+  readonly koy: string;
+  readonly kogato: string;
+  readonly seq: number;
 }
 
 /**
@@ -366,55 +589,127 @@ function poletataNaNaema(p: PayloadNaemDobaven | PayloadNaemPopraven) {
   };
 }
 
+/**
+ * ВИДОВЕТЕ, ПРИ КОИТО СЪЗДАВАНЕТО И ПОПРАВКАТА СА ЕДНО И СЪЩО СЪБИТИЕ.
+ *
+ * Делото няма отделно „Поправено": и създаването, и поправката са
+ * `ДелоЗаписано` върху същия id. Затова сторното на СЪЗДАВАНЕТО гасеше само
+ * неговия seq — а поправката после пак викаше `dela.set(id, …)` и делото СЕ
+ * ВРЪЩАШЕ, с чуждия seq на поправката. Същата дупка носят и другите четири.
+ *
+ * Имотът и наемът я нямат: там поправката е СВОЕ събитие и пази
+ * `if (imot)` — „поправка на несъществуващ имот не създава имот от нищото".
+ *
+ * ═══ ЗАЩО Е СПИСЪК, А НЕ ПЕТ ВИКАНИЯ (резен 24 · ADR-084) ═══
+ *
+ * Дотук всеки вид си имаше СВОЙ пълен обход на потока: пет вида — пет обхода,
+ * а с шестия щяха да станат шест. Растеж, който нищо не броеше, докато МЯРКАТА
+ * не го хвана: `fold` върху слетия поток мина от 9,4 ms (резен 18) на ~14 ms
+ * (резен 20), тоест числото се удвои по един резен наведнъж.
+ *
+ * Сега видовете стоят в ИМЕНУВАН СПИСЪК и се събират в ЕДИН обход. Шестата
+ * същност влиза в списъка, а не ражда шести обход — и тест го БРОИ, вместо
+ * дисциплина да го пази (ADR-056).
+ */
+export const VIDOVE_S_POPRAVKA_NA_MYASTO: readonly TipSabitie[] = Object.freeze([
+  'ДелоЗаписано',
+  'ЛичноДвижениеЗаписано',
+  'ПродажбаЗаписана',
+  'КредитЗаписан',
+  'ЗаплатаЗаписана',
+]);
+
+/** Един погасен запис · толкова, колкото трябва за зачертан ред. */
+export interface PogasenZapis {
+  readonly vid: string;
+  readonly id: string;
+  readonly seq: number;
+  readonly ts: string;
+  /**
+   * ДАТАТА НА САМИЯ ЗАПИС · не времето на записването.
+   *
+   * Разход с дата 12.11, въведен днес, принадлежи на НОЕМВРИ — там го търси
+   * човекът. Филтриране по `ts` го слагаше в днешния месец (ADR-087 §7).
+   */
+  readonly data: string;
+  readonly actor: string;
+  readonly type: string;
+  /** съкращението за човешко око · от `opis-na-zapisa.ts` */
+  readonly opis: string;
+  /** цели центове · липсва, когато записът не носи сума */
+  readonly suma_st: number | undefined;
+  /** думата на човека ПРИ СТОРНОТО · празна, ако не е писал */
+  readonly prichina: string;
+  /** `seq` на сторното, което го погаси · нула, ако е самото сторно */
+  readonly storniranOt: number;
+}
+
 export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const pogaseni = new Set<string>();
+  /**
+   * ПЪРВОТО събитие за всеки id, по вид · събира се В СЪЩИЯ обход.
+   *
+   * Дотук всеки от петте вида си имаше СВОЙ пълен обход на потока, и всеки нов
+   * вид добавяше още един. Числото го хвана: `fold` върху слетия поток мина от
+   * 9,4 ms (резен 18) на ~14 ms (резен 20), без нищо да го брои.
+   */
+  //
+  // КЛЮЧЪТ Е `string`, не `TipSabitie`, и това е нарочно: `s.type` идва от
+  // ЖУРНАЛА и е `string` по същата причина, по която е и в `eVnoska` — четенето
+  // не се доверява на писането. Списъкът, който пълни картата, е строгият.
+  const parvoto = new Map<string, Map<string, string>>();
+  for (const vid of VIDOVE_S_POPRAVKA_NA_MYASTO) parvoto.set(vid, new Map());
+  /** звено → сторното, което го гаси · за причината и за „от кого". */
+  const gasiGo = new Map<string, Sabitie>();
+
   for (const s of sabitiya) {
     if (s.type === 'Сторно') {
       const p = s.payload as unknown as PayloadStorno;
       // Пропусната верига значи СВОЯТА — виж `PayloadStorno.pogasyavaVeriga`.
-      pogaseni.add(klyuchNaZveno({ naematel: p.pogasyavaVeriga ?? s.naematel, seq: p.pogasyavaSeq }));
+      const zveno = klyuchNaZveno({
+        naematel: p.pogasyavaVeriga ?? s.naematel,
+        seq: p.pogasyavaSeq,
+      });
+      pogaseni.add(zveno);
       pogaseni.add(klyuchNaZveno(s));
+      // ПЪРВОТО сторно печели: второ сторно на същото звено не мени причината,
+      // с която редът е бил свален (правило 1 · последната дума важи за
+      // ПОПРАВКА, а тук се пази ПЪРВОТО решение).
+      if (!gasiGo.has(zveno)) gasiGo.set(zveno, s);
+      continue;
+    }
+    const negovite = parvoto.get(s.type);
+    if (negovite !== undefined && !negovite.has(s.sashtnost.id)) {
+      negovite.set(s.sashtnost.id, klyuchNaZveno(s));
     }
   }
 
-  /**
-   * СТОРНИРАНОТО ДЕЛО НЕ СЕ ВЪЗКРЕСЯВА ОТ СОБСТВЕНАТА СИ ПОПРАВКА.
-   *
-   * Делото няма отделно събитие „Поправено": и създаването, и поправката са
-   * `ДелоЗаписано` върху същия id. Затова сторното на СЪЗДАВАНЕТО гасеше само
-   * неговия seq — а поправката после пак викаше `dela.set(id, …)` и делото
-   * СЕ ВРЪЩАШЕ, с чуждия seq на поправката.
-   *
-   * Имотът и наемът нямат тази дупка: там поправката е СВОЕ събитие и пази
-   * `if (imot)` — „поправка на несъществуващ имот не създава имот от нищото".
-   * Делото няма къде да провери същото, затова се брои тук, преди цикъла.
-   *
-   * ПЪРВОТО `ДелоЗаписано` за един id е СЪЗДАВАНЕТО; погасне ли то, делото не
-   * се брои — каквото и да пише след него.
-   */
   const storniranite = (tip: TipSabitie): ReadonlySet<string> => {
-    const sazdadenoNaZveno = new Map<string, string>();
-    for (const s of sabitiya) {
-      if (s.type === tip && !sazdadenoNaZveno.has(s.sashtnost.id)) {
-        sazdadenoNaZveno.set(s.sashtnost.id, klyuchNaZveno(s));
-      }
+    const negovite = parvoto.get(tip);
+    // НЕ връща празно мълчаливо · вид извън списъка значи, че никой не му е
+    // събрал картата, тоест „нищо не е сторнирано" — а това е точно дупката,
+    // която тази функция съществува да затваря. Празен отговор без питане е
+    // по-скъп от липсващ (ADR-041).
+    if (negovite === undefined) {
+      throw new Error(
+        `Видът „${tip}" го няма във VIDOVE_S_POPRAVKA_NA_MYASTO. Добави го ТАМ, ` +
+          'иначе сторното на създаването му няма да гаси нищо.',
+      );
     }
     const mrtvi = new Set<string>();
-    for (const [id, zveno] of sazdadenoNaZveno) {
+    // Картата е готова от обхода горе · тук се решава само кое е погаснало.
+    for (const [id, zveno] of negovite) {
       if (pogaseni.has(zveno)) mrtvi.add(id);
     }
     return mrtvi;
   };
 
+  // ПЕТТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
   const stornirianiDela = storniranite('ДелоЗаписано');
-  /**
-   * Същата дупка, същото лечение · личното движение (И96 т.10).
-   *
-   * И то няма отделно събитие „Поправено": поправката е пак
-   * `ЛичноДвижениеЗаписано` върху същия id. Не се преписва разсъждението, а се
-   * ВИКА същата функция — правило 17 важи и за логиката, не само за числата.
-   */
   const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
+  const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
+  const stornianiKrediti = storniranite('КредитЗаписан');
+  const stornianiZaplati = storniranite('ЗаплатаЗаписана');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -426,6 +721,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const modeli = new Map<string, ModelNaTablitsa>();
   const butoni = new Map<string, Buton>();
   const sluzhiteli = new Map<string, PayloadSluzhitelZapisan>();
+  const izprateniZadachi = new Map<string, Izprashtane>();
+  const otgovoriNaZadachi = new Map<string, OtgovorNaZadacha>();
   // ПЪРВИЯТ печели: втори „СтопанинЗаписан" Вратата не пуска, но Огледалото
   // не разчита на това — четенето остава вярно и върху пипнат отвън Журнал.
   let stopanin = '';
@@ -433,16 +730,30 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   let parametriNaVhoda = nastroykiPoPodrazbirane();
   const kontragenti = new Map<string, Kontragent>();
   const prava = new Map<string, PravaZaModel>();
+  const dokumenti = new Map<string, ZakacheniDokumenti>();
+  const prodazhbi = new Map<string, Prodazhba>();
+  const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
+  const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
+  const krediti = new Map<string, Kredit>();
+  const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
+  const zaplati = new Map<string, RedNaZaplata>();
+  const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
+  const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
+  const tablitsiOtFayl = new Map<string, PayloadTablitsaOtFaylSazdadena>();
+  const kategorii = new Map<string, string>();
   const pototsi = new Map<string, PayloadPotokZapisan>();
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
   const tabove = new Map<string, Tab>();
+  const koefitsienti = new Map<string, SvoyKoefitsient>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
   const zadachi = new Map<string, Zadacha>();
   const svrazki = new Map<number, Svrazka>();
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
+  let redNaLentata: readonly string[] = [];
+  let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
@@ -453,9 +764,56 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const sverki: ZapisanaSverka[] = [];
   let prilozheni = 0;
 
+  const pogasenite: PogasenZapis[] = [];
+  const godinite = new Map<string, number>();
+  const zatvorenite = new Map<string, ZatvorenaGodina>();
+  const mesta = new Map<string, Myasto>();
+  const kontakti = new Map<string, Kontakt>();
+  const prepiski = new Map<string, Prepiska>();
+  const sreshti = new Map<string, Sreshta>();
+  const poletaSFormula = new Map<string, PoleSFormula>();
+
   for (const s of sabitiya) {
-    if (pogaseni.has(klyuchNaZveno(s))) continue;
+    if (pogaseni.has(klyuchNaZveno(s))) {
+      // САМОТО СТОРНО не се показва като погасен ред · то е поправката, не
+      // поправеното. Иначе всяка поправка щеше да ражда ДВА зачертани реда.
+      if (s.type !== 'Сторно') {
+        const gasi = gasiGo.get(klyuchNaZveno(s));
+        const prichina = gasi
+          ? String((gasi.payload as unknown as PayloadStorno).prichina ?? '')
+          : '';
+        pogasenite.push(
+          Object.freeze({
+            vid: s.sashtnost.vid,
+            id: s.sashtnost.id,
+            seq: s.seq,
+            ts: String(s.ts),
+            data: dataNaZapisa(s),
+            actor: s.actor,
+            type: s.type,
+            opis: opisaNaZapisa(s),
+            suma_st: sumataNaZapisa(s),
+            prichina,
+            storniranOt: gasi ? gasi.seq : 0,
+          }),
+        );
+      }
+      continue;
+    }
     prilozheni += 1;
+
+    // ГОДИНАТА НА ЗАПИСА · тук, в СЪЩИЯ обход (резен 24 · ADR-084). Отделен
+    // обход върху 20 000 събития щеше да струва колкото целия `fold`.
+    //
+    // БРОИ СЕ, НЕ СЕ СУМИРА. Сбор на годината звучеше полезно, докато не се
+    // погледне какво събира: наем, разход и внесено ДДС в едно число. Такъв
+    // сбор не значи нищо счетоводно и щеше да стои на екрана до истинските
+    // числа, все едно е едно от тях. Годишният приход и разход се смятат по
+    // своите пътища (`otcheti.ts` · `mesetsat.ts`) и домът им е там.
+    {
+      const godina = godinataNaZapisa(s);
+      godinite.set(godina, (godinite.get(godina) ?? 0) + 1);
+    }
 
     switch (s.type) {
       case 'ИмотДобавен': {
@@ -466,6 +824,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           adres: p.adres,
           edinitsa: p.edinitsa,
           ploshtad_kvsm: p.ploshtad_kvsm,
+          // Имот, записан ПРЕДИ полето, чете празно · старият запис си е валиден.
+          papka: p.papka ?? '',
         });
         break;
       }
@@ -524,7 +884,26 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // данни. Празната карта е вярната им стойност, не липса.
           formuli: p.formuli ?? {},
           nomera: p.nomera ?? {},
+          // Хедърите отпреди резен 14 не знаят на кой таб стоят. Празното е
+          // ВЯРНАТА им стойност — „още не е сложен на таб" (И103), не липса.
+          ekran: p.ekran ?? '',
         });
+        break;
+      }
+
+      case 'ЗадачаИзпратена': {
+        // Повторният запис на същия `zadachaId` ПОПРАВЯ задачата — същото
+        // правило като при делото. Второ изпращане не се ражда.
+        const p = s.payload as unknown as Izprashtane;
+        izprateniZadachi.set(p.zadachaId, p);
+        break;
+      }
+
+      case 'ОтговорНаЗадача': {
+        // ПОСЛЕДНАТА дума бие: човек, приел и после отказал, е отказал. Двата
+        // записа остават в Журнала — тук стои само в сила кой е.
+        const p = s.payload as unknown as OtgovorNaZadacha;
+        otgovoriNaZadachi.set(p.zadachaId, p);
         break;
       }
 
@@ -532,6 +911,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Последният запис за същия ключ надделява — поправка, не втори таб.
         const p = s.payload as unknown as Tab;
         tabove.set(p.klyuch, p);
+        break;
+      }
+
+      case 'КоефициентЗаписан': {
+        // Последната дума бие — и това важи и за МАХАНЕТО: то е запис със същия
+        // ключ и `mahnat: true`, не изчезване от картата. Върнатият коефициент
+        // е СЪЩИЯТ, не нов.
+        const p = s.payload as unknown as SvoyKoefitsient;
+        koefitsienti.set(p.klyuch, p);
         break;
       }
 
@@ -570,6 +958,40 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ПреносОтчетен': {
         const p = s.payload as unknown as PayloadPrenosOtcheten;
         prenosi.set(`${p.prenosId}:${p.posoka}`, p);
+        break;
+      }
+
+      case 'НАПВръзкаПревключена':
+        // ЗНАЕН тип, НАРОЧНО пренебрегнат — не „непознат" (както „ВалутаИзбрана").
+        //
+        // Негово, 31.08: „НАП отпада" — пада ПОДАВАНЕТО. Екранът, одитният файл
+        // и активирането ги няма от резен 53, тъй че новите Журнали не пишат
+        // това събитие. СТАРИТЕ обаче го носят, а Журналът не се пипа (правило
+        // 1): изтрит случай би направил събитието неразличимо от печатна грешка
+        // и би пратил истински запис в `default`.
+        //
+        // Формата му остава в `sabitiya.ts` по същата причина: за да е записано
+        // КАКВО стои в един стар Журнал, макар нищо от него вече да не ни трябва.
+        break;
+
+      case 'ДелаПодредени': {
+        const p = s.payload as unknown as PayloadDelaPodredeni;
+        // ПОСЛЕДНАТА ДУМА БИЕ · целият ред идва наведнъж (същата сметка като при
+        // лентата: разлика зависи от мига, цял списък е самодостатъчен). Празен
+        // ред е ВАЛИДЕН и значи „върни сметнатата подредба" — бутонът „Подреди".
+        rachniyatRedNaDelata = rachniyatRedOtZhurnala(p.red);
+        break;
+      }
+
+      case 'ЛентаПодредена': {
+        const p = s.payload as unknown as PayloadLentaPodredena;
+        // ПОСЛЕДНАТА ДУМА БИЕ · целият ред идва наведнъж, значи няма какво да се
+        // слива тук. Сливането с ЖИВИТЕ екрани става при рисуването (`podredi`),
+        // не при четенето: Огледалото не знае кои екрани съществуват днес.
+        // ПРЕЗ ЧЕТЕЦА · писачът вече отказва дубликат, но записът е ЗАВИНАГИ и
+        // книга може да дойде отвън (чужда верига, върнат архив). Дублиран ключ
+        // тук значи пункт, нарисуван ДВА пъти — и двата закачени.
+        redNaLentata = redOtZhurnala(p.red);
         break;
       }
 
@@ -747,6 +1169,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           sastoyanie: p.sastoyanie as Delo['sastoyanie'],
           nadDelo: p.nadDelo,
           dokument: p.dokument,
+          // КОГА и КОЙ · от ПОСЛЕДНОТО записване, не от създаването (резен 30).
+          // „Пази се история като бекъп" — Журналът я пази цяла; това е онова
+          // от нея, което трябва да се ВИДИ на реда, без да се отваря книгата.
+          promeneno: String(s.ts),
+          promeniGo: s.actor,
         });
         break;
       }
@@ -759,11 +1186,286 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       }
 
       case 'ПравоЗаписано': {
-        const p = s.payload as unknown as PravaZaModel;
-        prava.set(klyuchNaPravo(p.imeyl, p.model), p);
+        // ПРЕЗ ЧЕТЕЦА, не направо · събитията отпреди третата стойност нямат
+        // `samoVizhdat`, и първото `.includes` върху `undefined` би съборило
+        // цялото Огледало. Снизходителността е при ЧЕТЕНЕТО (правило 1).
+        const p = s.payload as unknown as Parameters<typeof pravaOtZhurnala>[0];
+        prava.set(klyuchNaPravo(p.imeyl, p.model), pravaOtZhurnala(p));
         break;
       }
 
+      case 'ДокументиЗакачени': {
+        // Целият списък се пише наведнъж; махането е ЗАПИС на списъка без него
+        // (правило 1). Затова тук няма сливане — последният запис е истината,
+        // а всяка предишна версия си стои в Журнала.
+        const p = s.payload as unknown as PayloadDokumentiZakacheni;
+        dokumenti.set(klyuchNaDokumenti(p.kam, p.id), p);
+        break;
+      }
+
+      case 'ПродажбаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · цялата сделка идва наведнъж, значи няма какво
+        // да се слива. Всяка предишна версия си стои в Журнала (правило 1).
+        //
+        // `seq` се пази от ПЪРВИЯ запис: сторното сочи раждането на сделката,
+        // а поправката не бива да мести целта му — същото решение като при
+        // имота и наема (`poletataNaNaema`).
+        const p = s.payload as unknown as PayloadProdazhbaZapisana;
+        // ПО СЪЩНОСТТА, не по голия `prodazhbaId`: адресът е `PRD:<id>`, и
+        // сравнението с голото число мълчеше — сделката възкръсваше от
+        // собствената си поправка. Тестът го хвана с „expected true to be false".
+        if (stornianiProdazhbi.has(s.sashtnost.id)) break;
+        const predishna = prodazhbi.get(p.prodazhbaId);
+        prodazhbi.set(p.prodazhbaId, {
+          id: p.prodazhbaId,
+          seq: predishna ? predishna.seq : s.seq,
+          imotId: p.imotId,
+          kupuvach: p.kupuvach,
+          telefon: p.telefon,
+          tsena_st: p.tsena_st,
+          prodazhba_st: p.prodazhba_st,
+          smr_st: p.smr_st,
+          pd_st: p.pd_st,
+          sastoyanie: p.sastoyanie,
+        });
+        break;
+      }
+
+      case 'ДвижениеПоПродажба': {
+        // ДОБАВЯ СЕ · нищо не се заменя. Сторното го сваля оттук по `seq`,
+        // както при плащанията — „Сторното не отменя, то добавя" (И97) значи,
+        // че редът в ЖУРНАЛА остава; свалено е само участието му в сметките.
+        const p = s.payload as unknown as PayloadDvizhenieProdazhba;
+        dvizheniyaNaProdazhbi.push({
+          id: p.dvizhenieId,
+          seq: s.seq,
+          prodazhbaId: p.prodazhbaId,
+          vid: p.vid,
+          suma_st: p.suma_st,
+          data: p.data,
+          belezhka: p.belezhka,
+          // Записите отпреди 29.08 нямат начин · тогава той не се е питал, и
+          // празното е ЧЕСТНО (правило 1: старият Журнал не се преписва).
+          nachin: p.nachin ?? '',
+        });
+        break;
+      }
+
+
+      case 'КредитЗаписан': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · договорът идва наведнъж. `seq` се пази от
+        // ПЪРВИЯ запис, за да не мести сторното целта си (както при сделката).
+        const p = s.payload as unknown as PayloadKreditZapisan;
+        if (stornianiKrediti.has(s.sashtnost.id)) break;
+        const predishen = krediti.get(p.kreditId);
+        krediti.set(p.kreditId, {
+          id: p.kreditId,
+          seq: predishen ? predishen.seq : s.seq,
+          ime: p.ime,
+          vid: p.vid as Kredit['vid'],
+          proektId: p.proektId,
+          ostatak_st: p.ostatak_st,
+          ot: p.ot,
+          lihva_bp: p.lihva_bp,
+          vnoska_st: p.vnoska_st,
+          den: p.den,
+          otgovornik: p.otgovornik,
+          obezpechenie_st: p.obezpechenie_st,
+        });
+        break;
+      }
+
+      case 'ПлащанеПоКредит': {
+        // ДОБАВЯ СЕ · нищо не се заменя. Сторното го сваля оттук по `seq`, и
+        // остатъкът се вдига обратно САМ — той се смята от този списък.
+        const p = s.payload as unknown as PayloadPlashtanePoKredit;
+        plashtaniyaPoKrediti.push({
+          id: p.plashtaneId,
+          seq: s.seq,
+          kreditId: p.kreditId,
+          data: p.data,
+          suma_st: p.suma_st,
+          glavnitsa_st: p.glavnitsa_st,
+          lihva_st: p.lihva_st,
+          taksa_st: p.taksa_st,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
+      case 'ЗаплатаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · редът идва наведнъж. `seq` се пази от ПЪРВИЯ
+        // запис, за да не мести сторното целта си (както при сделката).
+        const p = s.payload as unknown as PayloadZaplataZapisana;
+        if (stornianiZaplati.has(s.sashtnost.id)) break;
+        const predishna = zaplati.get(p.zaplataId);
+        zaplati.set(p.zaplataId, {
+          id: p.zaplataId,
+          seq: predishna ? predishna.seq : s.seq,
+          sedmitsa: p.sedmitsa,
+          proektId: p.proektId,
+          ime: p.ime,
+          dlazhnost: p.dlazhnost,
+          obekt: p.obekt,
+          dnevna_st: p.dnevna_st,
+          dni: p.dni,
+        });
+        break;
+      }
+
+      case 'СедмицаПрехвърлена': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА СЕДМИЦАТА БИЕ · замразяването е ВТОРИ запис
+        // върху същата същност, не трето събитие. „Прехвърлих" и „замразих"
+        // са едно решение на човек, взето на два пъти.
+        const p = s.payload as unknown as PayloadSedmitsaPrehvarlena;
+        prehvarleniSedmitsi.set(p.sedmitsa, {
+          sedmitsa: p.sedmitsa,
+          razhodId: p.razhodId,
+          suma_st: p.suma_st,
+          kogato: s.ts,
+          koy: s.actor,
+          zamrazena: p.zamrazena,
+        });
+        break;
+      }
+
+      case 'МястоЗаписано': {
+        // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на фирмата или папката е ново
+        // събитие върху същата същност, не второ място.
+        const p = s.payload as unknown as PayloadMyastoZapisano;
+        mesta.set(svedenotoMyasto(p.ime), {
+          ime: p.ime,
+          firma: p.firma,
+          papka: p.papka,
+          seq: mesta.get(svedenotoMyasto(p.ime))?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'КонтактЗаписан': {
+        // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на телефона е ново събитие върху
+        // същата същност, не втори човек (дословно както при мястото).
+        const p = s.payload as unknown as PayloadKontaktZapisan;
+        const klyuch = svedenoIme(p.ime);
+        kontakti.set(klyuch, {
+          ime: p.ime,
+          telefon: p.telefon,
+          imeyl: p.imeyl,
+          kakav: p.kakav,
+          seq: kontakti.get(klyuch)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'ПреписказЗаписана': {
+        const p = s.payload as unknown as PayloadPrepiskaZapisana;
+        prepiski.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          kontakt: p.kontakt,
+          kakvo: p.kakvo,
+          zaVzimane: p.zaVzimane,
+          // ЛИПСВАЩОТО ≠ ПРАЗНОТО, но тук четенето е ЕДНО: преписка, записана
+          // ПРЕДИ резен 41, няма тези полета в товара си, и празното е точният
+          // ѝ смисъл — „не е казано". Стар запис не се пренаписва (правило 1).
+          chas: p.chas ?? '',
+          otgovornik: p.otgovornik ?? '',
+          otsenka: (p.otsenka ?? 'нито-едно') as Otsenka,
+          zakachenaKam: (p.zakachenaKam ?? '') as VidNaZakachaneto,
+          zakachenaId: p.zakachenaId ?? '',
+          sastoyanie: p.sastoyanie as SastoyanieNaPrepiska,
+          seq: prepiski.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'СрещаЗаписана': {
+        const p = s.payload as unknown as PayloadSreshtaZapisana;
+        sreshti.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          kontakt: p.kontakt,
+          adres: p.adres,
+          data: p.data,
+          sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
+          // ПЪРВИЯТ `seq` остава · поправката мени съдържанието, не рождението.
+          seq: sreshti.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'ПолеЗаписано': {
+        const p = s.payload as unknown as PayloadPoleZapisano;
+        poletaSFormula.set(s.sashtnost.id, {
+          id: s.sashtnost.id,
+          ime: p.ime,
+          deystvie: p.deystvie as DeystvieNaFormula,
+          lyavo: p.lyavo,
+          dyasno: p.dyasno,
+          seq: poletaSFormula.get(s.sashtnost.id)?.seq ?? s.seq,
+          kogato: String(s.ts),
+          koy: s.actor,
+        });
+        break;
+      }
+
+      case 'ГодинаЗатворена': {
+        // ПОСЛЕДНОТО ЗАТВАРЯНЕ БИЕ · второ затваряне на същата година Вратата
+        // не пуска (`opId` е `GODINA:<година>`), но Огледалото не разчита на
+        // това: четенето остава вярно и върху пипнат отвън Журнал.
+        const p = s.payload as unknown as PayloadGodinaZatvorena;
+        zatvorenite.set(p.godina, {
+          godina: p.godina,
+          broySabitiya: p.broySabitiya,
+          koy: s.actor,
+          kogato: String(s.ts),
+          seq: s.seq,
+        });
+        break;
+      }
+
+      case 'ТаблицаОтФайлСъздадена': {
+        const p = s.payload as unknown as PayloadTablitsaOtFaylSazdadena;
+        tablitsiOtFayl.set(p.klyuch, p);
+        break;
+      }
+
+      case 'КатегорияЗададена': {
+        const p = s.payload as unknown as PayloadKategoriyaZadadena;
+        // ПРАЗНАТА маха · тя не е категория „", а решение да няма такава.
+        // Записът остава в Журнала — маха се от Огледалото, не от историята.
+        if (p.kategoriya === '') kategorii.delete(s.sashtnost.id);
+        else kategorii.set(s.sashtnost.id, p.kategoriya);
+        break;
+      }
+
+      case 'КешЗахранен': {
+        // ДОБАВЯ СЕ · салдото на джоба е СБОР, не поле. Сторното го сваля
+        // оттук по `seq`, и кешът пада обратно сам.
+        const p = s.payload as unknown as PayloadKeshZahranen;
+        zahranvaniyaNaKesha.push({
+          id: p.zahranvaneId,
+          seq: s.seq,
+          suma_st: p.suma_st,
+          data: p.data,
+          belezhka: p.belezhka,
+        });
+        break;
+      }
+
+      case 'ЕтапНаПродажбаЗаписан': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · преименуване е нов запис, не втори
+        // етап. Базовите седем не идват насам — те не се пишат в Журнала.
+        const p = s.payload as unknown as PayloadEtapNaProdazhbaZapisan;
+        etapiNaProdazhbite.set(p.klyuch, p);
+        break;
+      }
 
       case 'СверкаЗаписана': {
         const p = s.payload as unknown as PayloadSverkaZapisana;
@@ -865,6 +1567,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
             adres: p.adres,
             edinitsa: p.edinitsa,
             ploshtad_kvsm: p.ploshtad_kvsm,
+            // ЛИПСВАЩО поле НЕ трие вече записаната папка: поправка на площта
+            // не е решение за папката (същата сметка като при съгласието, ADR-036).
+            papka: p.papka ?? imot.papka,
           });
         }
         break;
@@ -963,17 +1668,33 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     modeli,
     butoni,
     sluzhiteli,
+    izprateniZadachi,
+    otgovoriNaZadachi,
     prava,
+    dokumenti,
+    prodazhbi,
+    dvizheniyaNaProdazhbi,
+    etapiNaProdazhbite,
+    krediti,
+    plashtaniyaPoKrediti,
+    zaplati,
+    prehvarleniSedmitsi,
+    zahranvaniyaNaKesha,
+    tablitsiOtFayl,
+    kategorii,
     pototsi,
     salda,
     dela,
     tabove,
+    koefitsienti,
     agenti,
     predlozheniya,
     zadachi,
     svrazki,
     prehvarleni,
     prenosi,
+    redNaLentata,
+    rachniyatRedNaDelata,
     lichnoVklyucheno,
     lichnoMyasto,
     lichniDostapi,
@@ -984,6 +1705,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     sverki,
     prilozheni,
     pogaseni,
+    pogasenite: Object.freeze(pogasenite),
+    godinite,
+    zatvorenite,
+    mesta,
+    kontakti,
+    prepiski,
+    sreshti,
+    poletaSFormula,
   };
 }
 

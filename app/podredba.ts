@@ -47,6 +47,18 @@ function zapomneniyatRed(ekran: string): readonly string[] {
  *   · новите → накрая, в реда, в който екранът ги е нарисувал;
  *   · изчезналите (запомнени, но вече ги няма) → просто отпадат.
  */
+/**
+ * ЗАПИСВА реда на секциите · ЕДИНСТВЕНИЯТ вход към тази памет.
+ *
+ * Отваря се, защото подреждането по семейство (`semeystva.ts`) стига до същия
+ * въпрос от друга страна: „какъв е редът на секциите на този екран". Втора
+ * памет за него би значела, че стрелките ▲▼ и бутонът за семействата казват
+ * различни неща за едно и също (правило 17).
+ */
+export function zapishiRedaNaSektsiite(ekran: string, red: readonly string[]): void {
+  zapomniEkranno(klyuchat(ekran), [...red]);
+}
+
 export function podredi(
   imena: readonly string[],
   zapomneni: readonly string[],
@@ -76,20 +88,71 @@ export function premesti(
 /**
  * КЛЮЧЪТ НА ЕДНА СЕКЦИЯ · маркерът, ако го има; иначе ЗАГЛАВИЕТО.
  *
- * Повечето екрани нямат `data-sektsiya` — маркерът се появи заради темите на
- * Настройките и стои само там, където някой води до него. Да се иска маркер за
- * подредбата значеше или да се пипнат десет екрана (десет места, които се
- * разминават), или лостът да работи на два от тях.
- *
- * Заглавието е стабилен ключ: то вече е там, уникално е в рамките на екрана и
- * е онова, което ЧОВЕКЪТ вижда, когато мести. Смени ли се заглавието, тази
- * секция пада накрая — губи се подредба, не се губи секция.
+ * Днес ВСЯКА секция носи `data-sektsiya` и падането към заглавието е само
+ * предпазител за секция, родена без маркер. Дотук беше обратното — маркерът
+ * стоеше само там, където някоя тема води до него, а останалите 50 се
+ * ключуваха по заглавието си. Цената на онова решение беше записана още тогава:
+ * „смени ли се заглавието, тази секция пада накрая". Именуването на секции
+ * (собственическо, по негова дума) прави точно това — затова маркерът стана
+ * задължителен ПРЕДИ него, а не след.
  */
 function klyuchNaSektsiya(e: HTMLElement): string {
   const beleg = e.dataset['sektsiya'];
   if (beleg) return beleg;
-  const zaglavie = e.querySelector('.dyalglava h2, .dyalglava h3')?.textContent?.trim();
+  const zaglavie = zaglavieNa(e);
   return zaglavie ? `zaglavie:${zaglavie}` : '';
+}
+
+function zaglavieNa(e: HTMLElement): string {
+  return e.querySelector('.dyalglava h2, .dyalglava h3')?.textContent?.trim() ?? '';
+}
+
+/** Ключът, по който секцията се е помнела ПРЕДИ маркерите. */
+function stariyatKlyuch(e: HTMLElement): string {
+  const zaglavie = zaglavieNa(e);
+  return zaglavie ? `zaglavie:${zaglavie}` : '';
+}
+
+/**
+ * ПРЕВОД НА СТАРИТЕ КЛЮЧОВЕ · платен при слагането на маркерите.
+ *
+ * Онзи, който вече е местил секции, има запомнен ред от вида
+ * `zaglavie:Нов имот`. Маркерът смени ключа — и БЕЗ този превод подредбата му
+ * нямаше просто да се нулира: онези ключове, които още съвпадат, щяха да си
+ * останат по местата, а другите да паднат накрая. Тоест РАЗБЪРКВАНЕ, не
+ * нулиране — и то мълчаливо. Разбърканият екран не казва защо е разбъркан.
+ *
+ * Чиста функция, за да се тества · картата се строи от живия екран, защото
+ * старият ключ СЕ СМЯТА от него и никога не е трябвало да се пази някъде.
+ * Непреведеното (заглавие, което вече го няма) отпада, както винаги.
+ */
+export function prevediZapomnenoto(
+  zapomneni: readonly string[],
+  karta: ReadonlyMap<string, string>,
+): readonly string[] {
+  if (karta.size === 0) return zapomneni;
+  const vidyani = new Set<string>();
+  const izhod: string[] = [];
+  for (const k of zapomneni) {
+    const nov = karta.get(k) ?? k;
+    // Преводът може да срещне два стари ключа в един нов (преименувана секция,
+    // местена и преди, и след). Пази се ПЪРВИЯТ — той е по-скорошното решение.
+    if (vidyani.has(nov)) continue;
+    vidyani.add(nov);
+    izhod.push(nov);
+  }
+  return izhod;
+}
+
+/** Картата стар→нов ключ · само за секциите, при които двата се различават. */
+function kartaNaKlyuchovete(sektsii: readonly HTMLElement[]): ReadonlyMap<string, string> {
+  const karta = new Map<string, string>();
+  for (const e of sektsii) {
+    const star = stariyatKlyuch(e);
+    const nov = klyuchNaSektsiya(e);
+    if (star && nov && star !== nov) karta.set(star, nov);
+  }
+  return karta;
 }
 
 /**
@@ -120,7 +183,22 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
   if (sektsii.length < 2) return;
 
   const imena = sektsii.map(klyuchNaSektsiya);
-  const red = podredi(imena, zapomneniyatRed(ekran));
+
+  /**
+   * ПРЕВОДЪТ СЕ ПИШЕ ОБРАТНО — ВЕДНЪЖ НА ЕКРАН.
+   *
+   * Без записа старият ред щеше да се превежда при всяко рисуване: работи, но
+   * оставя в паметта данни, за които вече никой не помни, че са стари. След
+   * едно отваряне на екрана запомненото е с новите ключове и `kartaNaKlyuchovete`
+   * връща празна карта — оттам нататък преводът е `if (karta.size === 0)`.
+   * Записва се САМО при разлика: `zapomniEkranno` при всяко рисуване би било
+   * писане без повод.
+   */
+  const zapomneno = zapomneniyatRed(ekran);
+  const prevedeno = prevediZapomnenoto(zapomneno, kartaNaKlyuchovete(sektsii));
+  if (prevedeno.join('|') !== zapomneno.join('|')) zapomniEkranno(klyuchat(ekran), [...prevedeno]);
+
+  const red = podredi(imena, prevedeno);
 
   /**
    * МЕСТИ САМО КОГАТО РЕДЪТ НАИСТИНА СЕ РАЗЛИЧАВА.

@@ -1,5 +1,6 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { deystvieSPrerisuvane, naEkran, plochka, tekstNa } from '../yadro/pomoshtni.ts';
+import { tishina } from '../yadro/tishina.ts';
 
 /** 15 · таблото */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -13,7 +14,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // Името вече идва от жетона на Google, не от закован ред (ADR-021).
     proveri('казва кой е влязъл', await plochka(p, 'Влязъл като'), 'Иво');
     proveri('казва през кого', await plochka(p, 'През'), 'Google');
-    proveri('казва чие е хранилището', await plochka(p, 'Хранилище'), 'Безплатно');
+    // ТУК Драйвът ОЩЕ не е питан — питането става чак в §93. Дотогава плочката
+    // НЕ твърди най-евтиното: „Безплатно" за непитан акаунт беше точно дупката,
+    // която резен Д затвори (ADR-076 §3). Проверката пази ТРЕТОТО състояние на
+    // мястото, където никой не е натискал нищо.
+    proveri('НЕ твърди чие е хранилището, преди да е питано',
+      await plochka(p, 'Хранилище'), 'Не е питано');
     proveri('казва ролята', await plochka(p, 'Роля'), 'собственик');
     proveri(
       'никъде не пише „парола" като поле',
@@ -129,8 +135,107 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       Boolean(await p.$('#izbor-tab')), true);
     await naEkran(p, 'imoti', '#forma-imot');
 
+    // ══ 110 · ПРОБВАНЕТО · тридесет дни, СМЯТАНИ (резен 32 · ADR-092) ══════
+    //
+    // „с 30 дн[и] б[ез]платно пробване" *(р83·[57])*, потвърдено с „da wavi"
+    // (И86): „пробването е СРОК преди плащането, не безплатен план".
+    razdel = '110 · Пробването · тече, и се КАЗВА';
+    await naEkran(p, 'tablo', '[data-sektsiya=tablo-probvane]');
+    proveri('картата я има',
+      Boolean(await p.$('[data-sektsiya=tablo-probvane]')), true);
+    // Книгата има записи от днес · срокът е тръгнал и ТЕЧЕ.
+    proveri('състоянието е „тече"',
+      await p.$eval('[data-sektsiya=tablo-probvane]', (e) => (e as any).dataset.sastoyanie), 'teche');
+    proveri('остават 29 дни · първият ден се БРОИ',
+      await p.$eval('[data-pole="ostavat-dni"] .chislo', (e) => (e as any).textContent.trim()), '29');
+    proveri('и денят на започването се КАЗВА',
+      (await p.$eval('[data-pole="ostavat-dni"] .pod', (e) => (e as any).textContent)).includes('от '),
+      true);
+
+    razdel = '110 · Пробването · СРОК, не план';
+    proveri('заглавието го КАЗВА',
+      (await tekstNa(p, '[data-sektsiya=tablo-probvane] .dyalglava'))
+        .includes('не безплатен план'), true);
+    proveri('и текстът дава ЧИСЛОТО и деня',
+      (await tekstNa(p, '[data-sektsiya=tablo-probvane]')).includes('остават 29 дни'), true);
+
+    razdel = '110 · Пробването · честна спирачка, не ключалка';
+    /**
+     * КАРТАТА НЕ ПРЕДЛАГА НИЩО ЗА НАТИСКАНЕ · тя КАЗВА.
+     *
+     * Броят се бутоните в `.deystviya` — нейните. Двата отвън са стрелките за
+     * подреждане, които ВСЯКА секция получава (резен АО): те не са на картата и
+     * не бива да влизат в това твърдение.
+     */
+    proveri('картата не предлага НИТО ЕДИН свой бутон',
+      await p.$$eval('[data-sektsiya=tablo-probvane] .deystviya button', (e) => e.length), 0);
+    proveri('и не заплашва с думи',
+      /забранен|блокиран|спрян/i.test(await tekstNa(p, '[data-sektsiya=tablo-probvane]')), false);
+
     // ══ 61 · ВЪЗСТАНОВЯВАНЕТО · запасният контакт (И100 · ADR-044) ══════════
     //
     // Пътят обратно се вписва ПРЕДИ да потрябва. Тук се проверява и най-важното
     // му свойство: телефонът НЕ пътува в изнесения файл — влиза само следата му.
+}
+
+/**
+ * 93 · ЧЕСТНАТА СПИРАЧКА · заявка за плана и проверка на драйва (резен Д · ADR-076)
+ *
+ * Проходът НЕ може да пита истинския Google — той иска съгласие в прозорче и
+ * жива мрежа. Мери се онова, което Е ТУК: третото състояние, думите му, липсата
+ * на ключалка и това, че бутонът казва ЗАЩО, когато свързващата част я няма.
+ */
+export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  razdel = '93 · Спирачката · „не е питано" е СЪСТОЯНИЕ';
+  await naEkran(p, 'tablo', '[data-sektsiya=tablo-spiratchka]');
+  proveri('видът НЕ се твърди, преди да е питан',
+    await p.$eval('[data-vid-hranilishte]', (e) => (e as HTMLElement).dataset['vidHranilishte']),
+    'не е питано');
+  proveri('оценката също',
+    await p.$eval('.znachka[data-otsenka]', (e) => (e as HTMLElement).dataset['otsenka']), 'ne e pitano');
+  proveri('и КАЗВА защо мълчи',
+    (await tekstNa(p, '[data-sektsiya=tablo-spiratchka]')).includes('не твърдим нищо'), true);
+  proveri('свободното НЯМА число · защото не е питано',
+    await p.$eval('[data-svobodno]', (e) => (e as HTMLElement).dataset['svobodno']), '-1');
+  // И СТАРАТА плочка спира да лъже: тя показваше „Безплатно" за всеки, вкл. за
+  // непитан акаунт. Тук се сверява САМОЛИЧНОСТТА, не пресният отговор — инак
+  // връщането на закованото „безплатно" остава невидимо (проходът го намери).
+  proveri('и плочката „Хранилище" КАЗВА същото',
+    await p.$eval('[data-hranilishte]', (e) => (e as HTMLElement).dataset['hranilishte']),
+    'не е питано');
+
+  razdel = '93 · Спирачката · нужното се МЕРИ, не се пита';
+  const nuzhno = Number(
+    await p.$eval('[data-nuzhno]', (e) => (e as HTMLElement).dataset['nuzhno']),
+  );
+  proveri('нужното е ЧИСЛО от браузъра', Number.isFinite(nuzhno) && nuzhno >= 0, true);
+  proveri('и е обявено като МЕРЕНО',
+    (await tekstNa(p, '[data-sektsiya=tablo-spiratchka]')).includes('МЕРЕНО от браузъра'), true);
+
+  razdel = '93 · Спирачката · НЕ Е ключалка, и го КАЗВА';
+  const tekst = await tekstNa(p, '[data-sektsiya=tablo-spiratchka]');
+  proveri('казва, че нищо не заключва', tekst.includes('нищо не се заключва'), true);
+  proveri('и че нарочната измама иска сървър', tekst.includes('иска сървър'), true);
+  proveri('и че не струва ново разрешение', tekst.includes('нито едно ново разрешение'), true);
+
+  razdel = '93 · Спирачката · отказът се КАЗВА, не мълчи';
+  // Проходът върви върху построеното приложение, но БЕЗ жива мрежа към Google.
+  // Натискането тръгва към доставчика и пада — точно каквото става при човек
+  // без връзка. Мълчанието в конзолата е ОЧАКВАНО и се обявява, вместо да се
+  // преглътне: същият флаг, с който раздел 16 къса мрежата нарочно.
+  proveri('бутонът е ТУК', await p.$$eval('#pitay-drayva', (e) => e.length), 1);
+  tishina.ochakvana = true;
+  await deystvieSPrerisuvane(p, () => p.click('#pitay-drayva'));
+  tishina.ochakvana = false;
+  proveri('отказът се КАЗВА с думи, не мълчи',
+    (await p.$$eval('#greshka-spiratchka', (e) => e.length)) > 0, true);
+  proveri('и след отказа пак НЕ се твърди нищо за акаунта',
+    await p.$eval('[data-vid-hranilishte]', (e) => (e as HTMLElement).dataset['vidHranilishte']),
+    'не е питано');
+  await naEkran(p, 'imoti', '#forma-imot');
 }

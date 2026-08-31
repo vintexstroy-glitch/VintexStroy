@@ -56,24 +56,49 @@ interface OpisNaDeystvie {
   readonly klyuch: Deystvie;
   readonly ime: string;
   readonly posoka: Posoka;
-  /** построено ли е вече, или само обявено — казва се на глас */
-  readonly postroeno: boolean;
+  /**
+   * ДОКЪДЕ Е СТИГНАЛ ПЪТЯТ · ТРИ думи, защото две лъжеха.
+   *
+   * Дотук беше булев: „построен" или „обявен". И той пусна точно бутона, срещу
+   * който собственото му съобщение предупреждава — „Създаване на таблица"
+   * минаваше за построено, излизаше в менюто, отваряше избора на файл и гърмеше
+   * с „не е за четене". Механизмът наистина СЪЩЕСТВУВА (`#svali-obrazets` в
+   * Редактора на хедъри), но нито един викащ не се разклонява по действието на
+   * бутона — тоест пътят е построен и НЕДОСТИЖИМ оттук.
+   *
+   * Третата дума е точно това състояние. Същата поука като при типовите таблици
+   * на НАП (ADR-068): дума, която липсва, кара половин работа да мине за цяла.
+   */
+  readonly dokade: DokadeEPatyat;
 }
 
+/** Построен и достижим · построен, но без бутон до него · само обявен. */
+export type DokadeEPatyat = 'postroen' | 'bez-buton' | 'obyaven';
+
+export const IMENA_NA_DOKADE: Readonly<Record<DokadeEPatyat, string>> = Object.freeze({
+  postroen: 'построен',
+  'bez-buton': 'БЕЗ БУТОН',
+  obyaven: 'обявен',
+});
+
 export const DEYSTVIYA: readonly OpisNaDeystvie[] = Object.freeze([
-  { klyuch: 'sveryavane-eksel', ime: 'Сверяване от Ексел', posoka: 'chete', postroeno: true },
-  { klyuch: 'prezapisvane-eksel', ime: 'Презаписване в Ексел', posoka: 'pishe', postroeno: false },
-  { klyuch: 'sveryavane-pdf', ime: 'Сверяване от ПДФ', posoka: 'chete', postroeno: false },
+  { klyuch: 'sveryavane-eksel', ime: 'Сверяване от Ексел', posoka: 'chete', dokade: 'postroen' as const },
+  { klyuch: 'prezapisvane-eksel', ime: 'Презаписване в Ексел', posoka: 'pishe', dokade: 'obyaven' as const },
+  { klyuch: 'sveryavane-pdf', ime: 'Сверяване от ПДФ', posoka: 'chete', dokade: 'obyaven' as const },
   // Построен в резен 14: `src/iznos/ot-model.ts` претворява модела на хедъра
   // в лист, а `rabotnaKniga` го изкарва като .xlsx. Негови думи: „функцията
   // дава възможност да претвориш модела на таблицата, от която четеш".
-  { klyuch: 'sazdavane-tablitsa', ime: 'Създаване на таблица', posoka: 'pishe', postroeno: true },
-  { klyuch: 'sazdavane-pdf', ime: 'Създаване на ПДФ', posoka: 'pishe', postroeno: false },
-  { klyuch: 'zasnemane-arhiv', ime: 'Заснемане и архив', posoka: 'pishe', postroeno: false },
-  { klyuch: 'smyatane', ime: 'Смятане', posoka: 'smyata', postroeno: false },
-  { klyuch: 'zapisvane', ime: 'Записване', posoka: 'pishe', postroeno: false },
-  { klyuch: 'sveryavane-vsichko', ime: 'Сверяване на всичко', posoka: 'chete', postroeno: false },
-  { klyuch: 'spetsialni-formuli', ime: 'Специални формули', posoka: 'smyata', postroeno: false },
+    // ПОСТРОЕН, НО НЕДОСТИЖИМ ОТ БУТОН. `src/iznos/ot-model.ts` претворява модела
+  // в лист и `rabotnaKniga` го изкарва като .xlsx — работи, но се вика от
+  // „Свали образец" ВЪТРЕ в Редактора на хедъри, не от път на бутон. Нито един
+  // викащ не се разклонява по `b.deystvie`.
+  { klyuch: 'sazdavane-tablitsa', ime: 'Създаване на таблица', posoka: 'pishe', dokade: 'bez-buton' as const },
+  { klyuch: 'sazdavane-pdf', ime: 'Създаване на ПДФ', posoka: 'pishe', dokade: 'obyaven' as const },
+  { klyuch: 'zasnemane-arhiv', ime: 'Заснемане и архив', posoka: 'pishe', dokade: 'obyaven' as const },
+  { klyuch: 'smyatane', ime: 'Смятане', posoka: 'smyata', dokade: 'obyaven' as const },
+  { klyuch: 'zapisvane', ime: 'Записване', posoka: 'pishe', dokade: 'obyaven' as const },
+  { klyuch: 'sveryavane-vsichko', ime: 'Сверяване на всичко', posoka: 'chete', dokade: 'obyaven' as const },
+  { klyuch: 'spetsialni-formuli', ime: 'Специални формули', posoka: 'smyata', dokade: 'obyaven' as const },
 ]);
 
 const PO_KLYUCH = new Map(DEYSTVIYA.map((d) => [d.klyuch, d]));
@@ -141,10 +166,20 @@ export function napraviButon(n: {
   }
 
   const opis = opisNaDeystvie(n.deystvie);
-  if (!opis.postroeno) {
+  if (opis.dokade === 'obyaven') {
     throw new GreshkaButon(
       `„${opis.ime}" още не е построено. Обявено е, но зад него няма код — ` +
         'бутон, който мълчи при натискане, е по-лош от липсващ бутон.',
+    );
+  }
+  // И ВТОРАТА ПОЛОВИНА НА СЪЩОТО ПРАВИЛО. Път, който е построен, но до който
+  // нито един бутон не води, дава СЪЩИЯ мълчащ бутон — само че по-коварно,
+  // защото минава проверката. Дотук точно това се случваше.
+  if (opis.dokade === 'bez-buton') {
+    throw new GreshkaButon(
+      `„${opis.ime}" е построено, но НЕ от бутон: викащият не се разклонява по ` +
+        'действието, и такъв бутон би отворил избор на файл и после отказал. ' +
+        'Днес пътят се извървява от „Свали образец" в Редактора на хедъри.',
     );
   }
 

@@ -46,16 +46,17 @@ import {
   type Tab,
   type VidSektsiya,
 } from '../src/domein/tabove.js';
-import { podredi } from '../src/domein/dela.js';
+import { podredi, zhivite } from '../src/domein/dela.js';
 import {
   adresnaKniga,
   samotni,
   sledvashtNomer,
-  vrazkataNaNomer,
+  svarzaniPoNomer,
   type RedVKnigata,
 } from '../src/domein/adresna-kniga.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
 import { dayNomer } from '../src/domein/redaktor.js';
-import { reshetka, obobshtenRed } from '../src/domein/gant.js';
+import { reshetka } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import { pishi } from '../src/yadro/pari.js';
@@ -131,7 +132,7 @@ function redoveZaIztochnik(o: Ogledalo, iztochnik: IztochnikTablitsa): readonly 
         klyuchove: {},
       }));
     case 'dela':
-      return [...o.dela.values()].map((d) => ({
+      return zhivite([...o.dela.values()]).map((d) => ({
         id: d.id,
         etiket: d.ime,
         detayl: `${d.ot} → ${d.do}`,
@@ -164,7 +165,7 @@ export function narisuvayTabove(o: Ogledalo, dnes: string): string {
       : undefined);
 
   return `
-    <section class="karta">
+    <section data-sektsiya="tabove-tabovete" class="karta">
       <div class="dyalglava">
         <h2>Табовете</h2>
         <span>стационарни — допълваш екраните с още секции · добавени — изцяло твои</span>
@@ -221,7 +222,7 @@ function blokAdresnaKniga(o: Ogledalo): string {
   const sledvasht = sledvashtNomer(kniga);
 
   return `
-    <section>
+    <section data-sektsiya="tabove-adresna-kniga">
       <div class="dyalglava">
         <h2>Адресната книга</h2>
         <span>връзката е ПО НОМЕР, като в Ексел · сходни номера = свързани колони</span>
@@ -242,11 +243,22 @@ function blokAdresnaKniga(o: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * ЕДИН РЕД от адресната книга · номерът, колоната и КОЙ ГО СПОДЕЛЯ.
+ *
+ * „Кои колони носят този номер" се пита от ДОМЕЙНА (`svarzaniPoNomer`), а не се
+ * преписва тук. Дотук екранът си го смяташе сам с второ `filter` — и двете
+ * версии вече се различаваха по нюанс (домейновата връща и себе си). Второ
+ * място за един факт е второ място, което се разминава (правило 17), а
+ * функцията в домейна стоеше с НУЛА живи викащи, само с теста си.
+ *
+ * САМИЯТ РЕД се маха тук, не в домейна: „свързаните" е свойство на номера, а
+ * „другите освен мен" е въпрос на ЕКРАНА, който рисува точно този ред.
+ */
 function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
-  const drugite = kniga.filter(
-    (x) => x.nomer === r.nomer && r.nomer > 0 && !(x.tablitsa === r.tablitsa && x.kolona === r.kolona),
+  const drugite = svarzaniPoNomer(kniga, r.nomer).filter(
+    (x) => !(x.tablitsa === r.tablitsa && x.kolona === r.kolona),
   );
-  const vgradenaVrazka = vrazkataNaNomer(r.nomer);
   return `
     <div class="red opis${r.nomer === 0 ? ' propusnat' : ''}" translate="no">
       <span>${
@@ -260,9 +272,11 @@ function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
       <span>${
         r.nomer === 0
           ? '<span class="znachka tiha">без връзка</span>'
-          : ekraniraj(
-              drugite.map((x) => `${x.tablitsa} · ${x.kolona}`).join(' · ') ||
-                (vgradenaVrazka ? 'чака втори край' : 'чака втори край'),
+          : // ТЕРНАР С ДВА ЕДНАКВИ КЛОНА стоеше тук и викаше `vrazkataNaNomer`
+            // само за да не ползва отговора му. Шум в най-чистия си вид —
+            // негова дума за резен 18: „без никакъв шум" (ADR-069).
+            ekraniraj(
+              drugite.map((x) => `${x.tablitsa} · ${x.kolona}`).join(' · ') || 'чака втори край',
             )
       }${
         r.otkade === 'model'
@@ -306,7 +320,7 @@ function formaNovTab(): string {
 
 function blokTab(o: Ogledalo, t: Tab, dnes: string): string {
   return `
-    <section>
+    <section data-sektsiya="tabove-izbraniyat">
       <div class="dyalglava">
         <h2>${ekraniraj(t.ime)}</h2>
         <span>${t.sektsii.length} ${t.sektsii.length === 1 ? 'секция' : 'секции'}${t.statsionaren ? ' · допълва екрана' : ''}</span>
@@ -357,7 +371,7 @@ function blokSektsiya(o: Ogledalo, t: Tab, s: Sektsiya, dnes: string): string {
 
 function diagramaNaSektsiya(o: Ogledalo, iztochnik: IztochnikDiagrama, dnes: string): string {
   if (iztochnik === 'mesetsi') return stalboveNaMesetsite(mesechnitePari(o, dnes));
-  const dela = podredi([...o.dela.values()], dnes);
+  const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '<p class="prazno">Още няма дела.</p>';
   const r = reshetka(dela, 'mesets', dnes);
   return narisuvayDiagrama(dela, r, dnes);
@@ -491,7 +505,10 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
     try {
       const ime = String(new FormData(formaTab).get('ime') ?? '');
       const tab = napraviTab({ ime });
-      await k.deystviya.zapishiTab(tab, { opId: `tab:${crypto.randomUUID()}` });
+      // СЪЗДАВАНЕ, не поправка: `sazdayTab` отказва зает ключ. Дотук новото
+      // име се записваше върху стария таб и той се връщаше ПРАЗЕН — секциите
+      // му изчезваха без нито една дума (дефект от голямата сверка).
+      await k.deystviya.sazdayTab(tab, { opId: `tab:${crypto.randomUUID()}` });
       izbranTab = tab.klyuch;
       zapomniEkranno('tabove.izbran', izbranTab);
       dobavyamTab = false;
@@ -640,7 +657,9 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
         if (!m) throw new Error('Хедърът вече го няма.');
         const nomer = pole?.value.trim() === '' ? 0 : Number(pole?.value);
         if (Number.isNaN(nomer)) throw new Error(`„${pole?.value}" не е номер.`);
-        const nov = dayNomer(m, Number(indeks), nomer, 'sobstvenik');
+        // РОЛЯТА се СМЯТА от Журнала, не се твърди с литерал: пазачът
+        // `samoUpravitel` иначе получава отговора, който иска (ADR-050).
+        const nov = dayNomer(m, Number(indeks), nomer, rolyataNa(k.kojSam.imeyl, o));
         await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
         greshka = '';
         k.vest('dobre', nomer === 0 ? 'Връзката е махната.' : `Колоната носи номер ${nomer}.`);

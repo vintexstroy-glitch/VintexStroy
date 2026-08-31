@@ -12,7 +12,10 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { VIDOVE_OBEKT } from '../src/kalkulator/chetene.js';
 import {
+  bazataENegova,
   DOBAVKI,
   EDINITSA_BT,
   GreshkaNastroyki,
@@ -20,6 +23,8 @@ import {
   KLYUCHOVE_KOEFITSIENTI,
   KOEFITSIENTI,
   NAY_GOLYAM_BT,
+  NEGOVI_BAZI,
+  SLUCHAI,
   PO_PODRAZBIRANE,
   btOtDumata,
   dobavka_st,
@@ -423,5 +428,148 @@ describe('изписването · коефициент, процент, про
     expect(kolkoMeni(9_200)).toBe('−8,00 %');
     expect(kolkoMeni(10_300)).toBe('+3,00 %');
     expect(kolkoMeni(10_000)).toBe('0,00 %');
+  });
+});
+
+/**
+ * КОЕ ЧИСЛО Е НЕГОВО · и защо това има ТЕСТ, а не само коментар.
+ *
+ * Дотук кодът и три документа държаха петте бази в ЕДНА кофа („всяко число тук
+ * чака него"), докато две негови изречения от 23.08 даваха ЕДНО от тях:
+ *
+ *   „За цените има таблица — претвори я и сложи 3000 евро цена за старт." (И53)
+ *   „3000 евро беше цената, която калкулаторът да ползва…"                 (И55)
+ *
+ * Изречение в коментар не пада на червено, когато някой го надживее. Списъкът
+ * пада — и екранът чете СЪЩИЯ списък, значи двете не могат да се разминат.
+ */
+describe('дадено срещу чакащо · базите на Калкулатора', () => {
+  // ВСИЧКИТЕ ПЕТ вече са негови (31.08): апартаментът е 3 000 €/м² от И53·И55,
+  // а другите четири са 2 000 €/м² от „Остави ги празни или напиши 2 000 евро
+  // на всички". Изборът между двете беше мой; ЧИСЛОТО е негово.
+  it('НЕГОВИ са ВСИЧКИТЕ ПЕТ бази · апартаментът 3 000, другите по 2 000 €/м²', () => {
+    expect(NEGOVI_BAZI).toEqual(['apartament', 'garazh', 'parkomyasto', 'sklad', 'drug']);
+    for (const vid of ['garazh', 'parkomyasto', 'sklad', 'drug'] as const) {
+      expect(PO_PODRAZBIRANE.baza_st[vid]).toBe(200_000);
+    }
+    expect(PO_PODRAZBIRANE.baza_st.apartament).toBe(300_000);
+    expect(bazataENegova('apartament')).toBe(true);
+  });
+
+  // ═══ РЕЗЕН 52 · шестте числа на разходния подход и теглата ═══
+  it('полезният живот е СТО години · поправен от 70 след проучване', () => {
+    // Занаятът дава 100–150 за масивна монолитна сграда и 50 за панелна.
+    // Взима се долната граница: тя амортизира по-бързо, тоест е предпазлива.
+    // При 70 сграда на 20 години губеше 28,6 % — почти двойно спрямо занаята.
+    expect(PO_PODRAZBIRANE.polezen_zhivot_g).toBe(100);
+  });
+
+  it('другите пет числа на разходния подход се ПОТВЪРДИХА, не се смениха', () => {
+    expect(PO_PODRAZBIRANE.zemya_st_kvm.apartament).toBe(60_000); // 600 €/м² РЗП
+    expect(PO_PODRAZBIRANE.stroitelna_st_kvm.apartament).toBe(120_000); // 1 200 €/м²
+    expect(PO_PODRAZBIRANE.vazrast_g).toBe(0);
+  });
+
+  // НЕГОВ ИЗБОР, ДЕЛЕГИРАН: „Избор. То ми кажи. Имаш цялото знание свободно."
+  it('пазарният подход ВОДИ и при ново строителство', () => {
+    const novo = SLUCHAI.find((x) => x.klyuch === 'novo')!;
+    expect([novo.pazaren_bt, novo.dohoden_bt, novo.razhoden_bt]).toEqual([5_000, 1_000, 4_000]);
+  });
+
+  // ИНВАРИАНТЪТ, а не само числото: купувачът плаща ЦЕНА, не себестойност.
+  // Себестойността е ПОД, не стойност — тя казва под кое число никой не би
+  // строил, а не над кое някой би платил. Затова разходният подход няма право
+  // да води в НИТО ЕДИН случай, каквито и числа да се сложат утре.
+  it('и разходният подход НЕ води в нито един случай', () => {
+    for (const sl of SLUCHAI) {
+      expect(sl.razhoden_bt, `${sl.klyuch}: разходният води`).toBeLessThanOrEqual(sl.pazaren_bt);
+    }
+  });
+
+  it('и трите случая още затварят на сто процента', () => {
+    for (const sl of SLUCHAI) {
+      expect(sl.pazaren_bt + sl.dohoden_bt + sl.razhoden_bt, sl.klyuch).toBe(10_000);
+    }
+  });
+
+  it('НИТО ЕДНА база вече не чака него · и това се брои, не се твърди', () => {
+    const chakat = VIDOVE_OBEKT.filter((v) => !bazataENegova(v));
+    // НУЛА чакащи · и празният списък се БРОИ, не се чете от изречение.
+    expect(chakat).toEqual([]);
+  });
+
+  it('и ПЕТТЕ имат база · нито един вид не се смята с нула', () => {
+    for (const vid of VIDOVE_OBEKT) {
+      expect(PO_PODRAZBIRANE.baza_st[vid]).toBeGreaterThan(0);
+    }
+    expect(VIDOVE_OBEKT).toHaveLength(5);
+  });
+
+  /**
+   * ЕКРАНЪТ ЧЕТЕ СЪЩИЯ СПИСЪК. Без този тест той можеше да покаже „негово
+   * число" под гаража, без нищо да падне — точно шарката на ADR-050.
+   */
+  it('екранът пита СПИСЪКА, не преписва думите му', () => {
+    const izvor = readFileSync('app/kalkulator.ts', 'utf8');
+    expect(izvor).toContain('bazataENegova(vid)');
+    expect(izvor).toContain('data-baza=');
+    // Полето вече не е ЕДНО: `sBaza` приемаше всеки вид, а екранът редактираше
+    // само апартамента — обявена възможност без лост.
+    expect(izvor).toContain('VIDOVE_OBEKT.map');
+  });
+
+  /**
+   * ПАРКОМЯСТОТО НОСИ ДВЕ ЦЕНИ · находка, обявена на глас, не изчистена наум.
+   *
+   * Като ГЛАВЕН обект се смята на м²; като ДОБАВКА — на брой. А собственият
+   * коментар на добавката казва, че „квадратните метри не значат нищо при
+   * паркомясто". И двете стоят, докато той не каже коя пада — но екранът го
+   * КАЗВА, вместо да го премълчи.
+   */
+  it('паркомястото има И цена на м², И цена на брой · и екранът го казва', () => {
+    expect(PO_PODRAZBIRANE.baza_st.parkomyasto).toBe(200_000);
+    const naBroy = DOBAVKI.find((d) => d.klyuch === 'parkomyasto')!;
+    expect(naBroy.vid).toBe('broy');
+    expect(naBroy.stoynost).toBe(12_000_00);
+    expect(readFileSync('app/kalkulator.ts', 'utf8')).toContain('data-parkomyasto-dvete');
+  });
+});
+
+describe('група Г · разбивката не рисува сметка, която не се прави (резен 47)', () => {
+  /**
+   * НАМЕРЕНО СЪС СЧУПВАНЕ, не с четене: върнах условието на разбивката към „И"
+   * и НИТО ЕДИН тест не падна. Тоест поправката в `tsenaPoRazhod` се пазеше, а
+   * съседката ѝ — не: числото щеше да е нула, а редовете щяха да го обясняват.
+   */
+  const sChisla = (zemya: number, stroitelna: number) => ({
+    ...PO_PODRAZBIRANE,
+    zemya_st_kvm: { ...PO_PODRAZBIRANE.zemya_st_kvm, apartament: zemya },
+    stroitelna_st_kvm: { ...PO_PODRAZBIRANE.stroitelna_st_kvm, apartament: stroitelna },
+  });
+  const redoveNaV = (n: ReturnType<typeof sChisla>): number =>
+    razbivka(n, { ...PRIMEREN_OBEKT, dobavki: {} }).v.length;
+
+  it('и двете числа дадени · В носи редове', () => {
+    expect(redoveNaV(sChisla(50_000, 100_000))).toBeGreaterThan(0);
+  });
+
+  it('ЕДНО липсващо · В няма НИТО ЕДИН ред', () => {
+    expect(redoveNaV(sChisla(50_000, 0))).toBe(0);
+    expect(redoveNaV(sChisla(0, 100_000))).toBe(0);
+  });
+});
+
+describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
+  it('настройките по подразбиране носят ЧЕТИРИНАЙСЕТ полета', () => {
+    expect(Object.keys(PO_PODRAZBIRANE)).toHaveLength(14);
+  });
+
+  it('примерният обект носи ШЕСТ полета', () => {
+    expect(Object.keys(PRIMEREN_OBEKT)).toHaveLength(6);
+  });
+
+  it('коефициентите на Калкулатора са ПЕТ', () => {
+    // ПЕТ, не дванайсет: съименникът в Сметки е ДРУГА константа, със свой пин.
+    expect(KOEFITSIENTI).toHaveLength(5);
   });
 });

@@ -75,7 +75,14 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { pishi } from '../src/yadro/pari.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { klyuchNaPravo, pravoNaKolona, vidNaKolona } from '../src/domein/kolonno.js';
+import {
+  klyuchNaPravo,
+  mozheDaRedaktiraKolona,
+  pravoNaKolona,
+  vidNaKolona,
+} from '../src/domein/kolonno.js';
+import { rolyataNa } from '../src/domein/stopanin.js';
+import { kartataNaSaglasieto } from './saglasie.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import type { Konteks } from './ekranite.js';
 
@@ -155,7 +162,7 @@ export function narisuvayII(o: Ogledalo, kontrol: TroyniyatKontrol, dnes: string
 function kartaPotvarzhdenie(): string {
   if (!iskane) return '';
   return `
-    <section class="karta izbrana" id="potvarzhdenieto">
+    <section data-sektsiya="ii-potvarzhdenie" class="karta izbrana" id="potvarzhdenieto">
       <div class="dyalglava">
         <h2>Потвърждение с имейл</h2>
         <span>${IMENA_ZA_KAKVO[iskane.zaKakvo]} · „${ekraniraj(iskane.kakvo)}"</span>
@@ -214,7 +221,7 @@ function kartaKontrol(k: TroyniyatKontrol, izbran: Agent | undefined): string {
 
 function kartaAgentite(agenti: readonly Agent[], izbran: Agent | undefined): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-agentite" class="karta">
       <div class="dyalglava">
         <h2>Агентите</h2>
         <span>един агент, един ред · всеки с ЧОВЕК-отговорник</span>
@@ -249,7 +256,7 @@ function kartaAgentite(agenti: readonly Agent[], izbran: Agent | undefined): str
 
 function formaNaAgent(): string {
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="ii-nov-agent" class="karta izbrana">
       <div class="dyalglava"><h2>Нов агент</h2><span>карта · длъжностна характеристика · забрани · три умения</span></div>
       <form id="forma-agent">
         <div class="poleta">
@@ -295,7 +302,7 @@ function formaNaAgent(): string {
 /** ПРОТОКОЛЪТ · четимият документ, от който се сглобява и промптът. */
 function kartaProtokol(a: Agent, k: TroyniyatKontrol, dnes: string): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-protokolat" class="karta">
       <div class="dyalglava">
         <h2>Протоколът на „${ekraniraj(a.ime)}"</h2>
         <span>единственият дом на длъжностната · промптът се СГЛОБЯВА оттук</span>
@@ -361,14 +368,24 @@ function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
     klyuch: m.klyuch,
     glavi: m.glavi,
     zatvorena: (kolona: number) => vidNaKolona(m, kolona) === 'zatvorena',
+    // ДВАТА ВЪПРОСА СА РАЗЛИЧНИ, откакто правото има ТРИ стойности: „вижда ли
+    // я" е всичко освен скритото, а „пипа ли я" минава и през ролята, и през
+    // вида на колоната. Дотук тук стоеше `=== 'vizhda'` и то беше вярно, докато
+    // стойностите бяха две — днес щеше да брои свалената до „вижда" за СКРИТА.
     vizhdaYa: (kolona: number) =>
-      pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona) === 'vizhda',
+      pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona) !== 'skrito',
+    pipaYa: (kolona: number) =>
+      mozheDaRedaktiraKolona({
+        rolya: rolyataNa(a.otgovornik, o),
+        vid: vidNaKolona(m, kolona),
+        pravo: pravoNaKolona(o.prava.get(klyuchNaPravo(a.otgovornik, m.klyuch)), kolona),
+      }),
   }));
   const karta = kartaNaDostapa(a, { modeli });
   const broi = broeviNaKartata(karta);
 
   return `
-    <section>
+    <section data-sektsiya="ii-dostapat">
       <div class="dyalglava">
         <h2>Къде вижда · къде редактира</h2>
         <span>чете се през правата на ${ekraniraj(a.otgovornik)} — агентът не вижда повече от отговорника си</span>
@@ -415,7 +432,7 @@ function kartaNaDostapaBlok(o: Ogledalo, a: Agent): string {
  */
 function kartaUmeniya(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-umeniyata" class="karta">
       <div class="dyalglava">
         <h2>Уменията на „${ekraniraj(a.ime)}"</h2>
         <span>характеристиката е умение, активирано ПОСТОЯННО · другите се добавят и махат</span>
@@ -465,50 +482,57 @@ function kartaUmeniya(a: Agent): string {
  * СЪГЛАСИЕТО · рисковете С ДУМИ, без „нула риск".
  *
  * Образецът е Claude for Chrome: prompt injection е обявен за нерешен проблем,
- * а „по-ниско" не се представя за „никакво". Отметката НЕ е сложена
- * предварително — нищо не се появява без изричен избор (правило 13 по дух).
+ * а „по-ниско" не се представя за „никакво".
+ *
+ * ФОРМАТА вече живее ЕДИН път (`app/saglasie.ts`) — тук остават само ДУМИТЕ.
+ * Дотук същият шаблон беше писан на ръка тук и в Служители; третото копие (НАП)
+ * щеше да направи поправка в едното невидима за другите две — а обещанието
+ * „кутийката не е сложена предварително" е точно онова, което човек чете, преди
+ * да пусне нещо навън.
  */
 function kartaSaglasie(a: Agent): string {
-  return `
-    <section class="karta izbrana" id="saglasieto">
-      <div class="dyalglava">
-        <h2>Включване на „${ekraniraj(a.ime)}"</h2>
-        <span>какво ще прави · какво НЯМА да прави · и какво може да се обърка</span>
-      </div>
-      <div class="tablitsa">
-        <div class="red opis" translate="no"><span><b>Ще прави</b></span><span>${ekraniraj(harakteristika(a)?.tekst ?? '')}</span></div>
-        <div class="red opis" translate="no"><span><b>НЯМА да прави</b></span><span>Не пише в Журнала, не изпраща нищо навън, не отнема достъп. Предложението му чака ТВОЯ дума.</span></div>
-      </div>
-      <div class="tablitsa">
-        <div class="glava opis"><span>Рискът</span><span>какво значи</span></div>
-        <div class="red opis" translate="no">
-          <span><b>Подхвърлен текст</b></span>
-          <span>Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той няма път към запис — но предложение, прието на доверие, пренася грешката. Затова всяко предложение носи сверка, и тя се гледа.</span>
-        </div>
-        <div class="red opis" translate="no">
-          <span><b>Умора от съгласия</b></span>
-          <span>Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" няма и няма да има — присъдата е ред по ред.</span>
-        </div>
-        <div class="red opis" translate="no">
-          <span><b>Сгрешена сметка</b></span>
-          <span>Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не го запишеш — и записът носи ТВОЯ имейл, не неговото име.</span>
-        </div>
-      </div>
-      <label class="vazm">
-        <input type="checkbox" id="razbrah">
-        <span class="vazm-tyalo"><b>Прочетох рисковете и включвам агента</b><span>отметката не е сложена предварително — изборът е изричен</span></span>
-      </label>
-      <div class="deystviya">
-        <button type="button" class="glaven" id="potvardi-vklyuchvane">Включи</button>
-        <button type="button" class="vtorichen" id="otkazhi-vklyuchvane">Откажи</button>
-      </div>
-    </section>`;
+  return kartataNaSaglasieto({
+    sektsiya: 'ii-vklyuchvane',
+    id: 'saglasieto',
+    zaglavie: `Включване на „${a.ime}"`,
+    podnaslov: 'какво ще прави · какво НЯМА да прави · и какво може да се обърка',
+    shte: harakteristika(a)?.tekst ?? '',
+    nyama:
+      'Не пише в Журнала, не изпраща нищо навън, не отнема достъп. ' +
+      'Предложението му чака ТВОЯ дума.',
+    riskove: [
+      {
+        ime: 'Подхвърлен текст',
+        kakvo:
+          'Агентът чете бележки, описания и имена, писани от хора. Злонамерен текст там ' +
+          'може да изкриви какво СМЯТА и какво предлага. Защитата ни е структурна — той ' +
+          'няма път към запис — но предложение, прието на доверие, пренася грешката. ' +
+          'Затова всяко предложение носи сверка, и тя се гледа.',
+      },
+      {
+        ime: 'Умора от съгласия',
+        kakvo:
+          'Ако всичко се потвърждава, човек почва да натиска сляпо. Затова „приеми всички" ' +
+          'няма и няма да има — присъдата е ред по ред.',
+      },
+      {
+        ime: 'Сгрешена сметка',
+        kakvo:
+          'Агентът греши като всеки, който смята. Числото му не влиза никъде, докато ти не ' +
+          'го запишеш — и записът носи ТВОЯ имейл, не неговото име.',
+      },
+    ],
+    otmetka: 'Прочетох рисковете и включвам агента',
+    idNaOtmetkata: 'razbrah',
+    potvardi: { id: 'potvardi-vklyuchvane', duma: 'Включи' },
+    otkazhi: { id: 'otkazhi-vklyuchvane', duma: 'Откажи' },
+  });
 }
 
 /** ПОЛЕТО СЪС ЗАКОНИТЕ · изброени поименно, всеки със своя дом. */
 function kartaZakonite(): string {
   return `
-    <section>
+    <section data-sektsiya="ii-zakonite">
       <div class="dyalglava">
         <h2>Законите</h2>
         <span>редът на оценка е забрана → питане → позволение · подразбраното е ЗАБРАНА</span>
@@ -562,7 +586,7 @@ function kartaZadachi(a: Agent, zadachi: readonly Zadacha[], dnes: string): stri
   const p = pokazateliNaZadachite(zadachi, dnes);
   const podredeni = [...zadachi].sort((x, y) => y.kogato.localeCompare(x.kogato));
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-zadachite" class="karta">
       <div class="dyalglava">
         <h2>Задачите на „${ekraniraj(a.ime)}"</h2>
         <span>възлагането е мое действие · нищо не тръгва без потвърждение по имейл</span>
@@ -661,7 +685,7 @@ function redNaZadacha(z: Zadacha, dnes: string): string {
  */
 function kartaKlod(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-klod" class="karta">
       <div class="dyalglava">
         <h2>Свързването с Клод</h2>
         <span>свързваща част · офлайн изданието изобщо няма този файл</span>
@@ -698,7 +722,7 @@ function kartaKlod(a: Agent): string {
  */
 function kartaRachnoPredlozhenie(a: Agent): string {
   return `
-    <section class="karta">
+    <section data-sektsiya="ii-rachno" class="karta">
       <div class="dyalglava">
         <h2>Ръчно предложение</h2>
         <span>пътят без мрежа · вписвам заключението сам</span>
@@ -740,7 +764,7 @@ function kartaZhurnal(predlozheniya: readonly Predlozhenie[]): string {
   const p = pokazateli(predlozheniya);
   const podredeni = [...predlozheniya].sort((a, b) => b.kogato.localeCompare(a.kogato));
   return `
-    <section>
+    <section data-sektsiya="ii-zhurnal">
       <div class="dyalglava">
         <h2>Журнал на предложенията</h2>
         <span>всяко е събитие в Журнала · това тук е Огледало, не втори лог</span>

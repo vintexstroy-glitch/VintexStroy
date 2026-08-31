@@ -38,6 +38,20 @@ import { butonSIkona, ikona } from './ikoni.js';
 import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
+import { zakachiGrupite } from './grupa-deystviya.js';
+import { zakachiZhiviyaHedar } from './zhiviyat-hedar.js';
+import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
+import {
+  kopchetoNaLentata,
+  lentataESvita,
+  moyatRed,
+  podredeniPunktove,
+  premestiVMoyaRed,
+  skritiPunktove,
+  zabraviMoyaRed,
+  vidimiPunktove,
+  zakachiSvivachaNaLentata,
+} from './lenta.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
@@ -46,6 +60,7 @@ import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
+import { nachaloNaProbvaneto } from '../src/domein/probvane.js';
 import { prochetiKnigata } from '../src/domein/knigata.js';
 import { sveriVerigite } from '../src/domein/sverka-verigi.js';
 import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
@@ -53,12 +68,17 @@ import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { zakachiIstoriya } from './istoriya.js';
+import { zakachiDokumentite } from './dokumenti.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { zakachiKlaviatura } from './klaviatura.js';
 import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
+import { zakachiZebrata } from './zebra.js';
+import { zakachiVisochinata } from './visochina.js';
+import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
+import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
-import { chetiIzbor, narisuvayTablo, zakachiTablo } from './tablo.js';
+import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
 import { narisuvayTabove, zakachiTabove } from './tabove.js';
@@ -134,6 +154,20 @@ let hranilishte: SastoyanieNaHranilishteto = {
   zaeto: -1,
   pozvoleno: -1,
 };
+/**
+ * ОТВАРЯ ЕКРАН · един дом, два викащи.
+ *
+ * Падащите редове (темите на Настройки и секциите на всеки екран) не знаят кой
+ * екран е отворен и не бива да научават: те казват КЪДЕ да се отиде, а пътят
+ * дотам е един. Дотук този път беше вписан вътре в закачането на Настройки и
+ * вторият викащ щеше да си направи копие. Живее ТУК, до самото `ekran` —
+ * единственото място, което го мени.
+ */
+async function otvoriEkran(koy: string): Promise<void> {
+  ekran = koy as KoyEkran;
+  zapomniEkranno('ekran', ekran);
+}
+
 let poslednaVest: { vid: 'dobre' | 'zle'; tekst: string } | null = null;
 let sastoyanieNaVerigata = { tsyala: true, proverena: false, broi: 0 };
 
@@ -616,6 +650,16 @@ async function trugvay(): Promise<void> {
     });
   }
 
+  /**
+   * ДРЪЖКАТА НА ЖИВИЯ ХЕДЪР · пази се, за да се ОТВЪРЖЕ при следващото рисуване.
+   *
+   * Слушателят стои на `window`, не на корена, защото страницата се скролва
+   * цялата. Всяко прерисуване подменя корена, тъй че без отвързване след десет
+   * прерисувания на `window` висят десет слушателя — и всеки мери целия екран
+   * на всеки кадър. Точно лагът, който той нарочно е поискал да го няма.
+   */
+  let otvarzhiZhiviyaHedar: (() => void) | undefined;
+
   async function prerisuvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
@@ -661,6 +705,11 @@ async function trugvay(): Promise<void> {
             <p>${opis.podnaslov}</p>
           </div>
           <div class="desno-gore">
+            ${/* РАЗМЕРЪТ НА ТЕКСТА · ПЪРВИ отляво в групата и затова видим на
+                  всеки екран, дори когато петте служебни пътя ги няма (личния).
+                  Рисува се в ЧЕРУПКАТА, не в екраните: инак единайсетият екран
+                  ще се роди без него, точно както се роди без `data-sektsiya`. */
+              lostatNaGoleminata()}
             ${
               /**
                * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
@@ -713,6 +762,9 @@ async function trugvay(): Promise<void> {
           ${opis.narisuvay({
             ogledalo,
             broySabitiya: sabitiya.length,
+            // ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · книгата е ТУК, значи и сметката е тук
+            // (резен 32). Таблото получава готов низ и не научава за Журнала.
+            parviyatZapis: nachaloNaProbvaneto(sabitiya),
             dnes,
             izbor,
             kojSam,
@@ -721,6 +773,15 @@ async function trugvay(): Promise<void> {
             lichnoOgledalo,
             lichenAkaunt: lichen.akaunt,
             broyLichni: lichniteSabitiya.length,
+            // МЕРЕНО, не питано (правило от `CLAUDE.md`: „Размерът се МЕРИ").
+            // `-1` значи „браузърът не казва" и екранът го чете като нула
+            // нужно място — по-честно от измислено число.
+            zaetoNaUstroystvoto: Math.max(0, hranilishte.zaeto),
+            dostapniEkrani: dostapniteEkrani({
+              rolya: rolyataNa(kojSam.imeyl, ogledalo),
+              lichnoVklyucheno,
+              lichnoPipnato: lichnoOgledalo !== null,
+            }),
           })}
         </div>
       </main>`;
@@ -731,8 +792,18 @@ async function trugvay(): Promise<void> {
       k,
       lichen,
       prerisuvay,
+      dnes: dnesKato(),
       prevklyuchiLichnoto: (znak, vklyucheno) => zakachiPrevklyuchvaneto(koren, znak, vklyucheno),
       zakachiTabloto: () => {
+        /**
+         * СВЪРЗВАЩАТА ЧАСТ · ТУК, не в екрана (ADR-021 · ADR-055).
+         *
+         * Таблото не знае за мрежа и не бива да научава: офлайн изданието НЕ
+         * носи `drayv-google.js`, и екран, който го внася направо, би го
+         * издърпал в пакета. Затова питането се ПОДАВА, а липсата му е
+         * състояние, което картата казва с думи.
+         */
+        svarzhiPitanetoNaDrayva(async () => new DrayvNaGoogle(await vzemiZheton()).kvota());
         zakachiTablo(
           koren,
           () => izbor,
@@ -747,6 +818,35 @@ async function trugvay(): Promise<void> {
         zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
         zakachiZapasniya(koren);
         zakachiVrashtaneto(koren);
+        /**
+         * ПУБЛИКУВА НАЧАЛНИЯ РЕД · ЕДИНСТВЕНОТО тук, което пише в Журнала.
+         *
+         * Взима реда, който Стопанинът вижда СЕГА (трите слоя, слети), и го
+         * записва като началния за всички. Едно събитие, при натиснат бутон —
+         * не при всяко местене: междинните подредби не са решения, а движение
+         * на ръката, и Журналът не се пълни с тях.
+         *
+         * СЛЕД ЗАПИСА МОЯТ РЕД СЕ ЗАБРАВЯ. Инак личният слой би останал върху
+         * основния и щеше да повтаря същия ред — после, при първа промяна на
+         * основния, човекът нямаше да види нищо и щеше да реши, че бутонът лъже.
+         */
+        koren
+          .querySelector<HTMLButtonElement>('#zapishi-nachalniya-red')
+          ?.addEventListener('click', async () => {
+            try {
+              const og = await k.deystviya.ogledalo();
+              const red = podredeniPunktove(dostapnite(og), og.redNaLentata, moyatRed());
+              await k.deystviya.podrediLentata(
+                { red: [...red] },
+                { opId: `lenta:${crypto.randomUUID()}` },
+              );
+              zabraviMoyaRed();
+              k.vest('dobre', 'Началният ред е записан. Всички го получават; всеки може да го пренареди за себе си.');
+            } catch (greshka) {
+              k.vest('zle', dumiZaGreshka(greshka));
+            }
+            await prerisuvay();
+          });
         koren.querySelector<HTMLButtonElement>('#izlez')?.addEventListener('click', async () => {
           await vhod.izlez();
           // Презареждането е нарочно: следващото тръгване минава по целия път
@@ -775,6 +875,8 @@ async function trugvay(): Promise<void> {
     if (mozhe(izbor, 'fini-filtri')) zakachiFiltri(koren, prerisuvay);
     if (sluzhebenEkran) {
       zakachiIstoriya(koren, k);
+      // ДОКУМЕНТИТЕ · ЕДИН закачач за трите екрана (резен 17б · ADR-073).
+      zakachiDokumentite(koren, k, prerisuvay);
       zakachiKontekstnoMenyu(koren, k);
       zakachiKlaviatura(koren, k, prerisuvay);
       zakachiRedaktsiya(koren, k, prerisuvay, rolyataNa(kojSam.imeyl, ogledalo));
@@ -783,7 +885,62 @@ async function trugvay(): Promise<void> {
     // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
     // След рисуването, защото пренарежда вече нарисувани възли.
     zakachiPodredbata(koren, ekran);
+    // ГРУПАТА ДЕЙСТВИЯ · няколко действия на едно място стават един бутон със
+    // стрелкичка (ADR-057). СЛЕД подредбата: тя мести цели секции, а групата
+    // пипа бутоните вътре в тях — обратният ред би свивал възли, които после
+    // се местят.
+    zakachiGrupite(koren, ekran);
+    // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с повече от три
+    // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
+    // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
+    zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
+    // ЖИВИЯТ ХЕДЪР · коя глава стои горе при скрол (M15 · резен 49). НАКРАЯ:
+    // той МЕРИ вече нарисуваното, а всичко над него още мести секции и възли.
+    // Предишната закачка се отвързва, инак при всяко прерисуване се трупа още
+    // един слушател върху `window` и лагът, който той не иска, идва сам.
+    otvarzhiZhiviyaHedar?.();
+    otvarzhiZhiviyaHedar = zakachiZhiviyaHedar(koren);
+    /**
+     * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
+     *
+     * Стрелките и бутонът „Запиши началния ред" питат едно и също, и питаха го
+     * с два еднакви къса — обходът за чистота ги хвана веднага. Разминат ли се,
+     * човек ще подрежда по един списък, а ще публикува друг.
+     */
+    const dostapnite = (og: Ogledalo) =>
+      dostapniteEkrani({
+        rolya: rolyataNa(kojSam.imeyl, og),
+        lichnoVklyucheno,
+        lichnoPipnato: lichnoOgledalo !== null,
+      });
+
+    // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
+    zakachiSvivachaNaLentata(koren, prerisuvay);
+    // И СЕ ПОДРЕЖДА · всеки за себе си (И111). Стрелките пишат в паметта на
+    // екрана, не в Журнала — затова тук няма нито едно повикване към Вратата.
+    for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-mesti]')) {
+      b.addEventListener('click', async (e) => {
+        // Пунктът е бутон и стрелката е ДО него, не в него — инак натискането
+        // на стрелка би сменило и екрана. Спира се пътят нагоре за всеки случай.
+        e.stopPropagation();
+        const og = await k.deystviya.ogledalo();
+        premestiVMoyaRed(
+          dostapnite(og),
+          og.redNaLentata,
+          b.dataset['mesti']!,
+          b.dataset['posoka'] as 'gore' | 'dolu',
+        );
+        await prerisuvay();
+      });
+    }
     prilozhiSkritite(koren);
+    // ЗЕБРАТА е ПОСЛЕДНА: тя брои РЕДОВЕТЕ, а скритите колони и подредбата
+    // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
+    // на редове, които после се местят.
+    zakachiGoleminata(koren);
+    zakachiIzgledaNaGanta(koren);
+    zakachiVisochinata(koren);
+    zakachiZebrata(koren);
     zakachiGlavnite(k, prerisuvay);
   }
 
@@ -808,6 +965,40 @@ async function trugvay(): Promise<void> {
   await zakachiDzhoba(prerisuvay);
 }
 
+/**
+ * КОИ ЕКРАНА СА ДОСТЪПНИ · ЕДИН дом (правило 17).
+ *
+ * Живееше вътре в `strana()` и стигаше, докато лентата само се рисуваше. Резен
+ * 15 добави ВТОРИ викащ — стрелките, които местят МОЯ ред и трябва да знаят
+ * върху какъв списък действат, включително СКРИТИТЕ (инак скриването би местило
+ * пунктове, а то не е ред). Преписан на две места, филтърът щеше да се разминава
+ * при първата нова възможност.
+ */
+function dostapniteEkrani(n: {
+  readonly rolya: Rolya;
+  readonly lichnoVklyucheno: boolean;
+  readonly lichnoPipnato: boolean;
+  /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
+}): readonly KoyEkran[] {
+  return (Object.keys(EKRANI) as KoyEkran[]).filter((koy) => {
+      // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
+      // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
+      // драйв, а полето за него живее на самия екран).
+      //
+      // ПРИБРАНОТО пада от лентата и се връща от Таблото, където изключеното
+      // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
+      // ≠ „включено", и това е причината да не е един булев.
+      if (koy === 'lichno') return n.lichnoVklyucheno || !n.lichnoPipnato;
+      // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
+      // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
+      // НЕГОВИ — езикът на интерфейса и личният таб.
+      if (koy === 'nastroyki') return true;
+      const iska = EKRANI[koy].iska;
+      if (iska && !mozhe(izbor, iska)) return false;
+    return dostapenLiE(koy, n.rolya);
+  });
+}
+
 function strana(
   o: Parameters<typeof duljimo>[0],
   dnes: string,
@@ -816,6 +1007,7 @@ function strana(
   lichnoPipnato = false,
   /** кой гледа · оттам идват темите на падащия ред (И101 т.2) */
   gledashtiyat: KoyGleda = 'stopanin',
+  /** връзката с НАП · ФАКТ от Журнала, третата врата на пункта (резен 17) */
 ): string {
   const v = sastoyanieNaVerigata;
   const tekst = !v.proverena
@@ -825,25 +1017,24 @@ function strana(
       : 'Веригата е СКЪСАНА';
   const zakasneli = prosrocheni(o, dnes).length;
 
-  const punktove = (Object.keys(EKRANI) as KoyEkran[])
-    .filter((koy) => {
-      // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
-      // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
-      // драйв, а полето за него живее на самия екран).
-      //
-      // ПРИБРАНОТО пада от лентата и се връща от Таблото, където изключеното
-      // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
-      // ≠ „включено", и това е причината да не е един булев.
-      if (koy === 'lichno') return lichnoVklyucheno || !lichnoPipnato;
-      // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
-      // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
-      // НЕГОВИ — езикът на интерфейса и личният таб.
-      if (koy === 'nastroyki') return true;
-      const iska = EKRANI[koy].iska;
-      if (iska && !mozhe(izbor, iska)) return false;
-      return dostapenLiE(koy, rolya);
-    })
-    .map((koy) => {
+  // СВИТА ЛИ Е · поглед, не факт: чете се от паметта на екрана (ADR-058).
+  const svita = lentataESvita();
+
+  const dostapni = dostapniteEkrani({ rolya, lichnoVklyucheno, lichnoPipnato });
+  /**
+   * ТРИТЕ СЛОЯ НА РЕДА · и ЧЕТВЪРТИЯТ въпрос, кое се вижда (резен 15 · И111).
+   *
+   * Обявеният ред (`EKRANI`) е основата; върху него ляга НАЧАЛНИЯТ на Стопанина
+   * (Журналът), а най-отгоре — МОЯТ (паметта на екрана). Скриването е отделно и
+   * е ЛИЧНО: то маха от лентата, но не мени нито реда, нито Журнала.
+   *
+   * Сливането е `podredi`, викана два пъти — непознатият ключ пада НАКРАЯ, значи
+   * нов екран се появява сам, без някой да е пипал записания ред.
+   */
+  const podredeni = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
+  const skriti = skritiPunktove();
+  const punktove = (vidimiPunktove(podredeni, skriti) as KoyEkran[])
+    .map((koy, i, spisak) => {
       const e = EKRANI[koy];
       /**
        * НАСТРОЙКИ Е ПАДАЩ РЕД, не обикновен пункт (И101 т.2 · ADR-045).
@@ -852,19 +1043,40 @@ function strana(
        * при натискане на настройки**". Пунктът остава на мястото си в лентата;
        * различава се само с това, което прави при натискане.
        */
-      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya));
+      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya), izbor);
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';
+      // ИМЕТО В СВОЙ ВЪЗЕЛ · гол текстов възел не се скрива с CSS, а свитата
+      // лента трябва да остави само знака (ADR-058). `textContent` не се мени,
+      // значи проходът и контекстното меню четат същото.
+      // СТРЕЛКИТЕ СА НА ВСЕКИ · това е неговото „всеки човек сам да подреди и
+      // размества" (И101). Местят МОЯ ред, не общия — нула събития в Журнала.
+      // Крайните не показват стрелка към нищото: бутон, който не прави нищо,
+      // учи човека да не му вярва.
+      const strelki =
+        `<span class="navmesti">` +
+        (i > 0
+          ? `<button type="button" class="navstrelka" data-mesti="${koy}" data-posoka="gore" title="Нагоре" aria-label="Премести „${e.ime}" нагоре">▲</button>`
+          : '') +
+        (i < spisak.length - 1
+          ? `<button type="button" class="navstrelka" data-mesti="${koy}" data-posoka="dolu" title="Надолу" aria-label="Премести „${e.ime}" надолу">▼</button>`
+          : '') +
+        `</span>`;
+      // БЕЗ ОБВИВКА · `.nav` е РЕШЕТКА с две колони (`1fr auto`), значи пунктът
+      // и стрелките му падат на един ред сами. Обвивка тук би счупила
+      // `.nav > [data-ekran]` — селекторът, с който падащият ред на екрана си
+      // намира пункта (`menyu-ekran.ts`), и той падна точно така при първия опит.
       return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
-        ${ikona(e.ikona, 'ikona navikona')}${e.ime}${znachka}
-      </button>`;
+        ${ikona(e.ikona, 'ikona navikona')}<span class="navime">${e.ime}</span>${znachka}
+      </button>${strelki}`;
     })
     .join('');
 
   return `
-    <aside class="strana">
+    <aside class="strana${svita ? ' svita' : ''}">
       <div class="marka">
+        ${kopchetoNaLentata(svita)}
         <b>VintexStroy</b>
         <span>MasterBook · ${SEGA.ime}</span>
       </div>
@@ -928,10 +1140,7 @@ function zakachiGlavnite(k: Konteks, prerisuvay: () => Promise<void>): void {
   // ПАДАЩИЯТ РЕД НА НАСТРОЙКИТЕ (И101 т.2 · ADR-045). Отварянето на екран е
   // подадено, а не вградено: компонентът не знае кой екран е отворен и не бива
   // да научава — той води до ТЕМА, а къде живее тя, казва домейнът.
-  zakachiMenyutoNaNastroykite(koren, prerisuvay, async (koy) => {
-    ekran = koy as KoyEkran;
-    zapomniEkranno('ekran', ekran);
-  });
+  zakachiMenyutoNaNastroykite(koren, prerisuvay, otvoriEkran);
 
   koren.querySelector<HTMLButtonElement>('#proveri')?.addEventListener('click', async () => {
     const sabitiya = await k.dnevnik.chetiVsichki(veriga);

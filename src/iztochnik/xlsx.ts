@@ -118,8 +118,23 @@ export function kolonaOtAdres(adres: string): number {
   return n - 1;
 }
 
-function listVTablitsa(xml: string, ime: string, nizove: readonly string[]): Tablitsa {
+function listVTablitsa(
+  xml: string,
+  ime: string,
+  nizove: readonly string[],
+): { readonly tablitsa: Tablitsa; readonly formuli: ReadonlyMap<number, string> } {
   const redove: string[][] = [];
+  /**
+   * ФОРМУЛАТА НА КОЛОНАТА · първата, която срещнем в нея.
+   *
+   * По колона, не по клетка: формулната колона в Excel е ЕДНА сметка,
+   * разтеглена надолу. Пазим първата и я гледаме като нейна — а дали цялата
+   * колона наистина я носи, го проверява преводачът (`prevod-formula.ts`),
+   * като пресмята и сравнява с кешираните стойности на самия Excel.
+   */
+  const formuli = new Map<number, string>();
+  /** Разтеглената формула („shared") стои ЦЯЛА само в първата си клетка. */
+  const spodeleni = new Map<string, string>();
 
   for (const red of xml.matchAll(/<row\b[^>]*>([\s\S]*?)<\/row>/g)) {
     const kletki: string[] = [];
@@ -142,11 +157,25 @@ function listVTablitsa(xml: string, ime: string, nizove: readonly string[]): Tab
       const kade = adres ? kolonaOtAdres(adres) : kletki.length;
       while (kletki.length < kade) kletki.push('');
       kletki[kade] = stoynost;
+
+      // ── ФОРМУЛАТА · дотук четецът виждаше само стойността (дълг M12) ──
+      const vazel = /<f\b([^>]*)(?:\/>|>([\s\S]*?)<\/f>)/.exec(tyalo);
+      if (vazel) {
+        const svoystvaF = vazel[1] ?? '';
+        const tekst = razkodiray(vazel[2] ?? '').trim();
+        const si = /si="(\d+)"/.exec(svoystvaF)?.[1];
+        let izraz = tekst;
+        if (si !== undefined) {
+          if (tekst !== '') spodeleni.set(si, tekst);
+          else izraz = spodeleni.get(si) ?? '';
+        }
+        if (izraz !== '' && !formuli.has(kade)) formuli.set(kade, izraz);
+      }
     }
     redove.push(kletki);
   }
 
-  return { ime, redove };
+  return { tablitsa: { ime, redove }, formuli };
 }
 
 /** Имената на листовете, по реда им в работната книга. */
@@ -154,29 +183,64 @@ function imenaNaListove(xml: string): string[] {
   return [...xml.matchAll(/<sheet\b[^>]*\bname="([^"]*)"/g)].map((n) => razkodiray(n[1] ?? ''));
 }
 
-/** Всички листове на .xlsx файл, като таблици. */
+/**
+ * ФОРМУЛИТЕ НА ЕДИН ЛИСТ · по номер на колона, дословно както са в файла.
+ *
+ * Пазят се ОТДЕЛНО от таблицата, а не в клетките ѝ: `Tablitsa` е това, което
+ * ЧОВЕКЪТ вижда, и стойността е нейната истина. Формулата е ДРУГ факт за
+ * същата колона — и той интересува само онзи, който строи таблица от файла.
+ */
+export interface FormuliteNaLista {
+  readonly ime: string;
+  readonly poKolona: ReadonlyMap<number, string>;
+}
+
+/**
+ * Всички листове на .xlsx файл, като таблици.
+ *
+ * ЕДИН ПЪТ, ДВЕ ЛИЦА: тук се вика четенето с формулите и се връща само
+ * половината. Втора подготовка (zip · общи низове · имена на листове) щеше да
+ * се разминава с първата точно в ъгъла, който никой не гледа — а обходът за
+ * дублирано я хвана още същия ден (правило 17).
+ */
 export async function otXLSX(danni: Uint8Array, ime = 'Excel'): Promise<Tablitsa[]> {
+  return (await otXLSXSFormuli(danni, ime)).tablitsi;
+}
+
+/**
+ * СЪЩИЯТ ФАЙЛ, но върнати и ФОРМУЛИТЕ · за строенето на таблица от файл.
+ *
+ * Свой викащ, а не втори параметър на `otXLSX`: десетките викащи на четенето
+ * не искат формули и не бива да ги носят. Обхождането е същото — вика се
+ * СЪЩАТА функция, не се преписва (правило 17).
+ */
+export async function otXLSXSFormuli(
+  danni: Uint8Array,
+  ime = 'Excel',
+): Promise<{ readonly tablitsi: Tablitsa[]; readonly formuli: FormuliteNaLista[] }> {
   const dv = new DataView(danni.buffer, danni.byteOffset, danni.byteLength);
   const opis = opisNaZip(dv);
 
   const nizove = opis.has('xl/sharedStrings.xml')
     ? obshtiNizove(await izvadi(danni, dv, opis.get('xl/sharedStrings.xml')!))
     : [];
-
   const imena = opis.has('xl/workbook.xml')
     ? imenaNaListove(await izvadi(danni, dv, opis.get('xl/workbook.xml')!))
     : [];
-
   const listove = [...opis.keys()]
     .filter((k) => /^xl\/worksheets\/sheet\d+\.xml$/.test(k))
     .sort((a, b) => Number(/(\d+)/.exec(a)![1]) - Number(/(\d+)/.exec(b)![1]));
 
   if (listove.length === 0) throw new GreshkaXLSX(`Във файла „${ime}" няма нито един лист.`);
 
-  const izhod: Tablitsa[] = [];
+  const tablitsi: Tablitsa[] = [];
+  const formuli: FormuliteNaLista[] = [];
   for (const [i, klyuch] of listove.entries()) {
     const xml = await izvadi(danni, dv, opis.get(klyuch)!);
-    izhod.push(listVTablitsa(xml, imena[i] ?? `лист ${i + 1}`, nizove));
+    const imeNaLista = imena[i] ?? `лист ${i + 1}`;
+    const prochetenoto = listVTablitsa(xml, imeNaLista, nizove);
+    tablitsi.push(prochetenoto.tablitsa);
+    formuli.push({ ime: imeNaLista, poKolona: prochetenoto.formuli });
   }
-  return izhod;
+  return { tablitsi, formuli };
 }

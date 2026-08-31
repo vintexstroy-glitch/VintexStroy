@@ -25,11 +25,13 @@
 
 import { ekraniraj } from './obshto.js';
 import { otvoriProzorets } from './prozorets.js';
+import { zavediDoSektsiyata } from './menyu-ekran.js';
 import { ikona } from './ikoni.js';
+import type { Izbor } from '../src/domein/planove.js';
 import {
   IMENA_NA_GLEDASHTITE,
   temaPoKlyuch,
-  temiZa,
+  temiPoGrupi,
   type KoyGleda,
   type TemaNastroyka,
 } from '../src/domein/temi-nastroyki.js';
@@ -44,8 +46,11 @@ let otvoren = false;
  * а изборът в реда води до темата. Два отделни бутона („Настройки" и стрелка)
  * биха питали човека нещо, което той не се е сещал да пита.
  */
-export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
-  const temi = temiZa(koy);
+export function redNaNastroykite(koy: KoyGleda, sEkran: boolean, izbor: Izbor): string {
+  // ИЗБОРЪТ влиза, за да отпаднат темите, чиято възможност планът не дава
+  // (двете, които искат Драйва). Дотук екранът искаше `iztochnitsi` ЦЕЛИЯТ и
+  // на локалните планове пунктът водеше обратно на Имоти — без дума защо.
+  const grupi = temiPoGrupi(koy, izbor);
   return `
     <div class="menyu-nastroyki${otvoren ? ' otvoreno' : ''}">
       <button type="button" class="navred nastroyki-vhod" id="nastroyki-vhod"${
@@ -63,14 +68,34 @@ export function redNaNastroykite(koy: KoyGleda, sEkran: boolean): string {
         sEkran ? ' data-ekran="nastroyki"' : ''
       }
               aria-expanded="${otvoren ? 'true' : 'false'}" aria-controls="nastroyki-red">
-        ${ikona('nastroyki', 'ikona navikona')}Настройки
+        ${ikona('nastroyki', 'ikona navikona')}<span class="navime">Настройки</span>
         <span class="strelka-dolu" aria-hidden="true">▾</span>
       </button>
       <div class="nastroyki-red" id="nastroyki-red" role="menu"
            aria-label="Теми на настройките"${otvoren ? '' : ' hidden'}>
         <p class="drebno za-kogo">Твоите теми · ${ekraniraj(IMENA_NA_GLEDASHTITE[koy])}</p>
-        ${temi.map(redNaTema).join('')}
+        ${grupi.map(grupata).join('')}
       </div>
+    </div>`;
+}
+
+/**
+ * ЕДНА ГРУПА · заглавие и темите под него.
+ *
+ * `role="group"` с `aria-labelledby` е ЕДИНСТВЕНОТО, което върши работа тук:
+ * вътре в `role="menu"` детето може да е `menuitem`, `group` или `separator` —
+ * нищо друго. Само `<p>` със стил би било надпис, който четецът на екран
+ * изговаря като изгубен текст между бутоните, вместо като име на групата им.
+ *
+ * Заглавието НЕ е бутон и няма `tabindex`: клавиатурата спира само там, където
+ * има какво да се направи.
+ */
+function grupata(g: { grupa: { klyuch: string; ime: string }; temi: readonly TemaNastroyka[] }): string {
+  const nomer = `grupa-nastroyki-${ekraniraj(g.grupa.klyuch)}`;
+  return `
+    <div role="group" aria-labelledby="${nomer}">
+      <p class="grupa-zaglavie" id="${nomer}">${ekraniraj(g.grupa.ime)}</p>
+      ${g.temi.map(redNaTema).join('')}
     </div>`;
 }
 
@@ -155,18 +180,9 @@ export function zakachiMenyutoNaNastroykite(
         vhod.setAttribute('aria-expanded', 'false');
         return;
       }
-      await otvoriEkran(tema.kade.ekran);
-      await prerisuvay();
-      // СЛЕД прерисуването: старият възел вече го няма, а новият още не е
-      // намерен. Търси се в живия документ, не в стария корен.
-      const tsel = document.querySelector<HTMLElement>(
-        `[data-sektsiya="${CSS.escape(tema.kade.sektsiya)}"]`,
-      );
-      if (tsel) {
-        tsel.scrollIntoView({ block: 'start' });
-        tsel.classList.add('podchertana');
-        setTimeout(() => tsel.classList.remove('podchertana'), 1600);
-      }
+      // ЕДИН дом на похвата „заведи и подчертай за миг" (`menyu-ekran.ts`):
+      // редът на секциите прави същото и копие тук би се разминало.
+      await zavediDoSektsiyata(tema.kade.ekran, tema.kade.sektsiya, otvoriEkran, prerisuvay);
     });
   }
 }

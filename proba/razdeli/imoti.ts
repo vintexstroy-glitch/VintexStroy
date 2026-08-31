@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /** 2 · имоти | 3 · дробни стотинки */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -61,7 +61,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'imoti', '#forma-imot');
 
     // поправка на имот — наемът му НЕ се къса
-    await deystvieSPrerisuvane(p, () => p.click('.red.imot:has-text("Дианабад") [data-popravi-imot]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Дианабад") [data-popravi-imot]'));
     proveri('формата се напълни със стария адрес', await p.inputValue('#imot-adres'), 'Дианабад');
     await p.fill('#imot-adres', 'Дианабад 4');
     await p.fill('#imot-prichina', 'сбъркан номер');
@@ -72,7 +72,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('наемът не се откачи', sledPopravka?.[1]?.startsWith('Стройпласт'), true);
 
     // поправка на наем — новата сума важи за напред
-    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Стройпласт") [data-popravi-naem]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Стройпласт") [data-popravi-naem]'));
     proveri('формата се напълни със старата сума', await p.inputValue('#naem-suma'), '1200,00');
     await p.fill('#naem-suma', '1300,00');
     await p.fill('#naem-prichina', 'вдигнат наем');
@@ -85,7 +85,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     );
 
     // прекратяване
-    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Домакинство") [data-prekrati]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Домакинство") [data-prekrati]'));
     await p.fill('#prekrati-kraj', '2026-02-28');
     await p.fill('#prekrati-prichina', 'изнесоха се');
     await sSabitie(p, () => p.click('#forma-prekrati button[type=submit]'));
@@ -98,11 +98,11 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('месечният наем спадна', await plochka(p, 'Месечен наем'), '1 600,00 €');
 
     // вратарят отказва, докато нещо живо виси
-    await deystvieSPrerisuvane(p, () => p.click('.red.imot:has-text("Малинова") [data-storno-imot]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Малинова") [data-storno-imot]'));
     proveri('сторно на имот с наеми се отказва', (await tekstNa(p, '.vest')).includes('висят'), true);
     proveri('нищо не влезе', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
-    await deystvieSPrerisuvane(p, () => p.click('.red.naem:has-text("Стройпласт") [data-storno-naem]'));
+    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Стройпласт") [data-storno-naem]'));
     proveri(
       'сторно на наем с вземания се отказва',
       (await tekstNa(p, '.vest')).includes('начислено вземане'),
@@ -113,7 +113,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // сторно на начисление БЕЗ плащания — минава
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00 €');
-    await sSabitie(p, () => p.click('.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
+    await sSabitie(p, () => natisniVGrupata(p, '.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
     proveri('шестнайсет събития', await broySabitiya(p), 16 + OTKRIVASHTOTO);
     proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00 €');
 
@@ -158,6 +158,75 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // БЕЗ ИМЕЙЛ НЯМА БУТОН · „Домакинство" е записан преди двете полета.
     proveri('наем без поща не показва празен бутон',
       await p.$$eval('.red.vzemane:has-text("Домакинство") [data-pismo]', (e) => e.length), 0);
+
+    // ══ 87 · РЕГИСТЪРЪТ НА НАЕМИТЕ · три изгледа, един сбор (резен 13б) ═══
+    razdel = '87 · регистърът на наемите · трите изгледа';
+    await naEkran(p, 'imoti', '[data-sektsiya=naemi-registar]');
+    proveri('трите изгледа стоят ВИДИМИ наведнъж · скритото не се сравнява',
+      await p.$$eval('[data-registar-izgled]', (e) => e.length), 3);
+    proveri('и точно ЕДИН е избран',
+      await p.$$eval('[data-registar-izgled][aria-pressed=true]', (e) => e.length), 1);
+
+    const ostatakNa = async (): Promise<string> =>
+      p.$eval('[data-registar=ostatak]', (e) => (e as HTMLElement).textContent!.trim());
+    const grupiNa = async (): Promise<number> => p.$$eval('[data-sektsiya=naemi-registar] [data-grupa]', (e) => e.length);
+    const smeniMeseca = async (m: string): Promise<void> => {
+      await deystvieSPrerisuvane(p, () =>
+        p.$eval('#registar-mesets', (e, stoynost) => {
+          (e as HTMLInputElement).value = stoynost as string;
+          e.dispatchEvent(new Event('change', { bubbles: true }));
+        }, m));
+    };
+
+    // РЕГИСТЪРЪТ ОТВАРЯ НА ТЕКУЩИЯ МЕСЕЦ, а данните на прохода са за 2026-02.
+    // Насочваме го натам, ИНАЧЕ всички числа са нула и сверката отдолу сравнява
+    // нула с нула — тя мина, докато я счупих нарочно, и това я хвана.
+    await smeniMeseca('2026-02');
+
+    const ostatakPoNaemateli = await ostatakNa();
+    const grupiPoNaemateli = await grupiNa();
+    proveri('регистърът показва редове', grupiPoNaemateli > 0, true);
+    // ЧИСЛОТО ТРЯБВА ДА Е РАЗЛИЧНО ОТ НУЛА · инак сверката долу сравнява нула с
+    // нула и минава, каквото и да е счупено. Проверка, която не може да се
+    // спъне, е надпис — това се хвана при нарочно счупване.
+    proveri('и остатъкът НЕ е нула · инак сверката отдолу мери нищо',
+      Number(await p.$eval('[data-registar=ostatak]', (e) =>
+        (e as HTMLElement).closest('.plochka')!.querySelector('.chislo')!.textContent!
+          .replace(/[^\d]/g, ''))) > 0, true);
+
+    // СВЕРКА ВХОД↔ИЗХОД НА ЕКРАНА · трите изгледа са ГРУПИРОВКИ на едни и същи
+    // редове. Дадат ли различни числа, вариантът престава да е избор и става
+    // три отделни истини — точно затова не са три таблици.
+    const predIzgleda = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('[data-registar-izgled=imoti]'));
+    proveri('по ИМОТ сборът е СЪЩИЯТ', await ostatakNa(), ostatakPoNaemateli);
+    proveri('но групите са ДРУГИ · инак изгледът не носи нищо',
+      (await grupiNa()) !== grupiPoNaemateli, true);
+    proveri('и превключването добавя НУЛА събития · това е ПОГЛЕД',
+      await broySabitiya(p), predIzgleda);
+
+    await deystvieSPrerisuvane(p, () => p.click('[data-registar-izgled=naemateli]'));
+    proveri('връщането дава пак първото число', await ostatakNa(), ostatakPoNaemateli);
+
+    razdel = '87 · регистърът · стъпката се СМЯТА и се КАЗВА с дума';
+    const stapki = await p.$$eval('[data-sektsiya=naemi-registar] [data-stapka]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['stapka']));
+    proveri('всеки ред носи стъпка', stapki.length > 0, true);
+    proveri('и всяка е от четирите познати',
+      stapki.every((x) => ['nezapochnat', 'nachislen', 'chastichno', 'sabran'].includes(x!)), true);
+    const tekstRegistar = await tekstNa(p, '[data-sektsiya=naemi-registar]');
+    proveri('състоянието се казва с ДУМА, не само с цвят',
+      /начислен|събран|частично|няма начисление/.test(tekstRegistar), true);
+    proveri('и се казва, че регистърът само ЧЕТЕ',
+      tekstRegistar.includes('само ЧЕТЕ Журнала'), true);
+
+    razdel = '87 · регистърът · месецът се избира и мени числата';
+    const predMeseca = await broySabitiya(p);
+    await smeniMeseca('2020-01');
+    proveri('празен месец казва защо е празен',
+      (await tekstNa(p, '[data-sektsiya=naemi-registar]')).includes('Няма живо наемане'), true);
+    proveri('и смяната на месец също е ПОГЛЕД · нула събития',
+      await broySabitiya(p), predMeseca);
 
     // ══ 27 · удобството · сортиране, търсене, памет, история, меню ═══════
 }

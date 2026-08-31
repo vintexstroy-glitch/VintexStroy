@@ -180,13 +180,17 @@ export function mesetsatKatoTablitsa(
   const sborNa = (izbor: (r: RedNaMesetsa) => boolean): number =>
     redove.filter(izbor).reduce((x, r) => x + r.stoynost_st, 0);
 
-  // Приходът е НАЧИСЛЕНОТО. КЕШ и БАНКА само показват как е дошло и затова
-  // не влизат в сбора — иначе едно и също би се броило два пъти.
+  // Приходът е НАЧИСЛЕНОТО плюс ВНОСКИТЕ по сделка (резен 23 · ADR-083). КЕШ и
+  // БАНКА само показват как е дошло и затова не влизат в сбора — иначе едно и
+  // също би се броило два пъти.
+  //
+  // Двата приходни реда стоят ПОИМЕННО, а не „всичко приходно": така новият
+  // сбиращ поток утре чупи сверката вместо тихо да се изпусне.
   dnevnik.zapishi(
     sverka(
       `Месецът ${period} · приходните потоци ↔ приход`,
-      s.prihod_st,
-      sborNa((r) => r.razdel === 'potok' && r.ime === 'Наеми'),
+      s.prihod_st + s.prihodProdazhbi_st,
+      sborNa((r) => r.razdel === 'potok' && ['Наеми', 'Продажби'].includes(r.ime)),
       kogato,
       MERKA.pari,
     ),

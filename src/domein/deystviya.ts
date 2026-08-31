@@ -12,21 +12,63 @@
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
+import { praviTsikal, SASTOYANIYA as SASTOYANIYA_NA_DELO } from './dela.js';
+import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
+import {
+  GreshkaZadacha,
+  napraviIzprashtane,
+  napraviOtgovor,
+} from './zadachi-kam-hora.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
-import { sashtnost, VID, type Vid } from './sabitiya.js';
+import { NACHINI_NA_PLASHTANE, sashtnost, VID, type Vid } from './sabitiya.js';
+import { proveri as proveriSvoyKoefitsient } from './svoy-koefitsient.js';
+import { sashtnostNaDokumenti } from './dokumenti.js';
+import {
+  etapite,
+  GreshkaProdazhba,
+  SASTOYANIYA,
+  sashtnostNaDvizhenie,
+  sashtnostNaProdazhba,
+  vArhiva,
+  VIDOVE_DVIZHENIE,
+} from './prodazhbi.js';
 import { sashtnostNaPravo } from './kolonno.js';
 import { GreshkaAgent, proveriPromyanata } from './agenti.js';
 import { GreshkaZamrazen } from './zamrazyavane.js';
 import { GreshkaTablitsa } from './zhurnal-ot-tablitsa.js';
 import { GreshkaDostap, napraviDostap, proveriMyasto, proveriNeSamSiAz } from './lichen-dostap.js';
+import { GreshkaLichniPari, napraviTema, proveriChastite } from './lichni-pari.js';
+import { GreshkaKredit, proveriTriteChasti, VIDOVE_KREDIT } from './kredit-matematika.js';
+import { GreshkaTablitsaOtFayl } from './tablitsa-ot-fayl.js';
+import { proveriZatvaryane } from './godishna-ravnosmetka.js';
 import {
-  GreshkaLichniPari,
-  napraviTema,
-  proveriChastite,
-  VIDOVE_KREDIT,
-} from './lichni-pari.js';
+  GreshkaKategoriya,
+  sashtnostNaKategoriya,
+  VIDOVE_PLASHTANE,
+} from './plashtaniya-arhiv.js';
+import {
+  dnitteNaSedmitsata,
+  GreshkaZaplata,
+  proveriZahranvane,
+  redoveNaSedmitsata,
+  sboraNaSedmitsata,
+  zashtoNeMozhe,
+} from './zaplati.js';
+import { ostatakNa } from './krediti.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
+import { napraviRedNaLentata } from './lenta.js';
+import { napraviRachniyaRed } from './porednost.js';
+import { proveriPapkata } from './papki.js';
+import { iztochnitsiteNaChisla } from './iztochnitsi-na-chisla.js';
+import { proveriPoleto } from './pole-s-formula.js';
+import {
+  proveriKontakta,
+  proveriPrepiskata,
+  proveriSreshtata,
+  sashtnostNaKontakta,
+} from './kontakti.js';
+import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
 import {
@@ -59,19 +101,41 @@ import type {
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
+  PayloadKoefitsientZapisan,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
+  PayloadLentaPodredena,
+  PayloadDelaPodredeni,
+  PayloadKontaktZapisan,
+  PayloadPrepiskaZapisana,
+  PayloadSreshtaZapisana,
+  PayloadPoleZapisano,
+  PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
   PayloadStorno,
   PayloadVzemaneNachisleno,
   PayloadSluzhitelZapisan,
+  PayloadDokumentiZakacheni,
+  PayloadDvizhenieProdazhba,
+  PayloadEtapNaProdazhbaZapisan,
+  PayloadKreditZapisan,
+  PayloadPlashtanePoKredit,
+  PayloadKeshZahranen,
+  PayloadTablitsaOtFaylSazdadena,
+  PayloadKategoriyaZadadena,
+  PayloadGodinaZatvorena,
+  PayloadMyastoZapisano,
+  PayloadZaplataZapisana,
+  PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
   PayloadPotokZapisan,
   PayloadSaldoZapisano,
   PayloadDeloZapisano,
   PayloadAgentZapisan,
+  PayloadOtgovorNaZadacha,
   PayloadTabZapisan,
+  PayloadZadachaIzpratena,
   PayloadPredlozhenieZapisano,
   PayloadZadachaZapisana,
   TipSabitie,
@@ -126,8 +190,21 @@ export class Deystviya {
     this.#kniga = n.kniga;
   }
 
+  /**
+   * ДОБАВЯ ИМОТ · с папката си, ако човек я е дал (резен 37 · р57·[110]).
+   *
+   * Линкът се проверява при ВХОДА, не при рисуването: записан веднъж, лош адрес
+   * остава ЗАВИНАГИ (правило 1) и всеки следващ четец трябва да го преживее.
+   * И отказът е ПОИМЕНЕН — `javascript:` в таблица се натиска.
+   */
   async dobaviImot(id: string, danni: PayloadImotDobaven, z: Zayavka): Promise<Rezultat> {
-    return this.#pusni('ИмотДобавен', VID.imot, id, danni, z);
+    return this.#pusni(
+      'ИмотДобавен',
+      VID.imot,
+      id,
+      { ...danni, papka: proveriPapkata(danni.papka ?? '') },
+      z,
+    );
   }
 
   async dobaviNaem(id: string, danni: PayloadNaemDobaven, z: Zayavka): Promise<Rezultat> {
@@ -141,7 +218,16 @@ export class Deystviya {
 
   /** Поправка на описанието — ново събитие върху същия имот, не сторно. */
   async popraviImot(danni: PayloadImotPopraven, z: Zayavka): Promise<Rezultat> {
-    return this.#pusni('ИмотПоправен', VID.imot, danni.imotId, danni, z);
+    return this.#pusni(
+      'ИмотПоправен',
+      VID.imot,
+      danni.imotId,
+      // ЛИПСВАЩОТО поле се подава ЛИПСВАЩО, не празно: празното значи „махни
+      // папката", а липсващото — „не пипам папката". Слети, поправка на площта
+      // щеше да трие линка мълчаливо.
+      danni.papka === undefined ? danni : { ...danni, papka: proveriPapkata(danni.papka) },
+      z,
+    );
   }
 
   async popraviNaem(danni: PayloadNaemPopraven, z: Zayavka): Promise<Rezultat> {
@@ -213,6 +299,24 @@ export class Deystviya {
     // Журнал. Единственият вход, който го връща, е обратният пренос
     // (`priemiPrehvarleno` в другата посока) — иначе следващият внос от МД
     // или невнимателна форма би го възкресила мълчаливо.
+    /**
+     * СЪСТОЯНИЕТО Е ИЗБРОЕНО · намерено от резен 30, не от план.
+     *
+     * Дотук тук проверка нямаше: свободна дума („зарязано") влизаше в Журнала
+     * и делото се появяваше като ЖИВО, с етикет, който никой изглед не разбира
+     * — нито светофарът, нито подредбата, нито новият списък на отпадналите.
+     *
+     * Дословно същата поука като при начина на плащане, където `app/menyu.ts`
+     * предвиди, че свободна стойност ще падне ТИХО в грешна кофа. Тук пада
+     * НАРОЧНО и с думи, а разликата между „тихо" и „нарочно" е целият смисъл
+     * на изброяването.
+     */
+    if (!(SASTOYANIYA_NA_DELO as readonly string[]).includes(danni.sastoyanie)) {
+      throw new GreshkaTablitsa(
+        `Непознато състояние „${danni.sastoyanie}". Изброените са: ` +
+          `${SASTOYANIYA_NA_DELO.join(' · ')}.`,
+      );
+    }
     const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
     if (prehvarleno) {
       throw new GreshkaTablitsa(
@@ -220,7 +324,50 @@ export class Deystviya {
           'Върни го с обратен пренос, не със запис наново.',
       );
     }
+    // ЦИКЪЛ · дело, направено свой прародител, ЗАКЛЮЧВА рисуването завинаги:
+    // всяка обиколка на дървото тръгва и не се връща. Дотук такъв пазач НЯМАШЕ
+    // и не се стигаше до цикъл само защото формата винаги ражда нов `id`. С
+    // бутони „навътре · навън" (резен 12б) се стига веднага.
+    //
+    // Проверката е ТУК, не при Вратата: Вратата не чете Огледалото — дословният
+    // прецедент на `vpishiZapasen` по-долу. Дървото се знае само от Огледалото.
+    if (danni.nadDelo !== '') {
+      const zhivi = [...(await this.ogledalo()).dela.values()];
+      if (praviTsikal(zhivi, id, danni.nadDelo)) {
+        throw new GreshkaTablitsa(
+          'Това дело не може да е под самото себе си или под свой потомък — ' +
+            'дървото щеше да се затвори в кръг и екранът нямаше да се нарисува.',
+        );
+      }
+    }
     return this.#pusni('ДелоЗаписано', VID.delo, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА МЯСТО (проект) · отговорник-ФИРМА и папка (резен 31 · ADR-091).
+   *
+   * „На нивото на проекта дай ЛИНК КЪМ ПАПКАТА с проекта" и „в таблицата за
+   * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])*.
+   *
+   * ЕДНА проверка: името не е празно. То е и адресът — делата сочат мястото по
+   * име, значи безименно място не може да се свърже с нищо.
+   *
+   * Фирмата и папката НЕ се искат: мястото има смисъл и само с име. Поле, което
+   * човек е принуден да измисли, се пълни с боклук и после се брои като данни.
+   *
+   * `opId` е на ВИКАЩИЯ: поправката на фирмата е ново решение, не повторение на
+   * старото — а ключ от съдържанието би върнал стария резултат при връщане към
+   * предишна стойност и поправката би изчезнала мълчаливо (правило 20).
+   */
+  async zapishiMyasto(danni: PayloadMyastoZapisano, z: Zayavka): Promise<Rezultat> {
+    const ime = proveriMyastoto(danni.ime);
+    return this.#pusni(
+      'МястоЗаписано',
+      VID.myasto,
+      sashtnostNaMyastoto(ime),
+      { ...danni, ime },
+      z,
+    );
   }
 
   /**
@@ -552,6 +699,151 @@ export class Deystviya {
     return this.#pusni('ЗапасенКонтактЗаписан', VID.zapasen, danni.imeyl, danni, z);
   }
 
+  
+  /**
+   * ПОДРЕЖДА ЛЕНТАТА · НАЧАЛНИЯТ ред, който всички получават (резен 15 · И111).
+   *
+   * Проверката „ти ли си Стопанинът" е ТУК, а не при Вратата — същият модел и
+   * същата причина като при запасния контакт: Вратата не чете Огледалото и не
+   * бива да го научава.
+   *
+   * ЗАПИСВА СЕ ЦЕЛИЯТ РЕД, не разлика. Разлика („мести Х с една нагоре") зависи
+   * от състоянието в мига на записа, а при много вериги (ADR-055) две
+   * едновременни размествания биха дали различен резултат според реда на
+   * прочитане. Цял списък е самодостатъчен.
+   *
+   * ЛИЧНОТО ПРЕНАРЕЖДАНЕ НЕ МИНАВА ОТТУК и това е половината от неговото
+   * решение: то е ПОГЛЕД и живее в паметта на екрана. Значи служител, който си
+   * подрежда менюто, не пише нито едно събитие — и проход §72 го брои.
+   */
+  async podrediLentata(danni: PayloadLentaPodredena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Началният ред на менюто се задава само от Стопанина — той е онова, което ' +
+          'ВСИЧКИ получават. Своя ред всеки си подрежда сам, и той не влиза в Журнала.',
+      );
+    }
+    // СТРОГОСТТА Е ПРИ ВХОДА · дубликат, записан веднъж, рисува пункт два пъти
+    // ЗАВИНАГИ (правило 1 · `lenta.ts`). Проверката е ПРЕДИ Вратата, защото
+    // Вратата пази парите и NFC, не смисъла на този товар.
+    return this.#pusni(
+      'ЛентаПодредена',
+      VID.lenta,
+      'LENTA',
+      { red: napraviRedNaLentata(danni.red) },
+      z,
+    );
+  }
+
+  /**
+   * ПОДРЕЖДА ДЕЛАТА РЪЧНО · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34).
+   *
+   * ЗАПИСВА СЕ ЦЕЛИЯТ РЕД, не движението. Дословно същата сметка като при
+   * лентата: разлика („мести Х с една нагоре") зависи от състоянието в мига на
+   * записа, а при много вериги (ADR-055) две едновременни размествания дават
+   * различен резултат според реда на прочитане. Цял списък е самодостатъчен.
+   *
+   * ПРАЗЕН РЕД Е ВАЛИДЕН и значи „върни сметнатата подредба" — това е неговият
+   * бутон „подреди" от същото изречение. Отмяна без триене (правило 1).
+   *
+   * НЯМА ПРОВЕРКА ЗА СТОПАНИН, и това е разликата с лентата. Лентата е поглед и
+   * има личен слой отгоре; редът на делата е самият план — кое се прави преди
+   * кое. Който има право да пише дело, има право и да каже кое е първо.
+   *
+   * `opId` е на ВИКАЩИЯ (правило 20): всяко пускане е ново решение, а ключ от
+   * съдържанието би върнал стария резултат при връщане към предишен ред — и
+   * поправката би изчезнала мълчаливо.
+   */
+  async podrediDelata(danni: PayloadDelaPodredeni, z: Zayavka): Promise<Rezultat> {
+    // СТРОГОСТТА Е ПРИ ВХОДА · дубликат, записан веднъж, рисува делото два пъти
+    // ЗАВИНАГИ (правило 1 · `porednost.ts`).
+    return this.#pusni(
+      'ДелаПодредени',
+      VID.porednost,
+      'POREDNOST',
+      { red: napraviRachniyaRed(danni.red) },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА КОНТАКТ · „КОгато се вкарва човек става от Преписки и контакти"
+   * *(р65·[46])* (резен 38 · M10).
+   *
+   * ЕДНА проверка: името не е празно. То е и адресът — падащото меню
+   * „Отговорник" сочи контакта по име *(ред 1318)*, значи безименен контакт не
+   * може да се избере никъде.
+   *
+   * Телефонът, имейлът и „какъв е" НЕ се искат: контакт само с име е нормален
+   * случай. Поле, което човек е принуден да измисли, се пълни с боклук и после
+   * се брои като данни (дословно същата сметка като при мястото, ADR-091).
+   *
+   * И записът тук НЕ дава достъп до програмата: достъпът е при доставчика
+   * (правило 14), а служителите са свой екран.
+   */
+  async zapishiKontakt(danni: PayloadKontaktZapisan, z: Zayavka): Promise<Rezultat> {
+    const ime = proveriKontakta(danni.ime);
+    return this.#pusni(
+      'КонтактЗаписан',
+      VID.kontakt,
+      sashtnostNaKontakta(ime),
+      { ...danni, ime },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ПРЕПИСКА · РАБОТА с човек (резен 38 · р57·[28]).
+   *
+   * Своя същност с СВОЙ `id`, а не поле на контакта: един контакт носи много
+   * преписки, и записана като поле, втората щеше да изтрие първата.
+   *
+   * Контактът се сочи по ИМЕ, както делата сочат мястото — и по същата причина:
+   * преписка може да се запише за човек, който още не е вписан като контакт,
+   * а списъкът го показва като „срещан, но незаписан".
+   */
+  async zapishiPrepiska(id: string, danni: PayloadPrepiskaZapisana, z: Zayavka): Promise<Rezultat> {
+    proveriPrepiskata(danni);
+    return this.#pusni('ПреписказЗаписана', VID.prepiska, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА СРЕЩА · „за контактите среща добавяш" *(р57·[30])*, резен 39.
+   *
+   * Контактът се сочи по ИМЕ, не по адрес на същност: срещата може да се запише
+   * и за човек, който още не е вписан в номенклатурата — точно както преписката.
+   * Обратното щеше да направи от вписването на контакт вратар на срещата.
+   */
+  async zapishiSreshta(id: string, danni: PayloadSreshtaZapisana, z: Zayavka): Promise<Rezultat> {
+    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie);
+    return this.#pusni('СрещаЗаписана', VID.sreshta, id, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ПОЛЕ С ФОРМУЛА в Отчети · „с формули между всички таблици" *(И90)*.
+   *
+   * Проверката иска ЖИВИТЕ извори, а те се четат от Огледалото — тоест това
+   * действие пита книгата, преди да пише. Формула, сочеща извор, който го няма,
+   * се отказва СЕГА, вместо да мълчи после (Notion 2.0 · `formuli.ts`).
+   *
+   * Периодът е на ВИКАЩИЯ: изворите се смятат за конкретен месец, и поле,
+   * проверено срещу друг месец, не е проверено.
+   */
+  async zapishiPole(
+    id: string,
+    danni: PayloadPoleZapisano,
+    period: { readonly period: string; readonly ot: string; readonly do: string },
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const iztochnitsi = iztochnitsiteNaChisla(
+      o, period.period, period.ot, period.do, this.#chasovnik(),
+    );
+    proveriPoleto(danni.ime, danni.deystvie, danni.lyavo, danni.dyasno, iztochnitsi);
+    return this.#pusni('ПолеЗаписано', VID.poleSFormula, id, danni, z);
+  }
+
   /**
    * СМЕНЯ СТОПАНИНА · единственият път, и той минава само през запасния (И100).
    *
@@ -741,13 +1033,641 @@ export class Deystviya {
 
 
   /**
+   * ЗАКАЧА ДОКУМЕНТИТЕ за един запис (резен 17б).
+   *
+   * НЕ ИСКА ОТКЛЮЧЕН ПЕРИОД, и това се казва на глас: документът не мени нито
+   * едно число — той е ДОКАЗАТЕЛСТВО за вече записано. Замразената справка
+   * заключва числата (правило 9), не хартията зад тях; иначе фактура, дошла с
+   * две седмици закъснение, нямаше да може да се закачи никога.
+   *
+   * Същото решение като при таба по-долу и по същата причина.
+   */
+  async zakachiDokumenti(danni: PayloadDokumentiZakacheni, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'ДокументиЗакачени',
+      VID.dokumenti,
+      sashtnostNaDokumenti(danni.kam, danni.id),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ДОБАВЯ ЕТАП НА ПРОДАЖБАТА · нова колона в таблицата (29.08).
+   *
+   * Негово: „какъвто и да е той може да се добави като колона и да се вкара в
+   * функционалност по плана, да може всеки да рзвие своя бизнес."
+   *
+   * ДВЕ ПРОВЕРКИ:
+   *   1. НЕГОВИТЕ седем НЕ се презаписват · те са дума, не настройка. Кръщаване
+   *      на нов етап „Капаро" щеше да смени смисъла на вече записани движения;
+   *   2. името не е празно · колона без глава не се чете.
+   *
+   * КОЙ може, решава МЯСТОТО: секцията живее в Настройки и се вижда само от
+   * Стопанина (`temi-nastroyki.ts`) — „меню, върху което системата СМЯТА, расте
+   * само от Настройки" (И97). Втора проверка тук би била втора врата към
+   * достъпа, а достъпът има един дом (правило 23).
+   */
+  async zapishiEtapNaProdazhba(
+    danni: PayloadEtapNaProdazhbaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const ime = danni.klyuch.trim();
+    if (ime === '') {
+      throw new GreshkaProdazhba('Етапът иска име — колона без глава не се чете.');
+    }
+    if (VIDOVE_DVIZHENIE.some((v) => v.klyuch === ime)) {
+      throw new GreshkaProdazhba(
+        `„${ime}" е негов етап от начало и не се презаписва. Вече записаните ` +
+          'движения по него биха сменили смисъла си мълчаливо.',
+      );
+    }
+    return this.#pusni(
+      'ЕтапНаПродажбаЗаписан',
+      VID.etapProdazhba,
+      `ETAP:${ime}`,
+      { ...danni, klyuch: ime },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ПРОДАЖБА · сделката с петнайсетте му колони (резен 18б).
+   *
+   * ТРИ ПРОВЕРКИ СТОЯТ ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата, а трите пазят смисъла:
+   *
+   *   1. ИМОТЪТ СЪЩЕСТВУВА · „Обект" и „Място" се четат от него; сделка върху
+   *      несъществуващ имот показва две празни колони и никой не разбира защо;
+   *   2. СЪСТОЯНИЕТО е едно от изброените · свободна стойност би паднала ТИХО
+   *      извън архива и щеше да отключи заключена сделка (същият капан като
+   *      при „карта", ADR-074);
+   *   3. АРХИВЪТ Е ЕДНОПОСОЧЕН · „Няма връщане от Продажби Архив. Там не се
+   *      трив нищо а само се сверява." Сделка, влязла в архива, не се
+   *      презаписва — нито обратно към „текуща", нито с нов купувач.
+   *
+   * НЕ ИСКА ОТКЛЮЧЕН ПЕРИОД · и това се казва на глас: сделката не е
+   * счетоводен запис в месец. Парите по нея влизат през ВНОСКИТЕ, всяка със
+   * своята дата — там е мястото на замразяването, ако някога потрябва.
+   */
+  async zapishiProdazhba(danni: PayloadProdazhbaZapisana, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.imoti.has(danni.imotId)) {
+      throw new GreshkaProdazhba(
+        'Няма такъв имот. Сделката чете „Обект" и „Място" от имота — без него ' +
+          'двете колони остават празни и никой не разбира защо.',
+      );
+    }
+    if (!SASTOYANIYA.some((s) => s.klyuch === danni.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        `Непознато състояние „${danni.sastoyanie}". Изброените са: ` +
+          `${SASTOYANIYA.map((s) => s.klyuch).join(' · ')}.`,
+      );
+    }
+    const predishna = o.prodazhbi.get(danni.prodazhbaId);
+    if (predishna && vArhiva(predishna.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        'Тази сделка е в Продажби Архив. „Няма връщане от Продажби Архив. Там не ' +
+          'се трив нищо а само се сверява." Поправка тук би отворила терминала.',
+      );
+    }
+    return this.#pusni(
+      'ПродажбаЗаписана',
+      VID.prodazhba,
+      sashtnostNaProdazhba(danni.prodazhbaId),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ДВИЖЕНИЕ ПО ПРОДАЖБА · вноска, връщане или неустойка.
+   *
+   * ТРИ ПРОВЕРКИ, по същата причина:
+   *
+   *   1. СДЕЛКАТА СЪЩЕСТВУВА · движение без сделка виси в Журнала и никой ред
+   *      не го показва — тиха загуба (`sveri` в `prodazhbi.ts` я БРОИ, но
+   *      по-добре е изобщо да не се ражда);
+   *   2. ВИДЪТ е един от седемте изброени · свободна стойност би паднала извън
+   *      проверката и щеше да изчезне от нея мълчаливо;
+   *   3. АРХИВЪТ НЕ ПРИЕМА НОВИ ДВИЖЕНИЯ · „там… само се сверява". Негово
+   *      (И90): „След нотариална сделка и да има неплатен суми по договор
+   *      сдеката е приключила и е в архива." Каквото влиза после, влиза през
+   *      Приходи — „праща се директно с датат в редовете с Приход в главната
+   *      таблица" *(р75·[50])*.
+   */
+  async zapishiDvizhenieNaProdazhba(
+    danni: PayloadDvizhenieProdazhba,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const prodazhba = o.prodazhbi.get(danni.prodazhbaId);
+    if (!prodazhba) {
+      throw new GreshkaProdazhba(
+        'Няма такава сделка. Движение без сделка не се вижда в нито един ред — ' +
+          'то е в Журнала, но никъде на екрана.',
+      );
+    }
+    const etapi = etapite(o);
+    if (!etapi.some((e) => e.klyuch === danni.vid)) {
+      throw new GreshkaProdazhba(
+        `Непознат вид движение „${danni.vid}". Изброените са: ` +
+          `${etapi.map((e) => e.klyuch).join(' · ')}.`,
+      );
+    }
+    // НАЧИНЪТ Е ИЗБОР, не подразбиране (негово, 29.08: „Даа има избор.").
+    // Изброен е по същата причина като при разхода: свободна стойност би
+    // паднала ТИХО в БАНКА и би разминала кеша от банковия път (ADR-074).
+    if (!NACHINI_NA_PLASHTANE.some((n) => n.klyuch === danni.nachin)) {
+      throw new GreshkaProdazhba(
+        `Непознат начин „${danni.nachin}". Изброените са: ` +
+          `${NACHINI_NA_PLASHTANE.map((n) => n.ime).join(' · ')}.`,
+      );
+    }
+    if (vArhiva(prodazhba.sastoyanie)) {
+      throw new GreshkaProdazhba(
+        'Тази сделка е в Продажби Архив и там само се сверява. Плащане след ' +
+          'нотариалната сделка влиза в Приходи, не тук.',
+      );
+    }
+    return this.#pusni(
+      'ДвижениеПоПродажба',
+      VID.dvizhenieProdazhba,
+      sashtnostNaDvizhenie(danni.dvizhenieId),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА КРЕДИТ · договорните данни (резен 19 · ADR-079).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата:
+   *
+   *   1. ИМЕТО не е празно · кредит без име не се различава от втори кредит
+   *      при същата банка, а вноската му отива в чужд ред;
+   *   2. ВИДЪТ е един от четирите изброени · свободна стойност би паднала ТИХО
+   *      извън всяка групировка (същият капан като при „карта", ADR-074);
+   *   3. ОСТАТЪКЪТ и ВНОСКАТА са над нула · нулева вноска дава безкраен план,
+   *      а нулев остатък — таблица от погасени договори;
+   *   4. ДЕНЯТ е между 1 и 31 · 31-ви СЪЩЕСТВУВА като падеж и се свива до
+   *      последния ден на месеца (`denNaVnoskata`). Отказ при 29–31 щеше да е
+   *      по-лесен за кода и невъзможен за човека с такъв договор.
+   *
+   * НЕ иска отключен период, и това се казва на глас: договорът не е
+   * счетоводен запис в месец. Парите влизат през ПЛАЩАНИЯТА, всяко със своята
+   * дата — там е мястото на замразяването.
+   */
+  async zapishiKredit(danni: PayloadKreditZapisan, z: Zayavka): Promise<Rezultat> {
+    if (danni.ime.trim() === '') {
+      throw new GreshkaKredit('Кредитът иска име — „Ипотека · Пощенска", за да се различава.');
+    }
+    if (!VIDOVE_KREDIT.includes(danni.vid as (typeof VIDOVE_KREDIT)[number])) {
+      throw new GreshkaKredit(
+        `Непознат вид кредит „${String(danni.vid)}". Изброените са: ${VIDOVE_KREDIT.join(' · ')}.`,
+      );
+    }
+    if (danni.ostatak_st <= 0) {
+      throw new GreshkaKredit('Остатъкът по кредита трябва да е повече от нула.');
+    }
+    if (danni.vnoska_st <= 0) {
+      throw new GreshkaKredit(
+        'Вноската трябва да е повече от нула — нулева вноска не гони остатъка ' +
+          'надолу и планът по дати няма край.',
+      );
+    }
+    if (!Number.isInteger(danni.den) || danni.den < 1 || danni.den > 31) {
+      throw new GreshkaKredit('Денят на вноската е между 1 и 31.');
+    }
+    return this.#pusni('КредитЗаписан', VID.kredit, `KRD:${danni.kreditId}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА ПЛАЩАНЕ ПО КРЕДИТ · вноската, разделена на три.
+   *
+   * ТРИ ПРОВЕРКИ:
+   *
+   *   1. КРЕДИТЪТ СЪЩЕСТВУВА · плащане без кредит виси в Журнала и не сваля
+   *      ничий остатък — тиха загуба на пари от книгата;
+   *   2. ТРИТЕ ЧАСТИ СЪБИРАТ вноската · общата `proveriTriteChasti`, същата,
+   *      която пази и личния кредит (правило 17);
+   *   3. МЕСЕЦЪТ НЕ Е ЗАМРАЗЕН · за разлика от договора, плащането Е
+   *      счетоводен запис с дата и мени числата на месеца (правило 9).
+   *
+   * ГЛАВНИЦАТА НЕ БИВА да надхвърля остатъка: погасен кредит, „платен" още
+   * веднъж, би дал отрицателен дълг и Дълг/EBITDA с обърнат знак.
+   */
+  async zapishiPlashtanePoKredit(
+    danni: PayloadPlashtanePoKredit,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const kredit = o.krediti.get(danni.kreditId);
+    if (!kredit) {
+      throw new GreshkaKredit(
+        'Няма такъв кредит. Плащане без кредит не сваля ничий остатък — то е в ' +
+          'Журнала, но никъде в сметките.',
+      );
+    }
+    proveriTriteChasti(
+      danni.suma_st,
+      danni.glavnitsa_st,
+      danni.lihva_st,
+      danni.taksa_st,
+      true,
+    );
+    const ostava = ostatakNa(kredit, o.plashtaniyaPoKrediti);
+    if (danni.glavnitsa_st > ostava) {
+      throw new GreshkaKredit(
+        `Главницата ${danni.glavnitsa_st} надхвърля остатъка ${ostava} (в цели ` +
+          'центове). Кредит, платен над остатъка си, дава отрицателен дълг.',
+      );
+    }
+    proveriZamrazen(o, danni.data.slice(0, 7), z.svereno);
+    return this.#pusni(
+      'ПлащанеПоКредит',
+      VID.plashtaneKredit,
+      `PLK:${danni.plashtaneId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА ЗАПЛАТА · един ред от седмичния списък (резен 20 · ADR-080).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана:
+   *
+   *   1. ИМЕТО не е празно · заплата без име не се плаща на никого;
+   *   2. ДНЕВНАТА СТАВКА е над нула · нулева заплата е или грешка, или
+   *      решение, което иска думи, не празно поле;
+   *   3. ДНИТЕ са 1–7 · седмицата има седем дни, и осмият ден мълчаливо би
+   *      надул сбора, който после отива в Разходи;
+   *   4. СЕДМИЦАТА НЕ Е ЗАМРАЗЕНА · „Замрази седмицата" значи точно това, и
+   *      отказът носи седмицата С ДАТИТЕ ѝ.
+   *
+   * НЕ иска отключен МЕСЕЦ, и това се казва на глас: заплатата още не е
+   * счетоводен запис. Тя става такъв при ПРЕХВЪРЛЯНЕТО, и там месецът се пита.
+   */
+  async zapishiZaplata(danni: PayloadZaplataZapisana, z: Zayavka): Promise<Rezultat> {
+    if (danni.ime.trim() === '') {
+      throw new GreshkaZaplata('Заплатата иска име — без него не се плаща на никого.');
+    }
+    if (!Number.isSafeInteger(danni.dnevna_st) || danni.dnevna_st <= 0) {
+      throw new GreshkaZaplata('Дневната ставка е цели центове, повече от нула.');
+    }
+    if (!Number.isInteger(danni.dni) || danni.dni < 1 || danni.dni > 7) {
+      throw new GreshkaZaplata('Дните в седмицата са между 1 и 7.');
+    }
+    const o = await this.ogledalo();
+    const zashto = zashtoNeMozhe(o, danni.sedmitsa);
+    if (zashto !== '') throw new GreshkaZaplata(zashto);
+    return this.#pusni('ЗаплатаЗаписана', VID.zaplata, `ZPL:${danni.zaplataId}`, danni, z);
+  }
+
+  /**
+   * ПРЕХВЪРЛЯ СЕДМИЦАТА В РАЗХОДИ · РЪЧНО, с архив и следа.
+   *
+   * Негово *(р48·[83])*: „да се прави РЪЧНО, когато се актуализира в Петък
+   * обикновенно, трябва да се пази архив на това и да оставя следа в таба
+   * ЗАПЛАТИ". По-ранното „автоматично" *(р48·[81])* е от СЪЩИЯ разговор и е
+   * надживяно (правило 28).
+   *
+   * ДВЕ СЪБИТИЯ, не едно: първо разходът, после следата. Ако второто падне,
+   * разходът стои сам и се вижда — по-добре от следа, която сочи нищо.
+   *
+   * ПОВТОРНО НАТИСКАНЕ НЕ УДВОЯВА: седмицата вече има следа и Вратата отказва
+   * с числото на вече прехвърленото. Идемпотентността през `opId` пази
+   * ПОВТОРЕНОТО НАТИСКАНЕ; тази проверка пази ВТОРОТО решение на човека — те
+   * са различни неща (правило 20).
+   */
+  async prehvarliSedmitsata(
+    sedmitsa: string,
+    zamrazi: boolean,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    const veche = o.prehvarleniSedmitsi.get(sedmitsa);
+    if (veche) {
+      throw new GreshkaZaplata(
+        `Седмица ${sedmitsa} вече е прехвърлена в Разходи за ${veche.suma_st} ` +
+          '(в цели центове). Второ прехвърляне би удвоило разхода за същите дни.',
+      );
+    }
+    const redove = redoveNaSedmitsata(o, sedmitsa);
+    if (redove.length === 0) {
+      throw new GreshkaZaplata(
+        `Седмица ${sedmitsa} няма нито един ред. Празно прехвърляне ражда разход ` +
+          'от нула, който после никой не може да обясни.',
+      );
+    }
+    const suma_st = sboraNaSedmitsata(o, sedmitsa);
+    const { do_ } = dnitteNaSedmitsata(sedmitsa);
+    const razhodId = `RZ-ZPL-${sedmitsa}`;
+    // РАЗХОДЪТ Е ПРЪВ · датата му е НЕДЕЛЯТА на седмицата, за да падне в
+    // месеца, в който седмицата свършва. Тук се пита и замразеният месец.
+    await this.zapishiRazhod(
+      razhodId,
+      {
+        potok: 'zaplati',
+        dostavchik: 'Заплати',
+        opis: `Седмица ${sedmitsa} · ${redove.length} ${redove.length === 1 ? 'ред' : 'реда'}`,
+        suma_st,
+        sektor: 'zaplati',
+        nachin: 'в брой',
+        data: do_,
+        dokument: '',
+        stavka: 0,
+      },
+      { ...z, opId: `${z.opId}:razhod` },
+    );
+    return this.#pusni(
+      'СедмицаПрехвърлена',
+      VID.sedmitsaZaplati,
+      `SED:${sedmitsa}`,
+      { sedmitsa, razhodId, suma_st, zamrazena: zamrazi },
+      z,
+    );
+  }
+
+  /**
+   * ЗАХРАНВА КЕША · „бутон за вкарване ма пари" *(р75·[32])*.
+   *
+   * Джобът е ЕДИН и е обявен (`DZHOBAT_NA_ZAPLATITE` = трезорът): „Един общ
+   * кеш-джоб за фирмата" плюс „Кеш = Трезор". Затова тук няма избор на джоб —
+   * избор, който има един вариант, е поле, което лъже, че има решение.
+   *
+   * Захранването е ПРИХОД по кеша, не разход: парите ВЛИЗАТ в джоба.
+   */
+  async zahraniKesha(danni: PayloadKeshZahranen, z: Zayavka): Promise<Rezultat> {
+    proveriZahranvane(danni);
+    return this.#pusni(
+      'КешЗахранен',
+      VID.keshZahranen,
+      `KSH:${danni.zahranvaneId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * СЪЗДАВА ТАБЛИЦА ОТ ФАЙЛ · и брои какво НЕ е дошло (резен 21 · ADR-081).
+   *
+   * ЧЕТИРИ ПРОВЕРКИ стоят ТУК, не на екрана:
+   *
+   *   1. ИМЕТО не е празно · таблица без име не се намира после;
+   *   2. ГЛАВИТЕ не са нула · таблица без колони не е таблица;
+   *   3. НИТО ЕДНА ГЛАВА не е празна · безименна колона не се вика от формула;
+   *   4. ФОРМУЛА НЕ СОЧИ ФОРМУЛНА КОЛОНА и не сочи себе си · плитък граф
+   *      (`formuli.ts`): формула върху формула прави верига, която гние тихо.
+   *
+   * ОТПЕЧАТЪКЪТ е задължителен: без него в Журнала стои таблица, за която не
+   * се знае от кой файл е дошла — а точно това после никой не може да провери.
+   *
+   * НЕ иска отключен период: таблицата не е число за месец, а описание.
+   */
+  async zapishiTablitsaOtFayl(
+    danni: PayloadTablitsaOtFaylSazdadena,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const ime = danni.klyuch.trim();
+    if (ime === '') {
+      throw new GreshkaTablitsaOtFayl('Таблицата иска име — по него ще се търси после.');
+    }
+    if (danni.glavi.length === 0) {
+      throw new GreshkaTablitsaOtFayl('Таблица без нито една колона не е таблица.');
+    }
+    const prazna = danni.glavi.findIndex((g) => g.trim() === '');
+    if (prazna >= 0) {
+      throw new GreshkaTablitsaOtFayl(
+        `Колона ${prazna + 1} няма име. Безименната колона не се вика от формула и ` +
+          'не се чете от човек.',
+      );
+    }
+    if (danni.otpechatak.trim() === '') {
+      throw new GreshkaTablitsaOtFayl(
+        'Липсва отпечатъкът на файла. Без него в Журнала стои таблица, за която ' +
+          'не се знае откъде е дошла.',
+      );
+    }
+    for (const [kade, f] of Object.entries(danni.formuli)) {
+      const sebe = Number(kade);
+      for (const k of f.ot) {
+        if (k === sebe) {
+          throw new GreshkaTablitsaOtFayl(
+            `Колона „${danni.glavi[sebe]}" сочи себе си — това не е сметка, а кръг.`,
+          );
+        }
+        if (danni.formuli[String(k)] !== undefined) {
+          throw new GreshkaTablitsaOtFayl(
+            `Колона „${danni.glavi[sebe]}" сочи „${danni.glavi[k]}", която сама е ` +
+              'формулна. Формула върху формула прави верига, която гние тихо.',
+          );
+        }
+      }
+    }
+    return this.#pusni(
+      'ТаблицаОтФайлСъздадена',
+      VID.tablitsaOtFayl,
+      `TOF:${ime}`,
+      { ...danni, klyuch: ime },
+      z,
+    );
+  }
+
+  /**
+   * ЗАДАВА КАТЕГОРИЯТА на едно плащане (резен 25 · ADR-085).
+   *
+   * „Плащания получава колона «Категория» — меню от Описа, храни серията
+   * «По категории»" *(р69·[50])*.
+   *
+   * ═══ ЗАЩО СВОЕ СЪБИТИЕ, А НЕ ПОЛЕ НА РАЗХОДА ═══
+   *
+   * Полето щеше да иска поправка на самия разход, а поправка = ново събитие
+   * (правило 1) — тоест пренаписване на факт заради ПРЕЦЕНКА върху него.
+   * А заплатата няма къде другаде да го носи.
+   *
+   * ═══ ТРИ ПРОВЕРКИ ═══
+   *
+   *   1. ВИДЪТ е изброен · свободна стойност би паднала в четвърти вид, който
+   *      никой лист не показва (същата поука като при начина на плащане);
+   *   2. ПЛАЩАНЕТО СЪЩЕСТВУВА · категория, закачена за нищо, виси в Журнала и
+   *      никой ред не я показва — тиха загуба;
+   *   3. НЕ ИСКА отключен период. Категорията не мени НИТО ЕДНО число: тя реже
+   *      сборове, не ги прави. Заключеният месец се преглежда по категории.
+   */
+  async zadaydeKategoriya(danni: PayloadKategoriyaZadadena, z: Zayavka): Promise<Rezultat> {
+    if (!(VIDOVE_PLASHTANE as readonly string[]).includes(danni.vid)) {
+      throw new GreshkaKategoriya(
+        `Непознат вид плащане „${danni.vid}". Изброените са: ${VIDOVE_PLASHTANE.join(' · ')}.`,
+      );
+    }
+    const o = await this.ogledalo();
+    const ima =
+      danni.vid === 'zaplata'
+        ? o.zaplati.has(danni.plashtaneId)
+        : o.razhodi.has(danni.plashtaneId);
+    if (!ima) {
+      throw new GreshkaKategoriya(
+        `Няма такова плащане (${danni.vid} · ${danni.plashtaneId}). Категория, закачена ` +
+          'за нищо, виси в Журнала и никой ред не я показва.',
+      );
+    }
+    return this.#pusni(
+      'КатегорияЗададена',
+      VID.kategoriya,
+      sashtnostNaKategoriya(danni.vid, danni.plashtaneId),
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ЗАТВАРЯ ЕДНА ГОДИНА (резен 28 · ADR-088).
+   *
+   * „Става на календарна година автоматично прави пълен годишен архив и
+   * променяш само през журнала назад" *(р85·[51])*.
+   *
+   * ═══ КАКВО ВЛИЗА В ЖУРНАЛА ═══
+   *
+   * САМО мигът. Съдържанието на годината се СМЯТА от книгата по всяко време —
+   * записано, то щеше да е второ копие, разминаващо се с първото при първата
+   * поправка. Прецедентът е негов, правило 20: смятаното не се записва.
+   *
+   * ═══ ДВЕТЕ ПРОВЕРКИ · и защо са ТУК ═══
+   *
+   *   1. годината е ПРИКЛЮЧИЛА · непълна година не е архив;
+   *   2. книгата има записи в нея · затваряне на празна година е надпис (ADR-041).
+   *
+   * Четат Огледалото, значи мястото им е тук: Вратата не чете Огледалото
+   * (дословният прецедент е `vpishiZapasen`).
+   *
+   * ═══ И ЕДНА, КОЯТО НАРОЧНО Я НЯМА ═══
+   *
+   * Затворената година НЕ отказва записи. Неговата дума е „променяш само през
+   * журнала назад" — позволение, не забрана; отказ тук би блъснал и сторното,
+   * и сверената промяна. Разминаването се МЕРИ и се КАЗВА (`godinite()`).
+   */
+  async zatvoriGodinata(godina: string, dnes: string, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    proveriZatvaryane(o, godina, dnes);
+    const danni: PayloadGodinaZatvorena = {
+      godina,
+      broySabitiya: o.godinite.get(godina) ?? 0,
+    };
+    return this.#pusni('ГодинаЗатворена', VID.godina, godina, danni, z);
+  }
+
+  /**
    * Записва ТАБ · секциите му и връзките между тях (И92 т.9).
    *
    * НЕ иска отключен период: табът не мени нито едно число — той решава
    * какво се ПОКАЗВА. Заключен месец се гледа през същите секции.
    */
+  /**
+   * ПРАЩА ЗАДАЧА НА ЧОВЕК (резен 14а · И110 · негово „ръчно", р57·[160]).
+   *
+   * ДВЕ проверки стоят ТУК, не на екрана — екран без бутон се заобикаля с
+   * конзолата, а тези две пазят смисъла:
+   *
+   *   1. получателят е ЖИВ служител · инак задачата няма кой да я приеме;
+   *   2. делото СЪЩЕСТВУВА · задача върху нищо е бележка, не задача.
+   *
+   * Проверките четат Огледалото, значи мястото им е тук, а не при Вратата —
+   * дословният прецедент на `vpishiZapasen`: Вратата не чете Огледалото.
+   *
+   * НЕ иска отключен период: задачата не мени нито едно число.
+   */
+  async pratiZadacha(danni: PayloadZadachaIzpratena, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.dela.has(danni.deloId)) {
+      throw new GreshkaZadacha(
+        'Няма такова дело. Задачата виси на дело — инак не се вижда нито в таблицата, нито в диаграмата.',
+      );
+    }
+    // Пресъздава се през домейна: така екранът и вносът минават през ЕДНА
+    // проверка, вместо всеки да носи своята половина.
+    // СТОПАНИНЪТ Е ВАЛИДЕН ПОЛУЧАТЕЛ · той също върши дела и също иска лист.
+    // Той не е „служител" (не се вписва като такъв — той е ПЪРВОТО събитие в
+    // Журнала, ADR-043), затова се добавя тук поименно, а не се крие в картата.
+    const poluchateli = [...o.sluzhiteli.keys()];
+    if (o.stopanin !== '') poluchateli.push(o.stopanin);
+    const proveren = napraviIzprashtane(danni, poluchateli);
+    return this.#pusni(
+      'ЗадачаИзпратена',
+      VID.zadachaKamChovek,
+      `ZADACHA:${proveren.zadachaId}`,
+      proveren,
+      z,
+    );
+  }
+
+  /**
+   * ОТГОВАРЯ на задача · приема я или я отказва.
+   *
+   * Пише се в СВОЯТА верига (ADR-055): служителят отговаря от своя Журнал, със
+   * своя `actor`. Затова тук НЕ се проверява „ти ли си получателят" — веригата
+   * го казва по-силно от всяка проверка: чуждият отговор просто не е в неговата
+   * книга, а Огледалото чете всички вериги и вижда кой какво е написал.
+   *
+   * Задачата обаче трябва да СЪЩЕСТВУВА: отговор на нищо е ехо.
+   */
+  async otgovoriNaZadacha(danni: PayloadOtgovorNaZadacha, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.izprateniZadachi.has(danni.zadachaId)) {
+      throw new GreshkaZadacha('Няма такава задача — отговор на нищо не се записва.');
+    }
+    const proveren = napraviOtgovor(danni);
+    return this.#pusni(
+      'ОтговорНаЗадача',
+      VID.zadachaKamChovek,
+      `OTGOVOR:${proveren.zadachaId}`,
+      proveren,
+      z,
+    );
+  }
+
+  /**
+   * Записва ТАБ · ПОПРАВКА на съществуващ или запис на вече проверен нов.
+   *
+   * Последният запис за ключа надделява — това е поправка, не втори таб.
+   * Създаването минава през `sazdayTab`, за да не може ново празно име да
+   * върне стар таб празен (дефект, намерен при голямата сверка).
+   */
   async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * СВОЙ КОЕФИЦИЕНТ · „Можеш да вкарваш сам коефициенти" (30.08).
+   *
+   * Адресът е `KOEF:<ключ>` — СЪЩИЯТ при промяна и при махане, защото това е
+   * един и същ коефициент. Нов адрес при махане би дал две неща в описа: едно
+   * живо и едно махнато, с еднакво име.
+   *
+   * `opId` носи ДЕЙСТВИЕТО (правило 20), не съдържанието: върнеш ли коефициент
+   * към предишната му рецепта, ключ от съдържанието би върнал стария резултат и
+   * поправката би изчезнала мълчаливо.
+   *
+   * Проверката е ТУК, при Вратата, а не на екрана: екранът е един път до нея,
+   * не единственият. Записът, дошъл от конзолата или от чужда верига, минава
+   * през същата преграда.
+   */
+  async zapishiKoefitsient(danni: PayloadKoefitsientZapisan, z: Zayavka): Promise<Rezultat> {
+    proveriSvoyKoefitsient(danni);
+    return this.#pusni('КоефициентЗаписан', VID.koefitsient, `KOEF:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * СЪЗДАВА нов таб · и ОТКАЗВА, ако ключът е зает.
+   *
+   * Проверката стои ТУК, не на екрана — по образеца на `zapishiAgent`: вторият
+   * екран, който създаде таб, няма да знае, че съществува (правило 2 по дух).
+   */
+  async sazdayTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
+    proveriNovTab(danni, (await this.ogledalo()).tabove);
+    return this.zapishiTab(danni, z);
   }
 
   /**

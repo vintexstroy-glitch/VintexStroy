@@ -105,6 +105,34 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
     { opId: 'op-p-banka' },
   );
 
+  // ПОТОК „Продажби" · вноска по сделка, по СВОЯТА дата (резен 23 · ADR-083).
+  await d.zapishiProdazhba(
+    {
+      prodazhbaId: 'PR-1',
+      imotId: 'I-1',
+      kupuvach: 'Петър Иванов',
+      telefon: '0888 000 000',
+      tsena_st: stotinki(200_000_00),
+      prodazhba_st: stotinki(190_000_00),
+      smr_st: stotinki(10_000_00),
+      pd_st: stotinki(180_000_00),
+      sastoyanie: 'tekushta',
+    },
+    { opId: 'op-prodazhba' },
+  );
+  await d.zapishiDvizhenieNaProdazhba(
+    {
+      dvizhenieId: 'PRD-1',
+      prodazhbaId: 'PR-1',
+      vid: 'Капаро',
+      suma_st: stotinki(20_000_00),
+      data: '2026-08-14',
+      belezhka: 'капаро по предварителен договор',
+      nachin: 'банка',
+    },
+    { opId: 'op-dvizhenie' },
+  );
+
   // ПОТОЦИ „Заплати", „Кредити", „Фактури" · разходната страна.
   for (const [i, r] of RAZHODITE.entries()) {
     await d.zapishiRazhod(
@@ -126,7 +154,7 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
 }
 
 describe('всички потоци, наведнъж', () => {
-  it('шестте потока имат СВОЯ ред, и никой не е празен', async () => {
+  it('СЕДЕМТЕ потока имат СВОЯ ред, и никой не е празен', async () => {
     const { deystviya } = stend();
     await vsichkiPotoci(deystviya);
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
@@ -152,9 +180,15 @@ describe('всички потоци, наведнъж', () => {
     // Приходът е НАЧИСЛЕНОТО, не сборът на трите реда.
     expect(s.prihod_st).toBe(1700_00);
     expect(s.sabrano_st).toBe(1700_00);
+    // СБИРАЩИТЕ приходни са ДВА (резен 23): наемът е НАЧИСЛЕНОТО, продажбата е
+    // ВНОСКАТА. КЕШ и БАНКА пак не сбират — те само показват как е дошло.
     expect(POTOTSI.filter((p) => p.posoka === 'приход' && p.sbira).map((p) => p.klyuch)).toEqual([
       'naemi',
+      'prodazhbi',
     ]);
+    // И вноската НЕ пипа ДДС-основата · нея я решава счетоводна преценка.
+    expect(s.prihodProdazhbi_st).toBe(20_000_00);
+    expect(s.prihod_st).toBe(1700_00);
   });
 
   it('разходът е сборът САМО на сбиращите потоци', async () => {
@@ -222,12 +256,12 @@ describe('акумулаторите · всеки със своето', () => {
 });
 
 describe('сверките затварят, когато в периода има ВСИЧКО', () => {
-  it('четирите сверки са налице и всяка е на нула', async () => {
+  it('ПЕТТЕ сверки са налице и всяка е на нула', async () => {
     const { deystviya } = stend();
     await vsichkiPotoci(deystviya);
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
 
-    expect(s.sverki).toHaveLength(4);
+    expect(s.sverki).toHaveLength(5);
     for (const sv of s.sverki) {
       expect(sv.razlika, `${sv.kakvo} не затвори`).toBe(0);
     }
@@ -239,13 +273,16 @@ describe('сверките затварят, когато в периода им
     await vsichkiPotoci(deystviya);
     const s = smetki(await deystviya.ogledalo(), PERIOD, KOGATO);
 
-    // Всичките четири са с нула — и всичките четири СЪЩЕСТВУВАТ.
-    expect(s.sverki.filter((sv) => sv.razlika === 0)).toHaveLength(4);
+    // Всичките ПЕТ са с нула — и всичките пет СЪЩЕСТВУВАТ.
+    expect(s.sverki.filter((sv) => sv.razlika === 0)).toHaveLength(5);
     expect(s.sverki.map((sv) => sv.kakvo.replace(`Сметки ${PERIOD} · `, ''))).toEqual([
       'приход ↔ основа + ДДС',
       'брой вземания ↔ брой в акумулаторите',
       'разход ↔ основа + ДДС',
       'брой разходи ↔ брой в акумулаторите',
+      // ПЕТАТА гледа самата таблица · четирите горни гледат акумулаторите и
+      // не биха мигнали при сбиращ приходен поток без число (резен 23).
+      'приход по редовете ↔ наеми + продажби',
     ]);
   });
 
@@ -291,5 +328,12 @@ describe('сверките затварят, когато в периода им
     expect(predi.zaVnasyane_st - sled.zaVnasyane_st).toBe(ddsOtObshta(600_00, 20).dds_st);
     // и сверките пак затварят — новото не е паднало между записа и акумулатора
     expect(sled.sverki.every((sv) => sv.razlika === 0)).toBe(true);
+  });
+});
+
+describe('пиновете · броевете се твърдят с ръка (резен 46 · група В)', () => {
+  it('потоците са СЕДЕМ и акумулаторите са СЕДЕМ', () => {
+    expect(POTOTSI).toHaveLength(7);
+    expect(AKUMULATORI).toHaveLength(7);
   });
 });

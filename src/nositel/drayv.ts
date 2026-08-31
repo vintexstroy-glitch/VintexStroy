@@ -63,6 +63,8 @@ export function nashLiE(ime: string): boolean {
   return ime.startsWith(PRISTAVKA_NA_FAYLA) && ime.endsWith('.json');
 }
 
+import type { KvotaNaDrayva } from '../domein/spiratchka.js';
+
 /** Един файл, както Драйвът го описва. Само каквото ползваме. */
 export interface FaylVDrayva {
   readonly id: string;
@@ -81,6 +83,19 @@ export interface Drayv {
   cheti(id: string): Promise<string>;
   sazday(ime: string, sadarzhanie: string): Promise<string>;
   presazday(id: string, sadarzhanie: string): Promise<void>;
+  /**
+   * ПЕТОТО повикване · таванът и заетото (резен Д).
+   *
+   * Портът беше умишлено беден и остава беден: това не е ново умение, а
+   * ЕДИНСТВЕНИЯТ начин да се СМЕНИ едно заковано подразбиране с измерване.
+   * Дотук видът на акаунта се пишеше `'безплатно'` при влизане — никога питан,
+   * а сравняван с плановете като факт.
+   *
+   * И НЕ ИСКА НОВ ОБХВАТ: `about.get` работи и с `drive.file`, най-тясното,
+   * което вече имаме. Честната спирачка не струва нито едно ново разрешение —
+   * инак тя щеше да е по-скъпа от дупката, която затваря.
+   */
+  kvota(): Promise<KvotaNaDrayva>;
 }
 
 /** Какво стана при бутане · за да го КАЖЕ екранът, вместо да мълчи. */

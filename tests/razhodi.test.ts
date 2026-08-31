@@ -148,7 +148,7 @@ describe('сверката на разхода', () => {
     await d.zapishiRazhod('R-2', razhod({ sektor: 'pokupki-uslugi', suma_st: stotinki(240_00) }), { opId: 'op-r2' });
 
     const s = smetki(await d.ogledalo(), PERIOD, KOGATO);
-    expect(s.sverki).toHaveLength(4);
+    expect(s.sverki).toHaveLength(5);
     expect(s.sverki.every((x) => x.nared)).toBe(true);
     expect(s.sverki[2]!.vhod).toBe(840_00);
     expect(s.sverki[3]!.vhod).toBe(2);
@@ -177,9 +177,9 @@ describe('сторно на разход', () => {
 });
 
 describe('таблицата на потоците', () => {
-  it('носи шестте потока и трите разходни', () => {
+  it('носи СЕДЕМТЕ потока и трите разходни', () => {
     expect(POTOTSI.map((p) => p.klyuch)).toEqual([
-      'naemi', 'kesh', 'banka', 'zaplati', 'krediti', 'fakturi',
+      'naemi', 'kesh', 'banka', 'prodazhbi', 'zaplati', 'krediti', 'fakturi',
     ]);
     expect(potototsiNaRazhod().map((p) => p.klyuch)).toEqual(['zaplati', 'krediti', 'fakturi']);
   });

@@ -17,8 +17,13 @@
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
+import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
+import { narisuvayKontaktite, zakachiKontaktite } from './kontakti.js';
+import { narisuvayProdazhbi, zakachiProdazhbite } from './prodazhbi.js';
+import { narisuvayPlashtaniyaArhiv, zakachiPlashtaniyaArhiv } from './plashtaniya-arhiv.js';
 import { narisuvayTablo } from './tablo.js';
 import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
 import { narisuvayII, zakachiII } from './ii.js';
@@ -28,6 +33,8 @@ import { mozhe, type Izbor, type Vazmozhnost } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
+import { godinite } from '../src/domein/godishna-ravnosmetka.js';
+import { probvaneto } from '../src/domein/probvane.js';
 import type { DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
 import type { Pravata, Vrata } from '../src/yadro/index.js';
 import type { Rolya, Samolichnost } from '../src/yadro/samolichnost.js';
@@ -42,6 +49,10 @@ export type KoyEkran =
   | 'ii'
   | 'tabove'
   | 'lichno'
+  | 'sluzhiteli'
+  | 'kontakti'
+  | 'prodazhbi'
+  | 'plashtaniya'
   | 'tablo';
 
 /**
@@ -131,6 +142,24 @@ interface ZaRisuvane {
   readonly lichnoOgledalo: Ogledalo | null;
   readonly lichenAkaunt: string;
   readonly broyLichni: number;
+  /** колко заема Журналът · МЕРЕНО от браузъра (резен Д · честната спирачка) */
+  readonly zaetoNaUstroystvoto: number;
+  /**
+   * ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · за пробването (резен 32).
+   *
+   * Подава се ЕДИН низ, а не цялата книга: Таблото показва, не смята, и няма
+   * защо да научава за Журнала заради едно число. Празно значи празна книга.
+   */
+  readonly parviyatZapis: string;
+  /**
+   * КОИ ЕКРАНА СА ДОСТЪПНИ на този човек · СМЯТА се в `main.ts` (правило 17).
+   *
+   * Подава се, а не се смята пак тук: филтърът пита и плана, и ролята, и трите
+   * състояния на личното. Втора негова сметка щеше да е второ място, което се
+   * разминава — а разминаването тук значи пункт, който го има в лентата и го
+   * няма в картата, или обратното.
+   */
+  readonly dostapniEkrani: readonly string[];
 }
 
 interface ZaZakachane {
@@ -138,6 +167,8 @@ interface ZaZakachane {
   readonly k: Konteks;
   readonly lichen: Konteks;
   readonly prerisuvay: () => Promise<void>;
+  /** ДНЕШНИЯТ ден · подава се, не се чете — часовникът е довод (резен 26) */
+  readonly dnes: string;
   /**
    * ДВЕТЕ НЕЩА, КОИТО ЖИВЕЯТ В ЗАТВАРЯНЕТО на `trugvay` и не могат да се
    * вдигнат на модулно ниво: превключването на личното (пише в личния Журнал
@@ -148,6 +179,22 @@ interface ZaZakachane {
    */
   readonly prevklyuchiLichnoto: (znak: string, vklyucheno: boolean) => void;
   readonly zakachiTabloto: () => void;
+}
+
+/**
+ * ПУНКТОВЕТЕ НА МЕНЮТО · ключ и име, В РЕДА ИМ · ЕДНА сметка (правило 17).
+ *
+ * Два екрана питат за нея — Служители (матрицата на правата се подрежда по
+ * табовете, И103) и Настройки (Редакторът пита хедъра на кой таб стои). Написана
+ * два пъти, тя щеше да се разминава: хедър, който в единия списък стои под
+ * „Пари", а в другия под нищо.
+ *
+ * Скритите пунктове ПАДАТ: скрит таб не е дом на хедър, който човек ще търси.
+ */
+function punktoveNaMenyuto(r: ZaRisuvane): readonly { klyuch: string; ime: string }[] {
+  return podredeniPunktove(r.dostapniEkrani, r.ogledalo.redNaLentata, moyatRed())
+    .filter((klyuch) => !skritiPunktove().includes(klyuch))
+    .map((klyuch) => ({ klyuch, ime: EKRANI[klyuch as KoyEkran].ime }));
 }
 
 /**
@@ -201,10 +248,33 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ime: 'Настройки',
     podnaslov: 'бутоните са модели на пътища · нищо не е константа',
     ikona: 'nastroyki',
-    iska: 'iztochnitsi',
+    /**
+     * БЕЗ `iska` · И ТОВА Е ПОПРАВКА НА ДЕФЕКТ (резен 18).
+     *
+     * Дотук стоеше `iska: 'iztochnitsi'` — възможност, която дава само Драйвът.
+     * Пунктът обаче се връща БЕЗУСЛОВНО (`main.ts` · И101 т.2: „Настройки не се
+     * скрива от никого"), значи на двата ЛОКАЛНИ плана той стоеше в лентата и
+     * натискането го връщаше на Имоти. Без дума защо, и с него падаха езикът на
+     * интерфейса, личният таб, контрагентите, колонното право — петнайсет теми
+     * заради две.
+     *
+     * Изискването слезе на ТЕМАТА (`temi-nastroyki.ts` · поле `iska`), където
+     * му е мястото: две теми искат Драйва, останалите не. Това връща и
+     * обещанието „ВСЯКО издание работи офлайн" на локалните планове.
+     */
     iskaRolya: 'sobstvenik',
-    narisuvay: (r) => narisuvayNastroyki(r.ogledalo, r.broySabitiya, r.izbor),
-    zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay),
+    narisuvay: (r) =>
+      narisuvayNastroyki(
+        r.ogledalo,
+        r.broySabitiya,
+        r.izbor,
+        // СТОПАНИНЪТ се СМЯТА от Журнала, не от самоличността (ADR-043).
+        r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
+        // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
+        punktoveNaMenyuto(r),
+        r.dnes,
+      ),
+    zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay, z.dnes),
   },
   stoynost: {
     ime: 'Стойност на Състояние',
@@ -213,6 +283,24 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     iskaRolya: 'sobstvenik',
     narisuvay: () => narisuvayStoynost(),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
+  },
+  sluzhiteli: {
+    ime: 'Служители',
+    podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
+    ikona: 'ekran-sluzhiteli',
+    narisuvay: (r) =>
+      narisuvaySluzhiteli(
+        r.ogledalo,
+        r.kojSam,
+        r.dnes,
+        r.izbor,
+        // Матрицата на правата подрежда хедърите по реда на менюто (И103).
+        punktoveNaMenyuto(r),
+        // ПРАВАТА ГИ РАЗДАВА САМО СТОПАНИНЪТ (И57) · ролята се СМЯТА от
+        // Журнала, не се твърди от самоличността (ADR-043).
+        rolyataNa(r.kojSam.imeyl, r.ogledalo) === 'sobstvenik',
+      ),
+    zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {
     ime: 'Управление',
@@ -280,6 +368,48 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
       z.prevklyuchiLichnoto('#lichno-priberi', false);
     },
   },
+  kontakti: {
+    ime: 'Контакти',
+    podnaslov: 'един таб, две секции · преписките и хората',
+    ikona: 'ekran-sluzhiteli',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`.
+     *
+     * Контактът е НОМЕНКЛАТУРА, не достъп: вписването тук не пуска никого в
+     * програмата (правило 14 · служителите са свой екран). А преписката е
+     * РАБОТА — същият служител, който води делата, води и нея. Роля тук би била
+     * втора врата към достъпа, точно каквото правило 23 забранява.
+     */
+    narisuvay: (r) => narisuvayKontaktite(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiKontaktite(z.koren, z.k, z.prerisuvay),
+  },
+  prodazhbi: {
+    ime: 'Продажби',
+    podnaslov: 'сделката, вноските ѝ и терминалът · оттам няма връщане',
+    ikona: 'ekran-prodazhbi',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`.
+     *
+     * Продажбата е РАБОТА, не настройка: същият служител, който води наемите,
+     * води и сделките. Роля тук би била надпис — кой какво пише, решават
+     * ролята при доставчика и колонното право (правило 23), а не втора врата
+     * на екрана.
+     */
+    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo),
+    zakachi: (z) => zakachiProdazhbite(z.koren, z.k, z.prerisuvay),
+  },
+  plashtaniya: {
+    ime: 'Плащания Архив',
+    podnaslov: 'седмицата в три листа · Заплати · Фактури Кеш · Фактури Карта',
+    ikona: 'ekran-plashtaniya',
+    /**
+     * БЕЗ `iska` и БЕЗ `iskaRolya`, и този път по НАЙ-силната причина:
+     * екранът няма НИТО ЕДИН път към Вратата. Роля над чист поглед би била
+     * втора врата към достъпа — точно онова, което правило 23 забранява.
+     */
+    narisuvay: (r) => narisuvayPlashtaniyaArhiv(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiPlashtaniyaArhiv(z.koren, z.k, z.prerisuvay),
+  },
   tablo: {
     ime: 'Табло',
     podnaslov: 'кой съм · какъв е планът · какво да се вижда',
@@ -303,6 +433,33 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
           vsichki: r.ogledalo.tabove.size,
           dobaveni: [...r.ogledalo.tabove.values()].filter((t) => !t.statsionaren).length,
         },
+        // ПУНКТОВЕТЕ НА ЛЕНТАТА · подредени по трите слоя, с ВСИЧКИ вътре —
+        // и скритите. Картата е мястото, където скритото се връща; списък само
+        // с видимите щеше да е капан без изход (правило 15).
+        {
+          punktove: podredeniPunktove(
+            r.dostapniEkrani,
+            r.ogledalo.redNaLentata,
+            moyatRed(),
+          ).map((klyuch) => ({
+            klyuch,
+            ime: EKRANI[klyuch as KoyEkran].ime,
+            skrit: skritiPunktove().includes(klyuch),
+          })),
+          moyatRedEPipnat: moyatRed().length > 0,
+        },
+        r.zaetoNaUstroystvoto,
+        // ГОДИНИТЕ · СМЯТАТ се тук, където Огледалото и денят са налице.
+        {
+          chakat: godinite(r.ogledalo, r.dnes)
+            .filter((g) => g.sastoyanie === 'chaka')
+            .map((g) => g.godina),
+          razminavat: godinite(r.ogledalo, r.dnes)
+            .filter((g) => g.sastoyanie === 'razminava')
+            .map((g) => g.godina),
+        },
+        // ПРОБВАНЕТО · СМЯТА се тук, където книгата и денят са налице.
+        probvaneto(r.parviyatZapis, r.dnes),
       ),
     zakachi: (z) => z.zakachiTabloto(),
   },

@@ -17,6 +17,7 @@ import { potok } from '../src/domein/smetki.js';
 import { smetki } from '../src/domein/smetki.js';
 import { platenoDDSZaPerioda, type Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { klyuchNaZveno } from '../src/yadro/sabitie.js';
+import { opisaNaZapisa, sumataNaZapisa } from '../src/domein/opis-na-zapisa.js';
 import type { Sabitie } from '../src/yadro/index.js';
 
 /** Стотинки → евро като число за клетка на Excel. Само за този изглед. */
@@ -24,21 +25,16 @@ function evro(st: number): number {
   return st / 100;
 }
 
+/**
+ * СУМАТА за КЛЕТКА · домейнът дава центовете, изгледът ги прави евро.
+ *
+ * Самото четене на товара живее в `opis-na-zapisa.ts` — оттам го чете и
+ * екранът, който показва сторнираните редове (ADR-087). Копие тук щеше да се
+ * разминава при първото ново поле.
+ */
 function sumaOtPayload(s: Sabitie): number | '' {
-  const p = s.payload as Record<string, unknown>;
-  for (const klyuch of ['suma_st', 'naem_st', 'dds_deklarirano_st']) {
-    const v = p[klyuch];
-    if (typeof v === 'number') return evro(v);
-  }
-  return '';
-}
-
-function opisOtPayload(s: Sabitie): string {
-  const p = s.payload as Record<string, unknown>;
-  const chasti = [p['adres'], p['naemetel'], p['dostavchik'], p['opis'], p['period'], p['prichina']]
-    .filter((x) => typeof x === 'string' && x !== '')
-    .slice(0, 3);
-  return chasti.join(' · ');
+  const st = sumataNaZapisa(s);
+  return st === undefined ? '' : evro(st);
 }
 
 /** Всички месеци, в които има нещо — за листа „ДДС". */
@@ -69,7 +65,7 @@ export function arhivZaEksel(sabitiya: readonly Sabitie[], o: Ogledalo, kogato: 
       s.ts.slice(0, 10),
       s.type,
       `${s.sashtnost.vid}:${s.sashtnost.id}`,
-      opisOtPayload(s),
+      opisaNaZapisa(s),
       sumaOtPayload(s),
       o.pogaseni.has(klyuchNaZveno(s)) ? 'да' : '',
       s.opId,

@@ -1,5 +1,5 @@
 /**
- * КОЛОННОТО ПРАВО · Вижда · Скрито · и защо „Редактира" не се раздава.
+ * КОЛОННОТО ПРАВО · Редактира · Вижда · Скрито · и защо всяка само СТЕСНЯВА.
  *
  * Петте обещания, които се пазят тук — всяко от негово изречение:
  *
@@ -21,13 +21,20 @@ import { napraviModel } from '../src/iztochnik/model.js';
 import { chislovi, vDvataSbora } from '../src/domein/chisla.js';
 import {
   belegNaPravo,
+  deystvashtoPravo,
   GreshkaPravo,
   mozheDaRedaktiraKolona,
   napraviPrava,
+  poTyasnoto,
+  stesniVsichki,
+  PRAVA_NA_KOLONA,
+  pravaOtZhurnala,
   pravoNaKolona,
-  sPrevklyuchenaVidimost,
+  sDumi,
+  sPromenenoPravo,
   vidimiKoloni,
   vidNaKolona,
+  zashtoNeDeystva,
 } from '../src/domein/kolonno.js';
 import {
   belegNaSluzhitel,
@@ -89,16 +96,16 @@ describe('видът на колоната', () => {
   });
 });
 
-describe('кой какво редактира', () => {
+describe('кой какво редактира · НАЙ-ТЯСНОТО от трите тавана', () => {
   it('затворена колона не се редактира дори от СТОПАНИНА', () => {
     expect(
-      mozheDaRedaktiraKolona({ rolya: 'sobstvenik', vid: 'zatvorena', pravo: 'vizhda' }),
+      mozheDaRedaktiraKolona({ rolya: 'sobstvenik', vid: 'zatvorena', pravo: 'redaktira' }),
     ).toBe(false);
   });
 
-  it('редакторът редактира променяща се, която вижда', () => {
+  it('редакторът редактира променяща се, която не е стеснена', () => {
     expect(
-      mozheDaRedaktiraKolona({ rolya: 'redaktor', vid: 'promenlyva', pravo: 'vizhda' }),
+      mozheDaRedaktiraKolona({ rolya: 'redaktor', vid: 'promenlyva', pravo: 'redaktira' }),
     ).toBe(true);
   });
 
@@ -108,10 +115,50 @@ describe('кой какво редактира', () => {
     ).toBe(false);
   });
 
-  it('наблюдателят не редактира дори променяща се и видима', () => {
+  it('наблюдателят не редактира дори променяща се и невстеснена', () => {
     expect(
-      mozheDaRedaktiraKolona({ rolya: 'nablyudatel', vid: 'promenlyva', pravo: 'vizhda' }),
+      mozheDaRedaktiraKolona({ rolya: 'nablyudatel', vid: 'promenlyva', pravo: 'redaktira' }),
     ).toBe(false);
+  });
+
+  it('СВАЛЕНАТА до „вижда" се ВИЖДА, но не се пипа · третата стойност', () => {
+    // Новото, което И105 върна: дотук се можеше само „скрий".
+    const n = { rolya: 'redaktor', vid: 'promenlyva', pravo: 'vizhda' } as const;
+    expect(deystvashtoPravo(n)).toBe('vizhda');
+    expect(mozheDaRedaktiraKolona(n)).toBe(false);
+    // …и НЕ пада от видимите — там е разликата между двете стеснения.
+    const p = napraviPrava({ imeyl: BAMSTERA, model: 'М', samoVizhdat: [3] });
+    expect(vidimiKoloni([0, 1, 2, 3], p)).toEqual([0, 1, 2, 3]);
+  });
+
+  it('изборът само СТЕСНЯВА · „редактира" не вдига наблюдател до редактор', () => {
+    // Ако можеше, този екран щеше да е втора врата към достъпа — точно
+    // каквото правило 14 отказва и И57 забранява с думи.
+    expect(
+      deystvashtoPravo({ rolya: 'nablyudatel', vid: 'promenlyva', pravo: 'redaktira' }),
+    ).toBe('vizhda');
+    expect(
+      deystvashtoPravo({ rolya: 'sobstvenik', vid: 'zatvorena', pravo: 'redaktira' }),
+    ).toBe('vizhda');
+  });
+
+  it('по-тясното от двете е СРЕЩА, не избор · и е независимо от реда', () => {
+    for (const a of PRAVA_NA_KOLONA) {
+      for (const b of PRAVA_NA_KOLONA) {
+        expect(poTyasnoto(a, b)).toBe(poTyasnoto(b, a));
+      }
+    }
+    expect(poTyasnoto('redaktira', 'skrito')).toBe('skrito');
+    expect(poTyasnoto('vizhda', 'redaktira')).toBe('vizhda');
+  });
+
+  it('изборът без действие се КАЗВА, не се преглъща (правило 15)', () => {
+    expect(zashtoNeDeystva({ rolya: 'nablyudatel', vid: 'promenlyva', pravo: 'redaktira' }))
+      .toContain('наблюдава');
+    expect(zashtoNeDeystva({ rolya: 'sobstvenik', vid: 'zatvorena', pravo: 'redaktira' }))
+      .toContain('СМЕТКА');
+    // Действащ избор мълчи — изречение до всяка клетка би било шум.
+    expect(zashtoNeDeystva({ rolya: 'redaktor', vid: 'promenlyva', pravo: 'skrito' })).toBe('');
   });
 });
 
@@ -147,8 +194,8 @@ describe('правило 23 има викащ в живия код', () => {
 });
 
 describe('правото на един служител', () => {
-  it('без записано право се вижда всичко', () => {
-    expect(pravoNaKolona(undefined, 3)).toBe('vizhda');
+  it('без записано право нищо не е стеснено', () => {
+    expect(pravoNaKolona(undefined, 3)).toBe('redaktira');
     expect(vidimiKoloni([0, 1, 2, 3], undefined)).toEqual([0, 1, 2, 3]);
   });
 
@@ -168,11 +215,47 @@ describe('правото на един служител', () => {
     expect(() => napraviPrava({ imeyl: BAMSTERA, model: '' })).toThrow(GreshkaPravo);
   });
 
-  it('превключването връща НОВ списък, старият не се пипа', () => {
+  it('смяната на думата връща НОВИ права, старите не се пипат', () => {
     const p = napraviPrava({ imeyl: BAMSTERA, model: 'Банка ОББ', skriti: [3] });
-    expect(sPrevklyuchenaVidimost(p, 3)).toEqual([]);
-    expect(sPrevklyuchenaVidimost(p, 1)).toEqual([1, 3]);
+    expect(sPromenenoPravo(p, 3, 'redaktira').skriti).toEqual([]);
+    expect(sPromenenoPravo(p, 1, 'skrito').skriti).toEqual([1, 3]);
     expect(p.skriti).toEqual([3]);
+  });
+
+  it('колоната минава между ТРИТЕ и никога не остава в два списъка', () => {
+    let p = napraviPrava({ imeyl: BAMSTERA, model: 'Банка ОББ' });
+    p = sPromenenoPravo(p, 2, 'skrito');
+    expect(pravoNaKolona(p, 2)).toBe('skrito');
+    p = sPromenenoPravo(p, 2, 'vizhda');
+    expect(pravoNaKolona(p, 2)).toBe('vizhda');
+    expect(p.skriti).toEqual([]);
+    p = sPromenenoPravo(p, 2, 'redaktira');
+    expect(pravoNaKolona(p, 2)).toBe('redaktira');
+    expect(p.samoVizhdat).toEqual([]);
+  });
+
+  it('колона в ДВАТА списъка се отказва на глас — едно право на колона', () => {
+    expect(() =>
+      napraviPrava({ imeyl: BAMSTERA, model: 'М', skriti: [2], samoVizhdat: [2] }),
+    ).toThrow(GreshkaPravo);
+  });
+
+  it('СТАРО събитие без третата стойност се чете, не събаря Огледалото', () => {
+    // Правило 1: стар код чете нов Журнал, и новият чете стария. Прочетено
+    // направо, липсващото `samoVizhdat` дава `undefined` и първото `.includes`
+    // събаря цялото Огледало — тоест книга, писана вчера, не се отваря днес.
+    const staro = { imeyl: BAMSTERA, model: 'Банка ОББ', skriti: [3] };
+    const p = pravaOtZhurnala(staro);
+    expect(p.samoVizhdat).toEqual([]);
+    expect(pravoNaKolona(p, 3)).toBe('skrito');
+    expect(pravoNaKolona(p, 1)).toBe('redaktira');
+  });
+
+  it('думите казват и двете стеснения · нула стеснения също се казва', () => {
+    expect(sDumi(napraviPrava({ imeyl: BAMSTERA, model: 'М' }))).toContain('нищо не е стеснено');
+    const p = napraviPrava({ imeyl: BAMSTERA, model: 'М', skriti: [1], samoVizhdat: [2] });
+    expect(sDumi(p)).toContain('1 скрити');
+    expect(sDumi(p)).toContain('1 само за гледане');
   });
 });
 
@@ -336,14 +419,34 @@ describe('контейнерите като таблици · моделът с�
     expect(baytove.length).toBeGreaterThan(500);
   });
 
-  it('действие №4 вече е ПОСТРОЕНО и бутон по него се прави', () => {
-    expect(opisNaDeystvie('sazdavane-tablitsa').postroeno).toBe(true);
+  /**
+   * ПРЕНАПИСАН при голямата сверка (резен 18) — и това е поуката му.
+   *
+   * Дотук тестът се казваше „действие №4 вече е ПОСТРОЕНО и бутон по него се
+   * прави" и пазеше ТОЧНО дефекта. Половината беше вярна: пътят Е построен
+   * (`obrazetsOtModel` → `rabotnaKniga`, проверено в теста над този). Другата
+   * половина — че се извървява ОТ БУТОН — не беше вярна никога: нито един
+   * викащ в `app/` не се разклонява по `b.deystvie`, тъй че такъв бутон
+   * отваряше избор на файл и после отказваше с „не е за четене".
+   *
+   * Тест, който пази половин истина, е по-скъп от липсващ: той прави дефекта
+   * официален.
+   */
+  it('действие №4 е построено, но БЕЗ БУТОН · и създаването се отказва с думи', () => {
+    expect(opisNaDeystvie('sazdavane-tablitsa').dokade).toBe('bez-buton');
+    expect(posokaNa('sazdavane-tablitsa')).toBe('pishe');
+    expect(() =>
+      napraviButon({ klyuch: 'Образец ОББ', papka: 'Образци', deystvie: 'sazdavane-tablitsa' }),
+    ).toThrow(/Свали образец/);
+  });
+
+  it('а построеното И достижимото си прави бутон както преди', () => {
     const b = napraviButon({
-      klyuch: 'Образец ОББ',
-      papka: 'Образци',
-      deystvie: 'sazdavane-tablitsa',
+      klyuch: 'Извлечения ОББ',
+      papka: 'Извлечения',
+      deystvie: 'sveryavane-eksel',
     });
-    expect(posokaNa(b.deystvie)).toBe('pishe');
+    expect(posokaNa(b.deystvie)).toBe('chete');
   });
 });
 
@@ -363,5 +466,63 @@ describe('изданието · Стартъп Алфа', () => {
     // Ако някой ден се слеят, това ще падне пръв.
     expect(PLAN_PO_PODRAZBIRANE).toBe('profesionalen');
     expect(String(SEGA.stepen)).not.toBe(String(PLAN_PO_PODRAZBIRANE));
+  });
+});
+
+/**
+ * ТРИТЕ ОБХВАТА · И103: „по цяло меню или по отделна таблица и колона от
+ * хедъра". Тук се пази СРЕДНИЯТ — цялата таблица с една дума. Цялото меню е
+ * същият изход, повторен на всяка таблица в групата: право на таб няма и не се
+ * измисля (`hedari-po-tabove.test.ts` пази групирането).
+ */
+describe('цялата таблица с ЕДНА дума', () => {
+  const prazni = napraviPrava({ imeyl: 'a@b.bg', model: 'Банка' });
+
+  it('„скрито" слага ВСИЧКИ колони в скритите', () => {
+    const p = stesniVsichki(prazni, 4, 'skrito');
+    expect(p.skriti).toEqual([0, 1, 2, 3]);
+    expect(p.samoVizhdat).toEqual([]);
+  });
+
+  it('„вижда" слага всички в СВОЯ списък, не в скритите — двете стеснения са две', () => {
+    const p = stesniVsichki(prazni, 3, 'vizhda');
+    expect(p.samoVizhdat).toEqual([0, 1, 2]);
+    expect(p.skriti).toEqual([]);
+  });
+
+  it('„редактира" ИЗПРАЗВА двата списъка · записват се само отклоненията', () => {
+    const skrito = stesniVsichki(prazni, 3, 'skrito');
+    const varnato = stesniVsichki(skrito, 3, 'redaktira');
+    expect(varnato.skriti).toEqual([]);
+    expect(varnato.samoVizhdat).toEqual([]);
+  });
+
+  it('по-широкият обхват ЗАМЕНЯ по-тесния избор, не се наслагва върху него', () => {
+    const smesen = napraviPrava({ imeyl: 'a@b.bg', model: 'Банка', skriti: [0], samoVizhdat: [2] });
+    const p = stesniVsichki(smesen, 4, 'vizhda');
+    expect(p.skriti).toEqual([]);
+    expect(p.samoVizhdat).toEqual([0, 1, 2, 3]);
+  });
+
+  it('имейлът и хедърът НЕ се менят — обхватът пипа колоните, не двойката', () => {
+    const p = stesniVsichki(prazni, 2, 'skrito');
+    expect(p.imeyl).toBe('a@b.bg');
+    expect(p.model).toBe('Банка');
+  });
+
+  it('таблица с НУЛА колони дава празни списъци, не гърми', () => {
+    expect(stesniVsichki(prazni, 0, 'skrito').skriti).toEqual([]);
+  });
+
+  it('брой колони, който не е брой, се ОТКАЗВА гласно', () => {
+    expect(() => stesniVsichki(prazni, -1, 'skrito')).toThrow(GreshkaPravo);
+    expect(() => stesniVsichki(prazni, 2.5, 'skrito')).toThrow(GreshkaPravo);
+  });
+
+  it('видът на колоната се чете и от НЕ-модел · вградената таблица няма модел', () => {
+    // Вградените таблици (Имоти · Наеми · …) се раждат в кода, не от файл.
+    // Правилото им е ЕДНО и също: сметнатата колона не се редактира от никого.
+    expect(vidNaKolona({ zatvoreni: [1, 3] }, 1)).toBe('zatvorena');
+    expect(vidNaKolona({ zatvoreni: [1, 3] }, 2)).toBe('promenlyva');
   });
 });

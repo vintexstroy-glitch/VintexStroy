@@ -37,7 +37,37 @@ const adres = (f) => `./${relative(DIST, f)}`;
 
 // Шрифтовете НЕ влизат в черупката — те се пазят по пакет (виж долу).
 const eShrift = (f) => f.endsWith('.woff2');
-const cherupka = vsichki.filter((f) => !eShrift(f)).map(adres);
+
+/**
+ * СВЪРЗВАЩИТЕ ЧАСТИ НЕ ВЛИЗАТ В ДЖОБА.
+ *
+ * CLAUDE.md обещава дословно: „Офлайн изданието се различава по едно:
+ * свързващата част ЛИПСВА в него, а не е изключена." А `app/ii.ts` обяснява, че
+ * динамичният внос го постига.
+ *
+ * ПОСТИГАШЕ ГО САМО НАПОЛОВИНА. Динамичният внос държи парчето извън ПЪРВОТО
+ * зареждане — но този печат помиташе целия `dist` и го слагаше в черупката,
+ * значи джобът го теглеше предварително и офлайн изданието го НОСЕШЕ. Обещание,
+ * вярно в изходния код и невярно в построеното, е по-лошо от липсващо: то се
+ * цитира.
+ *
+ * Затова тук парчетата се изключват ПОИМЕННО, а изключеното се ПЕЧАТА — да се
+ * вижда, вместо да се вярва. Всеки нов свързващ файл, който е свое парче, иска
+ * свой ред в този списък.
+ *
+ * ЗАБЕЛЕЖКА, казана на глас: това важи само за парчетата, теглени с ДИНАМИЧЕН
+ * внос. Драйвът се внася СТАТИЧНО (`app/main.ts`) и стои вътре в главното
+ * парче — него този списък не може да го извади. Значи обещанието днес държи
+ * за Клод, и ще държи за Календара, ако и той е динамичен.
+ */
+const SVARZVASHTI = ['klod', 'kalendar-google'];
+const eSvarzvashto = (f) => {
+  const ime = relative(DIST, f);
+  return SVARZVASHTI.some((s) => new RegExp(`(^|/)assets/${s}-[^/]*\\.js$`).test(ime));
+};
+
+const izvan = vsichki.filter(eSvarzvashto).map(adres);
+const cherupka = vsichki.filter((f) => !eShrift(f) && !eSvarzvashto(f)).map(adres);
 
 /**
  * Кой файл на коя азбука е. Vite хешира имената (`literata-greek-BxK2.woff2`),
@@ -77,10 +107,29 @@ const izhod = readFileSync(pat, 'utf8')
   .replace('__CHERUPKA__', JSON.stringify(['./', ...cherupka], null, 2))
   .replace('__AZBUKI__', JSON.stringify(azbuki, null, 2));
 
+// ПАЗАЧ, не надпис (ADR-056) · обявено правило, което никой не проверява, е
+// дума. Ако свързващо парче все пак се промъкне в черупката, строежът ПАДА тук,
+// а не се открива след месец в джоба на телефона.
+for (const s of SVARZVASHTI) {
+  if (new RegExp(`assets/${s}-[^"']*\\.js`).test(izhod)) {
+    throw new Error(
+      `Свързващата част „${s}" е влязла в черупката на джоба. ` +
+        'CLAUDE.md обещава, че офлайн изданието НЕ я носи — а обещание, вярно в ' +
+        'кода и невярно в построеното, се цитира с години.',
+    );
+  }
+}
+
 writeFileSync(pat, izhod);
 
 const kb = (fs) => (fs.reduce((s, f) => s + statSync(f).size, 0) / 1024).toFixed(1);
-console.log(`  джобът: ${cherupka.length} файла · ${kb(vsichki.filter((f) => !eShrift(f)))} KB · версия ${versiya}`);
+console.log(`  джобът: ${cherupka.length} файла · ${kb(vsichki.filter((f) => !eShrift(f) && !eSvarzvashto(f)))} KB · версия ${versiya}`);
+// Изключеното се ПЕЧАТА · обещание без число е дума (ADR-056).
+console.log(
+  izvan.length
+    ? `    ИЗВЪН джоба · свързващите части: ${izvan.join(' · ')}`
+    : '    ИЗВЪН джоба: НИТО ЕДНА свързваща част — списъкът `SVARZVASHTI` не улови нищо',
+);
 for (const p of PAKETI) {
   const negovi = shrifty.filter((f) => p.podmnozhestva.includes(koyaAzbuka(f)));
   console.log(`    азбуки „${p.klyuch}": ${negovi.length} файла · ${kb(negovi)} KB`);

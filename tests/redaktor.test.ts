@@ -18,6 +18,7 @@ import { Deystviya } from '../src/domein/deystviya.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { belegNaModel, napraviModel, poznavaLi } from '../src/iztochnik/model.js';
 import {
+  dayEkran,
   dobaviKolona,
   GreshkaRedaktor,
   iztriyMenyu,
@@ -319,5 +320,46 @@ describe('видът на СТОЙНОСТТА · втората половин�
     }
     // Само еврото влиза в двата сбора — това е правило 20, не подробност.
     expect(VIDOVE_STOYNOST.filter(ePari)).toEqual(['evro']);
+  });
+});
+
+/**
+ * ТАБЪТ НА ХЕДЪРА · И103, и се ПИТА, а не се гади.
+ *
+ * По него матрицата на правата подрежда хедърите „както са по табовете в
+ * менюто". Живите екрани се ПОДАВАТ — регистърът им е един и е `EKRANI`.
+ */
+describe('на кой таб стои хедърът', () => {
+  const ZHIVI = ['imoti', 'pari', 'smetki'];
+
+  it('приема ЖИВ екран и го записва в модела', () => {
+    const m = dayEkran(model(), 'pari', ZHIVI, 'sobstvenik');
+    expect(m.ekran).toBe('pari');
+  });
+
+  it('ОТКАЗВА екран, който не е в лентата · табът се избира, не се пише', () => {
+    expect(() => dayEkran(model(), 'izmislen', ZHIVI, 'sobstvenik')).toThrow(GreshkaRedaktor);
+  });
+
+  it('празното МАХА записа · „още не е сложен на таб" е състояние, не липса', () => {
+    const sTab = dayEkran(model(), 'imoti', ZHIVI, 'sobstvenik');
+    expect(dayEkran(sTab, '', ZHIVI, 'sobstvenik').ekran).toBeUndefined();
+  });
+
+  it('редакторът и наблюдателят НЕ местят хедър · само управителят', () => {
+    expect(() => dayEkran(model(), 'pari', ZHIVI, 'redaktor')).toThrow(GreshkaRedaktor);
+    expect(() => dayEkran(model(), 'pari', ZHIVI, 'nablyudatel')).toThrow(GreshkaRedaktor);
+  });
+
+  it('старият модел няма таб и това НЕ е грешка · пада към празно при четене', () => {
+    expect(model().ekran).toBeUndefined();
+  });
+
+  it('табът НЕ пипа нищо друго в хедъра · глави, роли и отпечатък стоят', () => {
+    const star = model();
+    const nov = dayEkran(star, 'smetki', ZHIVI, 'sobstvenik');
+    expect(nov.glavi).toEqual(star.glavi);
+    expect(nov.otpechatak).toBe(star.otpechatak);
+    expect(nov.koloni).toEqual(star.koloni);
   });
 });

@@ -28,7 +28,13 @@
  */
 
 import type { VidObekt } from './chetene.js';
-import { EDINITSA_BT, PO_PODRAZBIRANE, matritsaOtNastroyki } from './nastroyki.js';
+import {
+  EDINITSA_BT,
+  PO_PODRAZBIRANE,
+  matritsaOtNastroyki,
+  sboratNaTeglata,
+  type Tegla,
+} from './nastroyki.js';
 
 /**
  * Мерната единица идва от `nastroyki.ts` — там живеят коефициентите, значи там
@@ -108,6 +114,16 @@ export interface Matritsa {
    */
   readonly podrazbiran_etazh_bt: number;
   readonly podrazbirano_izlozhenie_bt: number;
+  /** В · земята в центове за кв.м обща площ · тя НЕ овехтява */
+  readonly zemya_st_kvm: Readonly<Record<VidObekt, number>>;
+  /** В · строителната себестойност в центове за кв.м · тя овехтява */
+  readonly stroitelna_st_kvm: Readonly<Record<VidObekt, number>>;
+  /** В · полезният живот на сградата в цели години */
+  readonly polezen_zhivot_g: number;
+  /** В · възрастта на сградата в цели години */
+  readonly vazrast_g: number;
+  /** трите тегла на съгласуването · сборът им е точно 10 000 б.т. */
+  readonly tegla: Tegla;
 }
 
 /**
@@ -266,6 +282,198 @@ export function tsenaPoSastoyanie(n: {
   const gore = godishen * zaet * chist * BigInt(EDINITSA_BT);
   const dolu = BigInt(EDINITSA_BT) * BigInt(EDINITSA_BT) * BigInt(m.dohodnost_bt);
   return Number((gore * 2n + dolu) / (dolu * 2n));
+}
+
+/**
+ * В · РАЗХОДНИЯТ подход · земя + строителна стойност − овехтяване.
+ *
+ * От методологията (`docs/otcheti/kalkulator-metodologii.md` §2.3):
+ *
+ *   „Стойност = земя + строителна стойност − овехтяване
+ *    овехтяване ≈ възраст / полезен живот (60–80 г. за жилище)"
+ *
+ * ═══ ЗЕМЯТА НЕ ОВЕХТЯВА · и това е ЦЯЛАТА мисъл на подхода ═══
+ *
+ * Овехтява СГРАДАТА — тухлите, инсталациите, дограмата. Парцелът под нея не
+ * губи стойност от годините. Приложено върху сбора, овехтяването щеше да яде и
+ * земята, и оценката на стара сграда щеше да клони към нула, каквото никога не
+ * става: най-старите сгради в центъра струват най-скъпо ЗАРАДИ земята.
+ *
+ * Затова множителят пипа САМО строителната част. Това е и най-честата грешка
+ * при този подход, и точно затова е написана тук, а не премълчана.
+ *
+ * ═══ ВЪЗРАСТ ≥ ПОЛЕЗЕН ЖИВОТ Е ОТГОВОР, НЕ ГРЕШКА ═══
+ *
+ * Сградата е изхабена докрай; остава земята. Същото решение като при нулевия
+ * наем в Б: липсата на едното не срива сметката, а дава своя резултат.
+ *
+ * Всичко в цели числа, делене ВЕДНЪЖ накрая (умението `matematika` §1).
+ */
+export function tsenaPoRazhod(n: {
+  readonly obshta_kvsm: number;
+  readonly vid: VidObekt;
+  readonly matritsa?: Matritsa;
+}): number {
+  const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
+  const zemya_st_kvm = m.zemya_st_kvm[n.vid];
+  const stroitelna_st_kvm = m.stroitelna_st_kvm[n.vid];
+  if (zemya_st_kvm === undefined || stroitelna_st_kvm === undefined) {
+    throw new GreshkaMatritsa(`Матрицата няма разходни числа за вид „${n.vid}".`);
+  }
+  if (!Number.isSafeInteger(n.obshta_kvsm) || n.obshta_kvsm < 0) {
+    throw new GreshkaMatritsa(`Площта е в цели кв.см от нула нагоре; получено: ${n.obshta_kvsm}`);
+  }
+  if (m.polezen_zhivot_g <= 0) {
+    throw new GreshkaMatritsa('Полезен живот нула не дели — овехтяването е невъзможно.');
+  }
+  if (n.obshta_kvsm === 0) return 0;
+
+  /**
+   * ЕДНО ЛИПСВАЩО ЧИСЛО ЗНАЧИ, ЧЕ ПОДХОДЪТ НЕ РАЖДА ЧИСЛО · група Г (`docs/11`).
+   *
+   * Нулата тук е СЕНТИНЕЛ за „не е дадено", не цена: така я чете и
+   * `proveriNastroyki` („нулева земя и нулево строителство са допустими — тогава
+   * подходът просто дава нула и се изключва"), и празният `NEGOVI_PARAMETRI`,
+   * който БРОИ кои от шестте числа са негови.
+   *
+   * Дотук сентинелът важеше само когато ДВЕТЕ са нула. При ЕДНО липсващо тук се
+   * смяташе наполовина и излизаше число, което ИЗГЛЕЖДА сметнато: сто кв.м с
+   * дадена строителна и липсваща земя даваха 94 080 € срещу 141 120 € — с една
+   * трета по-малко, без нито една дума, че земята липсва. И това число влизаше
+   * в съгласуването и дърпаше крайното надолу.
+   *
+   * Едно и също число не може да значи „не е дадено" на едно място и „струва
+   * нула" на друго. Оттук нататък значи първото навсякъде, а `saglasuvana`
+   * изхвърля подхода и го НАЗОВАВА в „отпаднали" (правило 15).
+   */
+  if (zemya_st_kvm === 0 || stroitelna_st_kvm === 0) return 0;
+
+  // ОСТАНАЛОТО от сградата, в б.т. Възраст над живота дава нула, не отрицателно:
+  // сграда не струва по-малко от нищо.
+  const iztekli = Math.min(m.vazrast_g, m.polezen_zhivot_g);
+  const ostavashti_bt =
+    EDINITSA_BT - Math.round((iztekli * EDINITSA_BT) / m.polezen_zhivot_g);
+
+  // площ(кв.см) × [ земя×10 000 + строителна×останали ] ÷ (10 000 кв.см/м² × 10 000 б.т.)
+  const zaKvadrat =
+    BigInt(zemya_st_kvm) * BigInt(EDINITSA_BT) +
+    BigInt(stroitelna_st_kvm) * BigInt(ostavashti_bt);
+  const gore = BigInt(n.obshta_kvsm) * zaKvadrat;
+  const dolu = 10_000n * BigInt(EDINITSA_BT);
+  return Number((gore * 2n + dolu) / (dolu * 2n));
+}
+
+/** Колко от сградата ОСТАВА, в базисни точки · един дом за екрана и за теста. */
+export function ostavashti_bt(matritsa?: Matritsa): number {
+  const m = matritsa ?? MATRITSA_ZA_RAZRABOTKA;
+  if (m.polezen_zhivot_g <= 0) return 0;
+  const iztekli = Math.min(Math.max(m.vazrast_g, 0), m.polezen_zhivot_g);
+  return EDINITSA_BT - Math.round((iztekli * EDINITSA_BT) / m.polezen_zhivot_g);
+}
+
+/**
+ * СЪГЛАСУВАНЕТО · претеглената цена от трите подхода.
+ *
+ * От методологията §2.4: „Професионалната практика не избира един подход, а ги
+ * ПРЕТЕГЛЯ: Цена = Σ ( тегло × стойност ), Σ тегла = 1."
+ *
+ * ═══ НУЛЕВИЯТ ПОДХОД СЕ ИЗКЛЮЧВА, НЕ СЕ СМЯТА ═══
+ *
+ * Обект без наем дава Б = 0. Влезе ли тази нула в претеглената сума с теглото
+ * си, съгласуваната пада с толкова процента, колкото е теглото — без някой да е
+ * решавал, и без нищо на екрана да го казва. Това е тиха загуба на пари.
+ *
+ * Затова нулевите подходи ОТПАДАТ и теглата на останалите се ПРЕНОРМИРАТ до
+ * 10 000. Кой е отпаднал и колко тегло е пренасочено, се връща — екранът го
+ * КАЗВА (правило 15).
+ *
+ * ОСТАТЪКЪТ ОТ ПРЕНОРМИРАНЕТО отива на НАЙ-ГОЛЯМОТО от оцелелите тегла и това
+ * е назовано (`matematika` §4): остатък, който изчезва, се появява по-късно
+ * като „сметката не затваря с една стотинка".
+ *
+ * Всичко в `BigInt`, делене ВЕДНЪЖ накрая.
+ */
+export interface Saglasuvane {
+  /** претеглената цена в цели центове, БЕЗ закръгляне */
+  readonly tochno_st: number;
+  /** теглата СЛЕД пренормирането · сборът им е точно 10 000 */
+  readonly deystvashti: Tegla;
+  /** имената на подходите, отпаднали заради нулева стойност */
+  readonly otpadnali: readonly string[];
+}
+
+/**
+ * ЗАТВАРЯТ ЛИ ТЕГЛАТА · питат ГО, преди да викнат `saglasuvana`.
+ *
+ * Строгостта на `saglasuvana` е правилна и остава: сбор, различен от 100 %, не
+ * бива да ражда число. Но ЕКРАНЪТ не бива да пада заради нея — човек, който
+ * мени тегло, минава през 110 % при всяко въвеждане.
+ *
+ * Платено с находка: проходът намери, че вдигането на едно тегло срива екрана
+ * с необработена грешка. Отказът е СЪОБЩЕНИЕ (правило 15), не срив; затова
+ * викащите питат тук, а пазачът си стои на място.
+ */
+export function teglataZatvaryat(tegla: Tegla): boolean {
+  return sboratNaTeglata(tegla) === EDINITSA_BT;
+}
+
+export function saglasuvana(n: {
+  readonly pazaren_st: number;
+  readonly dohoden_st: number;
+  readonly razhoden_st: number;
+  readonly tegla: Tegla;
+}): Saglasuvane {
+  const sbor = sboratNaTeglata(n.tegla);
+  if (sbor !== EDINITSA_BT) {
+    throw new GreshkaMatritsa(
+      `Трите тегла дават ${sbor} б.т., а трябва точно ${EDINITSA_BT}. ` +
+        'Тегло, което не затваря, е тихо изгубено число.',
+    );
+  }
+
+  const podhodi = [
+    { ime: 'пазарен', st: n.pazaren_st, bt: n.tegla.pazaren_bt },
+    { ime: 'доходен', st: n.dohoden_st, bt: n.tegla.dohoden_bt },
+    { ime: 'разходен', st: n.razhoden_st, bt: n.tegla.razhoden_bt },
+  ];
+  for (const p of podhodi) {
+    if (!Number.isSafeInteger(p.st) || p.st < 0) {
+      throw new GreshkaMatritsa(`Стойността по „${p.ime}" е в цели центове от нула нагоре.`);
+    }
+  }
+
+  const zhivi = podhodi.filter((p) => p.st > 0 && p.bt > 0);
+  const otpadnali = podhodi.filter((p) => p.st === 0 && p.bt > 0).map((p) => p.ime);
+  if (zhivi.length === 0) {
+    return Object.freeze({
+      tochno_st: 0,
+      deystvashti: Object.freeze({ pazaren_bt: 0, dohoden_bt: 0, razhoden_bt: 0 }),
+      otpadnali: Object.freeze(otpadnali),
+    });
+  }
+
+  // ПРЕНОРМИРАНЕ · всяко тегло към сбора на оцелелите; остатъкът на най-голямото.
+  const sborZhivi = zhivi.reduce((s, p) => s + p.bt, 0);
+  const novi = zhivi.map((p) => ({
+    ...p,
+    novo_bt: Math.floor((p.bt * EDINITSA_BT) / sborZhivi),
+  }));
+  const nay = novi.reduce((a, b) => (b.novo_bt > a.novo_bt ? b : a), novi[0]!);
+  nay.novo_bt += EDINITSA_BT - novi.reduce((s, p) => s + p.novo_bt, 0);
+
+  const gore = novi.reduce((s, p) => s + BigInt(p.novo_bt) * BigInt(p.st), 0n);
+  const dolu = BigInt(EDINITSA_BT);
+  const bt = (ime: string): number => novi.find((p) => p.ime === ime)?.novo_bt ?? 0;
+
+  return Object.freeze({
+    tochno_st: Number((gore * 2n + dolu) / (dolu * 2n)),
+    deystvashti: Object.freeze({
+      pazaren_bt: bt('пазарен'),
+      dohoden_bt: bt('доходен'),
+      razhoden_bt: bt('разходен'),
+    }),
+    otpadnali: Object.freeze(otpadnali),
+  });
 }
 
 /** Очакваният месечен наем за обект без наем в Журнала — от матрицата. */

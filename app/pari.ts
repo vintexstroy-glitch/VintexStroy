@@ -40,7 +40,7 @@ function novOpId(): string {
 }
 
 /** Колоните на вземанията — фините филтри важат и тук (ADR-022 · вълна 2). */
-function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
+export function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
   return [
     {
       klyuch: 'koy',
@@ -58,7 +58,7 @@ function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
 }
 
 /** Колоните на приетите плащания. */
-function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
+export function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
   return [
     { klyuch: 'data', ime: 'Дата', vid: 'data', vzemi: (p) => p.data },
     {
@@ -119,7 +119,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
       </div>
     </div>
 
-    <section class="karta">
+    <section data-sektsiya="pari-nachislyavane" class="karta">
       <div class="dyalglava">
         <h2>Начисляване</h2>
         <span>${zaMeseca} живи наема за ${mesets} · ${vecheZaMeseca} вече начислени</span>
@@ -141,7 +141,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
 
     ${izbrano ? formaPlashtane(o, izbrano) : ''}
 
-    <section>
+    <section data-sektsiya="pari-prosrocheni">
       <div class="dyalglava">
         <h2>Просрочени</h2>
         <span>${zakasneli.length ? 'най-закъснелите отгоре' : 'няма'}</span>
@@ -165,7 +165,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     ${
       otvoreni.length === 0
         ? ''
-        : `<section>
+        : `<section data-sektsiya="pari-vsrok">
       <div class="dyalglava"><h2>В срок</h2><span>${otvoreni.length}</span></div>
       ${poleZaTarsene('vsrok')}
       <div class="tablitsa" data-tablitsa="vsrok">
@@ -250,7 +250,7 @@ function narisuvayPlashtaniyata(o: Ogledalo, dnes: string): string {
   const vsichki = [...o.plashtaniya.values()].sort((a, b) => b.seq - a.seq);
   const f = filtriray('plashtaniya', vsichki, koloni, dnes);
   return `
-    <section>
+    <section data-sektsiya="pari-plashtaniya">
       <div class="dyalglava">
         <h2>Приети плащания</h2>
         <span>${o.plashtaniya.size} · поправка = сторно, не триене</span>
@@ -360,7 +360,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
   if (!v) return '';
   const { koy, kade } = opisiVzemane(o, v);
   return `
-    <section class="karta izbrana">
+    <section data-sektsiya="pari-priemi" class="karta izbrana">
       <div class="dyalglava">
         <h2>Приеми плащане</h2>
         <span>${ekraniraj(koy)} · ${ekraniraj(kade)} · ${v.period}</span>

@@ -26,7 +26,14 @@
 import { pishi } from '../yadro/pari.js';
 import { tsenaNagore } from '../yadro/valuta.js';
 import { kvSmVM2, type VidObekt } from './chetene.js';
-import { tsenaOtChasti } from './matritsa.js';
+import {
+  ostavashti_bt,
+  saglasuvana,
+  teglataZatvaryat,
+  tsenaOtChasti,
+  tsenaPoRazhod,
+  type Saglasuvane,
+} from './matritsa.js';
 import {
   DOBAVKI,
   EDINITSA_BT,
@@ -34,12 +41,14 @@ import {
   dobavka_st,
   klas,
   kolkoMeni,
+  matritsaOtNastroyki,
   stapka,
   vKoefitsient,
   vProtsent,
   type Koefitsient,
   type Nastroyki,
   type Stapka,
+  type Tegla,
 } from './nastroyki.js';
 
 /** Какво прави един ред. Изброено поименно — не се гадае от съдържанието. */
@@ -88,12 +97,24 @@ interface Razbivka {
   readonly a: readonly RedNaRazbivka[];
   /** ГРАФА Б · колко СТРУВА като актив */
   readonly b: readonly RedNaRazbivka[];
+  /** ГРАФА В · колко СТРУВА да се построи */
+  readonly v: readonly RedNaRazbivka[];
+  /** СЪГЛАСУВАНАТА · трите, претеглени */
+  readonly saglasuvaneto: readonly RedNaRazbivka[];
   /** А, точно · преди закръглянето; ТЯ влиза в сбор */
   readonly a_tochno_st: number;
   /** А, закръглена нагоре до стотица · показва се, НЕ влиза в сбор */
   readonly a_st: number;
   readonly b_tochno_st: number;
   readonly b_st: number;
+  readonly v_tochno_st: number;
+  readonly v_st: number;
+  readonly saglasuvana_tochno_st: number;
+  readonly saglasuvana_st: number;
+  /** кои подходи са отпаднали от съгласуването · нулевите */
+  readonly otpadnali: readonly string[];
+  /** теглата СЛЕД пренормирането · те са онези, с които е смятано */
+  readonly deystvashti_tegla: Tegla;
   /** Б − А, в цели центове · знакът е информацията */
   readonly razlika_st: number;
   /** същата разлика в базисни точки спрямо А · 0 при нулева А */
@@ -276,14 +297,166 @@ function redoveNaB(n: Nastroyki, v: Vhod): RedNaRazbivka[] {
 
 // ── ДВЕТЕ ГРАФИ ЗАЕДНО ─────────────────────────────────────────────────────
 
+// ── ГРАФА В · по разход ────────────────────────────────────────────────────
+
+/**
+ * В · КОЛКО СТРУВА ДА СЕ ПОСТРОИ · земя + строителна стойност − овехтяване.
+ *
+ * Редовете вървят в реда, по който човек оглежда себестойност: първо парцелът,
+ * после строителството, накрая колко от него е изхабено. ЗЕМЯТА СТОИ ПЪРВА и
+ * овехтяването НЕ я пипа — това е самата дефиниция на подхода и най-честата
+ * грешка при него (`matritsa.ts` · `tsenaPoRazhod`).
+ */
+function redoveNaV(n: Nastroyki, v: Vhod): RedNaRazbivka[] {
+  const redove: RedNaRazbivka[] = [];
+  const zemya_st_kvm = n.zemya_st_kvm[v.vid] ?? 0;
+  const stroitelna_st_kvm = n.stroitelna_st_kvm[v.vid] ?? 0;
+  // ИЛИ, не И · едно липсващо число спира целия подход (`tsenaPoRazhod`), тъй
+  // че разбивката не бива да рисува редове за сметка, която не се прави.
+  if (v.obshta_kvsm <= 0 || zemya_st_kvm === 0 || stroitelna_st_kvm === 0) return redove;
+
+  const m = matritsaOtNastroyki(n);
+  const kvm = kvSmVM2(v.obshta_kvsm);
+
+  // Земята сама · площ × цена на кв.м, делено ВЕДНЪЖ.
+  const zemya_st = Number(
+    (BigInt(v.obshta_kvsm) * BigInt(zemya_st_kvm) * 2n + 10_000n) / (10_000n * 2n),
+  );
+  redove.push({
+    kakvo: 'земя',
+    deystvie: 'osnova',
+    vhod: `${kvm} м² × ${pishi(zemya_st_kvm)}`,
+    mezhdinno_st: zemya_st,
+    meni_st: zemya_st,
+    zashto:
+      'Парцелът, отнесен към площта на обекта. ЗЕМЯТА НЕ ОВЕХТЯВА — затова стои ' +
+      'отделно от строителството и остава цяла, колкото и стара да е сградата.',
+  });
+
+  const stroitelna_st = Number(
+    (BigInt(v.obshta_kvsm) * BigInt(stroitelna_st_kvm) * 2n + 10_000n) / (10_000n * 2n),
+  );
+  redove.push({
+    kakvo: 'строителна стойност',
+    deystvie: 'dobavi',
+    vhod: `${kvm} м² × ${pishi(stroitelna_st_kvm)}`,
+    mezhdinno_st: zemya_st + stroitelna_st,
+    meni_st: stroitelna_st,
+    zashto: 'Себестойността да се построи наново днес — груб строеж плюс довършване.',
+  });
+
+  const ostavashti = ostavashti_bt(m);
+  const tselno_st = tsenaPoRazhod({ obshta_kvsm: v.obshta_kvsm, vid: v.vid, matritsa: m });
+  redove.push({
+    kakvo: 'овехтяване',
+    deystvie: 'umnozhi',
+    vhod: `${vKoefitsient(ostavashti)} върху строителството`,
+    mezhdinno_st: tselno_st,
+    meni_st: tselno_st - (zemya_st + stroitelna_st),
+    zashto:
+      `Възраст ${n.vazrast_g} г. при полезен живот ${n.polezen_zhivot_g} г. — остават ` +
+      `${vProtsent(ostavashti)} от сградата. Множителят пипа САМО строителството; ` +
+      'приложен върху сбора, той щеше да яде и земята.',
+  });
+
+  const gore_st = tsenaNagore(tselno_st);
+  redove.push({
+    kakvo: 'възстановителна стойност',
+    deystvie: 'zakragli',
+    vhod: 'нагоре до стотица',
+    mezhdinno_st: gore_st,
+    meni_st: gore_st - tselno_st,
+    zashto: 'Показва се закръглено; в сбора влиза точното.',
+  });
+  return redove;
+}
+
+// ── СЪГЛАСУВАНЕТО · претеглената от трите ──────────────────────────────────
+
+/**
+ * СЪГЛАСУВАНАТА · всеки подход с теглото си и с приноса си В ПАРИ.
+ *
+ * Негово искане: „легенда и ПРИМЕР за коефициент". Тегло 0,70 не значи нищо,
+ * докато не се види колко евро внася. Затова всеки ред казва и двете.
+ *
+ * Отпадналите подходи (нулева стойност) се показват с ПРЕНОРМИРАНОТО тегло,
+ * не с първоначалното: числото на екрана е онова, с което е смятано.
+ */
+function redoveNaSaglasuvaneto(
+  n: Nastroyki,
+  a_tochno_st: number,
+  b_tochno_st: number,
+  v_tochno_st: number,
+): { readonly redove: readonly RedNaRazbivka[]; readonly sag: Saglasuvane } {
+  // ТЕГЛА, КОИТО НЕ ЗАТВАРЯТ · графата мълчи, вместо разбивката да падне.
+  // Пазачът е в `saglasuvana` и си стои строг; тук се ПИТА, преди да се вика.
+  if (!teglataZatvaryat(n.tegla)) {
+    return {
+      redove: [],
+      sag: {
+        tochno_st: 0,
+        deystvashti: { pazaren_bt: 0, dohoden_bt: 0, razhoden_bt: 0 },
+        otpadnali: [],
+      },
+    };
+  }
+  const sag = saglasuvana({
+    pazaren_st: a_tochno_st,
+    dohoden_st: b_tochno_st,
+    razhoden_st: v_tochno_st,
+    tegla: n.tegla,
+  });
+  const chasti = [
+    { ime: 'А · по площ', st: a_tochno_st, bt: sag.deystvashti.pazaren_bt },
+    { ime: 'Б · по състояние', st: b_tochno_st, bt: sag.deystvashti.dohoden_bt },
+    { ime: 'В · по разход', st: v_tochno_st, bt: sag.deystvashti.razhoden_bt },
+  ];
+
+  const redove: RedNaRazbivka[] = [];
+  let dotuk_st = 0;
+  for (const [i, c] of chasti.entries()) {
+    const prinos_st = Number(
+      (BigInt(c.st) * BigInt(c.bt) * 2n + BigInt(EDINITSA_BT)) / (BigInt(EDINITSA_BT) * 2n),
+    );
+    dotuk_st += prinos_st;
+    redove.push({
+      kakvo: `${c.ime} · ${vProtsent(c.bt)}`,
+      deystvie: i === 0 ? 'osnova' : 'dobavi',
+      vhod: `${pishi(c.st)} × ${vKoefitsient(c.bt)}`,
+      mezhdinno_st: dotuk_st,
+      meni_st: prinos_st,
+      zashto:
+        c.bt === 0
+          ? 'Този подход НЕ участва: стойността му е нула и теглото му е пренасочено ' +
+            'към останалите. Иначе цената щеше да падне, без някой да е решавал.'
+          : `Теглото е ${vProtsent(c.bt)} от съгласуваната цена.`,
+    });
+  }
+
+  const gore_st = tsenaNagore(sag.tochno_st);
+  redove.push({
+    kakvo: 'съгласувана цена',
+    deystvie: 'zakragli',
+    vhod: 'нагоре до стотица',
+    mezhdinno_st: gore_st,
+    meni_st: gore_st - sag.tochno_st,
+    zashto: 'Показва се закръглено; в сбора влиза точното.',
+  });
+  return { redove, sag };
+}
+
 export function razbivka(n: Nastroyki, v: Vhod): Razbivka {
   const a = redoveNaA(n, v);
   const b = redoveNaB(n, v);
+  const vGrafa = redoveNaV(n, v);
   // Точното е междинното на реда ПРЕДИ закръглянето; закръгленото е последното.
   const a_tochno_st = a.length >= 2 ? a[a.length - 2]!.mezhdinno_st : 0;
   const a_st = a.length ? a[a.length - 1]!.mezhdinno_st : 0;
   const b_tochno_st = b.length >= 2 ? b[b.length - 2]!.mezhdinno_st : 0;
   const b_st = b.length ? b[b.length - 1]!.mezhdinno_st : 0;
+  const v_tochno_st = vGrafa.length >= 2 ? vGrafa[vGrafa.length - 2]!.mezhdinno_st : 0;
+  const v_st = vGrafa.length ? vGrafa[vGrafa.length - 1]!.mezhdinno_st : 0;
+  const sag = redoveNaSaglasuvaneto(n, a_tochno_st, b_tochno_st, v_tochno_st);
 
   const zaet_bt = EDINITSA_BT - n.nezaetost_bt;
   const chist_bt = EDINITSA_BT - n.operativni_bt;
@@ -293,10 +466,18 @@ export function razbivka(n: Nastroyki, v: Vhod): Razbivka {
     vhod: v,
     a: Object.freeze(a),
     b: Object.freeze(b),
+    v: Object.freeze(vGrafa),
+    saglasuvaneto: Object.freeze(sag.redove),
     a_tochno_st,
     a_st,
     b_tochno_st,
     b_st,
+    v_tochno_st,
+    v_st,
+    saglasuvana_tochno_st: sag.sag.tochno_st,
+    saglasuvana_st: tsenaNagore(sag.sag.tochno_st),
+    otpadnali: sag.sag.otpadnali,
+    deystvashti_tegla: sag.sag.deystvashti,
     razlika_st: b_tochno_st - a_tochno_st,
     razlika_bt: vBT(a_tochno_st, b_tochno_st),
     podrazbirashtaSe_bt:

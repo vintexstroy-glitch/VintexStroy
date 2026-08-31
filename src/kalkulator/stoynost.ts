@@ -32,7 +32,11 @@
 import { razlikaOtZakraglyane, tsenaNagore, zakragli } from '../yadro/valuta.js';
 import {
   evroNaKvadrat_st,
+  MATRITSA_ZA_RAZRABOTKA,
   ochakvanNaem_st,
+  saglasuvana,
+  teglataZatvaryat,
+  tsenaPoRazhod,
   tsenaPoSastoyanie,
   tsenaTochno,
   type Matritsa,
@@ -98,6 +102,26 @@ export interface RedNaStoynost {
    * ново строителство. Нула, когато А е нула.
    */
   readonly razlika_bt: number;
+  /** В · РАЗХОДНАТА стойност, точно · влиза в третия сбор */
+  readonly razhod_tochno_st: number;
+  /** В · същата, нагоре до стотица */
+  readonly razhod_st: number;
+  /** В · евро на квадрат по разход */
+  readonly razhodNaKvadrat_st: number;
+  /** СЪГЛАСУВАНАТА · претеглената от трите, точно · влиза в четвъртия сбор */
+  readonly saglasuvana_tochno_st: number;
+  /** СЪГЛАСУВАНАТА, нагоре до стотица */
+  readonly saglasuvana_st: number;
+  /** евро на квадрат по съгласуваната */
+  readonly saglasuvanaNaKvadrat_st: number;
+  /**
+   * Кои подходи са ОТПАДНАЛИ при съгласуването, защото дават нула.
+   *
+   * Обект без наем няма доходна стойност. Отпадането се КАЗВА на реда, вместо
+   * теглото му да се изяде мълчаливо — иначе цената пада с толкова процента,
+   * колкото е било теглото, и никой не знае защо (правило 15).
+   */
+  readonly otpadnali: readonly string[];
 }
 
 /** Стойността на състоянието: редовете и сборът им. */
@@ -124,6 +148,18 @@ export interface StoynostNaSastoyanie {
   readonly razlika_sastoyanie_st: number;
   /** Δ на двата сбора, в цели базисни точки */
   readonly razlika_na_metodite_bt: number;
+  /** В · сборът от точните разходни стойности */
+  readonly razhod_tochno_st: number;
+  /** В · същият, закръглен веднъж */
+  readonly razhod_st: number;
+  /** В · колко изяде закръглянето · всяка плочка казва своето (правило 7) */
+  readonly razlika_razhod_st: number;
+  /** СЪГЛАСУВАНАТА · сборът от точните претеглени стойности */
+  readonly saglasuvana_tochno_st: number;
+  /** СЪГЛАСУВАНАТА · същият, закръглен веднъж */
+  readonly saglasuvana_st: number;
+  /** СЪГЛАСУВАНАТА · колко изяде закръглянето */
+  readonly razlika_saglasuvana_st: number;
   /** колко обекта влизат в стойността */
   readonly broy: number;
   /** колко са пропуснати, защото са продадени */
@@ -143,14 +179,28 @@ export function stoynostNaSastoyanie(
   matritsa?: Matritsa,
   /** обект → действителен месечен наем от Журнала (`svarzvane.ts`) */
   naemiOtZhurnala: ReadonlyMap<string, number> = new Map(),
+  /**
+   * КОИ ОБЕКТИ ВЕЧЕ ИМАТ СДЕЛКА · продаденото се чете И от Журнала (29.08).
+   *
+   * Дотук единственият източник беше НЕГОВИЯТ файл. Негово: „Там избираш
+   * продаден и го праща от цени в таб Продажби" — значи изборът ражда сделка,
+   * а сделката е фактът. Двата източника се СЪБИРАТ: файлът пази заварените,
+   * Журналът — направените оттук нататък.
+   */
+  prodadeniOtZhurnala: ReadonlySet<string> = new Set(),
 ): StoynostNaSastoyanie {
   const redove: RedNaStoynost[] = [];
   let obshto_tochno_st = 0;
   let sastoyanie_tochno_st = 0;
+  let razhod_sbor_tochno_st = 0;
+  let saglasuvana_sbor_tochno_st = 0;
   let prodadeni = 0;
 
   for (const o of obekti) {
-    const dop = otLista.get(o.obekt.trim()) ?? PRAZNO_OT_LISTA;
+    const otFayla = otLista.get(o.obekt.trim()) ?? PRAZNO_OT_LISTA;
+    const dop = prodadeniOtZhurnala.has(o.obekt.trim())
+      ? { ...otFayla, prodaden: true }
+      : otFayla;
 
     // ── А · ПО ПЛОЩ · продажната цена ────────────────────────────────────
     const tsena_tochno_st = tsenaTochno({
@@ -177,11 +227,38 @@ export function stoynostNaSastoyanie(
     });
     const sastoyanie_st = tsenaNagore(sastoyanie_t_st);
 
+    // ── В · ПО РАЗХОД · колко струва да се построи ───────────────────────
+    // Земята НЕ овехтява; овехтява само сградата (`tsenaPoRazhod`).
+    const razhod_tochno_st = tsenaPoRazhod({
+      obshta_kvsm: o.obshta_kvsm,
+      vid: o.vid,
+      ...(matritsa ? { matritsa } : {}),
+    });
+    const razhod_st = tsenaNagore(razhod_tochno_st);
+
+    // ── СЪГЛАСУВАНАТА · претеглената от трите (методология §2.4) ─────────
+    // Смята се от ТОЧНИТЕ, не от закръглените: закръгленото никога не влиза в
+    // сметка, която ще се закръгля втори път (правило 3).
+    // Тегла, които не затварят, НЕ раждат число (`saglasuvana` отказва) — но и
+    // не събарят екрана: колоната мълчи и екранът казва защо (правило 15).
+    const tegla = (matritsa ?? MATRITSA_ZA_RAZRABOTKA).tegla;
+    const sag = teglataZatvaryat(tegla)
+      ? saglasuvana({
+          pazaren_st: tsena_tochno_st,
+          dohoden_st: sastoyanie_t_st,
+          razhoden_st: razhod_tochno_st,
+          tegla,
+        })
+      : { tochno_st: 0, otpadnali: [] as readonly string[] };
+    const saglasuvana_st = tsenaNagore(sag.tochno_st);
+
     if (dop.prodaden) {
       prodadeni += 1;
     } else {
       obshto_tochno_st += tsena_tochno_st;
       sastoyanie_tochno_st += sastoyanie_t_st;
+      razhod_sbor_tochno_st += razhod_tochno_st;
+      saglasuvana_sbor_tochno_st += sag.tochno_st;
     }
 
     redove.push({
@@ -205,6 +282,13 @@ export function stoynostNaSastoyanie(
       naem_mesechen_st,
       naemOt,
       razlika_bt: razlikaVBT(tsena_tochno_st, sastoyanie_t_st),
+      razhod_tochno_st,
+      razhod_st,
+      razhodNaKvadrat_st: evroNaKvadrat_st(razhod_st, o.obshta_kvsm),
+      saglasuvana_tochno_st: sag.tochno_st,
+      saglasuvana_st,
+      saglasuvanaNaKvadrat_st: evroNaKvadrat_st(saglasuvana_st, o.obshta_kvsm),
+      otpadnali: sag.otpadnali,
     });
   }
 
@@ -225,6 +309,12 @@ export function stoynostNaSastoyanie(
     sastoyanie_st: zakragli(sastoyanie_tochno_st, 'stotitsi'),
     razlika_sastoyanie_st: razlikaOtZakraglyane(sastoyanie_tochno_st, 'stotitsi'),
     razlika_na_metodite_bt: razlikaVBT(obshto_tochno_st, sastoyanie_tochno_st),
+    razhod_tochno_st: razhod_sbor_tochno_st,
+    razhod_st: zakragli(razhod_sbor_tochno_st, 'stotitsi'),
+    razlika_razhod_st: razlikaOtZakraglyane(razhod_sbor_tochno_st, 'stotitsi'),
+    saglasuvana_tochno_st: saglasuvana_sbor_tochno_st,
+    saglasuvana_st: zakragli(saglasuvana_sbor_tochno_st, 'stotitsi'),
+    razlika_saglasuvana_st: razlikaOtZakraglyane(saglasuvana_sbor_tochno_st, 'stotitsi'),
     broy: redove.length - prodadeni,
     prodadeni,
   };

@@ -145,7 +145,9 @@ export const VRAZKI: readonly Vrazka[] = Object.freeze([
     kam: 'Продажби Архив',
     myasto: 'Състояние = Продаден',
     funktsiya: 'vrata',
-    postroena: false,
+    // ПОСТРОЕНА в резен 18б: `vArhiva` заключва сделката, а Вратата отказва и
+    // презапис, и ново движение. Числото се БРОИ от `dokade()`, не се твърди.
+    postroena: true,
     ednoposochna: true, // „Няма връщане от Продажби Архив."
   },
 
