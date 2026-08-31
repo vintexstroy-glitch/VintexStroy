@@ -78,6 +78,8 @@ export const VID = {
   koefitsient: 'koefitsient',
   /** ДВОЙКАТА · закачка между два реда (M17 · много-към-много) */
   zakachka: 'zakachka',
+  /** РЕД на създадена таблица · данните ѝ живеят вътре (M12) */
+  redNaTablitsa: 'red-na-tablitsa',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
   /**
@@ -313,6 +315,7 @@ export type TipSabitie =
   | 'КоефициентЗаписан'
   | 'РедовеЗакачени'
   | 'РедовеРазкачени'
+  | 'РедНаТаблицаЗаписан'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
@@ -1180,6 +1183,24 @@ export interface PayloadRedoveZakacheni {
 }
 
 export type PayloadRedoveRazkacheni = PayloadRedoveZakacheni;
+
+/**
+ * РЕДЪТ НА СЪЗДАДЕНА ТАБЛИЦА · един тип за запис, поправка и махане.
+ *
+ * Последната дума за същия ключ бие. Затова „махнат" е поле, не втори тип:
+ * върнатият ред е СЪЩИЯТ ред, не нов, и историята му се чете на едно място.
+ *
+ * Стойностите са в ТРИ карти по вид — парите отделно и в ЦЕЛИ стотинки
+ * (правило 3). Една обща карта би приела 12.34 в колона за пари.
+ */
+export interface PayloadRedNaTablitsaZapisan {
+  readonly tablitsa: string;
+  readonly red: string;
+  readonly pari_st: Readonly<Record<string, number>>;
+  readonly chisla: Readonly<Record<string, number>>;
+  readonly tekst: Readonly<Record<string, string>>;
+  readonly mahnat: boolean;
+}
 
 export type PayloadAgentZapisan = Agent;
 

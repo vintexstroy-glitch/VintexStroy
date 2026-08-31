@@ -27,6 +27,7 @@ import {
   proveriZakachka,
   type Krai,
 } from './mnogo-kam-mnogo.js';
+import { proveriRed } from './redove-na-tablitsa.js';
 import { sashtnostNaDokumenti } from './dokumenti.js';
 import {
   etapite,
@@ -107,6 +108,7 @@ import type {
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
   PayloadKoefitsientZapisan,
+  PayloadRedNaTablitsaZapisan,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
@@ -1683,6 +1685,35 @@ export class Deystviya {
       VID.zakachka,
       `ZAK:${klyuchNaDvoykata(a, b)}`,
       { vidA: a.vid, idA: a.id, vidB: b.vid, idB: b.id, zashto },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА РЕД на създадена таблица · данните ѝ живеят ВЪТРЕ (M12).
+   *
+   * Адресът е `RED:<таблица>:<ред>` — СЪЩИЯТ при поправка и при махане, защото
+   * това е един и същ ред. Нов адрес при махане би дал две неща в описа: едно
+   * живо и едно махнато, с еднакъв ключ.
+   *
+   * Пазачът чете ГЛАВАТА от Огледалото: коя колона съществува, коя е затворена
+   * и от какъв вид е. Затова стои тук — екранът знае своята глава, Вратата знае
+   * КНИГАТА, а редът може да дойде и от внос, и от агент.
+   */
+  async zapishiRedNaTablitsa(
+    danni: PayloadRedNaTablitsaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const glavata = (await this.ogledalo()).tablitsiOtFayl.get(danni.tablitsa);
+    if (glavata === undefined) {
+      throw new Error(`Таблица „${danni.tablitsa}" я няма — ред без таблица не се записва.`);
+    }
+    proveriRed(danni, glavata);
+    return this.#pusni(
+      'РедНаТаблицаЗаписан',
+      VID.redNaTablitsa,
+      `RED:${danni.tablitsa}:${danni.red}`,
+      danni,
       z,
     );
   }

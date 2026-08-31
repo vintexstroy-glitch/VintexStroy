@@ -412,7 +412,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     </section>`
     }
 
-    ${blokNaTablitsaOtFayl()}
+    ${blokNaTablitsaOtFayl(o)}
 
     ${redPodRazhodite(o, mesets, dnes)}
 
