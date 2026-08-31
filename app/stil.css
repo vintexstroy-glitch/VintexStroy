@@ -554,8 +554,16 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    Плочката е капната на 240px и редът НЕ се разтяга (`justify-content: start`)
    — същият урок като при таблиците в резен 3: `1fr` разтяга пътеките и прави
    от четири плочки четири широки петна вместо шест събрани. */
+/* ПЛОЧКИТЕ · същата закована граница като при полетата, същото празно отдясно.
+   `auto-fill` (не `auto-fit`) пази празните коловози: с ЕДНА плочка тя остава
+   с ръста си, вместо да се разтегне през целия екран. С шест — редът се пълни.
+
+   ДОЛНАТА ГРАНИЦА Е 230, не 190: при 190 се побират пет плочки, надписите им се
+   пренасят на повече редове и ВИСОЧИНАТА скочи от 66 на 84 при праг 72. Хвана
+   го собствената мярка на прохода (§74) — пълненето на реда не бива да се плаща
+   с по-висока плочка. */
 .plochki {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 240px));
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   justify-content: start; gap: 10px;
 }
 /* Числото ВЛЯВО, етикетът и подтекстът вдясно един под друг · три реда стават
@@ -881,7 +889,11 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   grid-template-columns: minmax(0, 280px) 84px 150px minmax(0, 400px) 120px;
   min-width: 760px;
 }
-.red.parametar .kletka { display: flex; align-items: center; gap: 8px; }
+/* ПОСОКАТА, не само подравняването. `.kletka` е `flex-direction: column` по
+   устройство; тук се иска РЕД — знак ДО името. Без `row` знакът увисваше НАД
+   думата, центриран, и приличаше на счупен глиф. Правило, което сменя `display`
+   и `align-items`, но не и посоката, не мени нищо видимо. */
+.red.parametar .kletka { display: flex; flex-direction: row; align-items: center; gap: 8px; }
 .red.parametar input[type="text"], .red.parametar input:not([type]) {
   width: 100%; font-family: inherit; font-size: 0.893rem;
   border: 1px solid var(--liniya); border-radius: 4px; padding: 5px 8px; min-height: 30px;
