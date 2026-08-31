@@ -67,14 +67,31 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.$$eval('[data-tablitsa=ot-fayl] .red.otfaylred[data-formula=da]', (e) => e.length),
     1,
   );
+  // ВИДЪТ вече е ПАДАЩО МЕНЮ (резен 61): машината предлага, човекът решава.
+  // Затова се чете ИЗБРАНОТО, не текстът на клетката — иначе тук стоят всички
+  // пет думи слепени и проверката минава за друго.
   proveri(
-    'видовете се СМЯТАТ от данните · текст, евро, евро, евро, процент',
+    'видовете се ПРЕДЛАГАТ от данните · текст, евро, евро, евро, процент',
     (
-      await p.$$eval('[data-tablitsa=ot-fayl] .red.otfaylred[data-kolona]', (e) =>
-        e.map((x) => x.children[1]?.textContent ?? ''),
+      await p.$$eval('[data-tablitsa=ot-fayl] .red.otfaylred[data-kolona] select', (e) =>
+        e.map((x) => (x as HTMLSelectElement).value),
       )
     ).join(' · '),
-    'текст · евро · евро · евро · процент',
+    'tekst · evro · evro · evro · protsent',
+  );
+
+  // ══ 131 · ГЛАВАТА СЕ ПОЗНАВА · ВИДЪТ СЕ ПОПРАВЯ · ФАЙЛЪТ ВЛИЗА ЦЯЛ ══════
+  // (резен 61) Трите неща, без които неговият файл не влиза: главата под
+  // заглавен ред, парите като голи числа, и 120 реда, които не се пишат ръчно.
+  proveri(
+    'екранът казва на кой ред е познал главата',
+    Boolean(await p.$('#red-na-glavata')),
+    true,
+  );
+  proveri(
+    'видът на всяка колона е ПАДАЩО МЕНЮ, не присъда',
+    (await p.$$eval('[data-vid-na]', (e) => e.length)) > 0,
+    true,
   );
 
   // ── ПОТВЪРЖДЕНИЕТО · чак сега се пише ───────────────────────────────────
@@ -97,6 +114,39 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       'Файлът НЕ се качва тук',
     ),
     true,
+  );
+
+  // ── ВНОСЪТ · целият лист влиза с едно натискане ─────────────────────────
+  proveri(
+    'след създаването се предлага ВНОС на редовете',
+    Boolean(await p.$('#vnesi-redovete')),
+    true,
+  );
+  proveri(
+    'и сверката вход↔изход стои до бутона, с разлика НУЛА',
+    ((await p.textContent('#sverka-vnos')) ?? '').replace(/\s+/g, ' ').includes('разлика: 0'),
+    true,
+  );
+  // ВНОСЪТ пише ПО ЕДНО събитие на ред, не едно за партидата — затова тук не
+  // се ползва `sSabitie` (той чака точно +1), а се БРОЯТ. Числото е пин: три
+  // реда данни има фикстурата, три записа трябва да влязат.
+  const predVnos = await broySabitiya(p);
+  await deystvieSPrerisuvane(p, () => p.click('#vnesi-redovete'));
+  await p.waitForFunction(
+    (n) =>
+      Number(document.querySelector('[data-broi]')?.getAttribute('data-broi') ?? -1) >= (n as number) + 3,
+    predVnos,
+  );
+  proveri('вносът пише ПО ЕДНО събитие на ред', (await broySabitiya(p)) - predVnos, 3);
+  proveri(
+    'и те се виждат в таблицата',
+    (await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) => e.length)) > 0,
+    true,
+  );
+  proveri(
+    'бутонът си отива · внесеното не се внася втори път',
+    await p.$$eval('#vnesi-redovete', (e) => e.length),
+    0,
   );
 
   // ══ 128 · РЕДОВЕТЕ НА СЪЗДАДЕНАТА ТАБЛИЦА (резен 57 · M12) ═══════════════
@@ -132,10 +182,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const predRed = await broySabitiya(p);
   await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
   proveri('редът е СЪБИТИЕ', await broySabitiya(p), predRed + 1);
+  // ТРИТЕ ВНЕСЕНИ плюс ТОЗИ на ръка. Числото беше 1, докато вносът го нямаше —
+  // и остана 1 след него: проверка, зелена по стара причина. Тя падна чак
+  // когато вносът застана пред нея (резен 61).
   proveri(
-    'и се вижда в таблицата на редовете',
+    'написаният на ръка застава ДО внесените · 3 + 1',
     await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) => e.length),
-    1,
+    4,
   );
   proveri(
     'парите се показват цели, както ги пише валутата',
@@ -144,18 +197,25 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   );
   proveri(
     'сверката брои трите числа',
-    ((await p.textContent('#sverka-redove')) ?? '').replace(/\s+/g, ' ').includes('живи: 1'),
+    ((await p.textContent('#sverka-redove')) ?? '').replace(/\s+/g, ' ').includes('живи: 4'),
     true,
   );
 
   // МАХАНЕТО е ЗАПИС: редът си отива от таблицата, Журналът расте.
+  //
+  // Бутонът се хваща ПО КЛЮЧ, не като „първия махач". Голият селектор беше
+  // еднозначен, докато редът беше един; щом вносът сложи три пред него, той
+  // започна да маха ЧУЖД ред („Кауфланд"), а проверката отдолу пак минаваше.
+  // Точно това брои `chestnost` като гол селектор върху двусмислен белег.
   const predMahane = await broySabitiya(p);
-  await sSabitie(p, () => p.click('[data-mahni-red]'));
+  await sSabitie(p, () => p.click('[data-mahni-red="Ф-1"]'));
   proveri('махането също е СЪБИТИЕ', await broySabitiya(p), predMahane + 1);
   proveri(
-    'редът си отива от ТАБЛИЦАТА',
-    await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) => e.length),
-    0,
+    'редът си отива от ТАБЛИЦАТА · и то ТОЗИ ред',
+    (await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['red'] ?? ''),
+    )).join(' '),
+    'Кауфланд Пощенска Техномаркет',
   );
   proveri(
     'а сверката помни, че е БИЛ · записани 1 · махнати 1 · живи 0',
@@ -207,9 +267,9 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     0,
   );
   proveri(
-    'предлага се ЖИВИЯТ ред, а махнатият от §128 — не',
+    'предлагат се ЖИВИТЕ редове — внесените и писаният на ръка, а махнатият — не',
     await p.$$eval('#zak-red-a option', (e) => e.map((x) => x.textContent).join(' ')),
-    'Ф-7',
+    'Кауфланд Пощенска Техномаркет Ф-7',
   );
 
   await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-b', 'imot'));

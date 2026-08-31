@@ -25,18 +25,20 @@
 
 import { ekraniraj } from './obshto.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { otXLSXSFormuli } from '../src/iztochnik/xlsx.js';
-import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
+import { tablitsiSFormuli } from '../src/iztochnik/chetetsat.js';
 import {
+  redatNaGlavata,
   predlozhiTablitsa,
   sDumi,
   type PredlozhenieZaTablitsa,
 } from '../src/domein/tablitsa-ot-fayl.js';
 import { IMENA_NA_DEYSTVIYATA } from '../src/domein/formuli.js';
-import { IMENA_NA_VIDOVETE_STOYNOST } from '../src/domein/vid-stoynost.js';
+import { IMENA_NA_VIDOVETE_STOYNOST, VIDOVE_STOYNOST, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Konteks } from './ekranite.js';
+import type { Tablitsa } from '../src/iztochnik/tablitsa.js';
+import { podgotviVnos } from '../src/domein/vnos-na-redove.js';
 import type { PayloadTablitsaOtFaylSazdadena } from '../src/domein/sabitiya.js';
 import type { RedNaTablitsa } from '../src/domein/redove-na-tablitsa.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
@@ -52,9 +54,35 @@ import { razrezPoKolona, sveriRazreza } from '../src/domein/razrez.js';
 
 /** Каквото е прочетено, докато човекът не потвърди · нула събития дотогава. */
 let predlozhenie: PredlozhenieZaTablitsa | undefined;
+let formulite: ReadonlyMap<number, string> = new Map();
+
+/**
+ * ВИДЪТ, ПОПРАВЕН С РЪКА · последната дума е на човека, не на разпознавача.
+ *
+ * В неговия файл цените са ГОЛИ ЧИСЛА („147800"), без знак и без стотинки —
+ * разпознавачът ги чете като „число" и те не влизат в нито един сбор пари.
+ * Позна ли се грешно, поправката трябва да е тук, ПРЕДИ записа: сменен вид
+ * след това би преоценил вече записани числа.
+ */
+const vidoveOtRaka = new Map<number, VidStoynost>();
 let imeNaFayla = '';
 let otpechatakNaFayla = '';
 let greshka = '';
+
+/** ЗАЩО формули не са дошли · празно значи, че са дошли (правило 15). */
+let bezFormuli = '';
+
+/**
+ * ПРОЧЕТЕНИЯТ лист · пази се, за да влязат и РЕДОВЕТЕ, не само главата.
+ *
+ * Дотук предложението се прибираше след потвърждението и данните умираха с
+ * него: човек създаваше таблицата, а после въвеждаше 120-те ѝ реда на ръка.
+ */
+let prochetenList: Tablitsa | undefined;
+let zaVnos = '';
+
+/** НА КОЙ РЕД Е ГЛАВАТА · познато от файла, но последната дума е негова. */
+let redNaGlavata = 0;
 
 /** КОЯ създадена таблица гледам · памет на екрана, не факт (ADR-022). */
 let izbranaTablitsa = '';
@@ -77,10 +105,24 @@ export function blokNaTablitsaOtFayl(o: Ogledalo): string {
 
       <div class="redditsa">
         <button type="button" id="izbor-tablitsa-fayl">Прочети таблица от папката</button>
-        <input translate="no" type="file" id="fayl-tablitsa" accept=".xlsx,.csv" hidden>
+        <input translate="no" type="file" id="fayl-tablitsa" accept=".xlsx,.xlsb,.csv" hidden>
       </div>
       <p class="greshka" id="greshka-tablitsa-fayl">${ekraniraj(greshka)}</p>
+      ${bezFormuli === '' ? '' : `<p class="drebno" id="bez-formuli">${ekraniraj(bezFormuli)}</p>`}
 
+      ${
+        predlozhenie === undefined
+          ? ''
+          : `<div class="poleta tesni">
+          <div class="pole">
+            <label for="red-na-glavata">Главата е на ред</label>
+            <input translate="no" id="red-na-glavata" type="number" min="1" value="${redNaGlavata + 1}"
+                   class="tesen" inputmode="numeric">
+          </div>
+          <p class="drebno">Познато от файла. Смени го, ако главата стои другаде — всичко
+          под нея са данни.</p>
+        </div>`
+      }
       ${predlozhenie === undefined ? '' : predlozhenieto(predlozhenie)}
     </section>
     ${blokNaSazdadenite(o)}`;
@@ -112,7 +154,12 @@ function blokNaSazdadenite(o: Ogledalo): string {
     </section>`;
   }
 
-  const t = vsichki.find((x) => x.klyuch === izbranaTablitsa) ?? vsichki[0]!;
+  // ТОКУ-ЩО СЪЗДАДЕНАТА се показва сама: човек, който е натиснал „Създай",
+  // гледа нея, а не първата по азбука. Изричният избор пак бие.
+  const t =
+    vsichki.find((x) => x.klyuch === izbranaTablitsa) ??
+    vsichki.find((x) => x.klyuch === zaVnos) ??
+    vsichki[0]!;
   const redove = redovete(o.redoveNaTablitsi, t.klyuch);
   const sverka = sveriRedovete(o.vhodNaRedovete, o.redoveNaTablitsi, t.klyuch);
   const nomera = t.glavi.map((_, i) => String(i));
@@ -203,6 +250,7 @@ function blokNaSazdadenite(o: Ogledalo): string {
         }
       </div>
 
+      ${blokNaVnosa(t)}
       ${blokNaRazreza(t, redove, nomera)}
 
       <p class="drebno" id="sverka-redove">Записани: <b>${sverka.zapisani}</b> · махнати:
@@ -259,7 +307,12 @@ function predlozhenieto(p: PredlozhenieZaTablitsa): string {
         <div class="red otfaylred${k.zashto === '' ? '' : ' duljimo'}" translate="no"
              data-kolona="${k.nomer}" data-formula="${k.formula === undefined ? 'ne' : 'da'}">
           <span class="kletka">${ekraniraj(k.ime)}</span>
-          <span class="kletka">${ekraniraj(IMENA_NA_VIDOVETE_STOYNOST[k.vid])}</span>
+          <span class="kletka"><select translate="no" data-vid-na="${k.nomer}">
+            ${VIDOVE_STOYNOST.map(
+              (v) =>
+                `<option value="${v}"${v === (vidoveOtRaka.get(k.nomer) ?? k.vid) ? ' selected' : ''}>${ekraniraj(IMENA_NA_VIDOVETE_STOYNOST[v])}</option>`,
+            ).join('')}
+          </select></span>
           <span class="kletka">${
             k.formula === undefined
               ? '—'
@@ -289,6 +342,32 @@ function predlozhenieto(p: PredlozhenieZaTablitsa): string {
         </label>
         <button type="submit">Създай таблицата вътре</button>
       </form>`;
+}
+
+/**
+ * ВНОСЪТ НА РЕДОВЕТЕ · целият файл влиза, не само главата (резен 61).
+ *
+ * Появява се САМО докато прочетеният лист е още в ръцете на екрана и е за
+ * ТАЗИ таблица. Бутон, който предлага да внесе чужд лист, е бутон, който чака
+ * да сгреши.
+ */
+function blokNaVnosa(t: PayloadTablitsaOtFaylSazdadena): string {
+  if (prochetenList === undefined || zaVnos !== t.klyuch) return '';
+  const v = podgotviVnos(prochetenList, t, (t.redNaGlavata ?? 0) + 1);
+  return `
+    <div class="deystviya" data-vnos="${ekraniraj(t.klyuch)}">
+      <button type="button" id="vnesi-redovete"${v.redove.length ? '' : ' disabled'}>Внеси
+      ${v.redove.length} реда от файла</button>
+      <p class="drebno" id="sverka-vnos">Прочетени: <b>${v.sverka.procheteni}</b> · за
+      записване: <b>${v.sverka.zapisani}</b> · пропуснати: <b>${v.sverka.propusnati}</b> ·
+      разлика: <b>${v.sverka.razlika}</b>.${
+        v.propusnati.length === 0
+          ? ' Нито един ред не отпада.'
+          : ` Пропуснатите се КАЗВАТ поименно: ${ekraniraj(
+              v.propusnati.slice(0, 4).map((x) => `ред ${x.red} — ${x.zashto}`).join(' · '),
+            )}${v.propusnati.length > 4 ? ` · и още ${v.propusnati.length - 4}` : ''}.`
+      }</p>
+    </div>`;
 }
 
 /**
@@ -366,13 +445,17 @@ export function zakachiTablitsaOtFayl(
       const baytove = new Uint8Array(await fayl.arrayBuffer());
       otpechatakNaFayla = await otpechatak(baytove, sha256Web);
       imeNaFayla = fayl.name;
-      if (/\.csv$/i.test(fayl.name)) {
-        // CSV НЯМА формули · и това не е дефект, а свойство на формата.
-        predlozhenie = predlozhiTablitsa(otCSV(tekstOtBaytove(baytove), fayl.name), new Map());
-      } else {
-        const { tablitsi, formuli } = await otXLSXSFormuli(baytove, fayl.name);
-        predlozhenie = predlozhiTablitsa(tablitsi[0]!, formuli[0]!.poKolona);
-      }
+      // ЕДИН път за трите формата (правило 17). Липсата на формули не е дефект,
+      // а свойство на формата — и се КАЗВА с думите на своята причина.
+      const prochetenoto = await tablitsiSFormuli(baytove, fayl.name);
+      bezFormuli = prochetenoto.bezFormuli;
+      prochetenList = prochetenoto.tablitsi[0];
+      formulite = prochetenoto.formuli[0]!.poKolona;
+      // ГЛАВАТА СЕ ПОЗНАВА, не се приема за първия ред: неговите листове почват
+      // със заглавие в една клетка, а главата е под него.
+      vidoveOtRaka.clear();
+      redNaGlavata = redatNaGlavata(prochetenList!);
+      predlozhenie = predlozhiTablitsa(prochetenList!, formulite, redNaGlavata);
       greshka = '';
     } catch (err) {
       predlozhenie = undefined;
@@ -387,8 +470,61 @@ export function zakachiTablitsaOtFayl(
     await prerisuvay();
   });
 
+  koren.querySelector<HTMLButtonElement>('#vnesi-redovete')?.addEventListener('click', async () => {
+    const o = await k.deystviya.ogledalo();
+    const t = o.tablitsiOtFayl.get(zaVnos);
+    if (t === undefined || prochetenList === undefined) return;
+    const v = podgotviVnos(prochetenList, t, (t.redNaGlavata ?? 0) + 1);
+    let vlezli = 0;
+    try {
+      for (const red of v.redove) {
+        // ВСЕКИ ред е СВОЙ запис през Вратата, със свой `opId` (правило 20).
+        // Един запис за цялата партида би сложил сто решения под един ключ.
+        await k.deystviya.zapishiRedNaTablitsa(red, { opId: `vnos:${crypto.randomUUID()}` });
+        vlezli += 1;
+      }
+      greshka = '';
+      k.vest(
+        'dobre',
+        `Внесени ${vlezli} реда · пропуснати ${v.propusnati.length} · разлика ${
+          v.sverka.procheteni - vlezli - v.propusnati.length
+        }.`,
+      );
+      prochetenList = undefined;
+      zaVnos = '';
+      await prerisuvay();
+    } catch (err) {
+      // ЧАСТИЧНО ВНЕСЕНОТО ОСТАВА. Журналът е само за добавяне: редовете,
+      // които вече са влезли, са факти. Казва се докъде е стигнало.
+      greshka = `Спря на ред ${vlezli + 1}: ${dumiZaGreshka(err)}. Влезлите ${vlezli} остават.`;
+      k.vest('zle', greshka);
+      await prerisuvay();
+    }
+  });
+
   koren.querySelector<HTMLSelectElement>('#izbor-razrez')?.addEventListener('change', async (e) => {
     razrezPo = (e.target as HTMLSelectElement).value;
+    await prerisuvay();
+  });
+
+  for (const izbor of koren.querySelectorAll<HTMLSelectElement>('[data-vid-na]')) {
+    izbor.addEventListener('change', async () => {
+      const nomer = Number(izbor.dataset['vidNa']);
+      vidoveOtRaka.set(nomer, izbor.value as VidStoynost);
+      await prerisuvay();
+    });
+  }
+
+  koren.querySelector<HTMLInputElement>('#red-na-glavata')?.addEventListener('change', async (e) => {
+    const nov = Number((e.target as HTMLInputElement).value) - 1;
+    if (prochetenList === undefined || !Number.isInteger(nov) || nov < 0) return;
+    try {
+      predlozhenie = predlozhiTablitsa(prochetenList, formulite, nov);
+      redNaGlavata = nov;
+      greshka = '';
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
     await prerisuvay();
   });
 
@@ -478,10 +614,13 @@ export function zakachiTablitsaOtFayl(
       await k.deystviya.zapishiTablitsaOtFayl(
         {
           klyuch: ime,
+          redNaGlavata,
           otFayl: imeNaFayla,
           otpechatak: otpechatakNaFayla,
           glavi: p.koloni.map((x) => x.ime),
-          vidove: Object.fromEntries(p.koloni.map((x) => [x.nomer, x.vid])),
+          vidove: Object.fromEntries(
+            p.koloni.map((x) => [x.nomer, vidoveOtRaka.get(x.nomer) ?? x.vid]),
+          ),
           formuli: Object.fromEntries(
             p.koloni.filter((x) => x.formula !== undefined).map((x) => [x.nomer, x.formula!]),
           ),
@@ -492,6 +631,7 @@ export function zakachiTablitsaOtFayl(
         { opId: `tablitsa-ot-fayl:${crypto.randomUUID()}` },
       );
       predlozhenie = undefined;
+      zaVnos = ime;
       k.vest('dobre', `Таблицата „${ime}" е създадена · ${p.kopirani} копирани формули.`);
       await prerisuvay();
     } catch (err) {
