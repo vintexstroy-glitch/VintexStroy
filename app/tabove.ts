@@ -22,6 +22,7 @@ import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import {
   eSashtnostZaZakachane,
   IMENA_NA_SASHTNOSTITE,
+  krai,
   redoveNa,
   SASHTNOSTI_ZA_ZAKACHANE,
   svarzanite,
@@ -93,6 +94,10 @@ let vidB = chetiEkranno('tabove.zakachki.vidB', 'imot') as SashtnostZaZakachane;
 
 /** КОЙ ред е избран отляво · пак поглед: от него се чете „за какво е закачен". */
 let redA = chetiEkranno('tabove.zakachki.redA', '');
+
+/** КОЯ създадена таблица · само когато видът е „Ред на таблица" (резен 58). */
+let tablitsaA = chetiEkranno('tabove.zakachki.tablitsaA', '');
+let tablitsaB = chetiEkranno('tabove.zakachki.tablitsaB', '');
 
 /** Изборът за Select By: секция → ключовете на кликнатия ѝ ред. Ефимерно. */
 const izbraniRedove = new Map<string, Readonly<Partial<Record<PoKakvo, string>>>>();
@@ -279,8 +284,14 @@ function blokAdresnaKniga(o: Ogledalo): string {
  * колекция само, предлага ред, който Вратата после отказва.
  */
 function blokZakachki(o: Ogledalo): string {
-  const redoveA = redoveNa(o, vidA);
-  const redoveB = redoveNa(o, vidB);
+  // ИМЕНАТА НА СЪЗДАДЕНИТЕ ТАБЛИЦИ · нужни само за вид „ред", но се смятат
+  // винаги: списък, който се появява едва при избора, кара екрана да се рисува
+  // по два различни пътя, а два пътя за едно нещо се разминават (ADR-027).
+  const tablitsi = [...o.tablitsiOtFayl.keys()].sort();
+  const tA = tablitsi.includes(tablitsaA) ? tablitsaA : (tablitsi[0] ?? '');
+  const tB = tablitsi.includes(tablitsaB) ? tablitsaB : (tablitsi[0] ?? '');
+  const redoveA = vidA === 'red' ? redoveNa(o, 'red', tA) : redoveNa(o, vidA);
+  const redoveB = vidB === 'red' ? redoveNa(o, 'red', tB) : redoveNa(o, vidB);
   const zhivi = [...o.zakachki.entries()].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
   const sverka = sveriZakachkite(o.zakachki, o);
 
@@ -296,7 +307,21 @@ function blokZakachki(o: Ogledalo): string {
   // от другия вид — тогава пада на първия. Иначе „закачен за" би показвал
   // връзките на ред, който вече не стои в менюто.
   const izbranA = redoveA.includes(redA) ? redA : (redoveA[0] ?? '');
-  const zakachenoZa = svarzanite(o.zakachki, { vid: vidA, id: izbranA });
+  const zakachenoZa = svarzanite(o.zakachki, krai(vidA, izbranA, tA));
+
+  const menyuTablitsi = (id: string, spisak: readonly string[], izbran: string): string => `
+    <select translate="no" id="${id}"${spisak.length ? '' : ' disabled'}>
+      ${
+        spisak.length
+          ? spisak
+              .map(
+                (t) =>
+                  `<option value="${ekraniraj(t)}"${t === izbran ? ' selected' : ''}>${ekraniraj(t)}</option>`,
+              )
+              .join('')
+          : '<option value="">— няма създадени таблици —</option>'
+      }
+    </select>`;
 
   const redove = (id: string, spisak: readonly string[], izbran = ''): string => `
     <select translate="no" id="${id}"${spisak.length ? '' : ' disabled'}>
@@ -320,8 +345,10 @@ function blokZakachki(o: Ogledalo): string {
       </div>
       <div class="poleta tesni">
         <div class="pole"><label for="zak-vid-a">Този ред</label>${menyu('zak-vid-a', vidA)}</div>
+        ${vidA === 'red' ? `<div class="pole"><label for="zak-tablitsa-a">от таблица</label>${menyuTablitsi('zak-tablitsa-a', tablitsi, tA)}</div>` : ''}
         <div class="pole"><label for="zak-red-a">кой</label>${redove('zak-red-a', redoveA, izbranA)}</div>
         <div class="pole"><label for="zak-vid-b">се закача за</label>${menyu('zak-vid-b', vidB)}</div>
+        ${vidB === 'red' ? `<div class="pole"><label for="zak-tablitsa-b">от таблица</label>${menyuTablitsi('zak-tablitsa-b', tablitsi, tB)}</div>` : ''}
         <div class="pole"><label for="zak-red-b">кой</label>${redove('zak-red-b', redoveB)}</div>
         <div class="pole">
           <label for="zak-zashto">Защо · по избор</label>
@@ -357,8 +384,8 @@ function blokZakachki(o: Ogledalo): string {
                 .map(
                   ([klyuch, z]) => `
           <div class="red opis${sverka.viseshti.includes(klyuch) ? ' propusnat' : ''}" translate="no" data-zakachka="${ekraniraj(klyuch)}">
-            <span><b>${ekraniraj(IMENA_NA_SASHTNOSTITE[z.a.vid])}</b> · ${ekraniraj(z.a.id)}</span>
-            <span><b>${ekraniraj(IMENA_NA_SASHTNOSTITE[z.b.vid])}</b> · ${ekraniraj(z.b.id)}</span>
+            <span>${imeNaKraya(z.a)}</span>
+            <span>${imeNaKraya(z.b)}</span>
             <span>${ekraniraj(z.zashto) || '<span class="znachka tiha">без причина</span>'}</span>
             <span><button type="button" class="vtorichen malak" data-razkachi="${ekraniraj(klyuch)}">Разкачи</button></span>
           </div>`,
@@ -374,6 +401,17 @@ function blokZakachki(o: Ogledalo): string {
       Редовете на моделна и на внесена таблица още ги няма в Журнала (описът · M12), затова закачка
       към чужда таблица не се предлага — страна без редове не може да бъде проверена.</p>
     </section>`;
+}
+
+/**
+ * ИМЕТО на един край · и редът на таблица казва В КОЯ таблица е.
+ *
+ * Без таблицата два реда с ключ „Ф-1" в две таблици изглеждат като един и същ
+ * ред — точно двусмислието, заради което адресът им е двоен.
+ */
+function imeNaKraya(k: { vid: SashtnostZaZakachane; id: string; tablitsa?: string }): string {
+  const ime = `<b>${ekraniraj(IMENA_NA_SASHTNOSTITE[k.vid])}</b> · ${ekraniraj(k.id)}`;
+  return k.tablitsa === undefined ? ime : `${ime} <span class="drebno">(${ekraniraj(k.tablitsa)})</span>`;
 }
 
 /**
@@ -824,6 +862,23 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
     });
   }
 
+  for (const [id, koe] of [
+    ['zak-tablitsa-a', 'a'],
+    ['zak-tablitsa-b', 'b'],
+  ] as const) {
+    koren.querySelector<HTMLSelectElement>(`#${id}`)?.addEventListener('change', async (e) => {
+      const v = (e.target as HTMLSelectElement).value;
+      if (koe === 'a') {
+        tablitsaA = v;
+        zapomniEkranno('tabove.zakachki.tablitsaA', v);
+      } else {
+        tablitsaB = v;
+        zapomniEkranno('tabove.zakachki.tablitsaB', v);
+      }
+      await prerisuvay();
+    });
+  }
+
   koren.querySelector<HTMLSelectElement>('#zak-red-a')?.addEventListener('change', async (e) => {
     redA = (e.target as HTMLSelectElement).value;
     zapomniEkranno('tabove.zakachki.redA', redA);
@@ -838,7 +893,9 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
       // `opId` носи ДЕЙСТВИЕТО (правило 20): закачане СЛЕД разкачане е ново
       // решение. Ключ от двойката би върнал стария резултат и втората закачка
       // би изчезнала мълчаливо.
-      await k.deystviya.zakachiRedove({ vid: vidA, id: idA }, { vid: vidB, id: idB }, zashto, {
+      const tA = koren.querySelector<HTMLSelectElement>('#zak-tablitsa-a')?.value ?? '';
+      const tB = koren.querySelector<HTMLSelectElement>('#zak-tablitsa-b')?.value ?? '';
+      await k.deystviya.zakachiRedove(krai(vidA, idA, tA), krai(vidB, idB, tB), zashto, {
         opId: `zakachka:${crypto.randomUUID()}`,
       });
       greshka = '';

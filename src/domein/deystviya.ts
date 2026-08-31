@@ -28,6 +28,25 @@ import {
   type Krai,
 } from './mnogo-kam-mnogo.js';
 import { proveriRed } from './redove-na-tablitsa.js';
+
+/**
+ * ТОВАРЪТ на закачането и на разкачането · ЕДИН дом.
+ *
+ * Двете събития носят едно и също нещо, казано в различен ден. Два еднакви
+ * литерала се разминават при първото ново поле — тук се разминаха точно така:
+ * `tablitsa` дойде и трябваше да влезе на две места.
+ */
+function tovarNaZakachkata(a: Krai, b: Krai, zashto: string): PayloadRedoveZakacheni {
+  return {
+    vidA: a.vid,
+    idA: a.id,
+    vidB: b.vid,
+    idB: b.id,
+    zashto,
+    ...(a.tablitsa === undefined ? {} : { tablitsaA: a.tablitsa }),
+    ...(b.tablitsa === undefined ? {} : { tablitsaB: b.tablitsa }),
+  };
+}
 import { sashtnostNaDokumenti } from './dokumenti.js';
 import {
   etapite,
@@ -109,6 +128,7 @@ import type {
   PayloadParametarNaVhodaZapisan,
   PayloadKoefitsientZapisan,
   PayloadRedNaTablitsaZapisan,
+  PayloadRedoveZakacheni,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
@@ -1684,7 +1704,7 @@ export class Deystviya {
       'РедовеЗакачени',
       VID.zakachka,
       `ZAK:${klyuchNaDvoykata(a, b)}`,
-      { vidA: a.vid, idA: a.id, vidB: b.vid, idB: b.id, zashto },
+      tovarNaZakachkata(a, b, zashto),
       z,
     );
   }
@@ -1730,7 +1750,7 @@ export class Deystviya {
       'РедовеРазкачени',
       VID.zakachka,
       `RAZ:${klyuchNaDvoykata(a, b)}`,
-      { vidA: a.vid, idA: a.id, vidB: b.vid, idB: b.id, zashto },
+      tovarNaZakachkata(a, b, zashto),
       z,
     );
   }

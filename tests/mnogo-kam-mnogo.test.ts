@@ -9,6 +9,7 @@ import {
   IMENA_NA_SASHTNOSTITE,
   klyuchNaDvoykata,
   naredi,
+  krai,
   proveriZakachka,
   redoveNa,
   SASHTNOSTI_ZA_ZAKACHANE,
@@ -179,6 +180,180 @@ describe('много-към-много · сверката', () => {
   });
 });
 
+describe('много-към-много · РЕДЪТ НА СЪЗДАДЕНА ТАБЛИЦА (резен 58)', () => {
+  const RED_A: Krai = { vid: 'red', id: 'Ф-1', tablitsa: 'Фактури' };
+
+  async function sTablitsa() {
+    const { deystviya, dnevnik } = stend();
+    await deystviya.dobaviImot('I-1', { adres: 'А', edinitsa: 'х', ploshtad_kvsm: 0 }, { opId: 'i' });
+    await deystviya.zapishiTablitsaOtFayl(
+      {
+        klyuch: 'Фактури',
+        otFayl: 'f.xlsx',
+        otpechatak: 'ab'.repeat(32),
+        glavi: ['Доставчик', 'Сума'],
+        vidove: { 0: 'tekst', 1: 'evro' },
+        formuli: {},
+        nekopirani: [],
+      },
+      { opId: 't-1' },
+    );
+    await deystviya.zapishiRedNaTablitsa(
+      {
+        tablitsa: 'Фактури',
+        red: 'Ф-1',
+        pari_st: { 1: stotinki(100_00) },
+        chisla: {},
+        tekst: { 0: 'Д' },
+        mahnat: false,
+      },
+      { opId: 'r-1' },
+    );
+    const o = async () => fold(await dnevnik.chetiVsichki('vintexstroy'));
+    return { deystviya, o };
+  }
+
+  it('ред от създадена таблица се закача за имот', async () => {
+    const { deystviya, o } = await sTablitsa();
+    await deystviya.zakachiRedove(RED_A, IMOT, 'фактурата е за този имот', { opId: 'z-1' });
+    const zakachki = (await o()).zakachki;
+    expect(svarzanite(zakachki, IMOT).get('red')).toEqual(['Ф-1']);
+    expect(svarzanite(zakachki, RED_A).get('imot')).toEqual(['I-1']);
+  });
+
+  it('ДВА реда с еднакъв ключ в РАЗНИ таблици са различни краища', async () => {
+    const { deystviya, o } = await sTablitsa();
+    await deystviya.zapishiTablitsaOtFayl(
+      {
+        klyuch: 'Разписки',
+        otFayl: 'r.xlsx',
+        otpechatak: 'cd'.repeat(32),
+        glavi: ['Кой'],
+        vidove: { 0: 'tekst' },
+        formuli: {},
+        nekopirani: [],
+      },
+      { opId: 't-2' },
+    );
+    await deystviya.zapishiRedNaTablitsa(
+      { tablitsa: 'Разписки', red: 'Ф-1', pari_st: {}, chisla: {}, tekst: { 0: 'х' }, mahnat: false },
+      { opId: 'r-2' },
+    );
+
+    await deystviya.zakachiRedove(RED_A, IMOT, '', { opId: 'z-1' });
+    await deystviya.zakachiRedove({ vid: 'red', id: 'Ф-1', tablitsa: 'Разписки' }, IMOT, '', {
+      opId: 'z-2',
+    });
+
+    // ДВЕ различни двойки, не една: същият ключ, различна таблица.
+    expect((await o()).zakachki.size).toBe(2);
+  });
+
+  it('МАХНАТИЯТ ред не се закача · закачаш за нещо, което го няма', async () => {
+    const { deystviya } = await sTablitsa();
+    await deystviya.zapishiRedNaTablitsa(
+      {
+        tablitsa: 'Фактури',
+        red: 'Ф-1',
+        pari_st: { 1: stotinki(100_00) },
+        chisla: {},
+        tekst: { 0: 'Д' },
+        mahnat: true,
+      },
+      { opId: 'r-mahnat' },
+    );
+    await expect(deystviya.zakachiRedove(RED_A, IMOT, '', { opId: 'z-1' })).rejects.toThrow(
+      /не съществува/,
+    );
+  });
+
+  it('ред БЕЗ таблица и вградена същност С таблица се отказват с думи', async () => {
+    const { o } = await sTablitsa();
+    const kniga = await o();
+    expect(() => proveriZakachka({ vid: 'red', id: 'Ф-1' }, IMOT, kniga)).toThrow(/КОЯ таблица/);
+    expect(() =>
+      proveriZakachka({ vid: 'imot', id: 'I-1', tablitsa: 'Фактури' }, RED_A, kniga),
+    ).toThrow(/не живее в таблица/);
+  });
+
+  it('`krai` слага таблица САМО на реда · сглобката е при правилото', () => {
+    expect(krai('red', 'Ф-1', 'Фактури')).toEqual({ vid: 'red', id: 'Ф-1', tablitsa: 'Фактури' });
+    expect(krai('imot', 'I-1', 'Фактури')).toEqual({ vid: 'imot', id: 'I-1' });
+  });
+
+  it('ключът на двойката НЕ се слепва с разделител · разделителят е в данните', () => {
+    // Таблица „А" · ред „Б:В" срещу таблица „А:Б" · ред „В". КАКЪВТО И да е
+    // разделителят, слепването ги прави един низ; JSON ги различава, защото
+    // екранира вместо да се надява, че знакът го няма в данните.
+    const edno = klyuchNaDvoykata({ vid: 'red', id: 'Б:В', tablitsa: 'А' }, IMOT);
+    const drugo = klyuchNaDvoykata({ vid: 'red', id: 'В', tablitsa: 'А:Б' }, IMOT);
+    expect(edno).not.toBe(drugo);
+
+    // И НЕ носи кавичка: ключът влиза в `sashtnost.id`, а Журналът се изнася
+    // като CSV и се внася обратно — кавичка там значи нещо друго (проход §52).
+    expect(edno).not.toMatch(/["';]/);
+
+    // и със СЪЩИЯ знак, който старият ключ ползваше за другото ниво
+    expect(klyuchNaDvoykata({ vid: 'red', id: 'Б|В', tablitsa: 'А' }, IMOT)).not.toBe(
+      klyuchNaDvoykata({ vid: 'red', id: 'В', tablitsa: 'А|Б' }, IMOT),
+    );
+  });
+
+  it('еднакъв ключ в РАЗНИ таблици не смесва свързаните', async () => {
+    const { deystviya, o } = await sTablitsa();
+    await deystviya.dobaviImot('I-2', { adres: 'Б', edinitsa: 'х', ploshtad_kvsm: 0 }, { opId: 'i2' });
+    await deystviya.zapishiTablitsaOtFayl(
+      { klyuch: 'Разписки', otFayl: 'r.xlsx', otpechatak: 'cd'.repeat(32), glavi: ['Кой'], vidove: { 0: 'tekst' }, formuli: {}, nekopirani: [] },
+      { opId: 't-2' },
+    );
+    await deystviya.zapishiRedNaTablitsa(
+      { tablitsa: 'Разписки', red: 'Ф-1', pari_st: {}, chisla: {}, tekst: { 0: 'х' }, mahnat: false },
+      { opId: 'r-2' },
+    );
+    await deystviya.zakachiRedove(RED_A, IMOT, '', { opId: 'z-1' });
+    await deystviya.zakachiRedove({ vid: 'red', id: 'Ф-1', tablitsa: 'Разписки' }, IMOT2, '', {
+      opId: 'z-2',
+    });
+
+    const zakachki = (await o()).zakachki;
+    // Всеки ред вижда СВОЯ имот, не двата: таблицата участва в „кой съм аз".
+    expect(svarzanite(zakachki, RED_A).get('imot')).toEqual(['I-1']);
+    expect(svarzanite(zakachki, { vid: 'red', id: 'Ф-1', tablitsa: 'Разписки' }).get('imot')).toEqual(
+      ['I-2'],
+    );
+  });
+
+  it('двата реда ЕДИН ЗА ДРУГ са една двойка, от която и посока да се запишат', async () => {
+    const { deystviya, o } = await sTablitsa();
+    await deystviya.zapishiTablitsaOtFayl(
+      { klyuch: 'Разписки', otFayl: 'r.xlsx', otpechatak: 'cd'.repeat(32), glavi: ['Кой'], vidove: { 0: 'tekst' }, formuli: {}, nekopirani: [] },
+      { opId: 't-2' },
+    );
+    await deystviya.zapishiRedNaTablitsa(
+      { tablitsa: 'Разписки', red: 'Ф-1', pari_st: {}, chisla: {}, tekst: { 0: 'х' }, mahnat: false },
+      { opId: 'r-2' },
+    );
+    const drugiyat: Krai = { vid: 'red', id: 'Ф-1', tablitsa: 'Разписки' };
+
+    // ЕДНАКЪВ вид и ЕДНАКЪВ ключ, различна таблица: ако нареждането не гледа
+    // таблицата, същата двойка получава два различни ключа според реда на
+    // подаване — и става на две връзки.
+    await deystviya.zakachiRedove(RED_A, drugiyat, '', { opId: 'z-1' });
+    await deystviya.zakachiRedove(drugiyat, RED_A, 'пак', { opId: 'z-2' });
+    expect((await o()).zakachki.size).toBe(1);
+  });
+
+  it('менюто на редовете не предлага МАХНАТ ред', async () => {
+    const { deystviya, o } = await sTablitsa();
+    expect(redoveNa(await o(), 'red', 'Фактури')).toEqual(['Ф-1']);
+    await deystviya.zapishiRedNaTablitsa(
+      { tablitsa: 'Фактури', red: 'Ф-1', pari_st: {}, chisla: {}, tekst: { 0: 'Д' }, mahnat: true },
+      { opId: 'r-mahnat' },
+    );
+    expect(redoveNa(await o(), 'red', 'Фактури')).toEqual([]);
+  });
+});
+
 describe('много-към-много · списъкът е МАШИНА', () => {
   it('всяка същност за закачане има ИМЕ и КОЛЕКЦИЯ · нито една не мълчи', async () => {
     const { o } = await knigata();
@@ -188,7 +363,7 @@ describe('много-към-много · списъкът е МАШИНА', () 
       expect(Array.isArray(redoveNa(kniga, vid)), `вид без колекция: ${vid}`).toBe(true);
     }
     // Числото е ПИН С РЪКА: расте само когато някой добави същност съзнателно.
-    expect(SASHTNOSTI_ZA_ZAKACHANE.length).toBe(11);
+    expect(SASHTNOSTI_ZA_ZAKACHANE.length).toBe(12);
   });
 
   it('редовете идват ПОДРЕДЕНИ и от Огледалото, не от догадка', async () => {

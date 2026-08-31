@@ -40,6 +40,7 @@
  */
 
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
+import { redovete } from './redove-na-tablitsa.js';
 
 class GreshkaZakachka extends Error {
   override readonly name = 'GreshkaZakachka';
@@ -67,6 +68,14 @@ export const SASHTNOSTI_ZA_ZAKACHANE = [
   'kontakt',
   'prepiska',
   'zadacha',
+  /**
+   * РЕД НА СЪЗДАДЕНА ТАБЛИЦА · втората половина на M17 (резен 58).
+   *
+   * Единствената същност с ДВОЕН адрес: таблица + ред. Затова `Krai` носи
+   * `tablitsa` — вместо двата ключа да се слепват в един низ с разделител,
+   * който данните рано или късно съдържат.
+   */
+  'red',
 ] as const;
 
 export type SashtnostZaZakachane = (typeof SASHTNOSTI_ZA_ZAKACHANE)[number];
@@ -84,6 +93,7 @@ export const IMENA_NA_SASHTNOSTITE: Readonly<Record<SashtnostZaZakachane, string
   kontakt: 'Контакт',
   prepiska: 'Преписка',
   zadacha: 'Задача',
+  red: 'Ред на таблица',
 });
 
 /**
@@ -106,12 +116,23 @@ const REDOVETE: Readonly<Record<SashtnostZaZakachane, (o: Ogledalo) => ReadonlyM
     kontakt: (o) => o.kontakti,
     prepiska: (o) => o.prepiski,
     zadacha: (o) => o.zadachi,
+    // РЕДЪТ се търси в СВОЯТА таблица; без нея няма къде да се търси, и
+    // празната карта е честният отговор — пазачът пита отделно за `tablitsa`.
+    red: () => new Map(),
   });
 
 /** Един край на двойката. */
 export interface Krai {
   readonly vid: SashtnostZaZakachane;
   readonly id: string;
+  /**
+   * КОЯ таблица · САМО за вид `red`, и задължително за него.
+   *
+   * Другите единайсет същности живеят в една колекция и се намират по ключ.
+   * Редът на създадена таблица иска ДВА ключа — а два ключа, слепени в един
+   * низ, се разпадат при първия ключ, който съдържа разделителя.
+   */
+  readonly tablitsa?: string;
 }
 
 /** Двойката, както живее в Огледалото · вече нормализирана. */
@@ -135,12 +156,42 @@ export function eSashtnostZaZakachane(v: string): v is SashtnostZaZakachane {
  * място се разминава с първия (правило 17), а тук разминаването би значело
  * падащо меню, което предлага ред, който Вратата после отказва.
  */
-export function redoveNa(o: Ogledalo, vid: SashtnostZaZakachane): readonly string[] {
+export function redoveNa(
+  o: Ogledalo,
+  vid: SashtnostZaZakachane,
+  tablitsa = '',
+): readonly string[] {
+  if (vid === 'red') {
+    return redovete(o.redoveNaTablitsi, tablitsa)
+      .map((r) => r.red)
+      .sort();
+  }
   return [...REDOVETE[vid](o).keys()].sort();
 }
 
-/** Съществува ли този ред ДНЕС · пита се Огледалото, не се вярва на ключа. */
+/**
+ * СГЛОБЯВА край · и НЕ слага таблица там, където не ѝ е мястото.
+ *
+ * Пазачът отказва таблица при вградените същности нарочно (подадена и
+ * пренебрегната стойност е лъжа). Затова сглобяването живее ТУК, до правилото,
+ * а не във всеки екран, който строи край.
+ */
+export function krai(vid: SashtnostZaZakachane, id: string, tablitsa: string): Krai {
+  return vid === 'red' ? { vid, id, tablitsa } : { vid, id };
+}
+
+/**
+ * Съществува ли този ред ДНЕС · пита се Огледалото, не се вярва на ключа.
+ *
+ * МАХНАТИЯТ ред на създадена таблица НЕ съществува за закачане: той е в
+ * картата, за да се чете историята му, но да го закачиш значи да вържеш нещо
+ * за отсъстващо. Затова се пита ЖИВИЯТ списък, не суровата карта.
+ */
 function imaLiGo(o: Ogledalo, k: Krai): boolean {
+  if (k.vid === 'red') {
+    if (k.tablitsa === undefined) return false;
+    return redovete(o.redoveNaTablitsi, k.tablitsa).some((r) => r.red === k.id);
+  }
   return REDOVETE[k.vid](o).has(k.id);
 }
 
@@ -152,14 +203,40 @@ function imaLiGo(o: Ogledalo, k: Krai): boolean {
  * а ключ, който зависи от машината, не е ключ).
  */
 export function naredi(x: Krai, y: Krai): readonly [Krai, Krai] {
-  const parviyatEPrav = x.vid < y.vid || (x.vid === y.vid && x.id <= y.id);
-  return parviyatEPrav ? [x, y] : [y, x];
+  return belegat(x) <= belegat(y) ? [x, y] : [y, x];
 }
 
-/** Ключът на двойката · един и същ, откъдето и да я гледаш. */
+/**
+ * СЛЕПВА части ОБРАТИМО · всяка носи дължината си отпред.
+ *
+ * Нито разделител, нито кавички. Разделителят се чупи от данните, които го
+ * съдържат; кавичките пътуват ЗЛЕ — този ключ влиза в `sashtnost.id`, а
+ * Журналът се изнася като CSV и се внася обратно, където кавичка значи нещо
+ * друго. Дължината отпред е еднозначна и оцелява във всеки формат.
+ */
+function svarzhi(...chasti: readonly string[]): string {
+  return chasti.map((c) => `${c.length}:${c}`).join('');
+}
+
+/** Подреждащият белег · вид · таблица · ключ, в този ред. */
+function belegat(k: Krai): string {
+  return svarzhi(k.vid, k.tablitsa ?? '', k.id);
+}
+
+/**
+ * Ключът на двойката · един и същ, откъдето и да я гледаш.
+ *
+ * СЛЕПВАНЕ С РАЗДЕЛИТЕЛ НЯМА. Дотук ключът беше `вид:ключ|вид:ключ`, а
+ * ключовете идват от човек: ред „Ф|1" и таблица „А:Б" биха дали един и същ
+ * низ за две различни двойки — тихо слепени връзки. Затова се пише през
+ * дължина отпред: `3:red16:Фактури3:Ф-7…`. Обратимо е и НЕ носи нито
+ * разделител, нито кавичка — а този ключ влиза в `sashtnost.id` и пътува през
+ * изнесения CSV на Журнала. Същият урок като при разделителя в клетката
+ * (ADR-110), този път платен от прохода.
+ */
 export function klyuchNaDvoykata(x: Krai, y: Krai): string {
   const [a, b] = naredi(x, y);
-  return `${a.vid}:${a.id}|${b.vid}:${b.id}`;
+  return svarzhi(a.vid, a.tablitsa ?? '', a.id, b.vid, b.tablitsa ?? '', b.id);
 }
 
 /**
@@ -176,13 +253,21 @@ export function proveriZakachka(x: Krai, y: Krai, o: Ogledalo): void {
     if (k.id.trim() === '') {
       throw new GreshkaZakachka('Закачката иска ключ на реда — празно не се закача.');
     }
+    if (k.vid === 'red' && (k.tablitsa ?? '').trim() === '') {
+      throw new GreshkaZakachka('Ред на таблица иска и КОЯ таблица — само ключът не сочи никъде.');
+    }
+    if (k.vid !== 'red' && k.tablitsa !== undefined) {
+      throw new GreshkaZakachka(
+        `„${IMENA_NA_SASHTNOSTITE[k.vid]}" не живее в таблица — подадената таблица няма да се ползва, затова не се приема.`,
+      );
+    }
     if (!imaLiGo(o, k)) {
       throw new GreshkaZakachka(
-        `${IMENA_NA_SASHTNOSTITE[k.vid]} „${k.id}" не съществува — закачка към несъществуващ ред не се записва.`,
+        `${IMENA_NA_SASHTNOSTITE[k.vid]} „${k.id}"${k.tablitsa === undefined ? '' : ` в „${k.tablitsa}"`} не съществува — закачка към несъществуващ ред не се записва.`,
       );
     }
   }
-  if (x.vid === y.vid && x.id === y.id) {
+  if (x.vid === y.vid && x.id === y.id && (x.tablitsa ?? '') === (y.tablitsa ?? '')) {
     throw new GreshkaZakachka('Ред не се закача за себе си.');
   }
 }
@@ -212,9 +297,15 @@ export function svarzanite(
 
 /** Другият край, ако този ред участва в двойката. */
 function kraiotSreshta(z: Zakachka, na: Krai): Krai | undefined {
-  if (z.a.vid === na.vid && z.a.id === na.id) return z.b;
-  if (z.b.vid === na.vid && z.b.id === na.id) return z.a;
+  if (edin(z.a, na)) return z.b;
+  if (edin(z.b, na)) return z.a;
   return undefined;
+}
+
+/** Един и същ край ли са · и ТАБЛИЦАТА участва, иначе два реда с еднакъв ключ
+ *  в различни таблици минават за един. */
+function edin(x: Krai, y: Krai): boolean {
+  return x.vid === y.vid && x.id === y.id && (x.tablitsa ?? '') === (y.tablitsa ?? '');
 }
 
 /** Колко реда от този вид имат поне една закачка · за сверката. */
