@@ -1256,7 +1256,7 @@ export function zakachiSmetki(
   // Копието на решетката носи същите data-ширини като в Управление.
   slozhiShirinite(koren);
 
-  zakachiKoefitsientite(koren, prerisuvay);
+  zakachiKoefitsientite(koren, k, prerisuvay);
   zakachiSpravkite(koren, prerisuvay);
   // СВОИТЕ ПОЛЕТА С ФОРМУЛА · „с формули между всички таблици" (резен 42).
   // Месецът е СЪЩИЯТ като на Сметки: изворите се смятат за конкретен период,

@@ -114,5 +114,5 @@ export function stend() {
     actor: 'vintexstroy@gmail.com',
     chasovnik: () => new Date(Date.UTC(2026, 7, 25, 9, 0, tik++)).toISOString(),
   });
-  return { deystviya };
+  return { deystviya, dnevnik };
 }

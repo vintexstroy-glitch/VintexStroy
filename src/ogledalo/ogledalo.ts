@@ -53,6 +53,7 @@ import {
 } from '../domein/kontakti.js';
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
+import type { SvoyKoefitsient } from '../domein/svoy-koefitsient.js';
 import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
@@ -392,6 +393,13 @@ export interface Ogledalo {
   readonly dela: ReadonlyMap<string, Delo>;
   /** ключ → табът със секциите му; последният запис ПОПРАВЯ (И92 т.9) */
   readonly tabove: ReadonlyMap<string, Tab>;
+  /**
+   * СВОИТЕ КОЕФИЦИЕНТИ · последната дума за всеки ключ, махнатите ВКЛЮЧИТЕЛНО.
+   *
+   * Махнатите НЕ се изхвърлят тук: „нямаше го" и „махнахме го" са различни неща,
+   * и второто трябва да се вижда. Кой се показва, решава екранът.
+   */
+  readonly koefitsienti: ReadonlyMap<string, SvoyKoefitsient>;
   /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
   readonly agenti: ReadonlyMap<string, Agent>;
   /**
@@ -737,6 +745,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const salda = new Map<string, PayloadSaldoZapisano>();
   const dela = new Map<string, Delo>();
   const tabove = new Map<string, Tab>();
+  const koefitsienti = new Map<string, SvoyKoefitsient>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
   const zadachi = new Map<string, Zadacha>();
@@ -902,6 +911,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // Последният запис за същия ключ надделява — поправка, не втори таб.
         const p = s.payload as unknown as Tab;
         tabove.set(p.klyuch, p);
+        break;
+      }
+
+      case 'КоефициентЗаписан': {
+        // Последната дума бие — и това важи и за МАХАНЕТО: то е запис със същия
+        // ключ и `mahnat: true`, не изчезване от картата. Върнатият коефициент
+        // е СЪЩИЯТ, не нов.
+        const p = s.payload as unknown as SvoyKoefitsient;
+        koefitsienti.set(p.klyuch, p);
         break;
       }
 
@@ -1668,6 +1686,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     salda,
     dela,
     tabove,
+    koefitsienti,
     agenti,
     predlozheniya,
     zadachi,

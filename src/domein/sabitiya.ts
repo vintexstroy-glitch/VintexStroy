@@ -26,6 +26,7 @@
 
 import type { Sashtnost } from '../yadro/index.js';
 import type { Agent, Predlozhenie } from './agenti.js';
+import type { SvoyKoefitsient } from './svoy-koefitsient.js';
 import type { Tab } from './tabove.js';
 import type { Zadacha } from './zadachi.js';
 import type { Izprashtane, OtgovorNaZadacha } from './zadachi-kam-hora.js';
@@ -73,6 +74,8 @@ export const VID = {
   myasto: 'myasto',
   agent: 'agent',
   tab: 'tab',
+  /** СВОЯТ КОЕФИЦИЕНТ · „Можеш да вкарваш сам коефициенти“ (30.08) */
+  koefitsient: 'koefitsient',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
   /**
@@ -305,6 +308,7 @@ export type TipSabitie =
   | 'СалдоЗаписано'
   | 'ДелоЗаписано'
   | 'ТабЗаписан'
+  | 'КоефициентЗаписан'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
@@ -1141,6 +1145,17 @@ export interface PayloadStorno {
  * екран става необясним. Промяна = нов запис със същия ключ (правило 1).
  */
 export type PayloadTabZapisan = Tab;
+
+/**
+ * СВОЯТ КОЕФИЦИЕНТ · рецептата, не резултатът.
+ *
+ * Записва се КОЕ до КОЕ и с КАКВО действие; самата стойност се СМЯТА и не влиза
+ * в Журнала (правило 20 · същото като при формулите на колоните).
+ *
+ * Промяна = нов запис със същия ключ; махане = нов запис с `mahnat: true`.
+ * Последната дума бие, и се вижда КОЙ я е казал (правило 1).
+ */
+export type PayloadKoefitsientZapisan = SvoyKoefitsient;
 
 export type PayloadAgentZapisan = Agent;
 

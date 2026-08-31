@@ -21,6 +21,7 @@ import {
 } from './zadachi-kam-hora.js';
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { NACHINI_NA_PLASHTANE, sashtnost, VID, type Vid } from './sabitiya.js';
+import { proveri as proveriSvoyKoefitsient } from './svoy-koefitsient.js';
 import { sashtnostNaDokumenti } from './dokumenti.js';
 import {
   etapite,
@@ -100,6 +101,7 @@ import type {
   PayloadRazhodZapisan,
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
+  PayloadKoefitsientZapisan,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
@@ -1635,6 +1637,26 @@ export class Deystviya {
    */
   async zapishiTab(danni: PayloadTabZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('ТабЗаписан', VID.tab, `TAB:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * СВОЙ КОЕФИЦИЕНТ · „Можеш да вкарваш сам коефициенти" (30.08).
+   *
+   * Адресът е `KOEF:<ключ>` — СЪЩИЯТ при промяна и при махане, защото това е
+   * един и същ коефициент. Нов адрес при махане би дал две неща в описа: едно
+   * живо и едно махнато, с еднакво име.
+   *
+   * `opId` носи ДЕЙСТВИЕТО (правило 20), не съдържанието: върнеш ли коефициент
+   * към предишната му рецепта, ключ от съдържанието би върнал стария резултат и
+   * поправката би изчезнала мълчаливо.
+   *
+   * Проверката е ТУК, при Вратата, а не на екрана: екранът е един път до нея,
+   * не единственият. Записът, дошъл от конзолата или от чужда верига, минава
+   * през същата преграда.
+   */
+  async zapishiKoefitsient(danni: PayloadKoefitsientZapisan, z: Zayavka): Promise<Rezultat> {
+    proveriSvoyKoefitsient(danni);
+    return this.#pusni('КоефициентЗаписан', VID.koefitsient, `KOEF:${danni.klyuch}`, danni, z);
   }
 
   /**

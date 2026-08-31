@@ -58,7 +58,22 @@ import {
 import { dumataNaPosokata, sparklayn } from '../src/domein/sparklayn.js';
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
+import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import type { Konteks } from './ekranite.js';
+import {
+  DEYSTVIYA,
+  formulata,
+  klyuchOtImeto,
+  IMENA_NA_DEYSTVIYATA,
+  IMENA_NA_VELICHINITE,
+  kogatoSeSmyata,
+  smetni,
+  VELICHINI,
+  type DeystvieKoefitsient,
+  type SvoyKoefitsient,
+  type Velichina,
+} from '../src/domein/svoy-koefitsient.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 
 /** Четирите вида диаграма · и къде всеки лъже. */
@@ -96,6 +111,10 @@ let vidD = chetiEkranno<VidDiagrama>('koef.diagrama', 'liniya');
 let kamGodina = chetiEkranno('koef.godishna', false);
 /** ПЪРВОТО от двете падащи менюта (негово, 30.08) · как да видиш резултата. */
 let vidR = chetiEkranno<VidRezultat>('koef.rezultat', 'diagrama');
+/** Последната дума на Вратата · показва се, не се преглъща (правило 15). */
+let greshkaSvoy = '';
+/** ЕДИН opId на ЕДНО натискане · нов се вади чак след успешен запис. */
+let opIdSvoy = crypto.randomUUID();
 
 /** Подразбираният период · последните дванайсет месеца до днес. */
 function podrazbiranPeriod(dnes: string): { ot: string; do: string } {
@@ -121,10 +140,92 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
 
   return `
     ${sastoyanieto(o, dnes)}
+    ${formaNaSvoya()}
     ${lentata(nalichni, k, nachalo, kraj)}
     ${diagramata(redica, k)}
     ${podDiagramata(k, zaTseliya, o, nachalo, kraj)}
     ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes)}`;
+}
+
+/**
+ * ЖИВИТЕ свои коефициенти · махнатите ОСТАВАТ в Огледалото, но не на екрана.
+ *
+ * Разделянето е ТУК, а не в Огледалото: „нямаше го" и „махнахме го" са различни
+ * неща и Журналът трябва да пази второто. Кой се ПОКАЗВА е въпрос на екран.
+ */
+function zhivite(o: Ogledalo): readonly SvoyKoefitsient[] {
+  return [...o.koefitsienti.values()].filter((k) => !k.mahnat);
+}
+
+/**
+ * ПОКАЗАЛЕЦ за изписването · `sDumiStoynost` иска цял `Koefitsient`, а своят
+ * носи само мярка. Вместо втора функция за изписване (второ място, където
+ * „12 500" може да стане „125,00 %" по друг начин), се подава най-малкото,
+ * което тя чете — и мярката се СМЕНЯ от рецептата.
+ */
+const POKAZALETS = KOEFITSIENTI[0]!;
+
+/**
+ * ФОРМАТА ЗА СВОЙ КОЕФИЦИЕНТ · негово: „Можеш да вкарваш сам коефициенти".
+ *
+ * Няма поле за „формула" като текст и няма поле за МЯРКА: и двете се СМЯТАТ от
+ * избора (правило 17). Човекът избира ДВЕ величини и ЕДНО действие; формулата
+ * се сглобява пред очите му, преди да натисне.
+ *
+ * ВРЕМЕТО също не се пита — то следва от величините. Питано, то би позволило
+ * „състояние", в което участва приходът: число, което тихо зависи от прозорец,
+ * който никой не е избирал.
+ */
+function formaNaSvoya(): string {
+  return `
+    <section class="karta" data-sektsiya="koef-svoy">
+      <div class="dyalglava">
+        <h2>Свой коефициент</h2>
+        <span>две величини и едно действие · формулата се сглобява сама</span>
+      </div>
+      <form id="forma-svoy-koef" class="poleta tesni">
+        <div class="pole">
+          <label for="svoy-ime">Име</label>
+          <input translate="no" id="svoy-ime" type="text" maxlength="60" required>
+        </div>
+        <div class="pole">
+          <label for="svoy-gore">Величина А</label>
+          <select translate="no" id="svoy-gore">
+            ${VELICHINI.map(
+              (v) => `<option value="${v}">${ekraniraj(IMENA_NA_VELICHINITE[v])}</option>`,
+            ).join('')}
+          </select>
+        </div>
+        <div class="pole">
+          <label for="svoy-deystvie">Действие</label>
+          <select translate="no" id="svoy-deystvie">
+            ${DEYSTVIYA.map(
+              (d) => `<option value="${d}">${ekraniraj(IMENA_NA_DEYSTVIYATA[d])}</option>`,
+            ).join('')}
+          </select>
+        </div>
+        <div class="pole">
+          <label for="svoy-dolu">Величина Б</label>
+          <select translate="no" id="svoy-dolu">
+            ${VELICHINI.map(
+              (v) =>
+                `<option value="${v}"${v === 'zadalzheniya_st' ? ' selected' : ''}>${ekraniraj(
+                  IMENA_NA_VELICHINITE[v],
+                )}</option>`,
+            ).join('')}
+          </select>
+        </div>
+        <div class="pole">
+          <label for="svoy-kakvo">Какво казва (по избор)</label>
+          <input translate="no" id="svoy-kakvo" type="text" maxlength="120">
+        </div>
+        <button type="submit">Запиши коефициента</button>
+      </form>
+      <p class="drebno" id="svoy-formulata"></p>
+      ${greshkaSvoy === '' ? '' : `<p class="drebno trevozhno" id="svoy-greshka">${ekraniraj(greshkaSvoy)}</p>`}
+      <p class="drebno">Мярката и времето НЕ се питат — те следват от избора.
+        Записва се рецептата, не резултатът: стойността се смята всеки път наново.</p>
+    </section>`;
 }
 
 /**
@@ -145,6 +246,7 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
 function sastoyanieto(o: Ogledalo, dnes: string): string {
   const d = danniKamDnes(o, dnes);
   const chakat = poVreme('period');
+  const svoi = zhivite(o).filter((k) => kogatoSeSmyata(k) === 'sastoyanie');
   return `
     <section class="karta" data-sektsiya="koef-sastoyanie">
       <div class="dyalglava">
@@ -183,6 +285,33 @@ function sastoyanieto(o: Ogledalo, dnes: string): string {
                 ? '<p class="drebno palno">Числото е пълно — нищо не липсва.</p>'
                 : `<p class="drebno chaka">${ekraniraj(s.zashto)}</p>`
             }
+          </article>`;
+          })
+          .join('')}
+        ${svoi
+          .map((k) => {
+            const s = smetni(k, d);
+            return `
+          <article class="pole-otchet svoy" data-svoy="${ekraniraj(k.klyuch)}">
+            <div class="glavata">
+              <span class="etiket">${ekraniraj(k.ime)}</span>
+              <span class="chislo" translate="no">${ekraniraj(
+                sDumiStoynost(
+                  { koefitsient: { ...POKAZALETS, merka: s.merka }, stoynost: s.stoynost, zashto: '', parametri: [] },
+                  pishi,
+                ),
+              )}</span>
+            </div>
+            <p class="kakvo">${ekraniraj(k.kakvo === '' ? 'свой коефициент' : k.kakvo)}</p>
+            <ul class="formula" translate="no">
+              <li><span class="ime">${ekraniraj(formulata(k))}</span></li>
+            </ul>
+            ${
+              s.zashto === ''
+                ? '<p class="drebno palno">Числото е пълно — нищо не липсва.</p>'
+                : `<p class="drebno chaka">${ekraniraj(s.zashto)}</p>`
+            }
+            <button type="button" class="vtorichen" data-mahni-svoy="${ekraniraj(k.klyuch)}">Махни</button>
           </article>`;
           })
           .join('')}
@@ -555,8 +684,13 @@ function slozhiDyalovete(koren: HTMLElement): void {
   }
 }
 
-export function zakachiKoefitsientite(koren: HTMLElement, prerisuvay: () => Promise<void>): void {
+export function zakachiKoefitsientite(
+  koren: HTMLElement,
+  k: Konteks,
+  prerisuvay: () => Promise<void>,
+): void {
   slozhiDyalovete(koren);
+  zakachiSvoya(koren, k, prerisuvay);
 
   const vrazhi = (id: string, kam: (v: string) => void) => {
     koren.querySelector<HTMLInputElement | HTMLSelectElement>(id)?.addEventListener(
@@ -598,4 +732,83 @@ export function zakachiKoefitsientite(koren: HTMLElement, prerisuvay: () => Prom
     zapomniEkranno('koef.godishna', kamGodina);
     await prerisuvay();
   });
+}
+
+
+/**
+ * ЗАКАЧАНЕТО НА СВОЯ · формата, живата формула и махането.
+ *
+ * ЖИВАТА ФОРМУЛА се сглобява при всяка смяна на избор — човекът вижда какво ще
+ * запише, ПРЕДИ да натисне. Форма, която показва резултата си чак след записа,
+ * учи да се натиска и да се гледа.
+ *
+ * КЛЮЧЪТ СЕ СВЕЖДА ОТ ИМЕТО, не се пита: две полета за едно нещо са две места,
+ * където може да се разминат. Същото име = същият коефициент, тоест ПОПРАВКА.
+ */
+function zakachiSvoya(koren: HTMLElement, k: Konteks, prerisuvay: () => Promise<void>): void {
+  const chetiFormata = (): SvoyKoefitsient | undefined => {
+    const vzemi = (id: string): string =>
+      koren.querySelector<HTMLInputElement | HTMLSelectElement>(id)?.value ?? '';
+    const ime = vzemi('#svoy-ime').trim();
+    if (ime === '') return undefined;
+    return {
+      klyuch: klyuchOtImeto(ime),
+      ime,
+      gore: vzemi('#svoy-gore') as Velichina,
+      dolu: vzemi('#svoy-dolu') as Velichina,
+      deystvie: vzemi('#svoy-deystvie') as DeystvieKoefitsient,
+      kakvo: vzemi('#svoy-kakvo').trim(),
+      mahnat: false,
+    };
+  };
+
+  const pokazhiFormulata = (): void => {
+    const red = koren.querySelector<HTMLElement>('#svoy-formulata');
+    if (!red) return;
+    const nov = chetiFormata();
+    red.textContent = nov === undefined ? 'Дай име, за да се сглоби формулата.' : formulata(nov);
+  };
+  pokazhiFormulata();
+  for (const znak of ['#svoy-ime', '#svoy-gore', '#svoy-dolu', '#svoy-deystvie']) {
+    koren.querySelector(znak)?.addEventListener('input', pokazhiFormulata);
+    koren.querySelector(znak)?.addEventListener('change', pokazhiFormulata);
+  }
+
+  koren.querySelector<HTMLFormElement>('#forma-svoy-koef')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const nov = chetiFormata();
+    if (nov === undefined) {
+      greshkaSvoy = 'Коефициентът иска име.';
+      await prerisuvay();
+      return;
+    }
+    try {
+      await k.deystviya.zapishiKoefitsient(nov, { opId: `koef:${opIdSvoy}` });
+      opIdSvoy = crypto.randomUUID();
+      greshkaSvoy = '';
+    } catch (err) {
+      greshkaSvoy = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  });
+
+  // МАХАНЕТО Е ЗАПИС · същият ключ, `mahnat: true`, нов `opId`. Върнатият после
+  // коефициент е СЪЩИЯТ, не нов — затова ключът не се пипа.
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-mahni-svoy]')) {
+    but.addEventListener('click', async () => {
+      const klyuch = but.dataset['mahniSvoy'] ?? '';
+      const sega = (await k.deystviya.ogledalo()).koefitsienti.get(klyuch);
+      if (sega === undefined) return;
+      try {
+        await k.deystviya.zapishiKoefitsient(
+          { ...sega, mahnat: true },
+          { opId: `koef-mahni:${klyuch}:${crypto.randomUUID()}` },
+        );
+        greshkaSvoy = '';
+      } catch (err) {
+        greshkaSvoy = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 }

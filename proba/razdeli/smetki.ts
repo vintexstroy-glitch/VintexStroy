@@ -496,6 +496,51 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('поименно, не като празно място',
       (await p.$eval('[data-chakat-period]', (e) => e.textContent)).includes('Марж'), true);
 
+    // ══ 125 · СВОЙ КОЕФИЦИЕНТ · от формата до Журнала (резен 54) ═════════
+    //
+    // Негово, 30.08: „Можеш да вкарваш сам коефициенти."
+    razdel = '125 · свой коефициент';
+
+    // ЖИВАТА ФОРМУЛА се сглобява ПРЕДИ натискането · човекът вижда какво пише.
+    // ИЗБОРЪТ СЕ ПРАВИ ИЗРИЧНО · първото писане разчиташе, че „средства" е
+    // избрано по подразбиране, а по подразбиране стои ПЪРВАТА величина
+    // (приходът). Проверка, вързана за подредбата на списък, се чупи при първото
+    // разместване — и точно това направи тя.
+    await napishiSigurno(p, '#svoy-ime', 'Покритие');
+    await p.selectOption('#svoy-gore', 'sredstva_st');
+    await p.selectOption('#svoy-dolu', 'zadalzheniya_st');
+    proveri('формулата се сглобява преди записа',
+      await p.$eval('#svoy-formulata', (e) => e.textContent),
+      'Покритие = средства ÷ текущи задължения');
+
+    const predSvoya = await broySabitiya(p);
+    await sSabitie(p, () => p.click('#forma-svoy-koef button[type=submit]'));
+    proveri('записът е ТОЧНО едно събитие', (await broySabitiya(p)) - predSvoya, 1);
+    proveri('и коефициентът стои при СЪСТОЯНИЕТО, с формулата си',
+      await p.$eval('[data-svoy="покритие"] .formula .ime', (e) => e.textContent),
+      'Покритие = средства ÷ текущи задължения');
+    proveri('с ЧИСЛО, не с празно',
+      (await p.$eval('[data-svoy="покритие"] .chislo', (e) => e.textContent ?? '')).trim().length > 0,
+      true);
+
+    // ВРАТАТА ОТКАЗВА · и отказът се ЧЕТЕ на екрана (правило 15).
+    await napishiSigurno(p, '#svoy-ime', 'Едно и също');
+    await p.selectOption('#svoy-gore', 'prihod_st');
+    await p.selectOption('#svoy-dolu', 'prihod_st');
+    const predOtkaza = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#forma-svoy-koef button[type=submit]'));
+    proveri('сбърканата рецепта НЕ влиза в Журнала', await broySabitiya(p), predOtkaza);
+    proveri('а причината стои на екрана',
+      (await p.$eval('#svoy-greshka', (e) => e.textContent ?? '')).includes('едно и също число'),
+      true);
+
+    // МАХАНЕТО Е ЗАПИС, не триене · Журналът расте, екранът намалява.
+    const predMahaneto = await broySabitiya(p);
+    await sSabitie(p, () => p.click('[data-mahni-svoy="покритие"]'));
+    proveri('махането също е ЕДНО събитие', (await broySabitiya(p)) - predMahaneto, 1);
+    proveri('и картата слиза от екрана',
+      await p.$$eval('[data-svoy="покритие"]', (e) => e.length), 0);
+
     // ══ 24 · Гантът · решетката, лентите и диаграмата ════════════════════
 }
 
