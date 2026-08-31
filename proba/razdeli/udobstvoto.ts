@@ -1420,8 +1420,20 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const lentata = await p.$eval('.plochki', (e) => e.getBoundingClientRect().height);
     proveri('редът плочки заема под една трета от екрана',
       lentata < (await p.evaluate(() => innerHeight)) / 3, true);
-    proveri('и не се разтяга · плочката е капната',
-      await p.$eval('.plochka', (e) => Math.round(e.getBoundingClientRect().width) <= 240), true);
+    // НЕ СЕ РАЗТЯГА · но вече не с пиксел, а със ДЯЛ от реда.
+    //
+    // Дотук проверката пинваше „под 240px" — точно закованата граница, която
+    // оставяше празна четвърт на всеки екран (резен 64 · ADR-118). Тя падна;
+    // обещанието обаче остава и се казва иначе: при три и повече плочки нито
+    // една не изяжда повече от една трета от реда. Така важи и на широк екран,
+    // където 240 щеше да е пресилено тясно.
+    proveri('и не се разтяга · при три и повече нито една не взима над една трета',
+      await p.$eval('.plochki', (e) => {
+        const plochki = [...e.querySelectorAll('.plochka')];
+        if (plochki.length < 3) return true;
+        const red = e.getBoundingClientRect().width;
+        return plochki.every((x) => x.getBoundingClientRect().width <= red / 3 + 1);
+      }), true);
 
     razdel = '80 · Тактът · ЕДИН речник с ШЕСТ стойности';
     // Негови думи, 27.08 (И104): „Нека са като НАП 5 вида… за деня е от 08:00
