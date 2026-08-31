@@ -76,6 +76,10 @@ export const VID = {
   tab: 'tab',
   /** СВОЯТ КОЕФИЦИЕНТ · „Можеш да вкарваш сам коефициенти“ (30.08) */
   koefitsient: 'koefitsient',
+  /** ДВОЙКАТА · закачка между два реда (M17 · много-към-много) */
+  zakachka: 'zakachka',
+  /** РЕД на създадена таблица · данните ѝ живеят вътре (M12) */
+  redNaTablitsa: 'red-na-tablitsa',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
   /**
@@ -309,6 +313,9 @@ export type TipSabitie =
   | 'ДелоЗаписано'
   | 'ТабЗаписан'
   | 'КоефициентЗаписан'
+  | 'РедовеЗакачени'
+  | 'РедовеРазкачени'
+  | 'РедНаТаблицаЗаписан'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
@@ -1156,6 +1163,44 @@ export type PayloadTabZapisan = Tab;
  * Последната дума бие, и се вижда КОЙ я е казал (правило 1).
  */
 export type PayloadKoefitsientZapisan = SvoyKoefitsient;
+
+/**
+ * ЗАКАЧАНЕТО и РАЗКАЧАНЕТО · един товар за двете събития.
+ *
+ * Двата края идват НЕНОРДЕНИ от викащия и се нормализират при сгъването —
+ * така „закачи А за Б" и „закачи Б за А" са една двойка, а не две.
+ *
+ * `zashto` е свободен текст и може да е празен: причината е удобство за човека,
+ * не условие за връзката. Разкачането носи своя `zashto` — то е друго решение,
+ * взето в друг ден, и не преписва причината за закачането.
+ */
+export interface PayloadRedoveZakacheni {
+  readonly vidA: string;
+  readonly idA: string;
+  readonly vidB: string;
+  readonly idB: string;
+  readonly zashto: string;
+}
+
+export type PayloadRedoveRazkacheni = PayloadRedoveZakacheni;
+
+/**
+ * РЕДЪТ НА СЪЗДАДЕНА ТАБЛИЦА · един тип за запис, поправка и махане.
+ *
+ * Последната дума за същия ключ бие. Затова „махнат" е поле, не втори тип:
+ * върнатият ред е СЪЩИЯТ ред, не нов, и историята му се чете на едно място.
+ *
+ * Стойностите са в ТРИ карти по вид — парите отделно и в ЦЕЛИ стотинки
+ * (правило 3). Една обща карта би приела 12.34 в колона за пари.
+ */
+export interface PayloadRedNaTablitsaZapisan {
+  readonly tablitsa: string;
+  readonly red: string;
+  readonly pari_st: Readonly<Record<string, number>>;
+  readonly chisla: Readonly<Record<string, number>>;
+  readonly tekst: Readonly<Record<string, string>>;
+  readonly mahnat: boolean;
+}
 
 export type PayloadAgentZapisan = Agent;
 

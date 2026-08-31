@@ -129,6 +129,36 @@ describe('валидност', () => {
     expect(dobar.seq).toBe(1);
   });
 
+  /**
+   * СЪЩОТО СЛЯПО ПЕТНО, ВТОРАТА МУ ФОРМА · намерено при редовете на таблица.
+   *
+   * Пари ПО КОЛОНА се пазят в карта: `pari_st: { '2': 12000 }`. Дотук ключът с
+   * наставка + стойност обект падаше като „не е цели стотинки" — вярно за
+   * картата, безсмислено за човека, и оставяше един-единствен изход: име БЕЗ
+   * наставка, тоест заобикаляне на самата проверка.
+   */
+  it('проверява парите и в КАРТА — колона по колона', async () => {
+    const { vrata } = novaVrata();
+
+    await expect(
+      vrata.dobavi(operatsiya({ opId: 'op-1', payload: { pari_st: { 2: 120_00, 5: 12.34 } } })),
+    ).rejects.toMatchObject({ kod: 'NEVALIDNO' });
+
+    // и отказът КАЗВА КОЯ колона е сгрешена
+    await expect(
+      vrata.dobavi(operatsiya({ opId: 'op-2', payload: { pari_st: { 2: 120_00, 5: 12.34 } } })),
+    ).rejects.toThrow(/pari_st\.5/);
+
+    // празната карта минава — ред без нито една сума е ред, не грешка
+    const prazna = await vrata.dobavi(operatsiya({ opId: 'op-3', payload: { pari_st: {} } }));
+    expect(prazna.seq).toBe(1);
+
+    const dobar = await vrata.dobavi(
+      operatsiya({ opId: 'op-4', payload: { pari_st: { 2: 120_00, 5: 80_67 } } }),
+    );
+    expect(dobar.seq).toBe(2);
+  });
+
   it('масив от текст не се бърка с пари', async () => {
     const { vrata } = novaVrata();
     const r = await vrata.dobavi(

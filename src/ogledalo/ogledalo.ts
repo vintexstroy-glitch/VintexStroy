@@ -54,6 +54,13 @@ import {
 import type { Delo } from '../domein/dela.js';
 import type { Agent, Predlozhenie } from '../domein/agenti.js';
 import type { SvoyKoefitsient } from '../domein/svoy-koefitsient.js';
+import {
+  klyuchNaDvoykata,
+  naredi,
+  type SashtnostZaZakachane,
+  type Zakachka,
+} from '../domein/mnogo-kam-mnogo.js';
+import type { RedNaTablitsa, VhodNaRedovete } from '../domein/redove-na-tablitsa.js';
 import type { Tab } from '../domein/tabove.js';
 import type { Zadacha } from '../domein/zadachi.js';
 import type { FaylVSvrazka, Svrazka } from '../domein/zhurnal-ot-tablitsa.js';
@@ -66,6 +73,9 @@ import type {
   PayloadDeloZapisano,
   PayloadSluzhitelZapisan,
   PayloadPotokZapisan,
+  PayloadRedNaTablitsaZapisan,
+  PayloadRedoveRazkacheni,
+  PayloadRedoveZakacheni,
   PayloadSaldoZapisano,
   TipSabitie,
 } from '../domein/sabitiya.js';
@@ -400,6 +410,29 @@ export interface Ogledalo {
    * и второто трябва да се вижда. Кой се показва, решава екранът.
    */
   readonly koefitsienti: ReadonlyMap<string, SvoyKoefitsient>;
+  /**
+   * ЖИВИТЕ ЗАКАЧКИ · ключ на двойката → двойката (M17 · много-към-много).
+   *
+   * Тук стоят САМО живите: разкаченото си отива от картата, но остава в Журнала
+   * завинаги. Двете различни неща — не са били закачени, и бяха закачени, но ги
+   * разкачиха — се четат от Журнала, не от тази карта.
+   */
+  readonly zakachki: ReadonlyMap<string, Zakachka>;
+  /**
+   * РЕДОВЕТЕ НА СЪЗДАДЕНИТЕ ТАБЛИЦИ · таблица → ред → редът (M12).
+   *
+   * МАХНАТИТЕ ОСТАВАТ тук, с вдигнато знаме: „нямаше го" и „махнахме го" са
+   * различни неща. Кой се показва, решава екранът — а сверката брои и трите
+   * числа (записани · махнати · живи) и пада, ако се разминат.
+   */
+  readonly redoveNaTablitsi: ReadonlyMap<string, ReadonlyMap<string, RedNaTablitsa>>;
+  /**
+   * ВХОДНАТА страна на сверката за редовете · брои се ДОКАТО се сгъва.
+   *
+   * Отделен път от картата отгоре нарочно: сверка, смятана от същата карта,
+   * която проверява, не може да падне (правило 7 · обход В).
+   */
+  readonly vhodNaRedovete: ReadonlyMap<string, VhodNaRedovete>;
   /** ключ → агентът с протокола му; последният запис ПОПРАВЯ (И92 т.10) */
   readonly agenti: ReadonlyMap<string, Agent>;
   /**
@@ -746,6 +779,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const dela = new Map<string, Delo>();
   const tabove = new Map<string, Tab>();
   const koefitsienti = new Map<string, SvoyKoefitsient>();
+  const zakachki = new Map<string, Zakachka>();
+  const redoveNaTablitsi = new Map<string, Map<string, RedNaTablitsa>>();
+  const vhodNaRedove = new Map<string, { klyuchove: Set<string>; mahnati: Set<string> }>();
   const agenti = new Map<string, Agent>();
   const predlozheniya = new Map<string, Predlozhenie>();
   const zadachi = new Map<string, Zadacha>();
@@ -920,6 +956,56 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // е СЪЩИЯТ, не нов.
         const p = s.payload as unknown as SvoyKoefitsient;
         koefitsienti.set(p.klyuch, p);
+        break;
+      }
+
+      case 'РедовеЗакачени': {
+        // НОРМАЛИЗИРА се при сгъването, не при записа: така запис, направен от
+        // другия край, се чете като СЪЩАТА двойка. Ключът е един, откъдето и да
+        // я гледаш — иначе А-за-Б и Б-за-А биха били две различни връзки.
+        const p = s.payload as unknown as PayloadRedoveZakacheni;
+        const [a, b] = naredi(
+          { vid: p.vidA as SashtnostZaZakachane, id: p.idA },
+          { vid: p.vidB as SashtnostZaZakachane, id: p.idB },
+        );
+        zakachki.set(klyuchNaDvoykata(a, b), {
+          a,
+          b,
+          zashto: p.zashto,
+          kogato: s.ts,
+          actor: s.actor,
+        });
+        break;
+      }
+
+      case 'РедовеРазкачени': {
+        // Разкачането маха от КАРТАТА, не от Журнала (правило 1). Затова няма
+        // условие „има ли я": липсващата двойка просто не се маха, а записът
+        // остава като следа кой и кога го е поискал.
+        const p = s.payload as unknown as PayloadRedoveRazkacheni;
+        zakachki.delete(
+          klyuchNaDvoykata(
+            { vid: p.vidA as SashtnostZaZakachane, id: p.idA },
+            { vid: p.vidB as SashtnostZaZakachane, id: p.idB },
+          ),
+        );
+        break;
+      }
+
+      case 'РедНаТаблицаЗаписан': {
+        // Последната дума за същия ключ бие — и това важи и за МАХАНЕТО: то е
+        // запис със същия ключ и `mahnat: true`, не изчезване от картата.
+        const p = s.payload as unknown as PayloadRedNaTablitsaZapisan;
+        const na = redoveNaTablitsi.get(p.tablitsa) ?? new Map<string, RedNaTablitsa>();
+        na.set(p.red, p);
+        redoveNaTablitsi.set(p.tablitsa, na);
+
+        // ВХОДЪТ се брои ТУК, отделно от картата: така изгубен ред се вижда.
+        const v = vhodNaRedove.get(p.tablitsa) ?? { klyuchove: new Set(), mahnati: new Set() };
+        v.klyuchove.add(p.red);
+        if (p.mahnat) v.mahnati.add(p.red);
+        else v.mahnati.delete(p.red);
+        vhodNaRedove.set(p.tablitsa, v);
         break;
       }
 
@@ -1687,6 +1773,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     dela,
     tabove,
     koefitsienti,
+    zakachki,
+    redoveNaTablitsi,
+    vhodNaRedovete: new Map(
+      [...vhodNaRedove].map(([t, v]) => [t, { zapisani: v.klyuchove.size, mahnati: v.mahnati.size }]),
+    ),
     agenti,
     predlozheniya,
     zadachi,

@@ -98,4 +98,68 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     ),
     true,
   );
+
+  // ══ 128 · РЕДОВЕТЕ НА СЪЗДАДЕНАТА ТАБЛИЦА (резен 57 · M12) ═══════════════
+  // Дотук създадената таблица влизаше в Журнала и ИЗЧЕЗВАШЕ: картата ѝ в
+  // Огледалото имаше нула четци. Тук се проверява целият обратен път.
+  await p.waitForSelector('[data-sektsiya=sazdadenite-tablitsi]');
+  proveri(
+    'създадената таблица вече се ВИЖДА, а не изчезва в Журнала',
+    ((await p.textContent('[data-sektsiya=sazdadenite-tablitsi]')) ?? '').includes(
+      'Фактури от файл',
+    ),
+    true,
+  );
+
+  // Затворената колона НЕ получава поле — тя се смята (правило 23), и го КАЗВА.
+  const poleta = await p.$$eval('#forma-red-na-tablitsa input[data-vid]', (e) =>
+    e.map((x) => ({ id: x.id, vid: (x as HTMLElement).dataset['vid'] ?? '' })),
+  );
+  proveri('отворените колони имат поле', poleta.length > 0, true);
+  proveri(
+    'а затворената казва „смята се" вместо да приеме стойност',
+    ((await p.textContent('#forma-red-na-tablitsa')) ?? '').includes('смята се'),
+    true,
+  );
+
+  const poleTekst = poleta.find((x) => x.vid === 'tekst');
+  const poleEvro = poleta.find((x) => x.vid === 'evro');
+  proveri('има и текстова, и парична колона за писане', Boolean(poleTekst && poleEvro), true);
+
+  await p.fill('#red-klyuch', 'Ф-1');
+  if (poleTekst) await p.fill(`#${poleTekst.id}`, 'Доставчик ООД');
+  if (poleEvro) await p.fill(`#${poleEvro.id}`, '120,33');
+  const predRed = await broySabitiya(p);
+  await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
+  proveri('редът е СЪБИТИЕ', await broySabitiya(p), predRed + 1);
+  proveri(
+    'и се вижда в таблицата на редовете',
+    await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) => e.length),
+    1,
+  );
+  proveri(
+    'парите се показват цели, както ги пише валутата',
+    ((await p.textContent('[data-tablitsa=redove-na-sazdadena]')) ?? '').includes('120,33'),
+    true,
+  );
+  proveri(
+    'сверката брои трите числа',
+    ((await p.textContent('#sverka-redove')) ?? '').replace(/\s+/g, ' ').includes('живи: 1'),
+    true,
+  );
+
+  // МАХАНЕТО е ЗАПИС: редът си отива от таблицата, Журналът расте.
+  const predMahane = await broySabitiya(p);
+  await sSabitie(p, () => p.click('[data-mahni-red]'));
+  proveri('махането също е СЪБИТИЕ', await broySabitiya(p), predMahane + 1);
+  proveri(
+    'редът си отива от ТАБЛИЦАТА',
+    await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red]', (e) => e.length),
+    0,
+  );
+  proveri(
+    'а сверката помни, че е БИЛ · записани 1 · махнати 1 · живи 0',
+    ((await p.textContent('#sverka-redove')) ?? '').replace(/\s+/g, ' ').includes('махнати: 1'),
+    true,
+  );
 }

@@ -545,6 +545,17 @@ function proveriEdno(klyuch: string, stoynost: unknown, pale: string): void {
     return;
   }
   if (klyuch.endsWith(NASTAVKA_PARI)) {
+    // ВЛИЗА И В КАРТА, по същата причина, по която влиза и в масив. Поле
+    // `pari_st: { '2': 12000 }` (колона → сума) е КАРТА ОТ СУМИ: ключът се носи
+    // надолу и всяка стойност се проверява поотделно, с колоната в пътеката.
+    // Без това единственият начин да се пазят пари по колона е име БЕЗ
+    // наставка — тоест заобикаляне на самата проверка (правило 3).
+    if (stoynost !== null && typeof stoynost === 'object') {
+      for (const [vatreshen, chlen] of Object.entries(stoynost as Record<string, unknown>)) {
+        proveriEdno(klyuch, chlen, `${pale}.${vatreshen}`);
+      }
+      return;
+    }
     if (!eStotinki(stoynost)) {
       throw new GreshkaVrata(
         'NEVALIDNO',

@@ -22,6 +22,12 @@ import {
 import { periodNaSabitie, proveriZamrazen } from './zamrazyavane.js';
 import { NACHINI_NA_PLASHTANE, sashtnost, VID, type Vid } from './sabitiya.js';
 import { proveri as proveriSvoyKoefitsient } from './svoy-koefitsient.js';
+import {
+  klyuchNaDvoykata,
+  proveriZakachka,
+  type Krai,
+} from './mnogo-kam-mnogo.js';
+import { proveriRed } from './redove-na-tablitsa.js';
 import { sashtnostNaDokumenti } from './dokumenti.js';
 import {
   etapite,
@@ -102,6 +108,7 @@ import type {
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
   PayloadKoefitsientZapisan,
+  PayloadRedNaTablitsaZapisan,
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
@@ -1657,6 +1664,75 @@ export class Deystviya {
   async zapishiKoefitsient(danni: PayloadKoefitsientZapisan, z: Zayavka): Promise<Rezultat> {
     proveriSvoyKoefitsient(danni);
     return this.#pusni('КоефициентЗаписан', VID.koefitsient, `KOEF:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * ЗАКАЧА два реда · много-към-много (M17).
+   *
+   * Негово: „Занимай се първо с много-към-много."
+   *
+   * Адресът е ключът на ДВОЙКАТА, не на единия край: закачката е един факт с
+   * два края, а не два факта. Затова и адресът е нормализиран — записана от
+   * другия край, същата двойка има същия адрес.
+   *
+   * Проверката пита ОГЛЕДАЛОТО дали двата реда съществуват ДНЕС. Затова стои
+   * тук: екранът вижда своя списък, а Вратата вижда книгата.
+   */
+  async zakachiRedove(a: Krai, b: Krai, zashto: string, z: Zayavka): Promise<Rezultat> {
+    proveriZakachka(a, b, await this.ogledalo());
+    return this.#pusni(
+      'РедовеЗакачени',
+      VID.zakachka,
+      `ZAK:${klyuchNaDvoykata(a, b)}`,
+      { vidA: a.vid, idA: a.id, vidB: b.vid, idB: b.id, zashto },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА РЕД на създадена таблица · данните ѝ живеят ВЪТРЕ (M12).
+   *
+   * Адресът е `RED:<таблица>:<ред>` — СЪЩИЯТ при поправка и при махане, защото
+   * това е един и същ ред. Нов адрес при махане би дал две неща в описа: едно
+   * живо и едно махнато, с еднакъв ключ.
+   *
+   * Пазачът чете ГЛАВАТА от Огледалото: коя колона съществува, коя е затворена
+   * и от какъв вид е. Затова стои тук — екранът знае своята глава, Вратата знае
+   * КНИГАТА, а редът може да дойде и от внос, и от агент.
+   */
+  async zapishiRedNaTablitsa(
+    danni: PayloadRedNaTablitsaZapisan,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const glavata = (await this.ogledalo()).tablitsiOtFayl.get(danni.tablitsa);
+    if (glavata === undefined) {
+      throw new Error(`Таблица „${danni.tablitsa}" я няма — ред без таблица не се записва.`);
+    }
+    proveriRed(danni, glavata);
+    return this.#pusni(
+      'РедНаТаблицаЗаписан',
+      VID.redNaTablitsa,
+      `RED:${danni.tablitsa}:${danni.red}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * РАЗКАЧА · и това е ЗАПИС, не триене (правило 1).
+   *
+   * Тук НЕ се проверява дали редовете още съществуват: разкачаш точно защото
+   * нещо е отпаднало. Проверка „съществува ли" би заключила висящата двойка
+   * завинаги — точно обратното на онова, за което служи разкачането.
+   */
+  async razkachiRedove(a: Krai, b: Krai, zashto: string, z: Zayavka): Promise<Rezultat> {
+    return this.#pusni(
+      'РедовеРазкачени',
+      VID.zakachka,
+      `RAZ:${klyuchNaDvoykata(a, b)}`,
+      { vidA: a.vid, idA: a.id, vidB: b.vid, idB: b.id, zashto },
+      z,
+    );
   }
 
   /**

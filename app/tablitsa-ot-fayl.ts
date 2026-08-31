@@ -37,6 +37,15 @@ import { IMENA_NA_VIDOVETE_STOYNOST } from '../src/domein/vid-stoynost.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Konteks } from './ekranite.js';
+import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
+import { kakvoPishe, otSuma } from '../src/yadro/pari.js';
+import {
+  redovete,
+  sborNaKolona,
+  sveriRedovete,
+  vidaNaKolonata,
+  zatvorenaE,
+} from '../src/domein/redove-na-tablitsa.js';
 
 /** Каквото е прочетено, докато човекът не потвърди · нула събития дотогава. */
 let predlozhenie: PredlozhenieZaTablitsa | undefined;
@@ -44,7 +53,10 @@ let imeNaFayla = '';
 let otpechatakNaFayla = '';
 let greshka = '';
 
-export function blokNaTablitsaOtFayl(): string {
+/** КОЯ създадена таблица гледам · памет на екрана, не факт (ADR-022). */
+let izbranaTablitsa = '';
+
+export function blokNaTablitsaOtFayl(o: Ogledalo): string {
   return `
     <section data-sektsiya="tablitsa-ot-fayl">
       <div class="dyalglava">
@@ -64,6 +76,131 @@ export function blokNaTablitsaOtFayl(): string {
       <p class="greshka" id="greshka-tablitsa-fayl">${ekraniraj(greshka)}</p>
 
       ${predlozhenie === undefined ? '' : predlozhenieto(predlozhenie)}
+    </section>
+    ${blokNaSazdadenite(o)}`;
+}
+
+/**
+ * СЪЗДАДЕНИТЕ ТАБЛИЦИ · и техните РЕДОВЕ (резен 57 · M12).
+ *
+ * НАХОДКАТА, която роди този блок: `tablitsiOtFayl` в Огледалото имаше НУЛА
+ * четци. Таблицата се създаваше, влизаше в Журнала и изчезваше от очите на
+ * човека — обявена възможност без консуматор (ADR-041).
+ *
+ * Затворената колона (тази с формула) НЕ получава поле: тя се СМЯТА
+ * (правило 23). Показва се, но с думата „смята се" вместо вход — изключеното
+ * се КАЗВА, не се премълчава (правило 15).
+ */
+function blokNaSazdadenite(o: Ogledalo): string {
+  const vsichki = [...o.tablitsiOtFayl.values()].sort((a, b) =>
+    a.klyuch < b.klyuch ? -1 : a.klyuch > b.klyuch ? 1 : 0,
+  );
+  if (vsichki.length === 0) {
+    return `
+    <section data-sektsiya="sazdadenite-tablitsi">
+      <div class="dyalglava">
+        <h2>Създадените таблици</h2>
+        <span>тук ще стоят таблиците, направени от файл — с редовете си</span>
+      </div>
+      <p class="drebno">Още няма нито една. Прочети таблица от папката горе.</p>
+    </section>`;
+  }
+
+  const t = vsichki.find((x) => x.klyuch === izbranaTablitsa) ?? vsichki[0]!;
+  const redove = redovete(o.redoveNaTablitsi, t.klyuch);
+  const sverka = sveriRedovete(o.vhodNaRedovete, o.redoveNaTablitsi, t.klyuch);
+  const nomera = t.glavi.map((_, i) => String(i));
+
+  const kletkaNaReda = (r: (typeof redove)[number], k: string): string => {
+    if (zatvorenaE(t, k)) return '<span class="znachka tiha">смята се</span>';
+    const vid = vidaNaKolonata(t, k);
+    if (vid === 'evro') {
+      const st = r.pari_st[k];
+      return st === undefined ? '—' : ekraniraj(kakvoPishe(st as never));
+    }
+    if (vid === 'protsent' || vid === 'chislo') {
+      const n = r.chisla[k];
+      return n === undefined ? '—' : ekraniraj(String(n));
+    }
+    return ekraniraj(r.tekst[k] ?? '—');
+  };
+
+  return `
+    <section data-sektsiya="sazdadenite-tablitsi">
+      <div class="dyalglava">
+        <h2>Създадените таблици</h2>
+        <span>редовете им живеят ВЪТРЕ, в Журнала — не само в чуждия файл</span>
+      </div>
+      <div class="poleta tesni">
+        <div class="pole">
+          <label for="izbor-sazdadena">Коя гледам</label>
+          <select translate="no" id="izbor-sazdadena">
+            ${vsichki
+              .map(
+                (x) =>
+                  `<option value="${ekraniraj(x.klyuch)}"${x.klyuch === t.klyuch ? ' selected' : ''}>${ekraniraj(x.klyuch)}</option>`,
+              )
+              .join('')}
+          </select>
+        </div>
+      </div>
+
+      <form id="forma-red-na-tablitsa" class="poleta tesni">
+        <div class="pole">
+          <label for="red-klyuch">Ключ на реда</label>
+          <input translate="no" id="red-klyuch" name="red" placeholder="Р-1" required>
+        </div>
+        ${nomera
+          .map((k) =>
+            zatvorenaE(t, k)
+              ? `<div class="pole"><label>${ekraniraj(t.glavi[Number(k)]!)}</label>
+                 <span class="znachka tiha">смята се — затворена колона</span></div>`
+              : `<div class="pole">
+                   <label for="red-k-${k}">${ekraniraj(t.glavi[Number(k)]!)}</label>
+                   <input translate="no" id="red-k-${k}" name="k-${k}" data-vid="${vidaNaKolonata(t, k)}">
+                 </div>`,
+          )
+          .join('')}
+        <div class="deystviya"><button type="submit">Запиши реда</button></div>
+      </form>
+
+      <div class="tablitsa" data-tablitsa="redove-na-sazdadena">
+        <div class="glava opis"><span>Ред</span>${nomera
+          .map((k) => `<span>${ekraniraj(t.glavi[Number(k)]!)}</span>`)
+          .join('')}<span></span></div>
+        ${
+          redove.length
+            ? redove
+                .map(
+                  (r) => `
+          <div class="red opis" translate="no" data-red="${ekraniraj(r.red)}">
+            <span><b>${ekraniraj(r.red)}</b></span>
+            ${nomera.map((k) => `<span>${kletkaNaReda(r, k)}</span>`).join('')}
+            <span><button type="button" class="vtorichen malak" data-mahni-red="${ekraniraj(r.red)}">Махни</button></span>
+          </div>`,
+                )
+                .join('')
+            : `<div class="red opis"><span>Няма нито един ред.</span>${nomera
+                .map(() => '<span></span>')
+                .join('')}<span></span></div>`
+        }
+        ${
+          nomera.some((k) => vidaNaKolonata(t, k) === 'evro')
+            ? `<div class="red opis sumi" translate="no"><span><b>Сбор</b></span>${nomera
+                .map((k) =>
+                  vidaNaKolonata(t, k) === 'evro' && !zatvorenaE(t, k)
+                    ? `<span data-sbor-kolona="${k}"><b>${ekraniraj(kakvoPishe(sborNaKolona(redove, k) as never))}</b></span>`
+                    : '<span></span>',
+                )
+                .join('')}<span></span></div>`
+            : ''
+        }
+      </div>
+
+      <p class="drebno" id="sverka-redove">Записани: <b>${sverka.zapisani}</b> · махнати:
+      <b>${sverka.mahnati}</b> · живи: <b>${sverka.zhivi}</b> · разлика: <b>${sverka.razlika}</b>
+      — и четирите се броят, дори когато са нула.
+      Махането е ЗАПИС: редът си отива от таблицата, не от Журнала.</p>
     </section>`;
 }
 
@@ -178,6 +315,86 @@ export function zakachiTablitsaOtFayl(
     }
     await prerisuvay();
   });
+
+  // ── РЕДОВЕТЕ НА СЪЗДАДЕНАТА ТАБЛИЦА (резен 57 · M12) ─────────────────────
+  koren.querySelector<HTMLSelectElement>('#izbor-sazdadena')?.addEventListener('change', async (e) => {
+    izbranaTablitsa = (e.target as HTMLSelectElement).value;
+    await prerisuvay();
+  });
+
+  const formaRed = koren.querySelector<HTMLFormElement>('#forma-red-na-tablitsa');
+  formaRed?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const o = await k.deystviya.ogledalo();
+    const t = o.tablitsiOtFayl.get(izbranaTablitsa) ?? [...o.tablitsiOtFayl.values()][0];
+    if (t === undefined) return;
+
+    const danni = new FormData(formaRed);
+    const pari_st: Record<string, number> = {};
+    const chisla: Record<string, number> = {};
+    const tekst: Record<string, string> = {};
+    try {
+      for (const [kolona] of t.glavi.entries()) {
+        const k2 = String(kolona);
+        if (zatvorenaE(t, k2)) continue;
+        const surovo = String(danni.get(`k-${k2}`) ?? '').trim();
+        if (surovo === '') continue;
+        const vid = vidaNaKolonata(t, k2);
+        // ПАРИТЕ минават през четеца на суми — той знае и запетаята, и точката,
+        // и връща ЦЕЛИ стотинки. Ръчно `Number()*100` дава 12.340000000000002.
+        if (vid === 'evro') pari_st[k2] = otSuma(surovo);
+        else if (vid === 'protsent' || vid === 'chislo') {
+          const n = Number(surovo.replace(',', '.'));
+          if (!Number.isFinite(n)) throw new Error(`„${t.glavi[kolona]}" иска число, а дойде „${surovo}".`);
+          chisla[k2] = n;
+        } else tekst[k2] = surovo;
+      }
+
+      await k.deystviya.zapishiRedNaTablitsa(
+        {
+          tablitsa: t.klyuch,
+          red: String(danni.get('red') ?? '').trim(),
+          pari_st,
+          chisla,
+          tekst,
+          mahnat: false,
+        },
+        { opId: `red-na-tablitsa:${crypto.randomUUID()}` },
+      );
+      greshka = '';
+      k.vest('dobre', 'Редът влезе в таблицата.');
+      await prerisuvay();
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+      k.vest('zle', greshka);
+      await prerisuvay();
+    }
+  });
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-mahni-red]')) {
+    b.addEventListener('click', async () => {
+      const o = await k.deystviya.ogledalo();
+      const t = o.tablitsiOtFayl.get(izbranaTablitsa) ?? [...o.tablitsiOtFayl.values()][0];
+      const star = t === undefined ? undefined : o.redoveNaTablitsi.get(t.klyuch)?.get(b.dataset['mahniRed']!);
+      if (star === undefined) return;
+      try {
+        // МАХАНЕТО е ЗАПИС със същия ключ (правило 1). Стойностите се пренасят
+        // такива, каквито са: махнатият ред трябва да се чете утре, за да се
+        // види КАКВО е било махнато, а не само че нещо е било.
+        await k.deystviya.zapishiRedNaTablitsa(
+          { ...star, mahnat: true },
+          { opId: `red-mahnat:${crypto.randomUUID()}` },
+        );
+        greshka = '';
+        k.vest('dobre', 'Редът е махнат. Записът остава в Журнала.');
+        await prerisuvay();
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        k.vest('zle', greshka);
+        await prerisuvay();
+      }
+    });
+  }
 
   const forma = koren.querySelector<HTMLFormElement>('#forma-sazday-tablitsa');
   forma?.addEventListener('submit', async (e) => {
