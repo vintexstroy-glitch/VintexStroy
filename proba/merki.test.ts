@@ -48,8 +48,27 @@ import { SHA } from '../tests/pomoshtni.js';
 const NAEMATEL = 'vintexstroy';
 const BROY = 10_000;
 
-/** Колко пъти се пуска всяка мярка · взима се НАЙ-НИСКОТО. */
+/** НАЙ-МАЛКО толкова пускания на мярка · взима се НАЙ-НИСКОТО от всички. */
 const POVTORENIYA = 5;
+
+/** Таван на пробите · за да не мери мярката до безкрай на бавна машина. */
+const POVTORENIYA_NAY_MNOGO = 60;
+
+/** Таван на времето за ЕДНА мярка · пробите спират, дори да още падат. */
+const TAVAN_NA_MYARKA_MS = 2_000;
+
+/**
+ * КОЛКО ПРОБИ БЕЗ ПОДОБРЕНИЕ СПИРАТ МЕРЕНЕТО.
+ *
+ * Пет фиксирани проби стигаха на празна машина и падаха на заета: минимумът
+ * от пет носи чуждия шум, и мярката казваше „кодът се е забавил", когато
+ * забавен беше СЪСЕДЪТ — пълният тестов пакет, пуснат преди нея. Мярка, чиято
+ * присъда зависи от онова, което е текло ПРЕДИ нея, не мери кода.
+ *
+ * Затова се мери, докато най-ниското още пада. Прагът НЕ помръдва — сетивото
+ * се разширява, не тревогата се приглушава.
+ */
+const BEZ_PODOBRENIE = 12;
 
 /**
  * НАЙ-МАЛКИЯТ ДОПУСТИМ ЗАПАС.
@@ -72,14 +91,18 @@ const BYUDZHET = {
 
 const izmereno: Record<string, string> = {};
 
-/** НАЙ-НИСКОТО от `POVTORENIYA` пускания · с една загрявка преди тях. */
+/** НАЙ-НИСКОТО от пробите · с една загрявка преди тях. */
 function nayNiskoto(kakvo: () => void): number {
   kakvo();
   let nay = Infinity;
-  for (let i = 0; i < POVTORENIYA; i += 1) {
+  let bezPodobrenie = 0;
+  const kray = performance.now() + TAVAN_NA_MYARKA_MS;
+  for (let i = 0; i < POVTORENIYA_NAY_MNOGO; i += 1) {
     const t = performance.now();
     kakvo();
-    nay = Math.min(nay, performance.now() - t);
+    const sega = performance.now() - t;
+    if (sega < nay) { nay = sega; bezPodobrenie = 0; } else { bezPodobrenie += 1; }
+    if (i + 1 >= POVTORENIYA && (bezPodobrenie >= BEZ_PODOBRENIE || performance.now() >= kray)) break;
   }
   return nay;
 }
@@ -88,10 +111,14 @@ function nayNiskoto(kakvo: () => void): number {
 async function nayNiskotoChakashto(kakvo: (n: number) => Promise<void>): Promise<number> {
   await kakvo(0);
   let nay = Infinity;
-  for (let i = 1; i <= POVTORENIYA; i += 1) {
+  let bezPodobrenie = 0;
+  const kray = performance.now() + TAVAN_NA_MYARKA_MS;
+  for (let i = 1; i <= POVTORENIYA_NAY_MNOGO; i += 1) {
     const t = performance.now();
     await kakvo(i);
-    nay = Math.min(nay, performance.now() - t);
+    const sega = performance.now() - t;
+    if (sega < nay) { nay = sega; bezPodobrenie = 0; } else { bezPodobrenie += 1; }
+    if (i >= POVTORENIYA && (bezPodobrenie >= BEZ_PODOBRENIE || performance.now() >= kray)) break;
   }
   return nay;
 }

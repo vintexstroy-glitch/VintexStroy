@@ -1213,12 +1213,26 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .plochka .chislo.malka { font-size: 1.214rem; }
 
 /* Редакторът на хедъри · колоната и лицата ѝ */
-.glava.redaktor, .red.redaktor {
-  /* Колона · Вид · СТОЙНОСТ · Номенклатура · Готово меню · бутони.
-     „Стойност" е новата: тя казва дали сборът на колоната отива в Приходи и
-     Разходи (ADR-014), а дотук се задаваше само с гадаене при внасяне. */
-  grid-template-columns: minmax(0, 300px) 118px 150px minmax(0, 240px) minmax(0, 280px) 260px;
-  min-width: 980px;
+/* ДРЪЖКАТА ЗА МЕСТЕНЕ на колона (резен 55) · знакът + двете стрелки.
+   Стрелките НЕ са украса до влаченето: с клавиатура не се влачи, а на телефон
+   се влачи трудно. Затова те са първи в реда, а знакът ⠿ е само подсказка.
+
+   ПЪРВОТО ПИСАНЕ НА ТОЗИ БЛОК СЧУПИ ПРАВИЛО: вмъкна се между `.glava.redaktor,`
+   и `.red.redaktor`, тоест разкъса селектор, съединен със запетая. Затова стои
+   ПРЕДИ него, не в него. */
+.red.redaktor .drazhka { display: flex; align-items: center; gap: 4px; }
+.red.redaktor .hvat { cursor: grab; color: var(--mastilo2); user-select: none; }
+.red.redaktor .drazhka button { padding: 2px 6px; line-height: 1; }
+/* Редът, над който се пуска · линия отгоре, за да се вижда КЪДЕ ще влезе. */
+.red.redaktor.nad-nego { box-shadow: inset 0 2px 0 0 var(--aktsent); }
+
+.glava.redaktor,
+.red.redaktor {
+  /* Ред · Колона · Вид · СТОЙНОСТ · Номенклатура · Готово меню · бутони.
+     „Стойност" казва дали сборът на колоната отива в Приходи и Разходи
+     (ADR-014); „Ред" е новата (резен 55) — дръжката и двете стрелки. */
+  grid-template-columns: 96px minmax(0, 300px) 118px 150px minmax(0, 240px) minmax(0, 280px) 260px;
+  min-width: 1076px;
 }
 .red.redaktor input {
   width: 100%;

@@ -188,13 +188,47 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     await p.waitForSelector('.red.redaktor');
     const koloniPredi = (await redove(p, '.red.redaktor')).length;
     proveri('колоните на хедъра се редят', koloniPredi > 0, true);
-    // Клетките на реда: 0 име · 1 вид на колоната · 2 ВИД НА СТОЙНОСТТА ·
-    // 3 номенклатура · 4 готово меню. Третата е новата (ADR-014).
+    // Клетките на реда: 0 РЕД (дръжка и стрелки) · 1 име · 2 вид на колоната ·
+    // 3 ВИД НА СТОЙНОСТТА · 4 номенклатура · 5 готово меню. Нулевата е новата
+    // (резен 55) и размести всички след себе си — проходът я хвана веднага.
     proveri(
       'по подразбиране колоната е БЕЗ падащо меню',
-      (await redove(p, '.red.redaktor'))[0]?.[3],
+      (await redove(p, '.red.redaktor'))[0]?.[4],
       'без падащо меню',
     );
+
+    // ══ 126 · КОЛОНАТА СЕ МЕСТИ · стрелки и влачене (резен 55 · M15) ═════
+    //
+    // Описът я държеше като „ръчно пренареждане чрез влачене" — удобство. То не
+    // е: местенето ПРЕНОМЕРИРА, а деветте места, които сочат колоната по номер,
+    // трябва да се пренесат заедно с нея.
+    razdel = '126 · колоната се мести';
+
+    const imenata = async (): Promise<string[]> =>
+      p.$$eval('.red.redaktor [data-ime-vhod]', (e) => e.map((x) => (x as HTMLInputElement).value));
+    const predRedbata = await imenata();
+    proveri('хедърът има поне ТРИ колони, за да има какво да се мести',
+      predRedbata.length >= 3, true);
+
+    // ПЪРВАТА не се вдига нагоре, ПОСЛЕДНАТА не слиза надолу · изключено ≠
+    // липсващо: бутоните ги ИМА и се виждат защо не работят (правило 15).
+    proveri('стрелката нагоре на първата е изключена',
+      await p.$eval('[data-gore="0"]', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('а на втората — не',
+      await p.$eval('[data-gore="1"]', (e) => (e as HTMLButtonElement).disabled), false);
+
+    const predSabitieto = await broySabitiya(p);
+    await sSabitie(p, () => p.click('[data-gore="1"]'));
+    proveri('местенето е ТОЧНО едно събитие', (await broySabitiya(p)) - predSabitieto, 1);
+
+    const sledRedbata = await imenata();
+    proveri('двете първи колони си размениха местата',
+      [sledRedbata[0], sledRedbata[1]], [predRedbata[1], predRedbata[0]]);
+    proveri('и НИТО ЕДНА не се загуби', sledRedbata.length, predRedbata.length);
+
+    // ВРЪЩАНЕТО е същото действие в обратна посока · не е „отмяна".
+    await sSabitie(p, () => p.click('[data-dolu="0"]'));
+    proveri('обратното местене връща реда', await imenata(), predRedbata);
 
     // ══ 58 · ПЪТ №4 · ОБРАЗЕЦЪТ ОТ МОДЕЛА (ADR-041) ═══════════════════════
     //
@@ -249,7 +283,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('формулната колона казва СМЕТКАТА си в реда',
       Boolean(formulniyat?.some((k) => k.includes('сбор('))), true);
     proveri('и се вижда като ЗАТВОРЕНА — в нея не се пише',
-      formulniyat?.[1], 'затворена');
+      formulniyat?.[2], 'затворена');
 
     // ПРАВИЛОТО: формулната колона няма „Запиши" и няма „Премахни" — тя е сметка
     const broyKoloni = redoveNaHedara.length;
