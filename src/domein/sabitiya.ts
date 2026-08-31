@@ -974,6 +974,14 @@ export interface PayloadKeshZahranen {
  */
 export interface PayloadTablitsaOtFaylSazdadena {
   readonly klyuch: string;
+  /**
+   * НА КОЙ РЕД Е БИЛА ГЛАВАТА във файла · нулево-базиран.
+   *
+   * ПО ИЗБОР: старите записи го нямат и се четат като нула (правило 1 — нищо
+   * не се преписва). Нужен е, защото вносът на редовете трябва да знае откъде
+   * почват ДАННИТЕ, а при неговите листове главата е под заглавен ред.
+   */
+  readonly redNaGlavata?: number;
   readonly otFayl: string;
   readonly otpechatak: string;
   readonly glavi: readonly string[];
