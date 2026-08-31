@@ -37,8 +37,10 @@ import { IMENA_NA_VIDOVETE_STOYNOST } from '../src/domein/vid-stoynost.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Konteks } from './ekranite.js';
+import type { PayloadTablitsaOtFaylSazdadena } from '../src/domein/sabitiya.js';
+import type { RedNaTablitsa } from '../src/domein/redove-na-tablitsa.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { kakvoPishe, otSuma } from '../src/yadro/pari.js';
+import { kakvoPishe, otSuma, stotinki } from '../src/yadro/pari.js';
 import {
   redovete,
   sborNaKolona,
@@ -46,6 +48,7 @@ import {
   vidaNaKolonata,
   zatvorenaE,
 } from '../src/domein/redove-na-tablitsa.js';
+import { razrezPoKolona, sveriRazreza } from '../src/domein/razrez.js';
 
 /** Каквото е прочетено, докато човекът не потвърди · нула събития дотогава. */
 let predlozhenie: PredlozhenieZaTablitsa | undefined;
@@ -55,6 +58,9 @@ let greshka = '';
 
 /** КОЯ създадена таблица гледам · памет на екрана, не факт (ADR-022). */
 let izbranaTablitsa = '';
+
+/** ПО КОЯ колона е разрезът · празно значи „без разрез" (резен 59). */
+let razrezPo = '';
 
 export function blokNaTablitsaOtFayl(o: Ogledalo): string {
   return `
@@ -116,7 +122,7 @@ function blokNaSazdadenite(o: Ogledalo): string {
     const vid = vidaNaKolonata(t, k);
     if (vid === 'evro') {
       const st = r.pari_st[k];
-      return st === undefined ? '—' : ekraniraj(kakvoPishe(st as never));
+      return st === undefined ? '—' : ekraniraj(kakvoPishe(stotinki(st)));
     }
     if (vid === 'protsent' || vid === 'chislo') {
       const n = r.chisla[k];
@@ -189,13 +195,15 @@ function blokNaSazdadenite(o: Ogledalo): string {
             ? `<div class="red opis sumi" translate="no"><span><b>Сбор</b></span>${nomera
                 .map((k) =>
                   vidaNaKolonata(t, k) === 'evro' && !zatvorenaE(t, k)
-                    ? `<span data-sbor-kolona="${k}"><b>${ekraniraj(kakvoPishe(sborNaKolona(redove, k) as never))}</b></span>`
+                    ? `<span data-sbor-kolona="${k}"><b>${ekraniraj(kakvoPishe(stotinki(sborNaKolona(redove, k))))}</b></span>`
                     : '<span></span>',
                 )
                 .join('')}<span></span></div>`
             : ''
         }
       </div>
+
+      ${blokNaRazreza(t, redove, nomera)}
 
       <p class="drebno" id="sverka-redove">Записани: <b>${sverka.zapisani}</b> · махнати:
       <b>${sverka.mahnati}</b> · живи: <b>${sverka.zhivi}</b> · разлика: <b>${sverka.razlika}</b>
@@ -283,6 +291,63 @@ function predlozhenieto(p: PredlozhenieZaTablitsa): string {
       </form>`;
 }
 
+/**
+ * РАЗРЕЗЪТ · групи по избрана колона, със сбор на всяка парична (резен 59).
+ *
+ * Без избор няма разрез: празният избор не е „по първата колона", а „без".
+ * Сметка, която се появява сама, кара човека да ѝ вярва, без да я е поискал.
+ */
+function blokNaRazreza(
+  t: PayloadTablitsaOtFaylSazdadena,
+  redove: readonly RedNaTablitsa[],
+  nomera: readonly string[],
+): string {
+  const menyu = `
+    <div class="pole">
+      <label for="izbor-razrez">Разрез по</label>
+      <select translate="no" id="izbor-razrez">
+        <option value=""${razrezPo === '' ? ' selected' : ''}>— без разрез —</option>
+        ${nomera
+          .map(
+            (k) =>
+              `<option value="${k}"${k === razrezPo ? ' selected' : ''}>${ekraniraj(t.glavi[Number(k)]!)}</option>`,
+          )
+          .join('')}
+      </select>
+    </div>`;
+
+  if (razrezPo === '' || !nomera.includes(razrezPo)) {
+    return `<div class="poleta tesni">${menyu}</div>`;
+  }
+
+  const grupi = razrezPoKolona(redove, t, razrezPo);
+  const sverka = sveriRazreza(redove, t, grupi);
+  const pari = nomera.filter((k) => vidaNaKolonata(t, k) === 'evro');
+  const razlikite = Object.values(sverka.razlika_st).reduce((a, b) => a + Math.abs(b), 0);
+
+  return `
+    <div class="poleta tesni">${menyu}</div>
+    <div class="tablitsa" data-tablitsa="razrez">
+      <div class="glava opis"><span>${ekraniraj(t.glavi[Number(razrezPo)]!)}</span><span>Редове</span>${pari
+        .map((k) => `<span>${ekraniraj(t.glavi[Number(k)]!)}</span>`)
+        .join('')}</div>
+      ${grupi
+        .map(
+          (g) => `
+      <div class="red opis" translate="no" data-grupa="${ekraniraj(g.stoynost)}">
+        <span><b>${g.stoynost === '' ? '<span class="znachka tiha">(празно)</span>' : ekraniraj(g.stoynost)}</b></span>
+        <span>${g.broy}</span>
+        ${pari.map((k) => `<span>${ekraniraj(kakvoPishe(stotinki(g.sbor_st[k] ?? 0)))}</span>`).join('')}
+      </div>`,
+        )
+        .join('')}
+    </div>
+    <p class="drebno" id="sverka-razrez">Редове: <b>${sverka.redove}</b> · в групите:
+    <b>${sverka.vGrupite}</b> · разлика: <b>${sverka.razlikaVBroya}</b> · по парите:
+    <b>${razlikite}</b>. Цялото и сборът на частите се смятат по РАЗЛИЧЕН път — затова
+    разликата значи нещо. Празната клетка е СВОЯ група, не изхвърлен ред.</p>`;
+}
+
 export function zakachiTablitsaOtFayl(
   koren: HTMLElement,
   k: Konteks,
@@ -319,6 +384,11 @@ export function zakachiTablitsaOtFayl(
   // ── РЕДОВЕТЕ НА СЪЗДАДЕНАТА ТАБЛИЦА (резен 57 · M12) ─────────────────────
   koren.querySelector<HTMLSelectElement>('#izbor-sazdadena')?.addEventListener('change', async (e) => {
     izbranaTablitsa = (e.target as HTMLSelectElement).value;
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLSelectElement>('#izbor-razrez')?.addEventListener('change', async (e) => {
+    razrezPo = (e.target as HTMLSelectElement).value;
     await prerisuvay();
   });
 
