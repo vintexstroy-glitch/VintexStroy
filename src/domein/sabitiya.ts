@@ -1180,6 +1180,15 @@ export interface PayloadRedoveZakacheni {
   readonly vidB: string;
   readonly idB: string;
   readonly zashto: string;
+  /**
+   * КОЯ таблица · само когато видът е `red` (резен 58).
+   *
+   * ПО ИЗБОР нарочно: старите записи нямат тези полета и не се преписват
+   * (правило 1). Липсващата таблица се чете като „няма таблица", което е
+   * точната истина за единайсетте вградени същности.
+   */
+  readonly tablitsaA?: string;
+  readonly tablitsaB?: string;
 }
 
 export type PayloadRedoveRazkacheni = PayloadRedoveZakacheni;

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -160,6 +160,41 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   proveri(
     'а сверката помни, че е БИЛ · записани 1 · махнати 1 · живи 0',
     ((await p.textContent('#sverka-redove')) ?? '').replace(/\s+/g, ' ').includes('махнати: 1'),
+    true,
+  );
+
+  // ══ 129 · ЗАКАЧКА КЪМ РЕД НА СЪЗДАДЕНА ТАБЛИЦА (резен 58 · M17) ══════════
+  // Втората половина на M17. Живее ТУК, а не при закачките: там таблицата още
+  // не съществува — проходът тече по реда на екраните, не по реда на темите.
+  await p.fill('#red-klyuch', 'Ф-7');
+  if (poleTekst) await p.fill(`#${poleTekst.id}`, 'За закачане');
+  await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
+
+  await naEkran(p, 'tabove', '#izbor-tab');
+  await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-a', 'red'));
+  proveri(
+    'изборът „Ред на таблица" вади ВТОРО меню — коя таблица',
+    Boolean(await p.$('#zak-tablitsa-a')),
+    true,
+  );
+  proveri(
+    'а при вградена същност второто меню го НЯМА',
+    await p.$$eval('#zak-tablitsa-b', (e) => e.length),
+    0,
+  );
+  proveri(
+    'предлага се ЖИВИЯТ ред, а махнатият от §128 — не',
+    await p.$$eval('#zak-red-a option', (e) => e.map((x) => x.textContent).join(' ')),
+    'Ф-7',
+  );
+
+  await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-b', 'imot'));
+  const predChuzhda = await broySabitiya(p);
+  await sSabitie(p, () => p.click('#zak-zakachi'));
+  proveri('закачката към ред на таблица е СЪБИТИЕ', await broySabitiya(p), predChuzhda + 1);
+  proveri(
+    'и двойката показва В КОЯ таблица е редът',
+    ((await p.textContent('[data-tablitsa=zakachki]')) ?? '').includes('Фактури от файл'),
     true,
   );
 }

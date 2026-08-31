@@ -965,8 +965,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // я гледаш — иначе А-за-Б и Б-за-А биха били две различни връзки.
         const p = s.payload as unknown as PayloadRedoveZakacheni;
         const [a, b] = naredi(
-          { vid: p.vidA as SashtnostZaZakachane, id: p.idA },
-          { vid: p.vidB as SashtnostZaZakachane, id: p.idB },
+          { vid: p.vidA as SashtnostZaZakachane, id: p.idA, ...(p.tablitsaA === undefined ? {} : { tablitsa: p.tablitsaA }) },
+          { vid: p.vidB as SashtnostZaZakachane, id: p.idB, ...(p.tablitsaB === undefined ? {} : { tablitsa: p.tablitsaB }) },
         );
         zakachki.set(klyuchNaDvoykata(a, b), {
           a,
@@ -985,8 +985,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         const p = s.payload as unknown as PayloadRedoveRazkacheni;
         zakachki.delete(
           klyuchNaDvoykata(
-            { vid: p.vidA as SashtnostZaZakachane, id: p.idA },
-            { vid: p.vidB as SashtnostZaZakachane, id: p.idB },
+            { vid: p.vidA as SashtnostZaZakachane, id: p.idA, ...(p.tablitsaA === undefined ? {} : { tablitsa: p.tablitsaA }) },
+            { vid: p.vidB as SashtnostZaZakachane, id: p.idB, ...(p.tablitsaB === undefined ? {} : { tablitsa: p.tablitsaB }) },
           ),
         );
         break;
