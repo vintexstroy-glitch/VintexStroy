@@ -19,6 +19,15 @@
  */
 
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
+import {
+  eSashtnostZaZakachane,
+  IMENA_NA_SASHTNOSTITE,
+  redoveNa,
+  SASHTNOSTI_ZA_ZAKACHANE,
+  svarzanite,
+  sveriZakachkite,
+  type SashtnostZaZakachane,
+} from '../src/domein/mnogo-kam-mnogo.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import {
@@ -71,6 +80,19 @@ let dobavyamTab = false;
 /** Отворена ли е формата за нова секция В този таб. */
 let dobavyamSektsiya = false;
 let greshka = '';
+
+/**
+ * КОИ ДВА ВИДА се закачат в момента · ПАМЕТ НА ЕКРАНА, не факт (ADR-022).
+ *
+ * Изборът „кого с кого гледам" не е решение на човек за бизнеса — той е поглед.
+ * В Журнала биха влезли стотици записи за разглеждане, а правило 1 не позволява
+ * да се изчистят после.
+ */
+let vidA = chetiEkranno('tabove.zakachki.vidA', 'razhod') as SashtnostZaZakachane;
+let vidB = chetiEkranno('tabove.zakachki.vidB', 'imot') as SashtnostZaZakachane;
+
+/** КОЙ ред е избран отляво · пак поглед: от него се чете „за какво е закачен". */
+let redA = chetiEkranno('tabove.zakachki.redA', '');
 
 /** Изборът за Select By: секция → ключовете на кликнатия ѝ ред. Ефимерно. */
 const izbraniRedove = new Map<string, Readonly<Partial<Record<PoKakvo, string>>>>();
@@ -204,7 +226,8 @@ export function narisuvayTabove(o: Ogledalo, dnes: string): string {
     </section>
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
     ${izbran ? blokTab(o, izbran, dnes) : ''}
-    ${blokAdresnaKniga(o)}`;
+    ${blokAdresnaKniga(o)}
+    ${blokZakachki(o)}`;
 }
 
 /**
@@ -240,6 +263,116 @@ function blokAdresnaKniga(o: Ogledalo): string {
       <p class="drebno">Вградените връзки носят номера 1 · 2 · 3 и не се менят. На колона от твой
       хедър номер дава Стопанинът — следващият свободен е <b>${sledvasht}</b>; номер 0 маха връзката.
       Книгата се смята от моделите при всяко показване — тя е Огледало, не втори носител.</p>
+    </section>`;
+}
+
+/**
+ * ЗАКАЧКИТЕ · много-към-много между РЕДОВЕ (M17).
+ *
+ * Негово: „Занимай се първо с много-към-много."
+ *
+ * Стои точно под Адресната книга, защото двете отговарят на съседни въпроси:
+ * книгата казва кои КОЛОНИ говорят една с друга, закачките — кои РЕДОВЕ са
+ * закачени. Едно място за връзките, две нива.
+ *
+ * Падащите менюта се пълнят от ДОМЕЙНА (`redoveNa`): меню, което си избира
+ * колекция само, предлага ред, който Вратата после отказва.
+ */
+function blokZakachki(o: Ogledalo): string {
+  const redoveA = redoveNa(o, vidA);
+  const redoveB = redoveNa(o, vidB);
+  const zhivi = [...o.zakachki.entries()].sort(([x], [y]) => (x < y ? -1 : x > y ? 1 : 0));
+  const sverka = sveriZakachkite(o.zakachki, o);
+
+  const menyu = (id: string, izbran: SashtnostZaZakachane): string => `
+    <select translate="no" id="${id}">
+      ${SASHTNOSTI_ZA_ZAKACHANE.map(
+        (v) =>
+          `<option value="${v}"${v === izbran ? ' selected' : ''}>${ekraniraj(IMENA_NA_SASHTNOSTITE[v])}</option>`,
+      ).join('')}
+    </select>`;
+
+  // Избраният отляво ред се ПОМНИ; смени ли се видът, паметта може да сочи ред
+  // от другия вид — тогава пада на първия. Иначе „закачен за" би показвал
+  // връзките на ред, който вече не стои в менюто.
+  const izbranA = redoveA.includes(redA) ? redA : (redoveA[0] ?? '');
+  const zakachenoZa = svarzanite(o.zakachki, { vid: vidA, id: izbranA });
+
+  const redove = (id: string, spisak: readonly string[], izbran = ''): string => `
+    <select translate="no" id="${id}"${spisak.length ? '' : ' disabled'}>
+      ${
+        spisak.length
+          ? spisak
+              .map(
+                (r) =>
+                  `<option value="${ekraniraj(r)}"${r === izbran ? ' selected' : ''}>${ekraniraj(r)}</option>`,
+              )
+              .join('')
+          : '<option value="">— няма редове —</option>'
+      }
+    </select>`;
+
+  return `
+    <section data-sektsiya="tabove-zakachki">
+      <div class="dyalglava">
+        <h2>Закачки между редове</h2>
+        <span>един ред се закача за много редове, и обратно · двете посоки са ЕДИН запис</span>
+      </div>
+      <div class="poleta tesni">
+        <div class="pole"><label for="zak-vid-a">Този ред</label>${menyu('zak-vid-a', vidA)}</div>
+        <div class="pole"><label for="zak-red-a">кой</label>${redove('zak-red-a', redoveA, izbranA)}</div>
+        <div class="pole"><label for="zak-vid-b">се закача за</label>${menyu('zak-vid-b', vidB)}</div>
+        <div class="pole"><label for="zak-red-b">кой</label>${redove('zak-red-b', redoveB)}</div>
+        <div class="pole">
+          <label for="zak-zashto">Защо · по избор</label>
+          <input translate="no" id="zak-zashto" placeholder="кратка причина">
+        </div>
+      </div>
+      <div class="deystviya">
+        <button type="button" id="zak-zakachi"${redoveA.length && redoveB.length ? '' : ' disabled'}>Закачи</button>
+        ${
+          redoveA.length && redoveB.length
+            ? ''
+            : '<p class="drebno">Няма редове от единия вид — закачка не се прави от нищо.</p>'
+        }
+      </div>
+      <p class="drebno" id="zakacheno-za" translate="no">${
+        izbranA === ''
+          ? 'Няма избран ред.'
+          : zakachenoZa.size === 0
+            ? `<b>${ekraniraj(izbranA)}</b> не е закачен за нищо.`
+            : `<b>${ekraniraj(izbranA)}</b> е закачен за: ` +
+              [...zakachenoZa.entries()]
+                .map(
+                  ([vid, idta]) =>
+                    `${ekraniraj(IMENA_NA_SASHTNOSTITE[vid])} · ${ekraniraj(idta.join(', '))}`,
+                )
+                .join(' · ')
+      }</p>
+      <div class="tablitsa" data-tablitsa="zakachki">
+        <div class="glava opis"><span>Единият край</span><span>Другият край</span><span>Защо</span><span></span></div>
+        ${
+          zhivi.length
+            ? zhivi
+                .map(
+                  ([klyuch, z]) => `
+          <div class="red opis${sverka.viseshti.includes(klyuch) ? ' propusnat' : ''}" translate="no" data-zakachka="${ekraniraj(klyuch)}">
+            <span><b>${ekraniraj(IMENA_NA_SASHTNOSTITE[z.a.vid])}</b> · ${ekraniraj(z.a.id)}</span>
+            <span><b>${ekraniraj(IMENA_NA_SASHTNOSTITE[z.b.vid])}</b> · ${ekraniraj(z.b.id)}</span>
+            <span>${ekraniraj(z.zashto) || '<span class="znachka tiha">без причина</span>'}</span>
+            <span><button type="button" class="vtorichen malak" data-razkachi="${ekraniraj(klyuch)}">Разкачи</button></span>
+          </div>`,
+                )
+                .join('')
+            : '<div class="red opis"><span>Няма нито една закачка.</span><span></span><span></span><span></span></div>'
+        }
+      </div>
+      <p class="drebno" id="sverka-zakachki">Живи закачки: <b>${sverka.zhivi}</b> · висящи: <b>${sverka.viseshti.length}</b>${
+        sverka.viseshti.length ? ` — ${ekraniraj(sverka.viseshti.join(' · '))}` : ''
+      }. Висяща е двойка, чийто край вече го няма — стои, за да се види, а не за да мълчи.</p>
+      <p class="drebno">Разкачането е ЗАПИС, не триене: в Журнала остават и закачането, и разкачането.
+      Редовете на моделна и на внесена таблица още ги няма в Журнала (описът · M12), затова закачка
+      към чужда таблица не се предлага — страна без редове не може да бъде проверена.</p>
     </section>`;
 }
 
@@ -663,6 +796,72 @@ export function zakachiTabove(koren: HTMLElement, k: Konteks, prerisuvay: () => 
         await k.deystviya.zapishiModel(nov, { opId: `model:${crypto.randomUUID()}` });
         greshka = '';
         k.vest('dobre', nomer === 0 ? 'Връзката е махната.' : `Колоната носи номер ${nomer}.`);
+        await prerisuvay();
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+        await prerisuvay();
+      }
+    });
+  }
+
+  // ЗАКАЧКИТЕ · много-към-много (M17). Смяната на вида е ПОГЛЕД — помни се на
+  // екрана и не влиза в Журнала.
+  for (const [id, koe] of [
+    ['zak-vid-a', 'a'],
+    ['zak-vid-b', 'b'],
+  ] as const) {
+    koren.querySelector<HTMLSelectElement>(`#${id}`)?.addEventListener('change', async (e) => {
+      const v = (e.target as HTMLSelectElement).value;
+      if (!eSashtnostZaZakachane(v)) return;
+      if (koe === 'a') {
+        vidA = v;
+        zapomniEkranno('tabove.zakachki.vidA', v);
+      } else {
+        vidB = v;
+        zapomniEkranno('tabove.zakachki.vidB', v);
+      }
+      await prerisuvay();
+    });
+  }
+
+  koren.querySelector<HTMLSelectElement>('#zak-red-a')?.addEventListener('change', async (e) => {
+    redA = (e.target as HTMLSelectElement).value;
+    zapomniEkranno('tabove.zakachki.redA', redA);
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#zak-zakachi')?.addEventListener('click', async () => {
+    const idA = koren.querySelector<HTMLSelectElement>('#zak-red-a')?.value ?? '';
+    const idB = koren.querySelector<HTMLSelectElement>('#zak-red-b')?.value ?? '';
+    const zashto = koren.querySelector<HTMLInputElement>('#zak-zashto')?.value.trim() ?? '';
+    try {
+      // `opId` носи ДЕЙСТВИЕТО (правило 20): закачане СЛЕД разкачане е ново
+      // решение. Ключ от двойката би върнал стария резултат и втората закачка
+      // би изчезнала мълчаливо.
+      await k.deystviya.zakachiRedove({ vid: vidA, id: idA }, { vid: vidB, id: idB }, zashto, {
+        opId: `zakachka:${crypto.randomUUID()}`,
+      });
+      greshka = '';
+      k.vest('dobre', 'Двата реда са закачени.');
+      await prerisuvay();
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+      await prerisuvay();
+    }
+  });
+
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-razkachi]')) {
+    b.addEventListener('click', async () => {
+      const klyuch = b.dataset['razkachi']!;
+      try {
+        const o = await k.deystviya.ogledalo();
+        const z = o.zakachki.get(klyuch);
+        if (!z) throw new Error('Тази закачка вече я няма.');
+        await k.deystviya.razkachiRedove(z.a, z.b, '', {
+          opId: `razkachka:${crypto.randomUUID()}`,
+        });
+        greshka = '';
+        k.vest('dobre', 'Разкачени. Записът остава в Журнала.');
         await prerisuvay();
       } catch (err) {
         greshka = dumiZaGreshka(err);

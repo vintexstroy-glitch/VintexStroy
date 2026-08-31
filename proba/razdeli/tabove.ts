@@ -141,5 +141,38 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и Управление го вижда — един механизъм, два екрана',
       (await p.evaluate(() => document.body.textContent)).includes('Проба от Сметки'), true);
 
+    // ══ 127 · МНОГО-КЪМ-МНОГО · закачки между редове (резен 56 · M17) ════════
+    razdel = '127 · закачки между редове';
+
+    await naEkran(p, 'tabove', '#izbor-tab');
+    proveri('секцията стои под Адресната книга',
+      Boolean(await p.$('[data-sektsiya="tabove-zakachki"]')), true);
+
+    // ДЕЛО ↔ ИМОТ: и двата вида имат редове дотук — делата ги създаде §43.
+    await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-a', 'delo'));
+    await deystvieSPrerisuvane(p, () => p.selectOption('#zak-vid-b', 'imot'));
+    proveri('менюто помни избора си',
+      await p.$eval('#zak-vid-a', (e) => (e as HTMLSelectElement).value), 'delo');
+
+    await p.fill('#zak-zashto', 'делото е за този имот');
+    const predZakachka = await broySabitiya(p);
+    await sSabitie(p, () => p.click('#zak-zakachi'));
+    proveri('закачането е СЪБИТИЕ', await broySabitiya(p), predZakachka + 1);
+    proveri('двойката се вижда в таблицата',
+      await p.$$eval('[data-tablitsa="zakachki"] [data-zakachka]', (r) => r.length), 1);
+    proveri('и се КАЗВА за какво е закачен избраният ред',
+      (await p.$eval('#zakacheno-za', (e) => e.textContent)).includes('Имот'), true);
+    proveri('сверката брои живата и не намира висяща',
+      (await p.$eval('#sverka-zakachki', (e) => e.textContent)).includes('висящи: 0'), true);
+
+    // РАЗКАЧАНЕТО е ЗАПИС, не триене — Журналът расте, картата се смалява.
+    const predRazkachka = await broySabitiya(p);
+    await sSabitie(p, () => p.click('[data-razkachi]'));
+    proveri('разкачането също е СЪБИТИЕ', await broySabitiya(p), predRazkachka + 1);
+    proveri('и двойката си отива от КАРТАТА',
+      await p.$$eval('[data-tablitsa="zakachki"] [data-zakachka]', (r) => r.length), 0);
+    proveri('а екранът го казва с думи',
+      (await p.evaluate(() => document.body.textContent)).includes('Няма нито една закачка'), true);
+
     // ══ 44 · непроменимият протокол и картата (И94 т.6) ══════════════════════
 }

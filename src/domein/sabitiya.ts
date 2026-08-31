@@ -76,6 +76,8 @@ export const VID = {
   tab: 'tab',
   /** СВОЯТ КОЕФИЦИЕНТ · „Можеш да вкарваш сам коефициенти“ (30.08) */
   koefitsient: 'koefitsient',
+  /** ДВОЙКАТА · закачка между два реда (M17 · много-към-много) */
+  zakachka: 'zakachka',
   predlozhenie: 'predlozhenie',
   zadacha: 'zadacha',
   /**
@@ -309,6 +311,8 @@ export type TipSabitie =
   | 'ДелоЗаписано'
   | 'ТабЗаписан'
   | 'КоефициентЗаписан'
+  | 'РедовеЗакачени'
+  | 'РедовеРазкачени'
   | 'АгентЗаписан'
   | 'ПредложениеЗаписано'
   | 'ЗадачаЗаписана'
@@ -1156,6 +1160,26 @@ export type PayloadTabZapisan = Tab;
  * Последната дума бие, и се вижда КОЙ я е казал (правило 1).
  */
 export type PayloadKoefitsientZapisan = SvoyKoefitsient;
+
+/**
+ * ЗАКАЧАНЕТО и РАЗКАЧАНЕТО · един товар за двете събития.
+ *
+ * Двата края идват НЕНОРДЕНИ от викащия и се нормализират при сгъването —
+ * така „закачи А за Б" и „закачи Б за А" са една двойка, а не две.
+ *
+ * `zashto` е свободен текст и може да е празен: причината е удобство за човека,
+ * не условие за връзката. Разкачането носи своя `zashto` — то е друго решение,
+ * взето в друг ден, и не преписва причината за закачането.
+ */
+export interface PayloadRedoveZakacheni {
+  readonly vidA: string;
+  readonly idA: string;
+  readonly vidB: string;
+  readonly idB: string;
+  readonly zashto: string;
+}
+
+export type PayloadRedoveRazkacheni = PayloadRedoveZakacheni;
 
 export type PayloadAgentZapisan = Agent;
 
