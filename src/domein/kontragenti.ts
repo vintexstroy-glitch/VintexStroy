@@ -94,7 +94,7 @@ function kontrolna(
  * Празният НЕ минава оттук — той е „невписан", а не „невалиден"; кой от двата
  * е разликата, решава повикващият.
  */
-export function veretEIK(eik: string): boolean {
+function veretEIK(eik: string): boolean {
   if (!/^\d{9}$|^\d{13}$/.test(eik)) return false;
   const c = tsifri(eik);
   const deveta = kontrolna(c.slice(0, 8), [1, 2, 3, 4, 5, 6, 7, 8], [3, 4, 5, 6, 7, 8, 9, 10]);
@@ -110,7 +110,7 @@ export function veretEIK(eik: string): boolean {
  * букви държава + от 2 до 12 знака — чуждата проверка е чужда работа и не се
  * гадае, но държавата и дължината се пазят, за да не мине телефон за номер.
  */
-export function veretDDSNomer(nomer: string): boolean {
+function veretDDSNomer(nomer: string): boolean {
   const n = nomer.toUpperCase();
   if (!/^[A-Z]{2}[0-9A-Z]{2,12}$/.test(n)) return false;
   if (!n.startsWith('BG')) return true;

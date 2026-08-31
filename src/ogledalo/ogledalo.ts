@@ -444,8 +444,6 @@ export interface Ogledalo {
    * Празен имейл значи „не е включвана" — трето състояние няма нужда: прибраната
    * връзка пази съгласието, за да се вижда кой го е дал, ако се включи пак.
    */
-  readonly napVklyuchena: boolean;
-  readonly napSaglasieto: string;
   readonly redNaLentata: readonly string[];
   /**
    * РЪЧНИЯТ РЕД НА ДЕЛАТА · идентификаторите, в реда на човека (резен 34).
@@ -745,8 +743,6 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const svrazki = new Map<number, Svrazka>();
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
-  let napVklyuchena = false;
-  let napSaglasieto = '';
   let redNaLentata: readonly string[] = [];
   let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
@@ -947,14 +943,18 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
-      case 'НАПВръзкаПревключена': {
-        const p = s.payload as unknown as PayloadNAPVrazkaPrevklyuchena;
-        napVklyuchena = p.vklyucheno; // последната дума бие
-        // Съгласието се ПАЗИ и след прибиране: то е следа кой е чел границата,
-        // а не превключвател. Прибраното не е изтрито (ADR-036).
-        if (p.saglasieto) napSaglasieto = p.saglasieto;
+      case 'НАПВръзкаПревключена':
+        // ЗНАЕН тип, НАРОЧНО пренебрегнат — не „непознат" (както „ВалутаИзбрана").
+        //
+        // Негово, 31.08: „НАП отпада" — пада ПОДАВАНЕТО. Екранът, одитният файл
+        // и активирането ги няма от резен 53, тъй че новите Журнали не пишат
+        // това събитие. СТАРИТЕ обаче го носят, а Журналът не се пипа (правило
+        // 1): изтрит случай би направил събитието неразличимо от печатна грешка
+        // и би пратил истински запис в `default`.
+        //
+        // Формата му остава в `sabitiya.ts` по същата причина: за да е записано
+        // КАКВО стои в един стар Журнал, макар нищо от него вече да не ни трябва.
         break;
-      }
 
       case 'ДелаПодредени': {
         const p = s.payload as unknown as PayloadDelaPodredeni;
@@ -1674,8 +1674,6 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     svrazki,
     prehvarleni,
     prenosi,
-    napVklyuchena,
-    napSaglasieto,
     redNaLentata,
     rachniyatRedNaDelata,
     lichnoVklyucheno,

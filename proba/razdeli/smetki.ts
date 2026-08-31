@@ -961,151 +961,11 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
   let razdel = '—';
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
-    // ══ 85 · НАП · ПРЕДИ активиране НЯМА такъв пункт (резен 17 · И108) ══════
-    razdel = '85 · НАП · пунктът се появява СЛЕД активиране';
-    proveri('преди активиране НЯМА пункт „НАП" в лентата',
-      await p.$$eval('[data-ekran=nap]', (e) => e.length), 0);
-
-    await naEkran(p, 'nastroyki', '[data-sektsiya=nap]');
-    proveri('но в Настройки СТОИ картата със съгласието',
-      await p.$$eval('#razbrah-nap', (e) => e.length), 1);
-    proveri('и кутийката НЕ е сложена предварително',
-      await p.$eval('#razbrah-nap', (e) => (e as HTMLInputElement).checked), false);
-    // ПЕТТЕ РИСКА се КАЗВАТ, не се подразбират.
-    const riskovete = await tekstNa(p, '[data-sektsiya=nap]');
-    proveri('казва се, че отговорността е на данъчно задълженото лице',
-      riskovete.includes('отговаря данъчно задълженото лице'), true);
-    proveri('и че електронният подпис е НЕДОСТИЖИМ от браузър',
-      riskovete.includes('смарт-карта'), true);
-    proveri('и че приложението НЕ подава',
-      riskovete.includes('НЕ подава'), true);
-
-    // БЕЗ ОТМЕТКА · нула събития и нула пункт.
-    const predNAP = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => p.click('#vklyuchi-nap'));
-    proveri('без отметка връзката НЕ се включва', await broySabitiya(p), predNAP);
-    proveri('и се казва защо',
-      (await tekstNa(p, '.vest')).includes('не е сложена'), true);
-
-    // С ОТМЕТКА · ЕДНО събитие, и пунктът се появява.
-    await p.check('#razbrah-nap');
-    await sSabitie(p, () => p.click('#vklyuchi-nap'));
-    proveri('с отметка влиза ТОЧНО едно събитие', await broySabitiya(p), predNAP + 1);
-    await p.waitForSelector('[data-ekran=nap]');
-    proveri('и пунктът „НАП" се появява в лентата',
-      await p.$$eval('[data-ekran=nap]', (e) => e.length), 1);
-    proveri('а Настройки показва КОЙ е дал съгласието',
-      (await tekstNa(p, '[data-sektsiya=nap]')).includes('vintexstroy@gmail.com'), true);
-
-    razdel = '85 · НАП · типовите таблици с ЧЕСТЕН статус';
-    await naEkran(p, 'nap', '[data-sektsiya=nap-tipovi]');
-    proveri('деветте типови таблици се изреждат',
-      await p.$$eval('[data-tipova]', (e) => e.length), 9);
-    // ТРИ думи, не две · „частично" е онова, което две думи биха скрили.
-    const dokade = await p.$$eval('[data-dokade]', (e) =>
-      e.map((x) => (x as HTMLElement).dataset['dokade']));
-    proveri('и трите състояния присъстват',
-      new Set(dokade).size, 3);
-    proveri('поне едно е ЧАСТИЧНО · половин работа не минава за цяла',
-      dokade.includes('chastichno'), true);
-
-    razdel = '85 · НАП · празните кодове се БРОЯТ';
-    proveri('немапнатите сметки се броят на екрана',
-      Number(await p.$eval('[data-broi-kodove]', (e) => (e as HTMLElement).dataset['broiKodove'])),
-      13);
-    proveri('и се казва ЗАЩО стоят празни',
-      (await tekstNa(p, '[data-sektsiya=nap-kodove]')).includes('чл. 277а'), true);
-
-    // ══ 86 · НАП · КАКВО НАПУСКА и достъпът за счетоводителя (резен 17в) ═══
-    razdel = '86 · НАП · какво напуска устройството · ПОИМЕННО';
-    await naEkran(p, 'nap', '[data-sektsiya=nap-napuska]');
-    const broyImena = Number(
-      await p.$eval('[data-broi-imena]', (e) => (e as HTMLElement).dataset['broiImena']),
-    );
-    proveri('обявява се БРОЯТ на имената, които файлът ще носи', broyImena > 0, true);
-    // Сверка вход↔изход НА ЕКРАНА: обявеното число = изредените редове.
-    proveri('и толкова реда наистина се изреждат',
-      await p.$$eval('[data-ime-v-fayla]', (e) => e.length), broyImena);
-
-    // ПОИМЕННО и БЕЗ КЛИК · имената са изключението от стоящо обещание, а
-    // изключение, което иска клик, е обещание с една стъпка пред него.
-    // (`innerText` не вижда затворено `<details>` — точно както и окото.)
-    const napuska = await tekstNa(p, '[data-sektsiya=nap-napuska]');
-    // Всяко обявено име се ЧЕТЕ на екрана · без да се отваря нищо. Имената идват
-    // от самия екран, не от познат фиксиран текст: тестът пази СВОЙСТВОТО
-    // („всяко обявено е и видяно"), а не една конкретна фирма от прохода.
-    const obyaveni = await p.$$eval('[data-ime-v-fayla]', (e) =>
-      e.map((x) => (x as HTMLElement).dataset['imeVFayla']!));
-    proveri('всяко обявено име се ЧЕТЕ поименно, без да се отваря нищо',
-      obyaveni.length > 0 && obyaveni.every((ime) => napuska.includes(ime)), true);
-    proveri('казва се, че файлът НЕ тръгва сам',
-      napuska.includes('НЕ тръгва наникъде сам'), true);
-    proveri('и непълните се отделят с ДУМИ, не само с бройка',
-      napuska.includes('БЕЗ ЕИК'), true);
-
-    // Категориите са СПРАВКА и стоят прибрани · но се отварят и се четат.
-    await p.click('[data-sektsiya=nap-napuska] details:last-of-type summary');
-    // Отварянето е ДЕЙСТВИЕ · сгънатото `<details>` няма текст, тъй че четене
-    // преди `open` би минало по празен низ (урокът от §41, вече втори път).
-    await p.waitForSelector('[data-sektsiya=nap-napuska] details:last-of-type[open]');
-    proveri('изброява се и какво НЕ влиза · включително самият Журнал',
-      (await tekstNa(p, '[data-sektsiya=nap-napuska]')).includes('самият Журнал'), true);
-
-    razdel = '86 · НАП · достъпът за счетоводителя · чете и сваля, не пише';
-    const dostap = await tekstNa(p, '[data-sektsiya=nap-schetovoditel]');
-    proveri('двата реда стоят · ТУК и ИЗВЪН програмата',
-      await p.$$eval('[data-dostap]', (e) => e.length), 2);
-    proveri('трите стъпки навън са назовани · портал, тестово подаване, разписка',
-      dostap.includes('portal.nra.bg') && dostap.includes('ТЕСТОВО'), true);
-    proveri('и се казва, че КЕП-ът е недостижим от браузър',
-      dostap.includes('смарт-карта'), true);
-    // НУЛА ПЪТ КЪМ ВРАТАТА · целият екран, не само тази секция. Няма нито една
-    // форма за подаване — свойство, не пропуск (пази го и `tests/nap.test.ts`).
-    proveri('на целия екран НЯМА форма, която да пише',
-      await p.$$eval('.telo form', (e) => e.length), 0);
-
-    razdel = '86 · НАП · правило 23 · скритата колона ПАК се смята';
-    // Сборът и броят събития се запомнят ПРЕДИ скриването — то не бива да
-    // помръдне нито едното, нито другото.
-    const predSkrivane = await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor .suma',
-      (e) => (e as HTMLElement).dataset['st']);
-    const predSabitiya = await broySabitiya(p);
-    await p.click('[data-tablitsa=nap-smetkoplan] .red.opis >> nth=0 >> span >> nth=2',
-      { button: 'right' });
-    await p.waitForSelector('.kontekstno-menyu');
-    await p.click('.kontekstno-menyu button:has-text("Скрий колоната")');
-    proveri('колоната изчезва от очите',
-      await p.$eval('[data-tablitsa=nap-smetkoplan] .glava > span:nth-child(3)',
-        (e) => (e as HTMLElement).hidden), true);
-    proveri('а сборът в книгата НЕ мърда · скритото ПАК се смята',
-      await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor .suma',
-        (e) => (e as HTMLElement).dataset['st']), predSkrivane);
-    proveri('и скриването НЕ влиза в Журнала', await broySabitiya(p), predSabitiya);
-
-    razdel = '66 · Одитният файл · пречките се четат';
-    // ДОШЪЛ Е В СВОЙ ЕКРАН (резен 17б). Секцията пази `data-sektsiya=saf-t`,
-    // затова всички проверки долу оцеляват — сменя се само откъде се стига.
-    await naEkran(p, 'nap', '[data-sektsiya=saf-t]');
-    proveri('секцията е на екрана с версията на схемата',
-      (await p.$eval('[data-sektsiya=saf-t] .dyalglava span', (e) => e.textContent)).includes('1.0.2'),
-      true);
-    const prechkiPredi = await p.$$eval('[data-sektsiya=saf-t] .prechki li', (e) => e.length);
-    proveri('пречките се ИЗБРОЯВАТ, а не се мълчи за тях', prechkiPredi > 0, true);
-    proveri('и се казват с ДУМИ · фирмата липсва поименно',
-      (await p.$eval('[data-sektsiya=saf-t] .prechki', (e) => e.textContent)).includes('фирмата'),
-      true);
-
-    // ОБОРОТНАТА ВЕДОМОСТ · дебит = кредит на самия екран, не само в теста.
-    const sboratNaKnigata = await p.$eval('[data-sektsiya=saf-t] .red.saft.sbor', (e) => {
-      const sumi = [...e.querySelectorAll('.suma')].map((s) => Number((s as any).dataset.st));
-      return { debit: sumi[0], kredit: sumi[1] };
-    });
-    proveri('дебит = кредит на ЕКРАНА', sboratNaKnigata.debit === sboratNaKnigata.kredit, true);
-    proveri('и книгата НЕ е празна за този месец', (sboratNaKnigata.debit as any) > 0, true);
-    proveri('немапнатите сметки се ВИЖДАТ, а не се мълчат',
-      (await p.$$eval('[data-sektsiya=saf-t] .red.saft em', (e) => e.length)) > 0, true);
-
-    // ВПИСВАНЕТО МАХА СВОЯТА ПРЕЧКА · екранът и домейнът гледат едно число.
+    // ══ 66 · КОНТРАГЕНТЪТ И ЕИК-ът · без одитния файл (резен 53) ══════════
+    //
+    // Негово, 31.08: „НАП отпада" — пада ПОДАВАНЕТО. Проверките за одитния файл
+    // паднаха с него; ЕИК-ът остава, защото контрагентът е СЧЕТОВОДСТВО, не
+    // подаване, и грешният ЕИК пак трябва да пада ТУК, при вписването.
     razdel = '66 · Контрагентът · сбърканият ЕИК пада ТУК';
     await naEkran(p, 'nastroyki', '#forma-kontragent');
     await p.selectOption('#kontragent-vid', 'firma');
@@ -1130,12 +990,6 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и редът се появява като ПЪЛЕН',
       (await p.$eval('.red.kontragent .znachka', (e) => e.textContent)).trim(), 'пълен');
 
-    await naEkran(p, 'nap', '[data-sektsiya=saf-t]');
-    proveri('пречките са с ЕДНА по-малко',
-      (await p.$$eval('[data-sektsiya=saf-t] .prechki li', (e) => e.length)) < prechkiPredi, true);
-    proveri('и вече не пише, че фирмата липсва',
-      (await p.$eval('[data-sektsiya=saf-t]', (e) => e.textContent)).includes('фирмата няма'),
-      false);
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 65 · ПРОВЕРКИТЕ ПРИ ВЪВЕЖДАНЕ · параметри по бизнес (И96 т.1) ══════
@@ -1498,7 +1352,8 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
 }
 
 /**
- * 92 · МЯСТОТО НА СЧЕТОВОДСТВОТО В НАП · четирите справки (резен 17г · ADR-075)
+ * 92 · МЯСТОТО ЗА РАБОТА НА СЧЕТОВОДСТВОТО · четирите справки (резен 17г · ADR-075)
+ * Преместени от таба НАП в Сметки (резен 53): пада ПОДАВАНЕТО, не счетоводството.
  *
  * Мери с ЧИСЛА: колко реда във всяка справка, колко месеца чакат подаване,
  * и дали подаването на справка ГАСИ находката.
@@ -1552,7 +1407,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
     Number(await p.$eval(`[data-spravka=${klyuch}]`, (e) => (e as HTMLElement).dataset['st']));
 
   razdel = '92 · Справките · обхватът е СВОЙ, не месецът на файла';
-  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  await naEkran(p, 'smetki', '[data-sektsiya=nap-spravki]');
   proveri('обхватът има свои две полета',
     await p.$$eval('#spravki-ot, #spravki-do', (e) => e.length), 2);
 
@@ -1596,7 +1451,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
     data: '2026-10-08', dokument: 'O-1',
   });
 
-  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  await naEkran(p, 'smetki', '[data-sektsiya=nap-spravki]');
   proveri('редът влиза в справките', await p.$$eval('.red.spravkared', (e) => e.length), predRedove + 1);
   proveri('и е ПЛАТЕН · разходът се записва вече платен',
     await p.$eval(MOYAT_RED, (e) => (e as HTMLElement).dataset['plateno']), 'plateno');
@@ -1625,7 +1480,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   await p.fill('#spravka-data', '2026-11-14');
   await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
 
-  await naEkran(p, 'nap', '[data-sektsiya=nap-spravki]');
+  await naEkran(p, 'smetki', '[data-sektsiya=nap-spravki]');
   proveri('нито един месец вече не чака',
     await p.$eval('[data-sektsiya=nap-spravki] [data-chakat]', (e) => (e as HTMLElement).dataset['chakat']), '0');
   proveri('редът вече е ДЕКЛАРИРАН',

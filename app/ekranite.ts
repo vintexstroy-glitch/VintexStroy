@@ -21,7 +21,6 @@ import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
-import { narisuvayNAP, zakachiNAP } from './nap.js';
 import { narisuvayKontaktite, zakachiKontaktite } from './kontakti.js';
 import { narisuvayProdazhbi, zakachiProdazhbite } from './prodazhbi.js';
 import { narisuvayPlashtaniyaArhiv, zakachiPlashtaniyaArhiv } from './plashtaniya-arhiv.js';
@@ -51,7 +50,6 @@ export type KoyEkran =
   | 'tabove'
   | 'lichno'
   | 'sluzhiteli'
-  | 'nap'
   | 'kontakti'
   | 'prodazhbi'
   | 'plashtaniya'
@@ -369,25 +367,6 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
       z.prevklyuchiLichnoto('#lichno-pusni', true);
       z.prevklyuchiLichnoto('#lichno-priberi', false);
     },
-  },
-  nap: {
-    ime: 'НАП',
-    podnaslov: 'сглобява МЕСТНО и дава за сваляне · подаването е твое',
-    ikona: 'ekran-smetki',
-    /**
-     * ТРИ ВРАТИ, не една · и това е нарочно.
-     *
-     * `iska` пита ПЛАНА и отметката (`mozhe`). Третата — дали връзката е
-     * ВКЛЮЧЕНА в Журнала — не се побира тук, защото `EKRANI` не знае за
-     * Огледалото; тя живее в `dostapniteEkrani` (`main.ts`), до правилото на
-     * Личното, което има същата нужда.
-     *
-     * БЕЗ `iskaRolya`: счетоводителят е СЛУЖИТЕЛ, а не Стопанин, и екранът е
-     * точно за него. Опасност няма — тук няма нито един път към Вратата.
-     */
-    iska: 'nap-vrazka',
-    narisuvay: (r) => narisuvayNAP(r.ogledalo, r.dnes),
-    zakachi: (z) => zakachiNAP(z.koren, z.k, z.prerisuvay),
   },
   kontakti: {
     ime: 'Контакти',

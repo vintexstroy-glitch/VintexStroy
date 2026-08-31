@@ -21,7 +21,6 @@ import { OTKRIVASHTO_SABITIE } from '../src/domein/stopanin.js';
 import {
   glavnaKniga,
   GreshkaKniga,
-  nemapnati,
   oboroti,
   proveriStatiya,
   smetka,
@@ -33,7 +32,6 @@ import {
 } from '../src/domein/glavna-kniga.js';
 import { STAVKI } from '../src/domein/dds.js';
 import { smetki } from '../src/domein/smetki.js';
-import { safT } from '../src/iznos/saf-t.js';
 
 const GLAVEN = 'vintexstroy@gmail.com';
 const KOGATO = '2026-08-25T09:00:00.000Z';
@@ -108,7 +106,7 @@ async function mesets() {
   return { vrata, deystviya, ogledalo };
 }
 
-describe('сметкопланът · описът, който отива в НАП', () => {
+describe('сметкопланът · законът на двустранните статии', () => {
   it('номерата са различни и всяка сметка носи име и вид', () => {
     const nomera = SMETKOPLAN.map((s) => s.nomer);
     expect(new Set(nomera).size).toBe(nomera.length);
@@ -122,12 +120,19 @@ describe('сметкопланът · описът, който отива в Н�
     expect(() => smetka('999')).toThrow(GreshkaKniga);
   });
 
-  /**
-   * ЧЕСТНАТА ДУМА · днес НИТО ЕДНА не е мапната, защото номенклатурите на НАП
-   * не са свалени. Тестът пази точно това да се ВИЖДА, а не да се предполага.
-   */
-  it('немапнатите се БРОЯТ, а не се крият', () => {
-    expect(nemapnati().length).toBe(SMETKOPLAN.filter((s) => s.nra === '').length);
+  // ПИНЪТ НА СМЕТКОПЛАНА · с ръка, не сверен сам със себе си.
+  //
+  // Дотук числото му се пазеше косвено от проверката за немапнатите сметки; тя
+  // падна с мапинга към НАП (резен 53), и обход В веднага обяви `SMETKOPLAN` за
+  // константа без нито един пин. Права беше: сметкопланът е ЗАКОН на книгата, а
+  // не подробност на подаването — и остава да се пази, след като подаването го
+  // няма.
+  it('сметкопланът е ТРИНАЙСЕТ сметки, с двете страни на ДДС-то', () => {
+    expect(SMETKOPLAN).toHaveLength(13);
+    const nomera = SMETKOPLAN.map((s) => s.nomer);
+    expect(nomera).toContain('4531');
+    expect(nomera).toContain('4532');
+    expect(new Set(nomera).size).toBe(SMETKOPLAN.length);
   });
 
   it('всеки сектор води до СЪЩЕСТВУВАЩА сметка · и непознатият също', () => {
@@ -413,12 +418,9 @@ describe('нулата · източник без движение', () => {
     expect(k.debit_st).toBe(k.kredit_st);
   });
 
-  it('и одитният файл го КАЗВА, вместо да го премълчи', async () => {
-    const { ogledalo } = await sNulevoDDS();
-    const r = safT(await ogledalo(), '2026-07', KOGATO);
-    expect(r.prechki.some((p) => p.includes('не мести пари'))).toBe(true);
-    expect(r.xml.length).toBeGreaterThan(100);
-  });
+  // ПРОВЕРКАТА ЗА ОДИТНИЯ ФАЙЛ ПАДНА С НЕГО (резен 53 · „НАП отпада").
+  // Онова, което тя пазеше, обаче ОСТАВА и се пази тук: нулевото ДДС-плащане
+  // не поваля книгата и се брои отделно — вижте теста над този ред.
 
   /** И пазачът на ДЕЙСТВИЕТО · за да не се разчита само на проекцията. */
   it('но самото действие вече отказва нулата', async () => {

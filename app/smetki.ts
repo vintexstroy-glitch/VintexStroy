@@ -79,6 +79,7 @@ import {
 } from '../src/domein/mesetsat.js';
 import { narisuvayKalendara } from './kalendarat.js';
 import { narisuvayPoletata, zakachiPoletata } from './pole-s-formula.js';
+import { narisuvaySpravkite, zakachiSpravkite } from './spravki-schetovodstvo.js';
 import { stalboveNaMesetsite } from './diagrami.js';
 import {
   IMENA_NA_GNEZDATA,
@@ -101,8 +102,6 @@ import { blokNaKreditite, redPodRazhodite, zakachiKreditite } from './krediti.js
 import { blokNaZaplatite, zakachiZaplatite } from './zaplati.js';
 import { blokNaTablitsaOtFayl, zakachiTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import { butonSIkona } from './ikoni.js';
-import { safT } from '../src/iznos/saf-t.js';
-import { SHEMA } from '../src/iznos/saf-t-shema.js';
 import { oboroti } from '../src/domein/glavna-kniga.js';
 import { svaliFayl } from './obshto.js';
 import { CHAKA_DUMA_ZA_DDS } from '../src/domein/prodazhbi.js';
@@ -379,6 +378,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">${ZASHTO_I_NULATA}</p>
     </section>
 
+    ${narisuvaySpravkite(o, dnes)}
     ${narisuvayKoefitsientite(o, dnes)}
 
     ${narisuvayKalendara(o, mesets, dnes)}
@@ -1257,6 +1257,7 @@ export function zakachiSmetki(
   slozhiShirinite(koren);
 
   zakachiKoefitsientite(koren, prerisuvay);
+  zakachiSpravkite(koren, prerisuvay);
   // СВОИТЕ ПОЛЕТА С ФОРМУЛА · „с формули между всички таблици" (резен 42).
   // Месецът е СЪЩИЯТ като на Сметки: изворите се смятат за конкретен период,
   // и поле, проверено срещу друг месец, не е проверено.
