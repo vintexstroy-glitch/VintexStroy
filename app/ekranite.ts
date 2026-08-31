@@ -273,6 +273,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
         punktoveNaMenyuto(r),
         r.dnes,
+        r.dostapniEkrani,
       ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay, z.dnes),
   },

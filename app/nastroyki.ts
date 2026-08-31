@@ -94,6 +94,14 @@ import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import { izboratZaSemeystvo, sravniGlavi } from '../src/domein/obshta-glava.js';
 import type { Konteks } from './ekranite.js';
+import { EKRANI, type KoyEkran } from './ekranite.js';
+import { moyatRed, podredeniPunktove, zabraviMoyaRed, premestiVMoyaRed } from './lenta.js';
+import {
+  ekraniSPodredba,
+  premestiSektsiya,
+  videniteSektsii,
+  zabraviRedaNaSektsiite,
+} from './podredba.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
@@ -159,6 +167,14 @@ export function narisuvayNastroyki(
   punktove: readonly PunktNaMenyuto[] = [],
   /** ДНЕШНИЯТ ден · подава се, не се чете: часовникът е довод (резен 26) */
   dnes = '',
+  /**
+   * КОИ ЕКРАНА СА ДОСТЪПНИ · подават се, не се смятат тук (резен 63).
+   *
+   * Филтърът живее в черупката и вече е сметнат веднъж за лентата. Втори
+   * препис тук би се разминал при първата нова възможност — а „Подредбата на
+   * екраните" щеше да предлага пункт, който човекът няма.
+   */
+  dostapni: readonly string[] = [],
 ): string {
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
@@ -237,6 +253,7 @@ export function narisuvayNastroyki(
     ${sektsiyaGodinite(o, dnes, negoviyat)}
     ${blokNaBranshovete(dnes)}
     ${blokNaDeystviyata()}
+    ${blokNaPodredbata(o, dostapni)}
     ${blokNaKartata()}`;
 }
 
@@ -1262,6 +1279,93 @@ function blokNaDeystviyata(): string {
  * Обявената, но непостроена връзка не се крие: връзка, която мълчи при
  * ползване, е по-лоша от липсваща — така го казва и самият модул.
  */
+/**
+ * ПОДРЕДБАТА НА ЕКРАНИТЕ · тук се решава кое къде седи (резен 63 · ADR-117).
+ *
+ * Негова дума, 31.08: „Махни това смешно разместване. То ще се прави от всеки
+ * стопанин ОТ НАСТРОЙКИ, където да определяш кое къде седи и как работи."
+ *
+ * Дотук стрелките ▲▼ стояха ВЪРХУ всяко заглавие на всяка секция и до всеки
+ * пункт на лентата — над петдесет чифта, които се виждат винаги и се ползват
+ * веднъж. Редът не е отнет: той се мести оттук.
+ *
+ * ДВЕ ПОДРЕДБИ, ЕДНО МЯСТО: пунктовете на ЛЕНТАТА и секциите ВЪТРЕ в екраните.
+ * Двете са различни неща и не се сливат — първото казва кой екран е преди кой,
+ * второто — кой дял е преди кой вътре в един екран.
+ *
+ * И двете са ЛИЧНИ (паметта на екрана, нула събития). Началният ред на лентата
+ * си остава на Стопанина и живее в Журнала (ADR-066); тук се мести МОЯТ отгоре.
+ */
+function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
+  const punktove = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
+  const ekrani = ekraniSPodredba().filter((e: string) => videniteSektsii(e).length > 1);
+  const posleden = punktove.length - 1;
+
+  const strelki = (kade: string, klyuch: string, i: number, kray: number): string =>
+    `<span class="premestvane">
+      <button type="button" class="premestvach" data-podredi="${kade}" data-klyuch="${ekraniraj(klyuch)}"
+        data-posoka="gore"${i === 0 ? ' disabled' : ''} aria-label="нагоре">▲</button>
+      <button type="button" class="premestvach" data-podredi="${kade}" data-klyuch="${ekraniraj(klyuch)}"
+        data-posoka="dolu"${i === kray ? ' disabled' : ''} aria-label="надолу">▼</button>
+    </span>`;
+
+  return `
+    <section data-sektsiya="podredbata">
+      <div class="dyalglava">
+        <h2>Подредбата на екраните</h2>
+        <span>кое къде седи · твоят ред, на това устройство</span>
+      </div>
+      <p class="drebno">Стрелките ги няма вече по самите заглавия — стояха на всяка секция
+      на всеки екран и се ползват веднъж. Редът се мести <b>оттук</b>, и е ЛИЧЕН: нула
+      събития в Журнала, никой друг не го вижда.</p>
+
+      <div class="tablitsa" data-tablitsa="red-na-lentata">
+        <div class="red glava"><span>пункт на лентата</span><span></span></div>
+        ${punktove
+          .map(
+            (k, i) => `<div class="red opis" data-lentapunkt="${ekraniraj(k)}">
+          <span translate="no">${ekraniraj(EKRANI[k as KoyEkran]?.ime ?? k)}</span>
+          ${strelki('lenta', k, i, posleden)}
+        </div>`,
+          )
+          .join('')}
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen malak" id="zabravi-reda-lenta">Върни реда на лентата</button>
+      </div>
+
+      ${
+        ekrani.length === 0
+          ? `<p class="drebno" data-sektsiya="podredba-prazno">Секциите на един екран се подреждат тук,
+             щом го отвориш поне веднъж — иначе няма откъде да се знае какви дялове има.</p>`
+          : ekrani
+              .map((e) => {
+                const sektsii = videniteSektsii(e);
+                const kray = sektsii.length - 1;
+                return `
+        <div class="karta" data-podredba-ekran="${ekraniraj(e)}">
+          <div class="dyalglava"><h3>${ekraniraj(EKRANI[e as KoyEkran]?.ime ?? e)}</h3>
+            <span>${sektsii.length} дяла</span></div>
+          <div class="tablitsa">
+            ${sektsii
+              .map(
+                (sek, i) => `<div class="red opis" data-sektsiya-red="${ekraniraj(sek.klyuch)}">
+              <span translate="no">${ekraniraj(sek.ime)}</span>
+              ${strelki(`ekran:${e}`, sek.klyuch, i, kray)}
+            </div>`,
+              )
+              .join('')}
+          </div>
+          <div class="deystviya">
+            <button type="button" class="vtorichen malak" data-zabravi-ekran="${ekraniraj(e)}">Върни реда</button>
+          </div>
+        </div>`;
+              })
+              .join('')
+      }
+    </section>`;
+}
+
 function blokNaKartata(): string {
   const { postroeni, vsichki } = dokade();
   const chakat = obyaveni();
@@ -1478,6 +1582,40 @@ export function zakachiNastroyki(
     litseNaRedaktora = 'opis';
     await prerisuvay();
   });
+  // ── ПОДРЕДБАТА НА ЕКРАНИТЕ (резен 63) ────────────────────────────────────
+  // ЕДИН слушател за двете подредби: разликата е в `data-podredi` — „lenta"
+  // или „ekran:<кой>". Два отделни слушателя биха се разминали при първия нов
+  // вид подредба, а те правят едно и също нещо с различна памет.
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-podredi]')) {
+    but.addEventListener('click', async () => {
+      const kade = but.dataset['podredi'] ?? '';
+      const klyuch = but.dataset['klyuch'] ?? '';
+      const posoka = but.dataset['posoka'] as 'gore' | 'dolu';
+      if (kade === 'lenta') {
+        // СПИСЪКЪТ идва от СЪЩИТЕ редове, които човекът гледа — не от втори
+        // препис на филтъра „кои екрани са достъпни". Скритите са вътре:
+        // скриването не е ред и не бива да мести пунктове (ADR-066).
+        const og = await k.deystviya.ogledalo();
+        const vsichki = [...koren.querySelectorAll<HTMLElement>('[data-lentapunkt]')]
+          .map((e) => e.dataset['lentapunkt'] ?? '');
+        premestiVMoyaRed(vsichki, og.redNaLentata, klyuch, posoka);
+      } else if (kade.startsWith('ekran:')) {
+        premestiSektsiya(kade.slice('ekran:'.length), klyuch, posoka);
+      }
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLButtonElement>('#zabravi-reda-lenta')?.addEventListener('click', async () => {
+    zabraviMoyaRed();
+    await prerisuvay();
+  });
+  for (const but of koren.querySelectorAll<HTMLButtonElement>('[data-zabravi-ekran]')) {
+    but.addEventListener('click', async () => {
+      zabraviRedaNaSektsiite(but.dataset['zabraviEkran'] ?? '');
+      await prerisuvay();
+    });
+  }
+
   koren.querySelector<HTMLButtonElement>('#litse-semeystva')?.addEventListener('click', async () => {
     litseNaRedaktora = 'semeystva';
     await prerisuvay();
