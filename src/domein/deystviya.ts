@@ -13,6 +13,7 @@ import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/ind
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
 import { praviTsikal, proveriOtsenkata, SASTOYANIYA as SASTOYANIYA_NA_DELO, ZAVARSHENO } from './dela.js';
+import { proveriChasa } from './kontakti.js';
 import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
 import {
   GreshkaZadacha,
@@ -357,6 +358,10 @@ export class Deystviya {
     if (zaOtsenkata !== '') {
       throw new GreshkaTablitsa(zaOtsenkata);
     }
+    // ЧАСЪТ Е ПРАВО, не задължение (И124 т.1) — празното е „само дата".
+    // Проверката е СЪЩАТА като при преписката (един дом, правило 17); срокът
+    // `do` играе ролята на датата, без която час не свети.
+    proveriChasa(danni.chas ?? '', danni.do);
     const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
     if (prehvarleno) {
       throw new GreshkaTablitsa(
@@ -856,7 +861,7 @@ export class Deystviya {
    * Обратното щеше да направи от вписването на контакт вратар на срещата.
    */
   async zapishiSreshta(id: string, danni: PayloadSreshtaZapisana, z: Zayavka): Promise<Rezultat> {
-    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie);
+    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie, danni.vid, danni.chas);
     return this.#pusni('СрещаЗаписана', VID.sreshta, id, danni, z);
   }
 

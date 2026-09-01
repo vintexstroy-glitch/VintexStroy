@@ -47,6 +47,7 @@ function delo(p: Partial<Delo> & { id: string }): Delo {
     obekt: '',
     ime: p.id,
     otgovornik: 'Николай Петков',
+    chas: '',
     ot: DNES,
     do: DNES,
     otsenka: 'нито-едно',

@@ -46,6 +46,7 @@ function delo(p: Partial<Delo> & { id: string }): Delo {
     obekt: '',
     ime: 'дело',
     otgovornik: 'Николай Петков',
+    chas: '',
     ot: DNES,
     do: DNES,
     otsenka: 'нито-едно',
@@ -79,6 +80,7 @@ describe('делото · трите колони, не трите нива', ()
       obekt: 'бл. 1',
       ime: 'Акт 15',
       otgovornik: 'Николай Петков',
+      chas: '',
       ot: '2026-09-01',
       do: '2026-09-30',
       otsenka: 'спешно-важно',
@@ -105,6 +107,7 @@ describe('делото · трите колони, не трите нива', ()
         obekt: '',
         ime: 'Оглед',
         otgovornik: 'Ивайло Петков',
+        chas: '',
         ot: DNES,
         do: DNES,
         otsenka: 'важно-неспешно',
@@ -365,6 +368,7 @@ describe('подредбата при непозната оценка', () => {
   it('непознатото пада НАКРАЯ, а спешното остава първо', () => {
     const delo = (id: string, otsenka: string): Delo => ({
       id, seq: 1, myasto: 'Малинова', obekt: '', ime: id, otgovornik: '',
+      chas: '',
       ot: '2026-08-20', do: '2026-09-20',
       otsenka: otsenka as Delo['otsenka'], sastoyanie: 'чака', nadDelo: '', dokument: '',
       promeneno: '', promeniGo: '',

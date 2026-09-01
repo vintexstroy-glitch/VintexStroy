@@ -382,11 +382,13 @@ export interface DeloVhod {
   readonly nad?: string;
   /** по избор · подразбраното е първото в менюто, „чака" (резен 30) */
   readonly sastoyanie?: string;
+  /** по избор · правото на час (резен 68 · И124 т.1) */
+  readonly chas?: string;
 }
 
 export async function zapishiDelo(
   p: Page,
-  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie }: DeloVhod,
+  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie, chas }: DeloVhod,
 ): Promise<void> {
   await p.fill('#d-myasto', myasto);
   await p.fill('#d-obekt', obekt);
@@ -395,6 +397,7 @@ export async function zapishiDelo(
   await p.fill('#d-ot', ot);
   await p.fill('#d-do', doData);
   await p.selectOption('#d-otsenka', otsenka);
+  if (chas) await p.fill('#d-chas', chas);
   // СЪСТОЯНИЕТО по избор · подразбраното е първото в менюто („чака"), тъй че
   // старите викащи не се менят (резен 30).
   if (sastoyanie) await p.selectOption('#d-sastoyanie', sastoyanie);

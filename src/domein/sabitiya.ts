@@ -1124,6 +1124,9 @@ export interface PayloadDeloZapisano {
   readonly otgovornik: string;
   readonly ot: string;
   readonly do: string;
+  /** ПРАВОТО НА ЧАС (И124 т.1): по избор, „когато е необходимо"; празно =
+   * само дата. Запис отпреди резен 68 го няма — чете се като празно. */
+  readonly chas?: string;
   /** ключ от `OTSENKI` в `dela.ts` */
   readonly otsenka: string;
   /** ключ от `SASTOYANIYA` в `dela.ts` */
@@ -1424,10 +1427,15 @@ export interface PayloadPrepiskaZapisana {
 export interface PayloadSreshtaZapisana {
   /** С КОГО · името на контакта; срещата го СОЧИ, не преписва телефона му */
   readonly kontakt: string;
+  /** ВИДЪТ · среща · доставка · бележка · напомняне · свой (И124 т.1 · т.8);
+   * запис отпреди резен 68 го няма — чете се като „среща" */
+  readonly vid?: string;
   /** „**Адрес на срещата**" *(р57·[34])* · по избор */
   readonly adres: string;
-  /** КОГА · САМО дата: „**Не, само дата**" *(р57·[34])* */
+  /** КОГА · датата */
   readonly data: string;
+  /** ЧАСЪТ · по избор („Не, само дата" е надживяно от И124 т.1) */
+  readonly chas?: string;
   readonly sastoyanie: string;
 }
 

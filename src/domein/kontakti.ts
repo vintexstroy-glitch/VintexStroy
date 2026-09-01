@@ -212,7 +212,7 @@ export function proveriPrepiskata(n: {
  * Час без дата е обещание без ден: той не може нито да свети, нито да влезе в
  * червения списък, а на екрана изглежда като уговорено време.
  */
-function proveriChasa(chas: string, zaVzimane: string): void {
+export function proveriChasa(chas: string, zaVzimane: string): void {
   if (chas === '') return;
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(chas)) {
     throw new GreshkaKontakt(
@@ -385,14 +385,62 @@ export function sveriKontaktite(
 export const SASTOYANIYA_NA_SRESHTA = ['чака', 'проведена', 'отпаднала'] as const;
 export type SastoyanieNaSreshta = (typeof SASTOYANIYA_NA_SRESHTA)[number];
 
+/**
+ * ВИДЪТ НА АНГАЖИМЕНТА · негови думи (И124 т.1):
+ *
+ *   „А час има само не дело а еквивалент на среща, доставка или по избор
+ *    някаква бележка която да квараш, дори напомняне."
+ *
+ * И т.8: „или друго вкарано по избор от стопанина" — номенклатурата е
+ * ОТВОРЕНА: четирите са начални, стопанинът вкарва свои. Затова проверката
+ * иска само НЕПРАЗНО, а менюто предлага (`predlozheniVidove`), не заключва.
+ */
+export const VIDOVE_ANGAZHIMENT = ['среща', 'доставка', 'бележка', 'напомняне'] as const;
+
+/**
+ * КАКВО ПРЕДЛАГА МЕНЮТО НА ВИДА · „за другите показваш най използваните и
+ * последните" (И124 т.8). Началните четири стоят винаги; вкараните от
+ * стопанина се нареждат по УПОТРЕБА (най-използваните напред), а при равна
+ * употреба — по-скорошният пръв.
+ */
+export function predlozheniVidove(
+  sreshti: readonly { readonly vid: string; readonly kogato: string }[],
+): readonly string[] {
+  const broy = new Map<string, { broy: number; posleden: string }>();
+  for (const s of sreshti) {
+    const vid = s.vid.trim();
+    if (vid === '') continue;
+    const dosega = broy.get(vid) ?? { broy: 0, posleden: '' };
+    broy.set(vid, {
+      broy: dosega.broy + 1,
+      posleden: s.kogato > dosega.posleden ? s.kogato : dosega.posleden,
+    });
+  }
+  const svoi = [...broy.entries()]
+    .filter(([vid]) => !(VIDOVE_ANGAZHIMENT as readonly string[]).includes(vid))
+    .sort((a, b) => b[1].broy - a[1].broy || b[1].posleden.localeCompare(a[1].posleden))
+    .map(([vid]) => vid);
+  return [...VIDOVE_ANGAZHIMENT, ...svoi];
+}
+
 export interface Sreshta {
   readonly id: string;
+  /** ВИДЪТ · среща · доставка · бележка · напомняне · или негов собствен */
+  readonly vid: string;
   /** С КОГО · името на контакта, точно както преписката го сочи */
   readonly kontakt: string;
   /** „**Адрес на срещата**" *(р57·[34])* · по избор — среща по телефона няма адрес */
   readonly adres: string;
-  /** КОГА · САМО дата, без час: „**Не, само дата**" *(р57·[34])* */
+  /** КОГА · датата; часът е ОТДЕЛЕН и по избор */
   readonly data: string;
+  /**
+   * ЧАСЪТ · по избор; празно значи „само дата".
+   *
+   * „Не, само дата" *(р57·[34])* е НАДЖИВЯНО от И124 т.1 (правило 28):
+   * „час има само не дело а еквивалент на среща, доставка или… бележка…
+   * дори напомняне." Дните до срока пак се броят по КАЛЕНДАР (ADR-101).
+   */
+  readonly chas: string;
   readonly sastoyanie: SastoyanieNaSreshta;
   readonly seq: number;
   readonly kogato: string;
@@ -415,10 +463,20 @@ export function proveriSreshtata(
   kontakt: string,
   data: string,
   sastoyanie: string,
+  vid = 'среща',
+  chas = '',
 ): void {
   if (kontakt.trim() === '') {
     throw new GreshkaKontakt('Срещата няма с кого. „За контактите среща добавяш" — контактът е първата ѝ половина.');
   }
+  // Видът е ОТВОРЕН („друго вкарано по избор от стопанина"), но не празен:
+  // ангажимент без вид не може да се предложи на следващия.
+  if (vid.trim() === '') {
+    throw new GreshkaKontakt(
+      `Ангажиментът няма вид. Началните са ${VIDOVE_ANGAZHIMENT.join(' · ')}, а свой се вкарва свободно.`,
+    );
+  }
+  proveriChasa(chas, data);
   if (data.trim() === '') {
     throw new GreshkaKontakt(
       'Срещата няма дата. Без дата тя не става дело и не влиза в червения списък — ' +

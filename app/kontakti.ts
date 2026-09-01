@@ -15,6 +15,7 @@
  */
 
 import {
+  predlozheniVidove,
   imenataNaKontaktite,
   kogaEZaVzimane,
   kontaktite,
@@ -357,12 +358,21 @@ function blokSreshti(
   );
   return `
     <div class="dyalglava" data-blok="sreshti">
-      <h3>Срещи</h3>
-      <span>с кого · адрес · дата · и всяка чакаща става дело автоматично</span>
+      <h3>Срещи и ангажименти</h3>
+      <span>среща · доставка · бележка · напомняне · или свой вид — с час по избор (И124 т.1)</span>
     </div>
 
     <form id="forma-sreshta">
       <div class="poleta">
+        <div class="pole">
+          <label for="sr-vid">Вид</label>
+          <input translate="no" id="sr-vid" name="vid" required autocomplete="off"
+                 value="среща" list="spisak-vidove-angazhiment">
+          <datalist id="spisak-vidove-angazhiment">${predlozheniVidove(sreshti)
+            .map((v) => `<option value="${ekraniraj(v)}"></option>`)
+            .join('')}</datalist>
+          <span class="drebno">Началните четири + вкараните от Стопанина — най-използваните напред.</span>
+        </div>
         <div class="pole">
           <label for="sr-kontakt">С кого</label>
           <input translate="no" id="sr-kontakt" name="kontakt" required autocomplete="off"
@@ -379,7 +389,11 @@ function blokSreshti(
         <div class="pole">
           <label for="sr-data">Дата</label>
           <input translate="no" type="date" id="sr-data" name="data" required>
-          <span class="drebno">САМО дата, без час — „Не, само дата".</span>
+        </div>
+        <div class="pole">
+          <label for="sr-chas">Час (по избор)</label>
+          <input translate="no" type="time" id="sr-chas" name="chas">
+          <span class="drebno">Празен час значи „само дата" — дните се броят по календар.</span>
         </div>
         <div class="pole">
           <label for="sr-sastoyanie">Състояние</label>
@@ -403,16 +417,18 @@ function blokSreshti(
         : `<div class="skrolkutiya">
       <table class="tablitsa" data-tablitsa="sreshti">
         <thead>
-          <tr><th>С кого</th><th>Адрес</th><th>Дата</th><th>Състояние</th></tr>
+          <tr><th>Вид</th><th>С кого</th><th>Адрес</th><th>Дата</th><th>Час</th><th>Състояние</th></tr>
         </thead>
         <tbody>${podredeni
           .map(
             (x) => `
           <tr data-sreshta="${ekraniraj(x.id)}" data-sastoyanie="${ekraniraj(x.sastoyanie)}"
               data-svetofar="${x.sastoyanie === 'чака' ? svetofarNaSroka(x.data, dnes) : 'normalno'}">
+            <td translate="no" data-vid="${ekraniraj(x.vid)}">${ekraniraj(x.vid)}</td>
             <td translate="no">${ekraniraj(x.kontakt)}</td>
             <td translate="no">${x.adres === '' ? '—' : ekraniraj(x.adres)}</td>
             <td translate="no">${ekraniraj(x.data)}</td>
+            <td translate="no">${x.chas === '' ? '—' : ekraniraj(x.chas)}</td>
             <td>${padashtoSastoyanie('sreshta', x.id, x.sastoyanie, SASTOYANIYA_NA_SRESHTA)}</td>
           </tr>`,
           )
@@ -518,7 +534,7 @@ export function zakachiKontaktite(
           if (!x) return;
           await k.deystviya.zapishiSreshta(
             id,
-            { kontakt: x.kontakt, adres: x.adres, data: x.data, sastoyanie: el.value },
+            { kontakt: x.kontakt, vid: x.vid, adres: x.adres, data: x.data, chas: x.chas, sastoyanie: el.value },
             { opId: `sreshta:${crypto.randomUUID()}` },
           );
         }
@@ -541,8 +557,10 @@ export function zakachiKontaktite(
         crypto.randomUUID(),
         {
           kontakt: String(d.get('kontakt') ?? '').trim(),
+          vid: String(d.get('vid') ?? 'среща').trim(),
           adres: String(d.get('adres') ?? '').trim(),
           data: String(d.get('data') ?? ''),
+          chas: String(d.get('chas') ?? ''),
           sastoyanie: String(d.get('sastoyanie') ?? 'чака'),
         },
         { opId: `sreshta:${crypto.randomUUID()}` },

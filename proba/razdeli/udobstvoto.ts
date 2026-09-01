@@ -1977,8 +1977,14 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('едно събитие, не две', await broySabitiya(p), prediSreshta + 1);
     proveri('срещата стои в СВОЯТА таблица',
       await p.$$eval('[data-tablitsa=sreshti] [data-sreshta]', (e) => e.length), 1);
-    proveri('и полето за час го НЯМА · „Не, само дата"',
-      await p.$$eval('#forma-sreshta input[type=time]', (e) => e.length), 0);
+    // „Не, само дата" (р57·[34]) е НАДЖИВЯНО от И124 т.1 (правило 28):
+    // часът ГО ИМА, по избор — празното значи „само дата".
+    proveri('полето за час ГО ИМА · по избор (И124 т.1)',
+      await p.$$eval('#forma-sreshta input[type=time]', (e) => e.length), 1);
+    proveri('празният час се показва като тире, не като дупка',
+      (await p.$eval('[data-sreshta] [data-vid] ~ td:nth-of-type(5)', (e) => (e as any).innerText)).trim(), '—');
+    proveri('и видът по подразбиране е „среща"',
+      await p.$eval('[data-sreshta] [data-vid]', (e) => (e as any).dataset.vid), 'среща');
     proveri('адресът е СВОЙ на срещата, не преписан от контакта',
       (await p.$eval('[data-sreshta]', (e) => (e as any).innerText)).includes('кантора'), true);
 
@@ -2047,6 +2053,63 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-avtodelo]', (e) => e.length), prediZatvaryane - 1);
     proveri('и то БЕЗ сторно · затворен е изворът, не делото',
       await p.$$eval('[data-izvor=среща]', (e) => e.length), 0);
+
+    // ═══ 117д · ВИДОВЕТЕ АНГАЖИМЕНТ И ЧАСЪТ (резен 68 · И124 т.1 · т.8) ═══
+    //
+    // „А час има само не дело а еквивалент на среща, доставка или по избор
+    // някаква бележка която да квараш, дори напомняне. … Нека и делото да има
+    // право за вкарване на час, когато е необходимо."
+    razdel = '117д · Ангажиментът · доставка с час';
+    await naEkran(p, 'kontakti', '#forma-sreshta');
+    proveri('менюто предлага четирите начални вида',
+      await p.$$eval('#spisak-vidove-angazhiment option', (o) => o.map((x) => (x as any).value)),
+      ['среща', 'доставка', 'бележка', 'напомняне']);
+    await napishiSigurno(p, '#sr-vid', 'доставка');
+    await napishiSigurno(p, '#sr-kontakt', 'Мария Илиева');
+    await p.fill('#sr-data', denOtDnes(2));
+    await p.fill('#sr-chas', '14:30');
+    await sSabitie(p, () => p.click('#forma-sreshta button[type=submit]'));
+    proveri('доставката стои с вида си',
+      await p.$$eval('[data-vid="доставка"]', (e) => e.length), 1);
+    proveri('и часът се вижда на реда',
+      (await p.$eval('tr[data-sreshta]:has([data-vid="доставка"])', (e) => (e as any).innerText))
+        .includes('14:30'), true);
+
+    razdel = '117д · Свой вид · „друго вкарано по избор от стопанина"';
+    await napishiSigurno(p, '#sr-vid', 'оглед');
+    await napishiSigurno(p, '#sr-kontakt', 'Мария Илиева');
+    await p.fill('#sr-data', denOtDnes(3));
+    await sSabitie(p, () => p.click('#forma-sreshta button[type=submit]'));
+    proveri('свободният вид МИНАВА · номенклатурата е отворена',
+      await p.$$eval('[data-vid="оглед"]', (e) => e.length), 1);
+    proveri('и влиза в предложените · „най-използваните и последните"',
+      await p.$$eval('#spisak-vidove-angazhiment option', (o) => o.map((x) => (x as any).value)),
+      ['среща', 'доставка', 'бележка', 'напомняне', 'оглед']);
+
+    razdel = '117д · Кривият час пада с думи';
+    const prediKrivChas = await broySabitiya(p);
+    await napishiSigurno(p, '#sr-vid', 'среща');
+    await napishiSigurno(p, '#sr-kontakt', 'Мария Илиева');
+    await p.fill('#sr-data', denOtDnes(4));
+    await p.$eval('#sr-chas', (e) => { (e as HTMLInputElement).type = 'text'; });
+    await p.fill('#sr-chas', '25:99');
+    await p.click('#forma-sreshta button[type=submit]');
+    await p.waitForFunction(() =>
+      (document.querySelector('#greshka-sreshta')?.textContent ?? '').includes('Нечетим час'));
+    proveri('казва „Нечетим час" и НИЩО не влиза', await broySabitiya(p), prediKrivChas);
+
+    razdel = '117д · Делото · ПРАВО на час, когато е необходимо';
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('формата на делото носи час ПО ИЗБОР',
+      await p.$$eval('#d-forma-delo input[type=time]', (e) => e.length), 1);
+    proveri('и полето КАЗВА, че е право, не задължение',
+      (await tekstNa(p, '#d-forma-delo')).includes('когато е необходимо'), true);
+    await zapishiDelo(p, { myasto: 'Хисаря', obekt: '', ime: 'Оглед с час',
+      otgovornik: 'Ивайло Петков', ot: denOtDnes(5), do: denOtDnes(5),
+      otsenka: 'важно-неспешно', chas: '09:30' });
+    proveri('часът на делото стига до диаграмата',
+      await p.$$eval('.diagrama-red title', (t) =>
+        t.some((x) => (x.textContent ?? '').includes('09:30'))), true);
 
     // ═══ 118 · КАЛЕНДАРЪТ · цифрите в полето на деня (И90 · резен 40) ═══
     //

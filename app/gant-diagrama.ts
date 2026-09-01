@@ -304,7 +304,7 @@ function redNaDiagramata(
     <rect class="diagrama-lenta" x="${x1.toFixed(1)}" y="${yl}" width="${(kray - x1).toFixed(
       1,
     )}" height="${visokaLenta}" rx="3">
-      <title>${ekraniraj(`${d.ime} · ${d.ot} → ${d.do} · ${d.otgovornik}`)}</title>
+      <title>${ekraniraj(`${d.ime} · ${d.ot} → ${d.do}${d.chas === '' ? '' : ` · ${d.chas}`} · ${d.otgovornik}`)}</title>
     </rect>
     ${zakasnyalo}
   </g>`;

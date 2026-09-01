@@ -1020,6 +1020,11 @@ export function formaDelo(
             <input translate="no" id="${id('do')}" name="do" type="date" value="${dnes}" required>
           </div>
           <div class="pole">
+            <label for="${id('chas')}">Час (по избор)</label>
+            <input translate="no" id="${id('chas')}" name="chas" type="time">
+            <span class="drebno">Право, не задължение — „когато е необходимо". Празен час значи „само дата".</span>
+          </div>
+          <div class="pole">
             <label for="${id('otsenka')}">Оценка</label>
             <select translate="no" id="${id('otsenka')}" name="otsenka">
               ${OTSENKI.map((x) => `<option value="${x}">${IMENA_NA_OTSENKITE[x]}</option>`).join('')}
@@ -1218,7 +1223,7 @@ export function zakachiGant(
           {
             myasto: delo.myasto, obekt: delo.obekt, ime: delo.ime,
             otgovornik: delo.otgovornik, ot: delo.ot, do: delo.do,
-            otsenka: delo.otsenka, sastoyanie: delo.sastoyanie,
+            chas: delo.chas, otsenka: delo.otsenka, sastoyanie: delo.sastoyanie,
             nadDelo: nov, dokument: delo.dokument,
           },
           { opId: crypto.randomUUID() },
@@ -1510,6 +1515,7 @@ export function zakachiFormataNaDelo(
           otgovornik: String(d.get('otgovornik') ?? '').trim(),
           ot,
           do: doData,
+          chas: String(d.get('chas') ?? ''),
           // Изключеното (disabled) поле не влиза във FormData — а при
           // завършено точно това искаме: празна оценка, не „null".
           otsenka: String(d.get('otsenka') ?? '') as Otsenka,

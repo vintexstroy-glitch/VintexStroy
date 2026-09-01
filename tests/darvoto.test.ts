@@ -32,6 +32,7 @@ function delo(n: Partial<Delo> & { id: string }): Delo {
     obekt: '',
     ime: n.id,
     otgovornik: '',
+    chas: '',
     ot: '2026-08-01',
     do: '2026-12-31',
     otsenka: 'нито-едно',

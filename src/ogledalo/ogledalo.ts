@@ -1269,6 +1269,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           otgovornik: p.otgovornik,
           ot: p.ot,
           do: p.do,
+          chas: p.chas ?? '',
           // Старите Журнали носят петата оценка „завършено" — чете се
           // ПОИМЕННО и се превежда (И124 т.6 · образецът на ADR-106).
           ...(prevediOtsenkata(p.otsenka, p.sastoyanie) as {
@@ -1498,8 +1499,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         sreshti.set(s.sashtnost.id, {
           id: s.sashtnost.id,
           kontakt: p.kontakt,
+          // Запис отпреди резен 68 няма вид и час: той Е среща само с дата —
+          // празното е точният му смисъл, старото не се пренаписва (правило 1).
+          vid: p.vid ?? 'среща',
           adres: p.adres,
           data: p.data,
+          chas: p.chas ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
           // ПЪРВИЯТ `seq` остава · поправката мени съдържанието, не рождението.
           seq: sreshti.get(s.sashtnost.id)?.seq ?? s.seq,
