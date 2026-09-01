@@ -1232,22 +1232,38 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   razdel = '91 · Сверката с извлечението · трите начина';
+  // МЕСЕЦЪТ НА СВЕРКАТА Е ПОДВИЖЕН · четиринайсет месеца след „днес".
+  // Твърдият септември работеше, докато „днес" не ВЛЕЗЕ в него: разходът
+  // „проба" се пише с днешна дата (урокът от §24) и щом календарът стигна
+  // 01.09, цъфна в сверката като „липсва". А „два месеца напред" се оказа
+  // зает: ноември носи закованите записи на §24 и §88 (Доставчик 1–6,
+  // Стройпласт), и „Нов Доставчик" открадна реда на банката. Четиринайсет
+  // месеца бягат и от днешното, и от всяка закована 2026 дата — и се МЕСТЯТ
+  // с календара, за да не ги настигне никога.
+  const MESETSAT = (() => {
+    const d = new Date();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + 14);
+    return d.toISOString().slice(0, 7);
+  })();
+  const denVMesetsa = (den: string): string => `${MESETSAT}-${den}`;
+  const bgDen = (den: string): string => `${den}.${MESETSAT.slice(5, 7)}.${MESETSAT.slice(0, 4)}`;
   await naEkran(p, 'smetki', '#forma-period');
-  await p.fill('#smetki-period', '2026-09');
+  await p.fill('#smetki-period', MESETSAT);
   await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
 
   // ТРИ разхода, по един на начин · и СВОИ имена, за да не зависят от чужд блок
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Банка ООД',
-    opis: 'по банка', suma: '100,00', nachin: 'банка', data: '2026-09-10', dokument: 'B-1',
+    opis: 'по банка', suma: '100,00', nachin: 'банка', data: denVMesetsa('10'), dokument: 'B-1',
   });
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Карта ООД',
-    opis: 'с карта', suma: '200,00', nachin: 'карта', data: '2026-09-11', dokument: 'K-1',
+    opis: 'с карта', suma: '200,00', nachin: 'карта', data: denVMesetsa('11'), dokument: 'K-1',
   });
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Кеш ООД',
-    opis: 'в брой', suma: '300,00', nachin: 'в брой', data: '2026-09-12', dokument: 'V-1',
+    opis: 'в брой', suma: '300,00', nachin: 'в брой', data: denVMesetsa('12'), dokument: 'V-1',
   });
   proveri('и трите начина се предлагат в падащото меню',
     await p.$$eval('#razhod-nachin option', (e) => e.length), 3);
@@ -1260,12 +1276,12 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   // Редът на картата е с ДЕН по-късно — прозорецът от три дни го лови.
   const IZVLECHENIE =
     'Дата;Описание;Сума;Референция;Салдо\n' +
-    '10.09.2026;БАНКА ООД;-100,00;R-1;900,00\n' +
-    '12.09.2026;КАРТА ООД;-200,00;R-2;700,00\n' +
-    '20.09.2026;НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00';
+    `${bgDen('10')};БАНКА ООД;-100,00;R-1;900,00\n` +
+    `${bgDen('12')};КАРТА ООД;-200,00;R-2;700,00\n` +
+    `${bgDen('20')};НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00`;
   const predSverkata = await broySabitiya(p);
   await p.setInputFiles('#fayl-izvlechenie', {
-    name: 'izvlechenie-septemvri.csv',
+    name: 'izvlechenie-mesets.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(IZVLECHENIE, 'utf8'),
   });
@@ -1394,7 +1410,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('записаната сверка стои в Журнала и се вижда',
     (await tekstNa(p, '[data-sektsiya=sverki]')).includes('Сверка с извлечението'), true);
   proveri('и носи СВОЯ период',
-    (await tekstNa(p, '[data-sektsiya=sverki]')).includes('2026-09'), true);
+    (await tekstNa(p, '[data-sektsiya=sverki]')).includes(MESETSAT), true);
   await naEkran(p, 'imoti', '#forma-imot');
 }
 

@@ -51,10 +51,16 @@ import {
 import type { RedNaRazrez, Reshetka } from '../src/domein/gant.js';
 import { stepenNa } from '../src/domein/dela.js';
 import { ekraniraj } from './obshto.js';
+import { zapomnenaVisochina } from './visochina.js';
 
-/** Височина на един ред · подделото е по-тънко и това се вижда. */
-const RED = 26;
-const REDLO = 20;
+/**
+ * Началната височина на реда · СЪЩОТО 26, което стои на `.gant` в `stil.css`.
+ * Двете места се пазят от прохода, който мери, че редът на решетката и редът
+ * на диаграмата са еднакво високи (И104: „редовете… са едно").
+ */
+const RED_NACHALO = 26;
+/** Подделото е по-тънко с толкова · и това се вижда. */
+const PO_TANKO = 6;
 const GLAVA = 34;
 const IMENA = 210;
 const OTSTAP = 14;
@@ -79,6 +85,11 @@ export function narisuvayDiagrama(
    */
   sumi: readonly RedNaRazrez[] = [],
 ): string {
+  // ЕДНОТО число на реда (И104): диаграмата чете СЪЩАТА запомнена височина,
+  // която движи решетката. SVG смята координати, не CSS променливи — затова
+  // тя се изравнява при рисуване, не по средата на влаченето.
+  const RED = zapomnenaVisochina('gant-redove', RED_NACHALO);
+  const REDLO = RED - PO_TANKO;
   const parva = r.koloni[0]!;
   const posledna = r.koloni[r.koloni.length - 1]!;
   const nachalo = Date.parse(`${parva.ot}T00:00:00Z`);

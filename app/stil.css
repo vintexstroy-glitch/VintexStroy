@@ -663,6 +663,19 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    колоната). */
 .tablitsa { --red-visochina: 48px; }
 .tablitsa .red { min-height: var(--red-visochina); }
+/* Истинските <table> таблици · редовете им са <tr>, не .red. Дотук
+   променливата не ги стигаше и трите гъстоти там бяха ДЕКОРАЦИЯ — лостът
+   светеше, редът не помръдваше (И124 т.4: „забравени и не са спазени").
+   `height` върху <tr> действа като минимум: съдържанието пак може да го
+   разпъне, точно както min-height при .red. */
+.tablitsa tbody tr { height: var(--red-visochina); }
+/* Дръжката за влачене при <tr> · през клетките, защото псевдоелемент върху
+   table-row не се рисува надеждно, а върху table-cell — да. */
+.tablitsa tbody td { position: relative; }
+.tablitsa tbody td::after {
+  content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: 6px;
+  cursor: row-resize;
+}
 /* ДРЪЖКАТА · долните шест пиксела на реда.
    Тя е `::after`, а не свой възел: воал-елемент върху всеки ред би застанал
    между пръста и клетката, а клетката се редактира с двойно натискане (резен
@@ -674,19 +687,16 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   cursor: row-resize;
 }
 
-/* ТРИТЕ ГЪСТОТИ · в главата на секцията, до стрелките за подредба. */
-.gastotata { display: inline-flex; gap: 2px; margin-left: 6px; }
-.gastotata button {
+/* ЛОСТЪТ НА ГЪСТОТИТЕ · ЕДИН бутон в главата на секцията, обхожда трите
+   (И124 т.5: „трите бутона които не работя добре… да са 2 броя" — двете ТЕМИ
+   идват с резен 78; дотогава лостът е компактен, не троен). Показаната
+   гъстота се СМЯТА от числото (`gastotaNa`), не се пази втори път. */
+.gastotata {
   border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
   border-radius: 4px; padding: 1px 6px; font-size: 0.786rem; line-height: 1.4;
-  cursor: pointer;
+  cursor: pointer; margin-left: 6px;
 }
-.gastotata button:hover { background: var(--panel); color: var(--mastilo); }
-/* Отбелязаната гъстота е ЕДНА и се смята от числото (`gastotaNa`), не се пази
-   втори път — две памети за едно нещо се разминават при първото влачене. */
-.gastotata button[aria-pressed='true'] {
-  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
-}
+.gastotata:hover { background: var(--panel); color: var(--mastilo); }
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;
@@ -1708,6 +1718,11 @@ table.razbivka .drebno { font-size: 0.75rem; }
    по-старото 1/3 ↔ 2/3 (р48·[75] · р51·[145]) е за разгъната диаграма и не е
    надживяно. */
 .gant {
+  /* ЕДНОТО число на реда (И104: „редовете в таблицата и колоната са едно").
+     Дотук стоеше преписано на четири места — 26 · 26 · 30 · 34 — и се
+     държеше „едно" по дисциплина. Подразбраното 26 Е днешният изглед;
+     двигателят на височината (`visochina.ts`) само го мести. */
+  --red-visochina: 26px;
   display: grid; grid-template-columns: 1fr 1fr;
   border: 1px solid var(--liniya); border-radius: 6px; overflow: hidden;
   background: var(--hartiya);
@@ -1752,12 +1767,12 @@ table.razbivka .drebno { font-size: 0.75rem; }
    „Направи името на всеки проект в първа колона, а на задачите следващите
    редове да започват от втора колона" (р52·[231]). */
 .gant-myasto {
-  height: 30px; display: flex; align-items: center; padding: 0 10px;
+  height: calc(var(--red-visochina) + 4px); display: flex; align-items: center; padding: 0 10px;
   background: var(--grafiteno); color: #F4EFE7;
   font-weight: 600; font-size: 0.893rem; letter-spacing: 0.01em;
 }
 .gant-delo {
-  height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
+  height: var(--red-visochina); display: flex; align-items: center; gap: 6px; padding: 0 10px 0 18px;
   border-bottom: 1px solid var(--liniya); font-size: 0.893rem;
 }
 /* „задачите с редуващи се цветове, бял и светло сив, за да се открояват"
@@ -1846,7 +1861,7 @@ table.razbivka .drebno { font-size: 0.75rem; }
 }
 .stepenki button:hover { color: var(--aktsent); }
 .gant-sbor, .gant-red.sumi {
-  height: 34px; background: var(--panel); border-top: 2px solid var(--liniya);
+  height: calc(var(--red-visochina) + 8px); background: var(--panel); border-top: 2px solid var(--liniya);
 }
 .gant-sbor {
   display: flex; align-items: center; padding: 0 10px; font-size: 0.821rem; color: var(--mastilo2);
@@ -1859,10 +1874,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .gant-sbor ~ .gant-sbor, .gant-red.sumi ~ .gant-red.sumi { border-top: 1px solid var(--liniya); }
 
 .gant-red {
-  position: relative; height: 26px; display: grid; grid-template-columns: var(--vreme);
+  position: relative; height: var(--red-visochina); display: grid; grid-template-columns: var(--vreme);
   border-bottom: 1px solid var(--liniya);
 }
-.gant-red.prazen { height: 30px; background: var(--grafiteno); }
+.gant-red.prazen { height: calc(var(--red-visochina) + 4px); background: var(--grafiteno); }
 .gant-kletka { border-left: 1px solid var(--liniya); }
 .gant-kletka.dnes { background: var(--toplo); }
 .gant-red.prazen .gant-kletka.dnes { background: rgba(178, 94, 56, 0.35); }

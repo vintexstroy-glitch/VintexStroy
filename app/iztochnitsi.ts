@@ -275,7 +275,7 @@ export function narisuvayPlana(): string {
         </span>
       </div>
 
-      <div class="tablitsa">
+      <div class="tablitsa" data-tablitsa="iztochnik-redove">
         <div class="glava razlika">
           <span>Какво</span><span>Доставчик и описание</span><span>Дата</span>
           <span class="suma">Беше</span><span class="suma">Става</span>
@@ -293,7 +293,7 @@ export function narisuvayPlana(): string {
       ${
         nepoznati.length === 0
           ? ''
-          : `<div class="tablitsa">
+          : `<div class="tablitsa" data-tablitsa="iztochnik-nepoznati">
         <div class="glava propusnat"><span>Непознат лист</span><span>нито един позволен модел не го позна</span></div>
         ${nepoznati
           .map((x) => `<div class="red propusnat" translate="no"><span>лист</span><span>${ekraniraj(x)}</span></div>`)
@@ -304,7 +304,7 @@ export function narisuvayPlana(): string {
       ${
         p.snimka.propusnati.length === 0
           ? ''
-          : `<div class="tablitsa">
+          : `<div class="tablitsa" data-tablitsa="iztochnik-propusnati">
         <div class="glava propusnat"><span>Ред</span><span>Защо не е прочетен</span></div>
         ${p.snimka.propusnati
           .map(

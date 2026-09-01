@@ -734,7 +734,7 @@ export function tablitsataSOcveteniPoleta(
         <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
         <span>${dela.length} дела · първата колона е ДНЕС</span>
       </div>
-      <div class="gant" data-koloni="${r.koloni.length}">
+      <div class="gant" data-tablitsa="gant-redove" data-koloni="${r.koloni.length}">
         <div class="gant-imena">
           <div class="gant-glava">${ekraniraj(nadpisi.glavaNaImenata)}</div>
           ${[...poMyasto.entries()]

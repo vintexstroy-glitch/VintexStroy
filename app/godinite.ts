@@ -92,7 +92,7 @@ export function sektsiyaGodinite(o: Ogledalo, dnes: string, negoviyat: boolean):
         redove.length === 0
           ? '<p class="drebno">Книгата още няма нито един запис — няма и година за затваряне.</p>'
           : `<div class="skrolkutiya">
-        <table class="tablitsa">
+        <table class="tablitsa" data-tablitsa="godinite">
           <thead>
             <tr>
               <th>Година</th><th>Състояние</th><th class="chislo">Записи</th>

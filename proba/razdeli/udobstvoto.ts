@@ -1295,20 +1295,23 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('таблицата има повече от един ред, за да има какво да се мери',
       visochiniPredi.length > 1, true);
 
-    // ТРИТЕ ГЪСТОТИ · лостът стои в главата на секцията, до стрелките.
-    proveri('лостът за височина е в главата на секцията',
-      await p.$$eval('[data-sektsiya="imoti-spisak"] .gastotata button', (b) => b.length), 3);
-    await p.click('[data-sektsiya="imoti-spisak"] .gastotata button[data-gastota="shiroko"]');
-    await p.waitForTimeout(150);
+    // ЛОСТЪТ Е ЕДИН БУТОН · обхожда трите гъстоти. Той видя трите бутона:
+    // „трите бутона които не работя добре… да са 2 броя" (И124 т.5) — двете
+    // ТЕМИ идват с резен 78; дотогава лостът е компактен, не троен.
+    const lost = '[data-sektsiya="imoti-spisak"] .gastotata';
+    proveri('лостът за височина е в главата на секцията · ЕДИН бутон',
+      await p.$$eval(lost, (b) => b.length), 1);
+    proveri('и показва подразбраното · средно',
+      await p.$eval(lost, (e) => (e as HTMLElement).dataset['gastota']), 'sredno');
+    // От средно едно натискане води на широко (сбито → средно → широко → …).
+    await p.click(lost);
+    await p.waitForSelector(`${lost}[data-gastota="shiroko"]`);
     const shiroki = await p.$$eval('.red.imot', (r) =>
       r.map((x) => Math.round(x.getBoundingClientRect().height)));
-    console.log(`\n  ВИСОЧИНА НА РЕД: сбито/средно/широко → ${visochiniPredi[0]} → ${shiroki[0]}px\n`);
+    console.log(`\n  ВИСОЧИНА НА РЕД: средно/широко → ${visochiniPredi[0]} → ${shiroki[0]}px\n`);
     proveri('широкото вдига реда', shiroki[0]! > visochiniPredi[0]!, true);
     // ВСИЧКИ, не един — това е сърцевината на неговото изречение.
     proveri('и вдига ВСИЧКИ редове, не един', new Set(shiroki).size, 1);
-    proveri('отбелязана е точно ЕДНА гъстота',
-      await p.$$eval('[data-sektsiya="imoti-spisak"] .gastotata button[aria-pressed="true"]',
-        (b) => b.length), 1);
 
     // ЗА КОЛОНИТЕ НЕ ВАЖИ · неговата втора половина, премерена
     proveri('колоните НЕ се менят от височината на реда',
@@ -1319,8 +1322,16 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'imoti', '#forma-imot');
     proveri('широкото си стои след два екрана',
       await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)), shiroki[0]);
-    await p.click('[data-sektsiya="imoti-spisak"] .gastotata button[data-gastota="sredno"]');
-    await p.waitForTimeout(150);
+    // Кръгът се затваря: широко → сбито → средно. Сбитото НЕ смачква текста:
+    // „височината я дава ТЕКСТЪТ" (резен 8) — гъстотата е долна граница, и
+    // при двуредова клетка сбито (32) спира на текста, не под него.
+    await p.click(lost);
+    await p.waitForSelector(`${lost}[data-gastota="sbito"]`);
+    proveri('сбитото сваля реда до текста · не по-нагоре от средното',
+      await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height))
+        <= visochiniPredi[0]!, true);
+    await p.click(lost);
+    await p.waitForSelector(`${lost}[data-gastota="sredno"]`);
     proveri('и се връща на средното',
       await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)),
       visochiniPredi[0]);

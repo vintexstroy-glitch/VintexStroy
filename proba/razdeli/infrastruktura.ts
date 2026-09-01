@@ -662,6 +662,141 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-razgani-vsichki="smetki"]'));
     await naEkran(p, 'smetki', '#forma-period');
     proveri('„Разтвори всички" връща дяла разтворен', await vidimiPoleta(), predSgavane);
+
+    // ── ВИСОЧИНАТА СЕ СПАЗВА · на ВСЕКИ екран, не само на Имоти ───────────
+    // Неговата т.4 (И124): „височините… са забравени и не са спазени. Намери
+    // и ги направи." Дотук §75 мереше САМО `.red.imot` — девет истински
+    // <table> таблици и Гантът стояха невидими за мярката, и точно там
+    // височината беше декорация. Отсега редът се мери там, където е.
+    razdel = '135 · височината се спазва на всеки екран';
+    let premereniObshto = 0;
+    const schupeniObshto: string[] = [];
+    for (const [ekran, znak] of [
+      ['imoti', '#forma-imot'],
+      ['pari', '#forma-nachisli'],
+      ['smetki', '#razhod-dostavchik'],
+      ['gant', '#d-forma-delo'],
+      ['kontakti', '#forma-kontakt'],
+      ['stoynost', '#cheti-ploshti'],
+      ['tabove', '#izbor-tab'],
+      ['nastroyki', '#nov-buton'],
+      ['ii', '#nov-agent'],
+      ['tablo', '#tablo-lichno'],
+    ] as const) {
+      await naEkran(p, ekran, znak);
+      const m = await p.evaluate(() => {
+        const vidim = (e: Element): boolean => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const schupeni: string[] = [];
+        let premereni = 0;
+        for (const t of document.querySelectorAll<HTMLElement>('.tablitsa, .gant')) {
+          if (!vidim(t)) continue;
+          const uslovena = Number.parseFloat(
+            getComputedStyle(t).getPropertyValue('--red-visochina'),
+          );
+          if (!Number.isFinite(uslovena)) {
+            schupeni.push(`${t.dataset['tablitsa'] ?? t.className} · без --red-visochina`);
+            continue;
+          }
+          const redove = [
+            ...t.querySelectorAll<HTMLElement>('.red, tbody > tr, .gant-delo, .gant-red'),
+          ].filter(vidim);
+          for (const red of redove) {
+            premereni += 1;
+            // Височината е МИНИМУМ: съдържание на два реда я разпъва и това е
+            // правилно. Счупеното е ред ПОД числото на своята таблица.
+            if (red.getBoundingClientRect().height + 1 < uslovena) {
+              schupeni.push(
+                `${t.dataset['tablitsa'] ?? t.className} · ред ${Math.round(
+                  red.getBoundingClientRect().height,
+                )}px < ${uslovena}px`,
+              );
+            }
+          }
+        }
+        return { premereni, schupeni };
+      });
+      premereniObshto += m.premereni;
+      schupeniObshto.push(...m.schupeni.map((s) => `${ekran}: ${s}`));
+    }
+    console.log(`\n  ВИСОЧИНАТА ПО ЕКРАНИТЕ: ${premereniObshto} премерени реда\n`);
+    proveri('има какво да се мери · редове по десетте екрана', premereniObshto > 100, true);
+    proveri(
+      'нито един ред под височината на своята таблица',
+      schupeniObshto.length === 0 ? 'да' : schupeniObshto.slice(0, 5).join(' · '),
+      'да',
+    );
+
+    // ── ГАНТЪТ · „Редовете в таблицата и колоната са едно" (И104) ──────────
+    razdel = '135б · Гантът · редовете са едно';
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const dvete = await p.evaluate(() => ({
+      delo: Math.round(document.querySelector('.gant-delo')!.getBoundingClientRect().height),
+      red: Math.round(document.querySelector('.gant-red:not(.prazen):not(.sumi)')!.getBoundingClientRect().height),
+    }));
+    // 26 е ЗАКОВАНО С РЪКА: подразбраното на Ганта, същото в `stil.css` и в
+    // `gant-diagrama.ts`. Смени ли се едното, тази проверка го казва.
+    proveri('редът на имената е подразбраните 26px', dvete.delo, 26);
+    proveri('редът на времето е СЪЩОТО число', dvete.red, dvete.delo);
+
+    const gantLost = '.gastotata[data-za="gant-redove"]';
+    proveri('Гантът има лост за височината · един бутон',
+      await p.$$eval(gantLost, (b) => b.length), 1);
+    // 26 е най-близо до сбито · кръгът до широко е две натискания.
+    proveri('и лостът казва сбито', await p.$eval(gantLost, (e) => (e as HTMLElement).dataset['gastota']), 'sbito');
+    await p.click(gantLost);
+    await p.waitForSelector(`${gantLost}[data-gastota="sredno"]`);
+    await p.click(gantLost);
+    await p.waitForSelector(`${gantLost}[data-gastota="shiroko"]`);
+    const shiroko = await p.evaluate(() => ({
+      delo: Math.round(document.querySelector('.gant-delo')!.getBoundingClientRect().height),
+      red: Math.round(document.querySelector('.gant-red:not(.prazen):not(.sumi)')!.getBoundingClientRect().height),
+    }));
+    proveri('широкото вдига реда на имената', shiroko.delo > dvete.delo, true);
+    proveri('и МЕСТИ и колоната на времето · двете са едно', shiroko.red, shiroko.delo);
+
+    // Диаграмата (SVG) смята координати при рисуване — изравнява се при
+    // следващото, не по средата на влаченето. Отиване и връщане Е рисуване.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const svg = await p.evaluate(() => {
+      const lenta = document.querySelector('.diagrama-red:not(.poddelo) rect.diagrama-lenta');
+      return lenta === null ? -1 : Math.round(Number.parseFloat(lenta.getAttribute('height') ?? '0'));
+    });
+    // Лентата е редът минус 8 (по 4 въздух отгоре и отдолу).
+    proveri('диаграмата рисува същата височина след прерисуване', svg, 68 - 8);
+
+    // Чистене: гъстотата на Ганта се връща на подразбраната, за да не
+    // подпира следващите раздели на чуждо число.
+    await p.evaluate(() => localStorage.removeItem('ui.v1.red.visochina.gant-redove'));
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('връщането на подразбраното връща 26',
+      await p.$eval('.gant-delo', (e) => Math.round(e.getBoundingClientRect().height)), 26);
+
+    // ── ВЛАЧЕНЕТО ПО РЪБА · и при истинска <table> ─────────────────────────
+    razdel = '135в · влаченето по ръба стига и до <table>';
+    // „Местата" е истинска <table> с <tr> — дотук ръбът ѝ беше глух: нито
+    // височината я стигаше, нито влаченето. Мери се С РЪКА, не с клик.
+    // Редът първо се ДОВЛИЧА в средата на екрана: мишката работи с видими
+    // координати, а под сгъвката „r.bottom − 2" сочи извън прозореца.
+    const redNaMyasto = await p.$eval('[data-tablitsa=mestata] tbody tr', (e) => {
+      e.scrollIntoView({ block: 'center' });
+      const r = e.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.bottom - 2, visok: Math.round(r.height) };
+    });
+    await p.mouse.move(redNaMyasto.x, redNaMyasto.y);
+    await p.mouse.down();
+    await p.mouse.move(redNaMyasto.x, redNaMyasto.y + 24, { steps: 6 });
+    await p.mouse.up();
+    proveri('дърпането надолу вдига реда на истинската <table>',
+      await p.$eval('[data-tablitsa=mestata] tbody tr',
+        (e) => Math.round(e.getBoundingClientRect().height)) > redNaMyasto.visok, true);
+    // И тук се чисти след мярката.
+    await p.evaluate(() => localStorage.removeItem('ui.v1.red.visochina.mestata'));
+    await naEkran(p, 'imoti', '#forma-imot');
 }
 
 /**
