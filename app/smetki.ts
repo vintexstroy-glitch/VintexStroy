@@ -23,6 +23,7 @@ import {
   IMENA_NA_SADBITE,
   spisatsiteZaSchetovodstvoto,
   mesetsiSvetene,
+  predlozheniyaPoKredit,
   sverkaPoMesetsi,
   sverkataNaIzvlechenieto,
   zapisiteNaKnigata,
@@ -1387,6 +1388,32 @@ export function zakachiSmetki(
       await prerisuvay();
     });
 
+  // ПРЕДЛОЖЕНАТА ВНОСКА (резен 73) · натискането Е записът на човека.
+  for (const buton of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-vnoska]')) {
+    buton.addEventListener('click', async () => {
+      const d = buton.dataset;
+      try {
+        await k.deystviya.zapishiPlashtanePoKredit(
+          {
+            plashtaneId: `PL:${crypto.randomUUID()}`,
+            kreditId: d['kreditId'] ?? '',
+            data: d['data'] ?? '',
+            suma_st: Number(d['suma'] ?? 0),
+            glavnitsa_st: Number(d['glavnitsa'] ?? 0),
+            lihva_st: Number(d['lihva'] ?? 0),
+            taksa_st: Number(d['taksa'] ?? 0),
+            belezhka: 'предложено от извлечението · записано от човек',
+          },
+          { opId: `vnoska-ot-izvlechenie:${crypto.randomUUID()}` },
+        );
+        k.vest('dobre', 'Вноската е записана · остатъкът падна с главницата.');
+      } catch (err) {
+        greshkaIzvlechenie = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
+
   koren.querySelector<HTMLButtonElement>('#zabravi-izvlechenie')?.addEventListener('click', async () => {
     // МАХА се от ЕКРАНА, не от Журнала: записаната сверка си остава записана.
     sverkiteNaIzvlechenieto = [];
@@ -1668,6 +1695,8 @@ export function zakachiSmetki(
  * Журнала. Темата е предложение на машината (правило 18), не запис.
  */
 function blokNaProverkite(): string {
+  // Без извлечение няма и остатък — секцията се появява с него.
+  if (sverkiteNaIzvlechenieto.length === 0) return '';
   const pr = proverkiOtSverki(sverkiteNaIzvlechenieto, new Date().toISOString());
   const glava = `
       <div class="dyalglava">
@@ -1724,6 +1753,50 @@ function blokNaProverkite(): string {
       казва се и нулата.</p>`;
 }
 
+/**
+ * ПРЕДЛОЖЕНАТА ВНОСКА (резен 73 · И124 т.12) · „От извлеченията се вкарва и
+ * наличните кредити."
+ *
+ * Ред от банката, който никой не позна, а името му носи дума от име на
+ * кредит, се ПРЕДЛАГА като вноска с готова делба. Записва ЧОВЕКЪТ, с едно
+ * натискане (правило 18); бележката пази следата откъде е дошло.
+ */
+function blokNaPredlozhenite(o: Ogledalo): string {
+  const vsichki = sverkiteNaIzvlechenieto.flatMap((r) => predlozheniyaPoKredit(r, o));
+  if (vsichki.length === 0) return '';
+  return `
+      <div class="dyalglava">
+        <h2>Предложени вноски по кредити</h2>
+        <span>редове от банката с име на кредит · записва човекът</span>
+      </div>
+      ${
+        /* НЕ е `.tablitsa` нарочно: в клетка на таблица кликът отива на
+           редакцията-в-клетката (ADR-050) и бутонът остава глух — намерено от
+           §97в, когато натиснатото предложение не пишеше нищо. */ ''
+      }
+      <div data-predlozheni-vnoski="${vsichki.length}">
+        ${vsichki
+          .map(
+            (v) => `
+        <p class="drebno" translate="no" data-predlozhena-vnoska="${ekraniraj(v.kreditId)}">
+          <b>${ekraniraj(v.ime)}</b> · ${ekraniraj(v.data)} ·
+          <b data-st="${v.suma_st}">${pishi(v.suma_st)}</b> ·
+          главница ${pishi(v.glavnitsa_st)} · лихва ${pishi(v.lihva_st)}${
+            v.taksa_st === 0 ? '' : ` · такса ${pishi(v.taksa_st)}`
+          }
+          <button type="button" class="reden" data-zapishi-vnoska
+            data-kredit-id="${ekraniraj(v.kreditId)}" data-data="${ekraniraj(v.data)}"
+            data-suma="${v.suma_st}" data-glavnitsa="${v.glavnitsa_st}"
+            data-lihva="${v.lihva_st}" data-taksa="${v.taksa_st}">Запиши вноската</button>
+        </p>`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno">Делбата е ПРЕДЛОЖЕНИЕ — смята я същата функция, с която
+      живее планът (правило 17); непокритото от главница и лихва отива в такса.
+      Нищо не е записано, докато човек не натисне.</p>`;
+}
+
 function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
   const zapisi = zapisiteNaKnigata(o, mesets);
   const r = sverkiteNaIzvlechenieto.find((x) => x.period === mesets) ?? null;
@@ -1740,6 +1813,10 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
       <p class="drebno">Търсят се <b>по банка</b> и <b>с карта</b>. Платеното
       <b>в брой</b> НЕ се търси и не свети — то няма банкова следа и отива в
       списъка за счетоводството.</p>
+      <p class="drebno" data-dvete-i-trite>Той дели наемите на ДВЕ — Банка и Кеш
+      (И124 т.12). Начините в кода са ТРИ, защото картата Е банков джоб
+      (р57·[44]): двете му думи и трите начина не си противоречат — картата
+      стои при банката, и разликата се казва, не се преглъща.</p>
       ${
         greshkaIzvlechenie === ''
           ? ''
@@ -1753,6 +1830,23 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
         id: 'izbor-izvlechenie',
       })}
       <input translate="no" type="file" id="fayl-izvlechenie" multiple hidden>
+      ${
+        /* Извлечение за ДРУГ месец: сверката му не е на този екран, но
+           остатъкът и предложенията НЕ зависят от показания месец — те гледат
+           всички месеци на извлечението и стоят, за да не изглежда четенето
+           като нищо (правило 15). Намерено от §97в: извлечение 14 месеца
+           напред „изчезваше" заедно с предложената вноска по кредита. */
+        blokNaProverkite()
+      }
+      ${blokNaPredlozhenite(o)}
+      ${
+        sverkiteNaIzvlechenieto.length === 0
+          ? ''
+          : `<p class="drebno">Има прочетено извлечение за друг месец
+             (${sverkiteNaIzvlechenieto.map((x) => ekraniraj(x.period)).join(' · ')}) —
+             самата сверка се гледа, като екранът мине на неговия месец.</p>
+             ${butonSIkona({ ikona: 'mahni', tekst: 'Забрави извлечението', klas: '', id: 'zabravi-izvlechenie' })}`
+      }
     </section>`;
   }
 
@@ -1774,6 +1868,13 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
         <h2>Сверка с извлечението</h2>
         <span>${ekraniraj(r.ot)} → ${ekraniraj(r.do)} · ${r.redove.length} ${r.redove.length === 1 ? 'запис' : 'записа'}</span>
       </div>
+      ${
+        /* Отказът се КАЗВА и на заредения екран (правило 15) — преглътнат тук,
+           той оставяше натиснат бутон без никаква следа защо нищо не е станало. */
+        greshkaIzvlechenie === ''
+          ? ''
+          : `<p class="greshka" id="greshka-izvlechenie">${ekraniraj(greshkaIzvlechenie)}</p>`
+      }
 
       <div class="plochki">
         <div class="plochka${nahodki === 0 ? '' : ' duljimo'}" data-plochka="Находки">
@@ -1862,6 +1963,8 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
       }
 
       ${blokNaProverkite()}
+
+      ${blokNaPredlozhenite(o)}
 
       <div class="dyalglava">
         <h2>Списъците за счетоводството</h2>

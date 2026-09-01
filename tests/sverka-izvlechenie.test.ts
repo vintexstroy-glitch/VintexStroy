@@ -20,7 +20,9 @@ import {
   broyNahodki,
   GreshkaSverkaIzvlechenie,
   IMENA_NA_SADBITE,
+  imenataSeSreshtat,
   mesetsiSvetene,
+  predlozheniyaPoKredit,
   PROZORETS_DNI,
   seTarsiVIzvlechenieto,
   spisatsiteZaSchetovodstvoto,
@@ -404,5 +406,119 @@ describe('файлът е ОБХВАТ, не месец', () => {
       do: '2026-07-31',
     });
     expect(mesetsiSvetene(sverki, 'razhod:naem')).toBe(2);
+  });
+});
+
+/**
+ * ИМЕТО Е ТРЕТИЯТ БЕЛЕГ (резен 73 · И124 т.12).
+ *
+ * „другото се сверява за банка в името от извлечението" — дотук срещата беше
+ * само сума + посока + прозорец; две еднакви суми в един ден се разпознават по
+ * това КОЙ стои на реда.
+ */
+describe('името е третият белег', () => {
+  it('сведено съдържане · банката пише по своему, празното не отказва', () => {
+    expect(imenataSeSreshtat('Иван Петров', 'ПРЕВОД ОТ ИВАН ПЕТРОВ ПО ДОГОВОР')).toBe(true);
+    expect(imenataSeSreshtat('Материали ООД', 'МАТЕРИАЛИ ООД')).toBe(true);
+    expect(imenataSeSreshtat('Иван Петров', 'СТРОЙПЛАСТ ЕООД')).toBe(false);
+    // празното име (стар запис, скъсана връзка) се сверява по сумата и датата
+    expect(imenataSeSreshtat('', 'КОЙТО И ДА Е')).toBe(true);
+    expect(imenataSeSreshtat('Иван Петров', '')).toBe(true);
+  });
+
+  it('две еднакви суми в един ден се разпознават по името', () => {
+    const r = sverkata(
+      [
+        zapis({ klyuch: 'razhod:A', suma_st: 50_000, koy: 'Иван Петров' }),
+        zapis({ klyuch: 'razhod:B', suma_st: 50_000, koy: 'Мария Динева' }),
+      ],
+      [
+        bankov({ klyuch: 'b-maria', suma_st: 50_000, koy: 'МАРИЯ ДИНЕВА' }),
+        bankov({ klyuch: 'b-ivan', suma_st: 50_000, koy: 'ИВАН ПЕТРОВ' }),
+      ],
+    );
+    const po = new Map(r.redove.map((x) => [x.zapis.klyuch, x]));
+    // БЕЗ името двете щяха да са „няколко" · с него всяка намира СВОЯ ред
+    expect(po.get('razhod:A')!.sadba).toBe('nameren');
+    expect(po.get('razhod:A')!.sreshtu).toEqual(['b-ivan']);
+    expect(po.get('razhod:B')!.sadba).toBe('nameren');
+    expect(po.get('razhod:B')!.sreshtu).toEqual(['b-maria']);
+  });
+
+  it('чуждо име ОТКАЗВА срещата · сумата сама не стига', () => {
+    const r = sverkata(
+      [zapis({ klyuch: 'razhod:A', suma_st: 50_000, koy: 'Иван Петров' })],
+      [bankov({ klyuch: 'b1', suma_st: 50_000, koy: 'СТРОЙПЛАСТ ЕООД' })],
+    );
+    expect(r.redove[0]!.sadba).toBe('lipsva');
+    expect(r.samoVBankata).toHaveLength(1);
+  });
+});
+
+/**
+ * ПРЕДЛОЖЕНАТА ВНОСКА (резен 73 · И124 т.12) · „От извлеченията се вкарва и
+ * наличните кредити." Машината предлага, записва човекът (правило 18).
+ */
+describe('предложената вноска по кредит', () => {
+  const kredit = {
+    id: 'KR-1',
+    seq: 1,
+    ime: 'Ипотека · Пощенска',
+    vid: 'ipoteka' as const,
+    proektId: '',
+    ostatak_st: 100_000_00,
+    ot: '2026-01-15',
+    lihva_bp: 1200,
+    vnoska_st: 600_00,
+    den: 15,
+    otgovornik: 'vintexstroy@gmail.com',
+    obezpechenie_st: 0,
+  };
+  const sKrediti = (plasteno: readonly { kreditId: string; glavnitsa_st: number }[] = []) => ({
+    krediti: new Map([[kredit.id, kredit]]),
+    plashtaniyaPoKrediti: plasteno.map((p, i) => ({
+      id: `PL-${i}`,
+      seq: i,
+      kreditId: p.kreditId,
+      data: '2026-04-15',
+      suma_st: p.glavnitsa_st,
+      glavnitsa_st: p.glavnitsa_st,
+      lihva_st: 0,
+      taksa_st: 0,
+      belezhka: '',
+    })),
+    pogasitelniPlanove: new Map(),
+  });
+
+  it('ред с дума от името на кредита ражда предложение с готова делба', () => {
+    const r = sverkata([], [bankov({ klyuch: 'b1', suma_st: 600_00, koy: 'ПОЩЕНСКА БАНКА ВНОСКА КРЕДИТ' })]);
+    const predlozheniya = predlozheniyaPoKredit(r, sKrediti());
+    expect(predlozheniya).toHaveLength(1);
+    const p = predlozheniya[0]!;
+    expect(p.kreditId).toBe('KR-1');
+    // 12 % годишно върху 100 000 → 1 000,00 лихва за месеца; НЕ стига вноската
+    // 600 → цялата вноска е лихва (predlozhiVnoska казва stiga=false)
+    expect(p.lihva_st + p.glavnitsa_st + p.taksa_st).toBe(p.suma_st);
+    expect(p.suma_st).toBe(600_00);
+  });
+
+  it('приходен ред НЕ предлага · вноската излиза, не влиза', () => {
+    const r = sverkata(
+      [],
+      [bankov({ klyuch: 'b1', suma_st: 600_00, posoka: 'prihod', koy: 'ПОЩЕНСКА ВНОСКА' })],
+    );
+    expect(predlozheniyaPoKredit(r, sKrediti())).toHaveLength(0);
+  });
+
+  it('погасен кредит НЕ предлага · няма остатък, върху който да пада', () => {
+    const r = sverkata([], [bankov({ klyuch: 'b1', suma_st: 600_00, koy: 'ПОЩЕНСКА ВНОСКА' })]);
+    expect(
+      predlozheniyaPoKredit(r, sKrediti([{ kreditId: 'KR-1', glavnitsa_st: 100_000_00 }])),
+    ).toHaveLength(0);
+  });
+
+  it('чужд ред НЕ предлага · името решава', () => {
+    const r = sverkata([], [bankov({ klyuch: 'b1', suma_st: 600_00, koy: 'ТОПЛОФИКАЦИЯ СОФИЯ' })]);
+    expect(predlozheniyaPoKredit(r, sKrediti())).toHaveLength(0);
   });
 });

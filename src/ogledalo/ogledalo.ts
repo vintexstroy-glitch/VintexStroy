@@ -110,6 +110,8 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadPogasitelenPlanVkaran,
+  VnoskaOtDogovora,
   PayloadKeshZahranen,
   PayloadSedmitsaPrehvarlena,
   PayloadTablitsaOtFaylSazdadena,
@@ -360,6 +362,14 @@ export interface Ogledalo {
 
   /** Плащанията по кредити · ДОБАВЯТ се; сторнираното вече го няма тук. */
   readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
+
+  /**
+   * ПОГАСИТЕЛНИТЕ ПЛАНОВЕ от договорите (резен 73 · И124 т.12) · по кредит.
+   *
+   * Планът на банката БИЕ интерполацията (`krediti.ts` избира); ново вкарване
+   * заменя целия план — последната дума бие, както при самия кредит.
+   */
+  readonly pogasitelniPlanove: ReadonlyMap<string, readonly VnoskaOtDogovora[]>;
 
   /**
    * ЗАПЛАТИТЕ · редовете по седмици (резен 20 · ADR-080).
@@ -660,6 +670,7 @@ export const VIDOVE_S_POPRAVKA_NA_MYASTO: readonly TipSabitie[] = Object.freeze(
   'ЛичноДвижениеЗаписано',
   'ПродажбаЗаписана',
   'КредитЗаписан',
+  'ПогасителенПланВкаран',
   'ЗаплатаЗаписана',
 ]);
 
@@ -748,11 +759,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     return mrtvi;
   };
 
-  // ПЕТТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
+  // ШЕСТТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
   const stornirianiDela = storniranite('ДелоЗаписано');
   const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
   const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
   const stornianiKrediti = storniranite('КредитЗаписан');
+  const stornianiPlanove = storniranite('ПогасителенПланВкаран');
   const stornianiZaplati = storniranite('ЗаплатаЗаписана');
 
   const imoti = new Map<string, Imot>();
@@ -780,6 +792,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
+  const pogasitelniPlanove = new Map<string, readonly VnoskaOtDogovora[]>();
   const zaplati = new Map<string, RedNaZaplata>();
   const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
   const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
@@ -1403,6 +1416,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ПогасителенПланВкаран': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · планът е хартията на банката, идва ЦЯЛ (резен
+        // 73 · И124 т.12). Ново вкарване го заменя; сторнираният не се чете.
+        const p = s.payload as unknown as PayloadPogasitelenPlanVkaran;
+        if (stornianiPlanove.has(s.sashtnost.id)) break;
+        pogasitelniPlanove.set(p.kreditId, p.vnoski);
+        break;
+      }
+
       case 'ЗаплатаЗаписана': {
         // ПОСЛЕДНАТА ДУМА БИЕ · редът идва наведнъж. `seq` се пази от ПЪРВИЯ
         // запис, за да не мести сторното целта си (както при сделката).
@@ -1793,6 +1815,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     etapiNaProdazhbite,
     krediti,
     plashtaniyaPoKrediti,
+    pogasitelniPlanove,
     zaplati,
     prehvarleniSedmitsi,
     zahranvaniyaNaKesha,

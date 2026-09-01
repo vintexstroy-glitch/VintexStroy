@@ -151,6 +151,7 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadPogasitelenPlanVkaran,
   PayloadKeshZahranen,
   PayloadTablitsaOtFaylSazdadena,
   PayloadKategoriyaZadadena,
@@ -1343,6 +1344,67 @@ export class Deystviya {
       'ПлащанеПоКредит',
       VID.plashtaneKredit,
       `PLK:${danni.plashtaneId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ВКАРВА ПОГАСИТЕЛНИЯ ПЛАН от договора (резен 73 · И124 т.12).
+   *
+   * „наличните кредити, които работят с вкаран погасителен план" — планът на
+   * банката БИЕ интерполацията. ЧЕТИРИ проверки:
+   *
+   *   1. КРЕДИТЪТ СЪЩЕСТВУВА · план без кредит не движи нищо;
+   *   2. ПОНЕ ЕДНА ВНОСКА · празен план не е план, а изтриване — а планът се
+   *      надживява с НОВ запис, не с празен;
+   *   3. ДВЕТЕ ЧАСТИ СЪБИРАТ вноската · в договорния план вноската е главница
+   *      плюс лихва, точно — банката я е сметнала;
+   *   4. ДАТИТЕ РАСТАТ · разбъркан план чете се като счупен остатък.
+   *
+   * Планът НЕ е счетоводен запис с дата в месец — той е хартия за бъдещето —
+   * затова замразяването не го спира (правило 9 пази ЧИСЛАТА на месеца).
+   */
+  async zapishiPogasitelenPlan(
+    danni: PayloadPogasitelenPlanVkaran,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.krediti.has(danni.kreditId)) {
+      throw new GreshkaKredit('Няма такъв кредит. План без кредит не движи ничий остатък.');
+    }
+    if (danni.vnoski.length === 0) {
+      throw new GreshkaKredit(
+        'Планът иска поне една вноска. Нов договор се вкарва като НОВ план — ' +
+          'празен план не е поправка, а изтриване.',
+      );
+    }
+    let predishna = '';
+    for (const v of danni.vnoski) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.data)) {
+        throw new GreshkaKredit(`Датата на вноска се пише „ГГГГ-ММ-ДД"; получено: „${v.data}".`);
+      }
+      if (v.data <= predishna) {
+        throw new GreshkaKredit(
+          `Датите на плана трябва да растат: „${v.data}" идва след „${predishna}". ` +
+            'Разбъркан план се чете като счупен остатък.',
+        );
+      }
+      predishna = v.data;
+      if (v.glavnitsa_st < 0 || v.lihva_st < 0) {
+        throw new GreshkaKredit('Главница и лихва в плана не може да са отрицателни.');
+      }
+      if (v.glavnitsa_st + v.lihva_st !== v.vnoska_st) {
+        throw new GreshkaKredit(
+          `Вноската на ${v.data} не се събира: ${v.glavnitsa_st} + ${v.lihva_st} ≠ ` +
+            `${v.vnoska_st} (в цели центове). Банката е сметнала точно — грешката е в преписа.`,
+        );
+      }
+    }
+    return this.#pusni(
+      'ПогасителенПланВкаран',
+      VID.pogasitelenPlan,
+      `PPL:${danni.kreditId}`,
       danni,
       z,
     );

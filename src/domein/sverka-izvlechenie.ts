@@ -55,6 +55,8 @@ import type { Ogledalo, Plashtane } from '../ogledalo/ogledalo.js';
 import type { RedOtKarta } from '../iztochnik/karta.js';
 import { MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import type { NachinNaPlashtane } from './sabitiya.js';
+import { ostatakNa, type OgledaloNaKrediti } from './krediti.js';
+import { predlozhiVnoska } from './kredit-matematika.js';
 
 export class GreshkaSverkaIzvlechenie extends Error {
   constructor(message: string) {
@@ -151,6 +153,28 @@ function dniMezhdu(a: string, b: string): number {
   return Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / den);
 }
 
+/** Име, сведено за среща · малки букви, NFC, едно разстояние (правило 12). */
+function svedeno(ime: string): string {
+  return ime.trim().toLowerCase().normalize('NFC').replace(/\s+/g, ' ');
+}
+
+/**
+ * ИМЕТО Е ТРЕТИЯТ БЕЛЕГ (резен 73 · И124 т.12) · „се сверява за банка в
+ * името от извлечението".
+ *
+ * Банката пише името си по своему — главни букви, добавен текст („ПРЕВОД ОТ
+ * ИВАН ПЕТРОВ ПО ДОГОВОР") — затова срещата е СЪДЪРЖАНЕ, не равенство:
+ * едното сведено име носи другото. ПРАЗНОТО НЕ ОТКАЗВА: запис без име (стар
+ * запис, скъсана връзка) се сверява по сумата и датата, както досега — иначе
+ * третият белег би обявил цялата стара книга за несверима.
+ */
+export function imenataSeSreshtat(a: string, b: string): boolean {
+  const x = svedeno(a);
+  const y = svedeno(b);
+  if (x === '' || y === '') return true;
+  return x.includes(y) || y.includes(x);
+}
+
 /**
  * ЗАПИСИТЕ НА КНИГАТА за един месец · плащанията и разходите заедно.
  *
@@ -227,7 +251,10 @@ export function sverkaSIzvlechenie(n: {
         !izharcheni.has(r.klyuch) &&
         r.suma_st === zapis.suma_st &&
         r.posoka === zapis.posoka &&
-        Math.abs(dniMezhdu(zapis.data, r.data)) <= PROZORETS_DNI,
+        Math.abs(dniMezhdu(zapis.data, r.data)) <= PROZORETS_DNI &&
+        // ТРЕТИЯТ БЕЛЕГ · името (И124 т.12). Две еднакви суми в един ден се
+        // разпознават по това КОЙ стои на реда; празното име не отказва.
+        imenataSeSreshtat(zapis.koy, r.koy),
     );
     if (pasvat.length === 1) {
       izharcheni.add(pasvat[0]!.klyuch);
@@ -508,6 +535,75 @@ export function stesniPoDogovor(r: RezultatNaSverkata, dogovor: string): Stesnen
       .reduce((s, x) => s + x.zapis.suma_st, 0),
     skritiOtBankata: r.samoVBankata.length,
   });
+}
+
+/* ══ ПРЕДЛОЖЕНИЕТО ОТ ИЗВЛЕЧЕНИЕТО · вноската по кредит (резен 73) ═════════
+ *
+ * Негова дума (И124 т.12): „От извлеченията се вкарва и наличните кредити."
+ *
+ * Ред от банката, който никой не позна, а името му носи дума от име на
+ * кредит, е най-вероятно ВНОСКАТА за месеца. Машината я ПРЕДЛАГА с готова
+ * делба (правило 18) — записва човекът, с едно натискане, и следата казва
+ * откъде е дошло. Два кредита с еднаква дума раждат ДВЕ предложения — изборът
+ * между тях е решение на човек, не на машината.
+ */
+
+/** Една предложена вноска · редът от банката + готовата делба. */
+export interface PredlozhenaVnoska {
+  /** ключът на реда от извлечението · следата назад */
+  readonly klyuch: string;
+  readonly kreditId: string;
+  readonly ime: string;
+  readonly data: string;
+  readonly suma_st: number;
+  readonly glavnitsa_st: number;
+  readonly lihva_st: number;
+  /** непокритото от делбата · банката е добавила такса в същия ред */
+  readonly taksa_st: number;
+}
+
+/** Дума от името на кредита (поне 4 знака) стои ли в реда на банката. */
+function imeNaKreditSeSreshta(imeNaKredit: string, koyOtBankata: string): boolean {
+  const red = svedeno(koyOtBankata);
+  return svedeno(imeNaKredit)
+    .split(/[^\p{L}\d]+/u)
+    .some((duma) => duma.length >= 4 && red.includes(duma));
+}
+
+/**
+ * Предложенията за един месец · от остатъка „само в банката".
+ *
+ * Делбата идва от `predlozhiVnoska` — СЪЩАТА функция, с която смятат планът
+ * и екранът (правило 17); остатъкът от сумата над главница + лихва отива в
+ * такса, защото банките я събират в същия ред.
+ */
+export function predlozheniyaPoKredit(
+  r: RezultatNaSverkata,
+  o: OgledaloNaKrediti,
+): readonly PredlozhenaVnoska[] {
+  const redove: PredlozhenaVnoska[] = [];
+  for (const b of r.samoVBankata) {
+    if (b.posoka !== 'razhod') continue;
+    for (const k of o.krediti.values()) {
+      if (!imeNaKreditSeSreshta(k.ime, b.koy)) continue;
+      const ostatak = ostatakNa(k, o.plashtaniyaPoKrediti);
+      if (ostatak === 0) continue;
+      const delba = predlozhiVnoska(ostatak, k.lihva_bp, b.suma_st);
+      redove.push(
+        Object.freeze({
+          klyuch: b.klyuch,
+          kreditId: k.id,
+          ime: k.ime,
+          data: b.data,
+          suma_st: b.suma_st,
+          glavnitsa_st: delba.glavnitsa_st,
+          lihva_st: delba.lihva_st,
+          taksa_st: b.suma_st - delba.glavnitsa_st - delba.lihva_st,
+        }),
+      );
+    }
+  }
+  return Object.freeze(redove);
 }
 
 /**

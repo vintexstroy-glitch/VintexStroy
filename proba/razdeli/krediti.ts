@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
 import type { Page } from 'playwright-core';
 
 /**
@@ -172,6 +172,144 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.$$eval('[data-sektsiya=krediti-plan] [data-dokumenti]', (e) => e.length) > 0,
     true,
   );
+}
+
+/**
+ * 97в · ПОГАСИТЕЛНИЯТ ПЛАН · КАЛКУЛАТОРЪТ · ПРЕДЛОЖЕНАТА ВНОСКА (резен 73).
+ *
+ * И124 т.12, дословно: „От извлеченията се вкарва и наличните кредити, които
+ * работят с вкаран погасителен план и договори свързан в папка за това. В
+ * Сметки един прост груп йалкулато за вкарване ръчно на кредит за
+ * експеримент на прогноза."
+ */
+export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '97в · Погасителният план от договора';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // Дати НАПРЕД от днешния ден · закована дата ще остарее (урокът на §91).
+  const den = (mesetsaNapred: number): string => {
+    const d = new Date();
+    d.setUTCDate(5);
+    d.setUTCMonth(d.getUTCMonth() + mesetsaNapred);
+    return d.toISOString().slice(0, 10);
+  };
+
+  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  // Кредитът от §97 е избран от записа си · планът му е на екрана.
+  await p.waitForSelector('[data-sektsiya=krediti-plan][data-plan-izvor]');
+  proveri(
+    'без вкаран план изворът е ИНТЕРПОЛАЦИЯ и се казва',
+    await p.$eval('[data-sektsiya=krediti-plan]', (e) => (e as HTMLElement).dataset['planIzvor']),
+    'интерполация',
+  );
+
+  // Крив ред се ОТКАЗВА с датата си · частите не се събират.
+  await p.fill('#plan-tekst', `${den(1)};700,00;600,00;99,00`);
+  await p.click('#forma-plan button[type=submit]');
+  await p.waitForFunction(
+    () => (document.querySelector('#greshka-plan')?.textContent ?? '').length > 0,
+    undefined,
+    { timeout: 5_000 },
+  );
+  proveri(
+    'вноска, чиито части не се събират, се отказва с ДАТАТА ѝ',
+    /не се събира/.test((await p.textContent('#greshka-plan')) ?? ''),
+    true,
+  );
+
+  // Верният план влиза · договорът БИЕ интерполацията.
+  await p.fill('#plan-tekst', `${den(1)};700,00;600,00;100,00\n${den(2)};700,00;610,00;90,00`);
+  await sSabitie(p, () => p.click('#forma-plan button[type=submit]'));
+  await p.waitForSelector('[data-sektsiya=krediti-plan][data-plan-izvor=договор]');
+  proveri(
+    'планът вече е ДОГОВОР и заглавието го казва',
+    (await p.textContent('[data-sektsiya=krediti-plan] .dyalglava span'))?.includes('ВКАРАНИЯТ план'),
+    true,
+  );
+  proveri(
+    'редовете са ДВАТА от договора, по неговите дати',
+    await p.$$eval('[data-tablitsa=krediti-plan] .red.planred:not(.glava)', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['data']).join(' · '),
+    ),
+    `${den(1)} · ${den(2)}`,
+  );
+  proveri(
+    'и „вноски още" брои ДОГОВОРА, не интерполацията',
+    await p.$eval('[data-sektsiya=krediti-plan] [data-mesetsi]', (e) =>
+      Number((e as HTMLElement).dataset['mesetsi']),
+    ),
+    2,
+  );
+
+  razdel = '97в · Кредитният калкулатор · нула събития';
+  const sabitiyaPredi = await broySabitiya(p);
+  await p.fill('#kalk-ostatak', '100000,00');
+  await p.fill('#kalk-lihva', '3,45');
+  await p.fill('#kalk-vnoska', '1000,00');
+  await p.fill('#kalk-den', '15');
+  await p.click('#forma-kalkulator button[type=submit]');
+  await p.waitForSelector('[data-kalk-mesetsi]');
+  proveri(
+    'калкулаторът смята месеците на експеримента',
+    await p.$eval('[data-kalk-mesetsi]', (e) => Number((e as HTMLElement).dataset['kalkMesetsi'])) >
+      0,
+    true,
+  );
+  proveri('и НИЩО не влиза в Журнала · експеримент, не запис',
+    await broySabitiya(p), sabitiyaPredi);
+
+  razdel = '97в · Предложената вноска от извлечението';
+  // Ред на банката с ДУМА от името на кредита · никой запис не го познава.
+  // ЧЕТИРИНАЙСЕТ месеца напред, като §91: по-близък месец се оказа ЗАКЛЮЧЕН
+  // от ДДС-справката на друг блок и записът тихо отказваше.
+  const IZVLECHENIE =
+    'Дата;Описание;Сума;Референция;Салдо\n' +
+    `${den(14).split('-').reverse().join('.')};ПОЩЕНСКА БАНКА ВНОСКА КРЕДИТ;-612,34;RK-1;5000,00`;
+  await p.setInputFiles('#fayl-izvlechenie', {
+    name: 'izvlechenie-vnoska.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(IZVLECHENIE, 'utf8'),
+  });
+  await p.waitForSelector('[data-predlozheni-vnoski]');
+  proveri(
+    'редът с име на кредит ражда ЕДНО предложение',
+    await p.$$eval('[data-predlozhena-vnoska]', (e) => e.length),
+    1,
+  );
+  proveri(
+    'и четенето само НЕ пише нищо · машината предлага (правило 18)',
+    await broySabitiya(p),
+    sabitiyaPredi,
+  );
+
+  // ОСТАТЪКЪТ преди · после натискането Е записът на човека.
+  const ostatakPredi = await p.$eval('[data-kredit]', (e) =>
+    Number((e as HTMLElement).dataset['ostatak']),
+  );
+  const glavnitsa = await p.$eval('[data-zapishi-vnoska]', (e) =>
+    Number((e as HTMLElement).dataset['glavnitsa']),
+  );
+  await sSabitie(p, () => p.click('[data-zapishi-vnoska]'));
+  await p.waitForFunction(
+    (predi) =>
+      Number(
+        (document.querySelector('[data-kredit]') as HTMLElement | null)?.dataset['ostatak'] ?? '0',
+      ) < predi,
+    ostatakPredi,
+    { timeout: 5_000 },
+  );
+  proveri(
+    'остатъкът падна ТОЧНО с предложената главница',
+    await p.$eval('[data-kredit]', (e) => Number((e as HTMLElement).dataset['ostatak'])),
+    ostatakPredi - glavnitsa,
+  );
+
+  // Чисто след себе си · извлечението се забравя, записът остава.
+  await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
+  proveri('затварянето маха предложенията заедно с извлечението',
+    await p.$$eval('[data-predlozheni-vnoski]', (e) => e.length), 0);
 }
 
 /**
