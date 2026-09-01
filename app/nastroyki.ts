@@ -35,6 +35,7 @@ import {
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
+import { izboratNaTema } from './tema.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
@@ -1312,6 +1313,17 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
     </span>`;
 
   return `
+    <section data-sektsiya="tema-natovarvane">
+      <div class="dyalglava">
+        <h2>Темата на натоварването</h2>
+        <span>Начални или Основни · и от профила горе вдясно</span>
+      </div>
+      <p class="drebno">„Да се избира <b>и от там освен в настройки</b>" (И124 т.5) —
+      двете дръжки менят ЕДНО число: подразбраната височина на реда. Ръчното
+      влачене по ръба на реда важи за своята таблица и бие темата.</p>
+      ${izboratNaTema()}
+    </section>
+
     <section data-sektsiya="podredbata">
       <div class="dyalglava">
         <h2>Подредбата на екраните</h2>

@@ -22,7 +22,7 @@
  */
 
 import { ekraniraj } from './obshto.js';
-import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
+import { zakachiGoleminata } from './golemina.js';
 
 interface Prozorets {
   /** заглавието вътре · и достъпното име на прозореца */
@@ -49,11 +49,11 @@ export function otvoriProzorets(p: Prozorets): () => void {
   fon.innerHTML = `
     <div class="istoriya-karta" role="dialog" aria-modal="true" aria-label="${ekraniraj(p.zaglavie)}">
       ${
-        /* ЛОСТЪТ ЗА РАЗМЕРА И ТУК · негово: „на всеки прозорец" (резен 10).
-           Прозорецът ПОКРИВА шапката, значи лостът горе остава зад воала — а
-           точно тук се чете най-дребният текст. Разметката идва от ЕДНА
-           функция; двете места не са две истини. */
-        lostatNaGoleminata()
+        /* ЛОСТЪТ ЗА РАЗМЕРА ПАДНА ОТТУК (резен 78 · ADR-135): „да се измести
+           там" — в профила. Новата дума (31.08) надживя „на всеки прозорец"
+           (27.08); размерът, избран от профила, важи и тук — числото стои на
+           КОРЕНА и прозорецът го наследява. */
+        ''
       }
       <h3>${ekraniraj(p.zaglavie)}</h3>
       ${p.pod ? `<p class="pod">${ekraniraj(p.pod)}</p>` : ''}

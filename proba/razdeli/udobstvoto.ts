@@ -1201,56 +1201,63 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('повторното подреждане дава СЪЩИЯ ред', (await otpechatatsi()).join('¦'), sled.join('¦'));
     await naEkran(p, 'imoti', '#forma-imot');
 
-    razdel = '76 · Размерът на текста · лост, видим по всяко време';
-    // Негово: „Бутоните за размера на текста да е видим по ВСЯКО ВРЕМЕ горе в
-    // дясно, НА ВСЕКИ ПРОЗОРЕЦ."
-    //
-    // Мери се ПРЕМЕРЕНИЯТ размер, не атрибутът: правило може да е вярно и пак
-    // да не стига до текста (`[hidden]` вече ни го показа два пъти, ADR-057).
-    proveri('лостът стои ГОРЕ ВДЯСНО, в шапката',
-      await p.$$eval('.shapka .desno-gore .goleminata button', (b) => b.length), 3);
+    razdel = '76 · Профилът · аватарът горе вдясно, съдържанието в него';
+    // И124 т.5: „Битоните за размера на текста, да се създаде ПРОФИЛ и да се
+    // измести там с всичката информация за потребителя." Помирението с
+    // „на всеки прозорец" (27.08): бутонът е ЕДИН — аватарът; лостовете са в
+    // панела му; числото стои на КОРЕНА и стига навсякъде, и до прозорците.
+    proveri('аватарът стои ГОРЕ ВДЯСНО, в шапката',
+      await p.$$eval('.shapka .desno-gore #profil-avatar', (b) => b.length), 1);
+    proveri('и панелът е ПРИБРАН, докато никой не го е поискал',
+      await p.$eval('#profil-panel', (e) => (e as HTMLElement).hidden), true);
+    await p.click('#profil-avatar');
+    await p.waitForSelector('#profil-panel:not([hidden])');
+    proveri('панелът носи ИМЕЙЛА · кой е влязъл, от доставчика',
+      (await tekstNa(p, '#profil-panel')).includes('vintexstroy@gmail.com'), true);
+    proveri('и лостът за размера е ТАМ · три стъпала',
+      await p.$$eval('#profil-panel .goleminata button', (b) => b.length), 3);
+
     const tekstPredi = await p.$eval('body', (e) =>
       Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100);
-    await p.click('.shapka .goleminata [data-golemina="edro"]');
+    await p.click('#profil-panel .goleminata [data-golemina="edro"]');
     await p.waitForTimeout(150);
     const tekstEdro = await p.$eval('body', (e) =>
       Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100);
     console.log(`\n  РАЗМЕР НА ТЕКСТА: нормално ${tekstPredi}px → едро ${tekstEdro}px\n`);
     proveri('едрото наистина уголемява ТЕКСТА', tekstEdro > tekstPredi, true);
     proveri('и е отбелязано точно ЕДНО стъпало',
-      await p.$$eval('.shapka .goleminata button[aria-pressed="true"]', (b) => b.length), 1);
+      await p.$$eval('#profil-panel .goleminata button[aria-pressed="true"]', (b) => b.length), 1);
 
     // СКАЛАТА ОСТАВА `rem`-БАЗИРАНА · лостът мени БАЗАТА, не заменя механизма.
-    // Инак човек, вдигнал шрифта в браузъра, губи своето при първото натискане.
     proveri('скалата остава rem-базирана · множител, не нова скала',
       await p.evaluate(() =>
         getComputedStyle(document.documentElement).getPropertyValue('--text-base').includes('rem')),
       true);
 
-    razdel = '76 · Размерът · и В ПРОЗОРЕЦА, където текстът е най-дребен';
-    // Прозорецът ПОКРИВА шапката — лост зад воала е лост, който го няма.
+    razdel = '76 · Профилът · изборът важи навсякъде и преживява смяна';
+    await p.keyboard.press('Escape');
+    // Числото е на корена: прозорецът го НАСЛЕДЯВА — свой лост там вече няма
+    // („да се измести там", 31.08, надживя „на всеки прозорец", 27.08).
     await natisni(p, '[data-istoriya]');
     await p.waitForSelector('.istoriya-karta');
-    proveri('лостът е и в прозореца',
-      await p.$$eval('.istoriya-karta .goleminata button', (b) => b.length), 3);
-    proveri('и показва СЪЩОТО стъпало като шапката',
-      await p.$eval('.istoriya-karta .goleminata button[aria-pressed="true"]',
-        (e) => (e as HTMLElement).dataset['golemina']), 'edro');
+    proveri('прозорецът НЯМА свой лост · числото идва от корена',
+      await p.$$eval('.istoriya-karta .goleminata', (b) => b.length), 0);
     await p.keyboard.press('Escape');
-
-    razdel = '76 · Размерът · изборът преживява смяна на екран';
     await naEkran(p, 'pari', '#forma-nachisli');
-    proveri('лостът го има и на втория екран',
-      await p.$$eval('.shapka .goleminata button', (b) => b.length), 3);
+    proveri('аватарът го има и на втория екран',
+      await p.$$eval('.shapka #profil-avatar', (b) => b.length), 1);
     proveri('и текстът е още едър',
       await p.$eval('body', (e) =>
         Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100), tekstEdro);
     await naEkran(p, 'imoti', '#forma-imot');
-    await p.click('.shapka .goleminata [data-golemina="normalno"]');
+    await p.click('#profil-avatar');
+    await p.waitForSelector('#profil-panel:not([hidden])');
+    await p.click('#profil-panel .goleminata [data-golemina="normalno"]');
     await p.waitForTimeout(150);
     proveri('и се връща на нормалното',
       await p.$eval('body', (e) =>
         Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100), tekstPredi);
+    await p.keyboard.press('Escape');
 
     razdel = '75 · Височината на реда · ЕДНА за цялата таблица';
     // Негово: „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ
@@ -1262,44 +1269,55 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('таблицата има повече от един ред, за да има какво да се мери',
       visochiniPredi.length > 1, true);
 
-    // ЛОСТЪТ Е ЕДИН БУТОН · обхожда трите гъстоти. Той видя трите бутона:
-    // „трите бутона които не работя добре… да са 2 броя" (И124 т.5) — двете
-    // ТЕМИ идват с резен 78; дотогава лостът е компактен, не троен.
-    const lost = '[data-sektsiya="imoti-spisak"] .gastotata';
-    proveri('лостът за височина е в главата на секцията · ЕДИН бутон',
-      await p.$$eval(lost, (b) => b.length), 1);
-    proveri('и показва подразбраното · средно',
-      await p.$eval(lost, (e) => (e as HTMLElement).dataset['gastota']), 'sredno');
-    // От средно едно натискане води на широко (сбито → средно → широко → …).
-    await p.click(lost);
-    await p.waitForSelector(`${lost}[data-gastota="shiroko"]`);
-    const shiroki = await p.$$eval('.red.imot', (r) =>
-      r.map((x) => Math.round(x.getBoundingClientRect().height)));
-    console.log(`\n  ВИСОЧИНА НА РЕД: средно/широко → ${visochiniPredi[0]} → ${shiroki[0]}px\n`);
-    proveri('широкото вдига реда', shiroki[0]! > visochiniPredi[0]!, true);
-    // ВСИЧКИ, не един — това е сърцевината на неговото изречение.
-    proveri('и вдига ВСИЧКИ редове, не един', new Set(shiroki).size, 1);
+    // ЛОСТЪТ НА ГЪСТОТИТЕ ПАДНА (резен 78 · ADR-135): „те да са 2 броя и да
+    // са ТЕМИ за натоварването с обяснение" — темите живеят в профила.
+    proveri('лост на гъстотите по секциите ВЕЧЕ НЯМА',
+      await p.$$eval('.gastotata', (b) => b.length), 0);
+    await p.click('#profil-avatar');
+    await p.waitForSelector('#profil-panel:not([hidden])');
+    proveri('профилът носи ДВЕ теми · „те да са 2 броя"',
+      await p.$$eval('#profil-panel [data-tema-izbor]', (b) => b.length), 2);
+    proveri('и всяка е С ОБЯСНЕНИЕ, не голо име',
+      await p.$$eval('#profil-panel .tema-red .drebno',
+        (e) => e.every((x) => (x.textContent ?? '').length > 10)), true);
+    proveri('подразбраната е „Начални" · за начало',
+      await p.$eval('#profil-panel [data-tema-izbor="nachalni"]',
+        (e) => (e as HTMLInputElement).checked), true);
 
-    // ЗА КОЛОНИТЕ НЕ ВАЖИ · неговата втора половина, премерена
-    proveri('колоните НЕ се менят от височината на реда',
-      await p.$eval('.glava.imot', (e) => getComputedStyle(e).gridTemplateColumns), koloniPredi);
-
-    razdel = '75 · Височината · изборът преживява смяна на екран';
-    await naEkran(p, 'pari', '#forma-nachisli');
-    await naEkran(p, 'imoti', '#forma-imot');
-    proveri('широкото си стои след два екрана',
-      await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)), shiroki[0]);
-    // Кръгът се затваря: широко → сбито → средно. Сбитото НЕ смачква текста:
-    // „височината я дава ТЕКСТЪТ" (резен 8) — гъстотата е долна граница, и
-    // при двуредова клетка сбито (32) спира на текста, не под него.
-    await p.click(lost);
-    await p.waitForSelector(`${lost}[data-gastota="sbito"]`);
-    proveri('сбитото сваля реда до текста · не по-нагоре от средното',
+    // „Основни" сваля ПОДРАЗБРАНОТО на реда. Мери се МЕХАНИЗМЪТ (min-height):
+    // „височината я дава ТЕКСТЪТ" (резен 8) — двуредовата клетка на Имоти
+    // стои на текста си и при двете теми, и отпечатъкът не би мръднал.
+    await p.check('#profil-panel [data-tema-izbor="osnovni"]');
+    await p.waitForFunction(() => document.documentElement.dataset['tema'] === 'osnovni');
+    const sbiti = await p.$$eval('.red.imot', (r) =>
+      r.map((x) => getComputedStyle(x).minHeight));
+    console.log(`\n  ПОДРАЗБРАН РЕД: Начални 48px → Основни ${sbiti[0]}\n`);
+    proveri('„Основни" сваля подразбраното на реда до 32px', sbiti[0], '32px');
+    // ВСИЧКИ, не един — това е сърцевината на неговото изречение от 27.08.
+    proveri('и сваля ВСИЧКИ редове, не един', new Set(sbiti).size, 1);
+    proveri('а текстът НЕ се смачква · редът спира на текста, не под него',
       await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height))
         <= visochiniPredi[0]!, true);
-    await p.click(lost);
-    await p.waitForSelector(`${lost}[data-gastota="sredno"]`);
-    proveri('и се връща на средното',
+
+    // ЗА КОЛОНИТЕ НЕ ВАЖИ · неговата втора половина, премерена
+    proveri('колоните НЕ се менят от темата',
+      await p.$eval('.glava.imot', (e) => getComputedStyle(e).gridTemplateColumns), koloniPredi);
+
+    razdel = '75 · Темата · изборът преживява смяна на екран';
+    await p.keyboard.press('Escape');
+    await naEkran(p, 'pari', '#forma-nachisli');
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('„Основни" си стои след два екрана',
+      await p.$eval('.red.imot', (e) => getComputedStyle(e).minHeight), sbiti[0]);
+    // Темата се избира „И ОТ ТАМ ОСВЕН В НАСТРОЙКИ" — втората дръжка.
+    await naEkran(p, 'nastroyki', '[data-sektsiya=tema-natovarvane]');
+    proveri('Настройки носи СЪЩИЯ избор · втората дръжка',
+      await p.$eval('[data-sektsiya=tema-natovarvane] [data-tema-izbor="osnovni"]',
+        (e) => (e as HTMLInputElement).checked), true);
+    await p.check('[data-sektsiya=tema-natovarvane] [data-tema-izbor="nachalni"]');
+    await p.waitForFunction(() => document.documentElement.dataset['tema'] === 'nachalni');
+    await naEkran(p, 'imoti', '#forma-imot');
+    proveri('и връщането на „Начални" връща реда',
       await p.$eval('.red.imot', (e) => Math.round(e.getBoundingClientRect().height)),
       visochiniPredi[0]);
 

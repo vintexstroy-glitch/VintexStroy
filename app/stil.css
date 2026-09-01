@@ -505,6 +505,31 @@ a:hover { color: var(--aktsent-tumen); }
 .lenta-period label { display: flex; align-items: center; gap: 5px; font-size: 0.857rem; color: var(--mastilo2); }
 .lenta-period input { padding: 4px 6px; }
 
+/* ── ПРОФИЛЪТ · аватар горе вдясно на всеки екран (резен 78 · ADR-135) ────
+   Панелът виси под аватара като меню: клик другаде и Escape затварят. */
+.profilat { position: relative; display: inline-flex; }
+.avatar {
+  width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--liniya);
+  background: var(--aktsent); color: #FFFFFF; font-weight: 600; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.avatar:hover { background: var(--aktsent-tumen); }
+.profil-panel {
+  position: absolute; right: 0; top: calc(100% + 6px); z-index: 30;
+  min-width: 280px; padding: 12px; border: 1px solid var(--liniya);
+  border-radius: 7px; background: #FFFFFF; box-shadow: 0 8px 24px rgba(23, 20, 15, 0.13);
+}
+.profil-panel hr { border: none; border-top: 1px solid var(--liniya); margin: 10px 0; }
+.profil-koy { display: flex; flex-direction: column; gap: 2px; }
+.profil-red { display: flex; flex-direction: column; gap: 6px; font-size: 0.857rem; color: var(--mastilo2); }
+.temite { display: flex; flex-direction: column; gap: 6px; }
+.tema-red {
+  display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
+  column-gap: 8px; align-items: center; cursor: pointer;
+}
+.tema-red input { grid-row: 1 / span 2; margin: 0; }
+.tema-red .drebno { grid-column: 2; margin: 0; }
+
 /* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
    показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
    шапката, а лост зад воала е лост, който го няма. */
@@ -662,7 +687,10 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    КОЛОНИТЕ НЕ СЕ ПИПАТ. Тук няма нито един `grid-template-columns` — всяка
    таблица си остава със своите ширини (ADR-013: видът и ширината живеят в
    колоната). */
-.tablitsa { --red-visochina: 48px; }
+/* ПОДРАЗБРАНАТА ВИСОЧИНА идва от ТЕМАТА на корена (резен 78 · ADR-135):
+   „Начални" = 48px (премереното), „Основни" = 32px. Ръчното влачене по ръба
+   пише направо на таблицата и бие темата. Гантът пази своята сбита шарка. */
+.tablitsa { --red-visochina: var(--tema-red-visochina, 48px); }
 .tablitsa .red { min-height: var(--red-visochina); }
 /* Истинските <table> таблици · редовете им са <tr>, не .red. Дотук
    променливата не ги стигаше и трите гъстоти там бяха ДЕКОРАЦИЯ — лостът
@@ -688,16 +716,8 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   cursor: row-resize;
 }
 
-/* ЛОСТЪТ НА ГЪСТОТИТЕ · ЕДИН бутон в главата на секцията, обхожда трите
-   (И124 т.5: „трите бутона които не работя добре… да са 2 броя" — двете ТЕМИ
-   идват с резен 78; дотогава лостът е компактен, не троен). Показаната
-   гъстота се СМЯТА от числото (`gastotaNa`), не се пази втори път. */
-.gastotata {
-  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
-  border-radius: 4px; padding: 1px 6px; font-size: 0.786rem; line-height: 1.4;
-  cursor: pointer; margin-left: 6px;
-}
-.gastotata:hover { background: var(--panel); color: var(--mastilo); }
+/* ЛОСТЪТ НА ГЪСТОТИТЕ ПАДНА (резен 78 · ADR-135): „те да са 2 броя и да са
+   теми за натоварването" — двете теми живеят в профила и в Настройки. */
 .glava {
   background: var(--panel); border-bottom: 1px solid var(--liniya);
   font-size: 0.821rem; letter-spacing: 0.06em; text-transform: uppercase;

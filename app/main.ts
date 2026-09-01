@@ -76,7 +76,9 @@ import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiZebrata } from './zebra.js';
 import { zakachiVisochinata } from './visochina.js';
-import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
+import { zakachiGoleminata } from './golemina.js';
+import { narisuvayProfila, zakachiProfila } from './profil.js';
+import { zakachiTemata } from './tema.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
@@ -108,6 +110,7 @@ import {
   poslednite2,
   rolyataNa,
 } from '../src/domein/stopanin.js';
+import { IMENA_NA_ROLITE } from '../src/yadro/samolichnost.js';
 
 /**
  * ПОКАЗАЛЕЦЪТ КЪМ ВЪРНАТ ЖУРНАЛ · местен, като запомнения вход (И100).
@@ -706,11 +709,12 @@ async function trugvay(): Promise<void> {
             ekran === 'smetki' ? lentataNaBalansa(dnes) : ''
           }
           <div class="desno-gore">
-            ${/* РАЗМЕРЪТ НА ТЕКСТА · ПЪРВИ отляво в групата и затова видим на
-                  всеки екран, дори когато петте служебни пътя ги няма (личния).
-                  Рисува се в ЧЕРУПКАТА, не в екраните: инак единайсетият екран
-                  ще се роди без него, точно както се роди без `data-sektsiya`. */
-              lostatNaGoleminata()}
+            ${/* ПРОФИЛЪТ (И124 т.5 · ADR-135) · аватарът е на ВСЕКИ екран, а
+                  размерът на текста и темите живеят В НЕГО: „да се създаде
+                  профил и да се измести там с всичката информация за
+                  потребителя". Рисува се в ЧЕРУПКАТА, не в екраните: инак
+                  единайсетият екран ще се роди без него. */
+              narisuvayProfila(kojSam.imeyl, IMENA_NA_ROLITE[rolyataNa(kojSam.imeyl, ogledalo)])}
             ${
               /**
                * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
@@ -921,6 +925,9 @@ async function trugvay(): Promise<void> {
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
     // на редове, които после се местят.
     zakachiGoleminata(koren);
+    // ПРОФИЛЪТ И ТЕМИТЕ (резен 78 · ADR-135) · панелът, размерът и двете теми.
+    zakachiProfila(koren);
+    zakachiTemata(koren);
     zakachiIzgledaNaGanta(koren);
     zakachiVisochinata(koren);
     zakachiZebrata(koren);

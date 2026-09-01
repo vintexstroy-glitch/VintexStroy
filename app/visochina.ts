@@ -10,13 +10,13 @@
  * ръба на кой да е ред, всички стават толкова. Колоната НЕ следва това правило:
  * всяка си остава своя (ADR-013 · видът и ширината живеят в колоната).
  *
- * ═══ ДВА ЛОСТА, ЕДНО ЧИСЛО ═══
+ * ═══ ТЕМАТА ДАВА ПОДРАЗБРАНОТО · ВЛАЧЕНЕТО БИЕ (резен 78 · И124 т.5) ═══
  *
- * Негов избор беше „и двете": влачене по ръба, като в Ексел, И три готови
- * гъстоти. Те не са две настройки — те пипат ЕДНО число. Гъстотата е име на
- * число; влаченето е същото число, казано с ръка. Затова изборът се помни като
- * ПИКСЕЛИ, а името се СМЯТА обратно (`gastotaNa`): две памети за едно нещо се
- * разминават при първото влачене.
+ * Трите готови гъстоти и лостът им (☰ на всяка секция) са НАДЖИВЕНИ: „те да
+ * са 2 броя и да са теми за натоварването" — двете теми живеят в профила
+ * (`app/tema.ts`) и слагат подразбраната височина на корена. Тук остава
+ * Ексел-жестът: влаченето по ръба, което пипа СВОЯТА таблица и бие темата.
+ * Изборът се помни като ПИКСЕЛИ — име за смятане обратно вече няма.
  *
  * ═══ ЗАЩО В ПАМЕТТА НА ЕКРАНА ═══
  *
@@ -33,27 +33,11 @@
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
-/** Трите готови гъстоти · име на число, не отделна настройка. */
-export const GASTOTI = ['sbito', 'sredno', 'shiroko'] as const;
-export type Gastota = (typeof GASTOTI)[number];
-
-const IMENA_NA_GASTOTITE: Readonly<Record<Gastota, string>> = Object.freeze({
-  sbito: 'Сбито',
-  sredno: 'Средно',
-  shiroko: 'Широко',
-});
-
 /**
- * ВИСОЧИНИТЕ · в пиксели.
- *
- * „Средно" е 48 — премереният ред след резен 8 (`ВИСОЧИНА НА РЕД: 49px`).
- * Тоест подразбраното НЕ мени нищо: то е онова, което вече стои на екрана.
+ * ПОДРАЗБРАНАТА ВИСОЧИНА · премереният ред след резен 8 (49px).
+ * Темите (`tema.ts`) я предефинират през `--tema-red-visochina` на корена.
  */
-export const VISOCHINI: Readonly<Record<Gastota, number>> = Object.freeze({
-  sbito: 32,
-  sredno: 48,
-  shiroko: 68,
-});
+export const PODRAZBRANA = 48;
 
 /** Под 24px не се пипа с пръст, над 160px редът престава да е ред. */
 export const NAY_MALKO = 24;
@@ -61,28 +45,8 @@ export const NAY_GOLYAMO = 160;
 
 /** Пиксели в позволеното · чиста функция. */
 export function ogranichi(px: number): number {
-  if (!Number.isFinite(px)) return VISOCHINI.sredno;
+  if (!Number.isFinite(px)) return PODRAZBRANA;
   return Math.min(NAY_GOLYAMO, Math.max(NAY_MALKO, Math.round(px)));
-}
-
-/**
- * КОЯ ГЪСТОТА Е ТОВА ЧИСЛО · най-близката, не точното съвпадение.
- *
- * След влачене числото рядко пада точно върху предварително число, а лостът пак
- * трябва да покаже кое от трите е отбелязано. Точното съвпадение би оставило и
- * трите неотбелязани веднага след първото дръпване.
- */
-export function gastotaNa(px: number): Gastota {
-  let nay: Gastota = 'sredno';
-  let razlika = Infinity;
-  for (const g of GASTOTI) {
-    const r = Math.abs(VISOCHINI[g] - px);
-    if (r < razlika) {
-      razlika = r;
-      nay = g;
-    }
-  }
-  return nay;
 }
 
 function klyuchat(tablitsa: string): string {
@@ -116,12 +80,12 @@ function klyuchNaTablitsata(t: HTMLElement): string {
  * на Ганта в двигателя не му мени изгледа: подразбраното Е днешното.
  */
 function nachalotoNa(t: HTMLElement): number {
-  // Изричен разбор, не parseFloat: празна или чужда стойност пада на средното
-  // ПОИМЕННО, вместо NaN да тръгне към екрана.
+  // Изричен разбор, не parseFloat: празна или чужда стойност пада на
+  // подразбраното ПОИМЕННО, вместо NaN да тръгне към екрана.
   const surovo = /^(\d+(?:\.\d+)?)px$/.exec(
     getComputedStyle(t).getPropertyValue('--red-visochina').trim(),
   );
-  return surovo === null ? VISOCHINI.sredno : Number(surovo[1]);
+  return surovo === null ? PODRAZBRANA : Number(surovo[1]);
 }
 
 /** Колко е висок редът на тази таблица сега. */
@@ -147,74 +111,15 @@ export function zakachiVisochinata(koren: HTMLElement): void {
     const klyuch = klyuchNaTablitsata(t);
     if (klyuch === '') continue;
     const nachalo = nachalotoNa(t);
+    // ЛОСТЪТ НА ГЪСТОТИТЕ ГО НЯМА ВЕЧЕ (резен 78 · ADR-135): подразбраното
+    // идва от ТЕМАТА на корена; тук се слага само ръчно извлаченото.
     const postavi = (px: number): void => {
       t.style.setProperty('--red-visochina', `${px}px`);
-      const g = gastotaNa(px);
-      t.dataset['gastota'] = g;
-      // Показаната гъстота се СМЯТА от числото, не се пази втори път.
-      for (const b of glavata(t)?.querySelectorAll<HTMLButtonElement>('[data-gastota]') ?? []) {
-        if (b.dataset['za'] !== klyuch) continue;
-        oblechiLosta(b, g);
-      }
     };
-    postavi(visochinataNa(klyuch, nachalo));
-    lostaNaGastotite(t, klyuch, postavi);
+    const svoya = chetiEkranno<number | null>(klyuchat(klyuch), null);
+    if (svoya !== null) postavi(ogranichi(svoya));
     vlacheneToPoRaba(t, klyuch, nachalo, postavi);
   }
-}
-
-/** Главата на секцията, в която живее лостът · един дом за този въпрос. */
-function glavata(t: HTMLElement): Element | null {
-  return t.closest('[data-sektsiya]')?.querySelector('.dyalglava') ?? null;
-}
-
-const ZNATSI_NA_GASTOTITE: Readonly<Record<Gastota, string>> = Object.freeze({
-  sbito: '≡',
-  sredno: '☰',
-  shiroko: '▤',
-});
-
-/** Следващата гъстота в кръга · чиста функция, за да я пази тест. */
-export function sledvashtataGastota(g: Gastota): Gastota {
-  return GASTOTI[(GASTOTI.indexOf(g) + 1) % GASTOTI.length]!;
-}
-
-/** Знакът, думата и целта на лоста · за ЕДНА гъстота. */
-function oblechiLosta(b: HTMLButtonElement, g: Gastota): void {
-  const sledva = sledvashtataGastota(g);
-  b.dataset['gastota'] = g;
-  b.textContent = ZNATSI_NA_GASTOTITE[g];
-  b.title = `Височина на реда · ${IMENA_NA_GASTOTITE[g]} · натисни за ${IMENA_NA_GASTOTITE[sledva]}`;
-  b.setAttribute('aria-label', `Височина на реда · ${IMENA_NA_GASTOTITE[g]}`);
-}
-
-/**
- * Лостът на гъстотите · ЕДИН бутон, който обхожда трите.
- *
- * Дотук бяха три бутона на секция — и той ги видя: „трите бутона които не
- * работя добре… да са 2 броя" (И124 т.5). Трите ГОТОВИ гъстоти (негов избор,
- * 27.08) остават — обхождат се с едно натискане; финото е влаченето по ръба.
- * Падащо меню тук НЕ се строи: „Падаши менюта да има само в менюто" (И124
- * т.3). Двете ТЕМИ от т.5 идват с резен 78 и ще преначертаят този лост.
- */
-function lostaNaGastotite(
-  t: HTMLElement,
-  klyuch: string,
-  postavi: (px: number) => void,
-): void {
-  const glava = glavata(t);
-  if (!glava || glava.querySelector(`[data-gastota][data-za="${CSS.escape(klyuch)}"]`)) return;
-  const b = document.createElement('button');
-  b.type = 'button';
-  b.className = 'gastotata';
-  b.dataset['za'] = klyuch;
-  oblechiLosta(b, gastotaNa(visochinataNa(klyuch, nachalotoNa(t))));
-  glava.append(b);
-  b.addEventListener('click', () => {
-    const px = VISOCHINI[sledvashtataGastota(b.dataset['gastota'] as Gastota)];
-    zapomniEkranno(klyuchat(klyuch), px);
-    postavi(px);
-  });
 }
 
 /**

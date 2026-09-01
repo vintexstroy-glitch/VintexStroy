@@ -741,26 +741,20 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('редът на имената е подразбраните 26px', dvete.delo, 26);
     proveri('редът на времето е СЪЩОТО число', dvete.red, dvete.delo);
 
-    const gantLost = '.gastotata[data-za="gant-redove"]';
-    proveri('Гантът има лост за височината · един бутон',
-      await p.$$eval(gantLost, (b) => b.length), 1);
-    // 26 е най-близо до сбито · кръгът до широко е две натискания.
-    proveri('и лостът казва сбито', await p.$eval(gantLost, (e) => (e as HTMLElement).dataset['gastota']), 'sbito');
-    await p.click(gantLost);
-    await p.waitForSelector(`${gantLost}[data-gastota="sredno"]`);
-    await p.click(gantLost);
-    await p.waitForSelector(`${gantLost}[data-gastota="shiroko"]`);
+    // ЛОСТЪТ НА ГЪСТОТИТЕ ПАДНА (резен 78 · ADR-135) — височината на Ганта
+    // се мени с ВЛАЧЕНЕ по ръба или пада от подразбраното; двете половини
+    // („редовете са едно") се проверяват през ПАМЕТТА, както влаченето би я
+    // записало, а диаграмата се изравнява при следващото рисуване.
+    await p.evaluate(() => localStorage.setItem('ui.v1.red.visochina.gant-redove', '68'));
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
     const shiroko = await p.evaluate(() => ({
       delo: Math.round(document.querySelector('.gant-delo')!.getBoundingClientRect().height),
       red: Math.round(document.querySelector('.gant-red:not(.prazen):not(.sumi)')!.getBoundingClientRect().height),
     }));
-    proveri('широкото вдига реда на имената', shiroko.delo > dvete.delo, true);
+    proveri('изтегленото нагоре вдига реда на имената', shiroko.delo > dvete.delo, true);
     proveri('и МЕСТИ и колоната на времето · двете са едно', shiroko.red, shiroko.delo);
 
-    // Диаграмата (SVG) смята координати при рисуване — изравнява се при
-    // следващото, не по средата на влаченето. Отиване и връщане Е рисуване.
-    await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'gant', '#d-forma-delo');
     const svg = await p.evaluate(() => {
       const lenta = document.querySelector('.diagrama-red:not(.poddelo) rect.diagrama-lenta');
       return lenta === null ? -1 : Math.round(Number.parseFloat(lenta.getAttribute('height') ?? '0'));
@@ -768,7 +762,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // Лентата е редът минус 8 (по 4 въздух отгоре и отдолу).
     proveri('диаграмата рисува същата височина след прерисуване', svg, 68 - 8);
 
-    // Чистене: гъстотата на Ганта се връща на подразбраната, за да не
+    // Чистене: височината на Ганта се връща на подразбраната, за да не
     // подпира следващите раздели на чуждо число.
     await p.evaluate(() => localStorage.removeItem('ui.v1.red.visochina.gant-redove'));
     await naEkran(p, 'imoti', '#forma-imot');
