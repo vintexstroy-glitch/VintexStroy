@@ -15,6 +15,10 @@ import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadr
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import {
+  bankovotoSaldo,
+  dzhobNaNachina,
+  kotvataNaBankata,
+  trezornotoSaldo,
   kapital,
   likvidnost,
   otcheti,
@@ -119,50 +123,65 @@ function naRaka(p: Pole): number {
   return p.sastavki.reduce((s, c) => s + c.suma_st, 0);
 }
 
-describe('салдото на един джоб', () => {
-  it('се записва през Вратата и повторният запис ПОПРАВЯ, не ражда втори', async () => {
+describe('салдото на един джоб · „Вкарва само в трезора" (И124 т.9)', () => {
+  it('трезорът се записва през Вратата и повторният запис ПОПРАВЯ', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-1' },
     );
-    expect(saldoNa(await deystviya.ogledalo(), 'banka')).toBe(10_000_00);
+    expect(saldoNa(await deystviya.ogledalo(), 'trezor')).toBe(10_000_00);
 
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(12_500_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(12_500_00), ot: '2026-08-01' },
       { opId: 'op-saldo-2' },
     );
     const o = await deystviya.ogledalo();
-    expect(saldoNa(o, 'banka')).toBe(12_500_00);
+    expect(saldoNa(o, 'trezor')).toBe(12_500_00);
     expect(o.salda.size).toBe(1); // поправка, не втори джоб
   });
 
-  it('незаписаният джоб е НУЛА, а полето казва че го чака', async () => {
+  it('банковото РЪЧНО салдо се ОТКАЗВА · банката е при котвата', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.zapishiSaldo(
+        { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+        { opId: 'op-saldo-banka' },
+      ),
+    ).rejects.toThrowError(/само в трезора/);
+  });
+
+  it('незаписаният трезор е НУЛА, а полето казва какво чака', async () => {
     const { deystviya } = stend();
     const p = likvidnost(await deystviya.ogledalo());
     expect(saldoNa(await deystviya.ogledalo(), 'trezor')).toBe(0);
-    expect(p.chaka).toContain('началното салдо на Банка');
+    expect(p.chaka).toContain('котвата на Банка — месечната сверка с извлечението');
     expect(p.chaka).toContain('началното салдо на Трезор');
   });
 
   it('приема отрицателно салдо — овърдрафтът е дълг, не грешка', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(-2_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(-2_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-minus' },
     );
-    expect(saldoNa(await deystviya.ogledalo(), 'banka')).toBe(-2_000_00);
+    expect(saldoNa(await deystviya.ogledalo(), 'trezor')).toBe(-2_000_00);
   });
 });
 
-describe('ЛИКВИДНОСТ · ръчно начало + автоматични движения', () => {
-  it('събира началото с движенията и сборът отговаря на съставките', async () => {
+describe('джобът на начина · картата Е банков джоб (р57·[44])', () => {
+  it('заковано с ръка · банка и карта в Банка, в брой в Трезора, празното никъде', () => {
+    expect(dzhobNaNachina('банка')).toBe('banka');
+    expect(dzhobNaNachina('карта')).toBe('banka');
+    expect(dzhobNaNachina('в брой')).toBe('trezor');
+    expect(dzhobNaNachina('')).toBe('');
+  });
+});
+
+describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
+  it('банката е движения без начало, трезорът е ръчно + в брой, сборът отговаря', async () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
-    await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
-      { opId: 'op-s-b' },
-    );
     await deystviya.zapishiSaldo(
       { kade: 'trezor', saldo_st: stotinki(500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
@@ -191,17 +210,68 @@ describe('ЛИКВИДНОСТ · ръчно начало + автоматичн
       { opId: 'op-r-1' },
     );
 
-    const p = likvidnost(await deystviya.ogledalo());
-    // ВТОРИЯТ ПЪТ, на ръка: 10 000 + 500 + 300 − 800
-    expect(p.sbor_st).toBe(10_000_00 + 500_00 + 300_00 - 800_00);
+    const o = await deystviya.ogledalo();
+    // ПО ДЖОБ, на ръка: Банка = 300 (без начало), Трезор = 500 − 800 = −300.
+    expect(bankovotoSaldo(o)).toEqual({ saldo_st: 300_00, izvor: 'няма начало' });
+    expect(trezornotoSaldo(o)).toEqual({ saldo_st: 500_00 - 800_00, izvor: 'ръчно' });
+    const p = likvidnost(o);
+    expect(p.sbor_st).toBe(300_00 + 500_00 - 800_00);
     expect(p.sbor_st).toBe(naRaka(p));
-    expect(p.chaka).toEqual([]); // и двата джоба са записани
+    // Без котва полето ЧАКА нея — не мълчи.
+    expect(p.chaka).toContain('котвата на Банка — месечната сверка с извлечението');
+  });
+
+  it('КОТВАТА закотвя банката · след нея се ИЗЧИСЛЯВА (И124 т.9)', async () => {
+    const { deystviya } = stend();
+    await nasadi(deystviya);
+    await deystviya.zapishiSverka(
+      'sverka-izvlechenie-2026-08',
+      {
+        buton: 'Сверка с извлечението',
+        period: '2026-08',
+        vhod_st: 0,
+        izhod_st: 0,
+        razlika_st: 0,
+        izvori: ['проба'],
+        propusnati: 0,
+        saldoKray_st: stotinki(7_000_00),
+      },
+      { opId: 'op-sverka-kotva' },
+    );
+    const o1 = await deystviya.ogledalo();
+    const vzemaneId = [...o1.vzemaniya.values()].find((v) => v.naemId === 'N-1')!.id;
+    // Плащане СЛЕД котвения месец → влиза в изчислението.
+    await deystviya.priemiPlashtane(
+      'P-2',
+      { vzemaneId, suma_st: stotinki(300_00), nachin: 'карта', data: '2026-09-10' },
+      { opId: 'op-p-2' },
+    );
+    // Плащане ПРЕДИ края на котвения месец → извлечението ВЕЧЕ го носи.
+    await deystviya.priemiPlashtane(
+      'P-3',
+      { vzemaneId, suma_st: stotinki(111_00), nachin: 'банка', data: '2026-08-05' },
+      { opId: 'op-p-3' },
+    );
+    const o = await deystviya.ogledalo();
+    expect(kotvataNaBankata(o)).toEqual({ period: '2026-08', saldo_st: 7_000_00 });
+    expect(bankovotoSaldo(o)).toEqual({
+      saldo_st: 7_000_00 + 300_00,
+      izvor: 'котва',
+      period: '2026-08',
+    });
+    // И полето вече НЕ чака котва.
+    expect(likvidnost(o).chaka).not.toContain('котвата на Банка — месечната сверка с извлечението');
+    // И ДВАТА ПЪТЯ на Капитала четат котвата като ДЕФИНИЦИЯ — дупката я намери
+    // проходът (§103): вторият път броеше всички движения от нулата, докато
+    // първият вече тръгваше от извлечението. Тук нулата е ПРОВЕРЕНА с котва.
+    const r = otcheti(o, PERIOD, KOGATO, { stoynostNaSastoyanie_st: 100_00 });
+    expect(r.sverka.razlika_st).toBe(0);
   });
 
   it('НЕ се нулира на първо число — състояние е, не оборот', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(1_000_00), ot: '2026-01-01' },
+      { kade: 'trezor', saldo_st: stotinki(1_000_00), ot: '2026-01-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -277,7 +347,7 @@ describe('СРЕДСТВА · и защо не е Капитал', () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -295,12 +365,9 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
   it('смята се по формулата и сборът отговаря на съставките', async () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
+    // Наличните са в ЕДИН запис на трезора — банково ръчно салдо няма (И124 т.9).
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
-      { opId: 'op-s-b' },
-    );
-    await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(500_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(10_500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
     );
     await sKredit(deystviya);
@@ -309,7 +376,7 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
     const p = kapital(o, { stoynostNaSastoyanie_st: 160_700_00 });
 
     // ВТОРИЯТ ПЪТ, на ръка:
-    //   активи      160 700 + (10 000 + 500) + 1 700
+    //   активи      160 700 + 10 500 + 1 700
     //   задължения  50 000
     const ochakvano = 160_700_00 + 10_500_00 + 1700_00 - 50_000_00;
     expect(p.sbor_st).toBe(ochakvano);
@@ -439,7 +506,7 @@ describe('сверката вход↔изход на Капитала (прав
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -495,7 +562,7 @@ describe('вторият път брои САМ', () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-b' },
     );
     const o = await deystviya.ogledalo();

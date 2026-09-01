@@ -250,6 +250,8 @@ export interface ZapisanaSverka {
   readonly razlika_st: number;
   readonly izvori: readonly string[];
   readonly propusnati: number;
+  /** котвата на банката · крайното салдо от извлечението (резен 71) */
+  readonly saldoKray_st?: number;
 }
 
 export interface Ogledalo {

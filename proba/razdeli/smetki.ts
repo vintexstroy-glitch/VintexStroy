@@ -367,12 +367,16 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('Вземанията НЕ крият празната половина',
       (await p.$$eval('[data-pole="vzemaniya"] .formula .ime', (e) => e.map((x) => x.textContent))).length, 2);
 
-    // САЛДОТО · записва се, вижда се в Ликвидността, поправя се без втори ред.
-    // Ликвидността вече носи движенията от по-ранните раздели, затова се мери
-    // РАЗЛИКАТА, не абсолютното число: салдото трябва да добави точно 10 000.
+    // САЛДОТО · „Вкарва само в трезора" (И124 т.9 · резен 71): формата пише
+    // ТРЕЗОРА; банката се закотвя от сверката с извлечението и се ИЗЧИСЛЯВА.
     const likvidnostPredi = await chisloNaPoleto(p, 'likvidnost');
     const predSaldoto = await broySabitiya(p);
-    await p.selectOption('#saldo-kade', 'banka');
+    proveri('изборът на джоб ГО НЯМА · формата пише само трезора',
+      await p.$$eval('#saldo-kade', (e) => e.length), 0);
+    proveri('и отказът за банката се КАЗВА с думи (правило 15)',
+      (await tekstNa(p, '[data-sektsiya=smetki-salda]')).includes('банково салдо на ръка НЯМА'), true);
+    proveri('банката ЧАКА първата котва',
+      await p.$eval('[data-banka-izvor]', (e) => (e as any).dataset.bankaIzvor), 'няма начало');
     await p.fill('#saldo-suma', '10 000,00');
     await p.fill('#saldo-ot', '2026-08-01');
     await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
@@ -380,8 +384,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     const likvidnost1 = await chisloNaPoleto(p, 'likvidnost');
     proveri('началото добавя ТОЧНО 10 000 към Ликвидността', likvidnost1 - likvidnostPredi, 10_000_00);
-    proveri('и вече не чака Банка',
-      (await p.$eval('[data-pole="likvidnost"] .chaka', (e) => e.textContent)).includes('Банка'), false);
+    proveri('но полето ЧАКА котвата на Банка, не мълчи',
+      (await p.$eval('[data-pole="likvidnost"] .chaka', (e) => e.textContent)).includes('котвата на Банка'), true);
 
     // Поправка на същия джоб · последният запис бие, втори ред не се ражда.
     await p.fill('#saldo-suma', '12 500,00');
@@ -389,9 +393,9 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
     const likvidnost2 = await chisloNaPoleto(p, 'likvidnost');
     proveri('поправката добавя разликата, не второ салдо', likvidnost2 - likvidnost1, 2_500_00);
-    proveri('Банка се показва веднъж в формулата',
+    proveri('Трезорът се показва веднъж в формулата',
       (await p.$$eval('[data-pole="likvidnost"] .formula .ime',
-        (e) => e.filter((x) => x.textContent.includes('Банка')).length)), 1);
+        (e) => e.filter((x) => x.textContent.includes('Трезор')).length)), 1);
 
     // СВЕРКАТА вход↔изход на Капитала · нулата се ПОКАЗВА (правило 7).
     // ОБХВАТ: ГНЕЗДОТО „ОТЧЕТИ" · сверката на Капитала живее вътре в него, не е
@@ -1325,6 +1329,20 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   const predZapisa = await broySabitiya(p);
   await deystvieSPrerisuvane(p, () => p.click('#zapishi-sverka-izvlechenie'));
   proveri('едно събитие, не две', await broySabitiya(p), predZapisa + 1);
+
+  razdel = '91б · КОТВАТА на банката (резен 71 · И124 т.9)';
+  // Сверката е записана — крайното салдо на извлечението е КОТВА: банката се
+  // закотвя и до следващата сверка се ИЗЧИСЛЯВА.
+  proveri('банката вече стои на КОТВА',
+    await p.$eval('[data-banka-izvor]', (e) => (e as any).dataset.bankaIzvor), 'котва');
+  proveri('и котвата е крайното салдо на извлечението · −77,00',
+    await p.$eval('[data-banka-saldo]', (e) => (e as any).dataset.bankaSaldo), '-7700');
+  proveri('и се КАЗВА откъде идва',
+    (await tekstNa(p, '[data-sektsiya=smetki-salda]')).includes('котва от извлечението за'), true);
+  // Празният списък „чака" не рисува елемент — затова се броят всички.
+  proveri('Ликвидността спира да чака котвата',
+    (await p.$$eval('[data-pole="likvidnost"] .chaka', (e) => e.map((x) => x.textContent).join(' ')))
+      .includes('котвата на Банка'), false);
 
   razdel = '91 · Сверката с извлечението · затварянето маха ЕКРАНА, не записа';
   await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));

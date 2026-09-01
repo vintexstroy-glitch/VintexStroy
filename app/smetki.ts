@@ -51,6 +51,8 @@ import {
 } from '../src/domein/smetki.js';
 import { sDumi, type RezultatSverka } from '../src/domein/sverka-dds.js';
 import {
+  bankovotoSaldo,
+  trezornotoSaldo,
   IMENA_NA_DZHOBOVETE,
   otcheti,
   saldoNa,
@@ -207,6 +209,8 @@ let sverkiteNaIzvlechenieto: readonly RezultatNaSverkata[] = [];
  */
 let dogovorNaSverkata = chetiEkranno('izvlechenie.dogovor', '');
 let greshkaIzvlechenie = '';
+/** Крайното салдо по месеци от последното прочетено извлечение · котвите. */
+let krayniteSalda = new Map<string, number>();
 let opIdSverkaIzvlechenie = crypto.randomUUID();
 /** отпечатъците на прочетените файлове · влизат в записаната сверка */
 let izvoriteNaIzvlechenieto: readonly string[] = [];
@@ -448,27 +452,36 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
  * точно там, където се гледа.
  */
 function formaSalda(o: Ogledalo): string {
-  const banka_st = saldoNa(o, 'banka');
-  const trezor_st = saldoNa(o, 'trezor');
-  const lipsvat = !o.salda.has('banka') || !o.salda.has('trezor');
+  const banka = bankovotoSaldo(o);
+  const trezor = trezornotoSaldo(o);
   return `
     <section data-sektsiya="smetki-salda" class="karta">
       <div class="dyalglava">
         <h2>Салда</h2>
-        <span>ръчно начало · движенията идват от Журнала</span>
+        <span>трезорът на ръка · банката се закотвя от извлечението (И124 т.9)</span>
+      </div>
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">${ekraniraj(IMENA_NA_DZHOBOVETE.banka)} · сега</span>
+          <span class="chislo" translate="no" data-banka-saldo="${banka.saldo_st}">${pishi(banka.saldo_st)}</span>
+          <span class="pod" data-banka-izvor="${ekraniraj(banka.izvor)}">${
+            banka.izvor === 'котва'
+              ? `котва от извлечението за ${ekraniraj(banka.period ?? '')} + изчислено оттогава`
+              : banka.izvor === 'ръчно'
+                ? 'ръчно старо начало + движения · чака първата котва'
+                : 'чака първата сверка с извлечение — тя е котвата'
+          }</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">${ekraniraj(IMENA_NA_DZHOBOVETE.trezor)} · сега</span>
+          <span class="chislo" translate="no" data-trezor-saldo="${trezor.saldo_st}">${pishi(trezor.saldo_st)}</span>
+          <span class="pod">${trezor.izvor === 'ръчно' ? 'ръчно начало + движения в брой' : 'движения в брой · чака начало'}</span>
+        </div>
       </div>
       <form id="forma-saldo">
         <div class="poleta tesni">
-          ${poleSIzbor({
-            id: 'saldo-kade',
-            ime: 'kade',
-            etiket: 'Джоб',
-            spisak: 'dzhob',
-            opcii: `<option value="banka">${ekraniraj(IMENA_NA_DZHOBOVETE.banka)} · сега ${pishi(banka_st)}</option>
-              <option value="trezor">${ekraniraj(IMENA_NA_DZHOBOVETE.trezor)} · сега ${pishi(trezor_st)}</option>`,
-          })}
           <div class="pole">
-            <label for="saldo-suma">Начално салдо</label>
+            <label for="saldo-suma">Начално салдо на ТРЕЗОРА</label>
             <input translate="no" id="saldo-suma" name="suma" inputmode="decimal" placeholder="10 000,00" required>
           </div>
           <div class="pole">
@@ -477,14 +490,13 @@ function formaSalda(o: Ogledalo): string {
           </div>
         </div>
         <div class="deystviya">
-          <button type="submit" class="vtorichen">Запиши салдото</button>
+          <button type="submit" class="vtorichen">Запиши салдото на трезора</button>
           <p class="greshka" id="greshka-saldo">${ekraniraj(greshkaSaldo)}</p>
         </div>
-        <p class="drebno">${
-          lipsvat
-            ? 'Липсващо салдо се брои за нула — Ликвидността го казва, вместо да го скрие.'
-            : 'Повторен запис ПОПРАВЯ салдото на джоба; втори ред не се ражда.'
-        } Отрицателно се приема — овърдрафтът е дълг, не грешка.</p>
+        <p class="drebno">„Вкарва само в трезора" — банково салдо на ръка НЯМА: банката се
+        закотвя всеки месец от сверката с извлечението и до следващата се ИЗЧИСЛЯВА
+        (правило 15: изборът, който го няма, се казва). Повторен запис ПОПРАВЯ трезора;
+        втори ред не се ражда. Отрицателно се приема — овърдрафтът е дълг, не грешка.</p>
       </form>
     </section>`;
 }
@@ -1324,6 +1336,12 @@ export function zakachiSmetki(
           ot: slyata.ot,
           do: slyata.do,
         });
+        // КОТВАТА (резен 71): крайното салдо на всеки месец е салдото СЛЕД
+        // последния му ред — банката го е написала, ние само го пренасяме.
+        krayniteSalda = new Map();
+        for (const red of [...slyata.redove].sort((a, b) => a.data.localeCompare(b.data))) {
+          krayniteSalda.set(red.data.slice(0, 7), red.saldoSled_st);
+        }
         // НОВ ключ на ново четене · същият ключ би върнал СТАРАТА сверка при
         // втори файл (правило 20: `opId` носи ДЕЙСТВИЕТО).
         opIdSverkaIzvlechenie = crypto.randomUUID();
@@ -1355,6 +1373,8 @@ export function zakachiSmetki(
             razlika_st: s.razlika,
             izvori: izvoriteNaIzvlechenieto,
             propusnati: propusnatiOtIzvlechenieto,
+            // Котвата на банката · крайното салдо от извлечението (И124 т.9).
+            ...(krayniteSalda.has(r.period) ? { saldoKray_st: krayniteSalda.get(r.period)! } : {}),
           },
           { opId: `sverka-izvlechenie:${opIdSverkaIzvlechenie}` },
         );
@@ -1483,7 +1503,8 @@ export function zakachiSmetki(
     buton.disabled = true;
     try {
       await k.deystviya.zapishiSaldo(
-        { kade: String(danni.get('kade')) as 'banka' | 'trezor', saldo_st, ot },
+        // Формата пише САМО трезора (И124 т.9) — банката е при котвата.
+        { kade: 'trezor', saldo_st, ot },
         { opId: opIdSaldo },
       );
       // нов opId чак СЛЕД успешен запис — дотогава повторното натискане е

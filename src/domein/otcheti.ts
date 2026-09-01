@@ -97,6 +97,90 @@ export function saldoNa(o: Ogledalo, kade: Dzhob): number {
 }
 
 /**
+ * КОТВАТА НА БАНКАТА (резен 71 · И124 т.9) · последната сверка с извлечение,
+ * която носи крайно салдо. „По Банка се сверява всеки месец от извлеченията,
+ * а до следващия изчислява."
+ */
+export function kotvataNaBankata(
+  o: Ogledalo,
+): { readonly period: string; readonly saldo_st: number } | null {
+  let nay: { period: string; saldo_st: number } | null = null;
+  for (const s of o.sverki) {
+    if (s.saldoKray_st === undefined) continue;
+    if (nay === null || s.period > nay.period) nay = { period: s.period, saldo_st: s.saldoKray_st };
+  }
+  return nay;
+}
+
+/** Кой начин на плащане в кой джоб пада · картата Е банков джоб (р57·[44]). */
+export function dzhobNaNachina(nachin: string): Dzhob | '' {
+  if (nachin === 'банка' || nachin === 'карта') return 'banka';
+  if (nachin === 'в брой') return 'trezor';
+  return '';
+}
+
+/** Влязло − излязло по един джоб · по избор само СЛЕД дадена дата. */
+function dvizheniePoDzhob(o: Ogledalo, kade: Dzhob, sled: string): number {
+  let sbor = 0;
+  for (const p of o.plashtaniya.values()) {
+    if (dzhobNaNachina(p.nachin) === kade && p.data > sled) sbor += p.suma_st;
+  }
+  for (const r of o.razhodi.values()) {
+    if (dzhobNaNachina(r.nachin) === kade && r.data > sled) sbor -= r.suma_st;
+  }
+  return sbor;
+}
+
+/** Движенията БЕЗ начин · не се делят по джоб, но не се и губят (правило 7). */
+function dvizhenieBezNachin(o: Ogledalo): number {
+  let sbor = 0;
+  for (const p of o.plashtaniya.values()) if (dzhobNaNachina(p.nachin) === '') sbor += p.suma_st;
+  for (const r of o.razhodi.values()) if (dzhobNaNachina(r.nachin) === '') sbor -= r.suma_st;
+  return sbor;
+}
+
+export interface SaldoNaDzhob {
+  readonly saldo_st: number;
+  /** откъде тръгва числото · казва се на екрана, не се гадае */
+  readonly izvor: 'котва' | 'ръчно' | 'няма начало';
+  /** периодът на котвата · само при извор „котва" */
+  readonly period?: string;
+}
+
+/**
+ * БАНКОВОТО САЛДО · котва + изчисление (И124 т.9).
+ *
+ * С котва: крайното салдо от извлечението + движенията по банковия джоб СЛЕД
+ * края на котвения месец. Без котва: старото ръчно начало (запис отпреди
+ * резена — чете се, правило 1) + всички банкови движения.
+ */
+export function bankovotoSaldo(o: Ogledalo): SaldoNaDzhob {
+  const kotva = kotvataNaBankata(o);
+  if (kotva !== null) {
+    const krayNaMeseca = `${kotva.period}-31`;
+    return {
+      saldo_st: kotva.saldo_st + dvizheniePoDzhob(o, 'banka', krayNaMeseca),
+      izvor: 'котва',
+      period: kotva.period,
+    };
+  }
+  const rachno = o.salda.get('banka');
+  return {
+    saldo_st: (rachno?.saldo_st ?? 0) + dvizheniePoDzhob(o, 'banka', ''),
+    izvor: rachno === undefined ? 'няма начало' : 'ръчно',
+  };
+}
+
+/** ТРЕЗОРЪТ · ръчното начало + движенията в брой („Вкарва само в трезора"). */
+export function trezornotoSaldo(o: Ogledalo): SaldoNaDzhob {
+  const rachno = o.salda.get('trezor');
+  return {
+    saldo_st: (rachno?.saldo_st ?? 0) + dvizheniePoDzhob(o, 'trezor', ''),
+    izvor: rachno === undefined ? 'няма начало' : 'ръчно',
+  };
+}
+
+/**
  * ЛИКВИДНОСТТА · ръчно начало + автоматични движения.
  *
  * Негов трети вариант *(р48·[71])*, и защо ръчно *(р75·[38])*:
@@ -107,22 +191,34 @@ export function saldoNa(o: Ogledalo, kade: Dzhob): number {
  * не оборот.
  */
 export function likvidnost(o: Ogledalo): Pole {
-  const banka_st = saldoNa(o, 'banka');
-  const trezor_st = saldoNa(o, 'trezor');
-  let vlyazlo_st = 0;
-  for (const p of o.plashtaniya.values()) vlyazlo_st += p.suma_st;
-  let izlyazlo_st = 0;
-  for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
+  // ПО ДЖОБ (резен 71 · И124 т.9): Банката е котва + изчисление, Трезорът е
+  // ръчно + движения в брой. Движение БЕЗ начин (стар запис) не се дели, но
+  // не се и губи — стои като своя съставка и се вижда.
+  const banka = bankovotoSaldo(o);
+  const trezor = trezornotoSaldo(o);
+  const bezNachin_st = dvizhenieBezNachin(o);
 
   const sastavki: Sastavka[] = [
-    { ime: 'Банка · начално салдо', suma_st: banka_st, otkade: 'ръчно, в Сметки' },
-    { ime: 'Трезор · начално салдо', suma_st: trezor_st, otkade: 'ръчно, в Сметки' },
-    { ime: 'Влязло · плащания', suma_st: vlyazlo_st, otkade: 'Журналът' },
-    { ime: 'Излязло · разходи', suma_st: -izlyazlo_st, otkade: 'Журналът' },
+    {
+      ime: 'Банка · салдо',
+      suma_st: banka.saldo_st,
+      otkade:
+        banka.izvor === 'котва'
+          ? `котва от извлечението за ${banka.period} + движения след нея`
+          : banka.izvor === 'ръчно'
+            ? 'ръчно старо начало + банкови движения'
+            : 'банкови движения · чака първата котва',
+    },
+    {
+      ime: 'Трезор · салдо',
+      suma_st: trezor.saldo_st,
+      otkade: trezor.izvor === 'ръчно' ? 'ръчно начало + движения в брой' : 'движения в брой · чака начало',
+    },
+    { ime: 'Движения без начин', suma_st: bezNachin_st, otkade: 'стари записи без начин на плащане' },
   ];
 
   const chaka: string[] = [];
-  if (!o.salda.has('banka')) chaka.push('началното салдо на Банка');
+  if (banka.izvor !== 'котва') chaka.push('котвата на Банка — месечната сверка с извлечението');
   if (!o.salda.has('trezor')) chaka.push('началното салдо на Трезор');
 
   return {
@@ -289,10 +385,31 @@ export function aktiviIZadalzheniya(
   o: Ogledalo,
   vanshni: VanshniZaKapitala = {},
 ): { readonly aktivi_st: number; readonly zadalzheniya_st: number } {
-  let vlyazlo_st = 0;
-  for (const pl of o.plashtaniya.values()) vlyazlo_st += pl.suma_st;
-  let izlyazlo_st = 0;
-  for (const r of o.razhodi.values()) izlyazlo_st += r.suma_st;
+  // КОТВАТА Е ДЕФИНИЦИЯ, не подробност на `likvidnost` (резен 71 · И124 т.9):
+  // има ли котва, банковото салдо ТРЪГВА от нея и движенията по банковия джоб
+  // ПРЕДИ края на котвения месец не се броят — извлечението вече ги носи.
+  // Затова и вторият път я чете; движенията обаче ги брои САМ, със свои
+  // цикли — прескочи ли `likvidnost` джоб или преброи ли нещо два пъти,
+  // разликата пак светва.
+  const kotva = kotvataNaBankata(o);
+  const sledKotvata = kotva === null ? '' : `${kotva.period}-31`;
+  let banka_st = kotva === null ? saldoNa(o, 'banka') : kotva.saldo_st;
+  let trezor_st = saldoNa(o, 'trezor');
+  let bezNachin_st = 0;
+  for (const pl of o.plashtaniya.values()) {
+    const dzhob = dzhobNaNachina(pl.nachin);
+    if (dzhob === 'banka') {
+      if (pl.data > sledKotvata) banka_st += pl.suma_st;
+    } else if (dzhob === 'trezor') trezor_st += pl.suma_st;
+    else bezNachin_st += pl.suma_st;
+  }
+  for (const r of o.razhodi.values()) {
+    const dzhob = dzhobNaNachina(r.nachin);
+    if (dzhob === 'banka') {
+      if (r.data > sledKotvata) banka_st -= r.suma_st;
+    } else if (dzhob === 'trezor') trezor_st -= r.suma_st;
+    else bezNachin_st -= r.suma_st;
+  }
   let vzemaniya_st = 0;
   for (const v of o.vzemaniya.values()) vzemaniya_st += v.ostatak_st;
   // И ВТОРИЯТ ПЪТ брои продажбите САМ · иначе сверката щеше да падне точно със
@@ -303,10 +420,9 @@ export function aktiviIZadalzheniya(
   return Object.freeze({
     aktivi_st:
       (vanshni.stoynostNaSastoyanie_st ?? 0) +
-      saldoNa(o, 'banka') +
-      saldoNa(o, 'trezor') +
-      vlyazlo_st -
-      izlyazlo_st +
+      banka_st +
+      trezor_st +
+      bezNachin_st +
       vzemaniya_st,
     zadalzheniya_st: obshtOstatak(o),
   });
