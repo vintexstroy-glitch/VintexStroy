@@ -45,6 +45,7 @@ import { koloniNaProdazhbite } from './prodazhbi.js';
 import { koloniNaDelata } from './gant.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { TablitsaSHedar } from '../src/domein/hedari-po-tabove.js';
+import { eVgradenKlyuch } from '../src/domein/dobavki.js';
 
 /** Колкото регистърът чете от един описател — име и нищо повече. */
 interface SamoIme {
@@ -145,23 +146,35 @@ const VGRADENI: readonly VgradenaTablitsa[] = Object.freeze<VgradenaTablitsa[]>(
  * накрая на своя таб, както новият екран застава накрая на лентата (ADR-066).
  */
 export function tablitsiteNaProgramata(o: Ogledalo): readonly TablitsaSHedar[] {
-  const vgradeni: TablitsaSHedar[] = VGRADENI.map((v) => ({
-    klyuch: v.klyuch,
-    ime: v.ime,
-    ekran: v.ekran,
-    glavi: v.koloni(o).map((k) => k.ime),
-    zatvoreni: v.zatvoreni,
-  }));
+  const vgradeni: TablitsaSHedar[] = VGRADENI.map((v) => {
+    // ДОБАВКИТЕ НА СТОПАНИНА (резен 79) · наслагваемият модел със същия ключ
+    // носи САМО добавените колони — те се долепят след кодовите, а неговите
+    // затворени номера се отместват с броя на кодовите. Затова редът му НЕ
+    // влиза при вносните долу: същият ключ на две места е двойник в матрицата.
+    const dobavki = o.modeli.get(v.klyuch);
+    const kodovi = v.koloni(o).map((k) => k.ime);
+    return {
+      klyuch: v.klyuch,
+      ime: v.ime,
+      ekran: v.ekran,
+      glavi: dobavki ? [...kodovi, ...dobavki.glavi] : kodovi,
+      zatvoreni: dobavki
+        ? [...v.zatvoreni, ...dobavki.zatvoreni.map((z) => z + kodovi.length)]
+        : v.zatvoreni,
+    };
+  });
 
-  const vnosni: TablitsaSHedar[] = [...o.modeli.values()].map((m) => ({
-    klyuch: m.klyuch,
-    ime: m.klyuch,
-    // Хедър без отговор на въпроса „на кой таб стоиш" пада в последната група —
-    // преброен и назован, не скрит (`hedari-po-tabove.ts`).
-    ekran: m.ekran ?? '',
-    glavi: m.glavi,
-    zatvoreni: m.zatvoreni,
-  }));
+  const vnosni: TablitsaSHedar[] = [...o.modeli.values()]
+    .filter((m) => !eVgradenKlyuch(m.klyuch))
+    .map((m) => ({
+      klyuch: m.klyuch,
+      ime: m.klyuch,
+      // Хедър без отговор на въпроса „на кой таб стоиш" пада в последната
+      // група — преброен и назован, не скрит (`hedari-po-tabove.ts`).
+      ekran: m.ekran ?? '',
+      glavi: m.glavi,
+      zatvoreni: m.zatvoreni,
+    }));
 
   return Object.freeze([...vgradeni, ...vnosni]);
 }
@@ -173,4 +186,9 @@ export function tablitsiteNaProgramata(o: Ogledalo): readonly TablitsaSHedar[] {
  */
 export function eVgradena(klyuch: string): boolean {
   return VGRADENI.some((v) => v.klyuch === klyuch);
+}
+
+/** Името на вградена по ключ · домът на имената е този регистър (правило 17). */
+export function imeNaVgradena(klyuch: string): string {
+  return VGRADENI.find((v) => v.klyuch === klyuch)?.ime ?? klyuch;
 }

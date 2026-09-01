@@ -108,6 +108,12 @@ import {
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import {
+  eVgradenKlyuch,
+  prazenModelZaVgradena,
+  VGRADENI_S_DOBAVKI,
+} from '../src/domein/dobavki.js';
+import { imeNaVgradena } from './tablitsite.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -408,7 +414,14 @@ function redNaModel(m: ModelNaTablitsa): string {
  * Вратата в `actor`, не този файл.
  */
 function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): string {
-  const izbran = modeli.find((m) => m.klyuch === izbranHedar);
+  // ВГРАДЕНИТЕ С ДОБАВКИ влизат в избора (резен 79): наслагваемият модел, ако
+  // е записан, иначе празният — той се ражда в Журнала чак с ПЪРВАТА колона.
+  // Кодовите им колони не са тук (правило 17): редактира се само добавеното.
+  const zaRedaktora: ModelNaTablitsa[] = [
+    ...VGRADENI_S_DOBAVKI.map((k) => o.modeli.get(k) ?? prazenModelZaVgradena(k)),
+    ...modeli.filter((m) => !eVgradenKlyuch(m.klyuch)),
+  ];
+  const izbran = zaRedaktora.find((m) => m.klyuch === izbranHedar);
   return `
     <section data-sektsiya="hedari">
       <div class="dyalglava">
@@ -425,7 +438,7 @@ function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): strin
           ? litseOpis(modeli)
           : litseNaRedaktora === 'semeystva'
             ? litseSemeystva(o)
-            : litseHedari(modeli, izbran)
+            : litseHedari(zaRedaktora, izbran)
       }
     </section>`;
 }
@@ -579,9 +592,6 @@ function litseHedari(
   modeli: readonly ModelNaTablitsa[],
   izbran: ModelNaTablitsa | undefined,
 ): string {
-  if (modeli.length === 0) {
-    return '<p class="prazno">Още няма хедъри.<br>Първата непозната таблица ражда модел — и той се редактира тук.</p>';
-  }
   return `
     <label class="pole">
       <span>Хедър</span>
@@ -590,7 +600,11 @@ function litseHedari(
         ${modeli
           .map(
             (m) =>
-              `<option value="${ekraniraj(m.klyuch)}"${m.klyuch === izbranHedar ? ' selected' : ''}>${ekraniraj(m.klyuch)} · ${m.glavi.length} колони</option>`,
+              `<option value="${ekraniraj(m.klyuch)}"${m.klyuch === izbranHedar ? ' selected' : ''}>${
+                eVgradenKlyuch(m.klyuch)
+                  ? `${ekraniraj(imeNaVgradena(m.klyuch))} · вградена · ${m.glavi.length} ${m.glavi.length === 1 ? 'добавка' : 'добавки'}`
+                  : `${ekraniraj(m.klyuch)} · ${m.glavi.length} колони`
+              }</option>`,
           )
           .join('')}
       </select>
@@ -611,6 +625,13 @@ function litseHedari(
  * хедърът. Свойство, питано на два екрана, се разминава.
  */
 function poleZaTaba(m: ModelNaTablitsa): string {
+  // Вградената стои на своя екран ОТ КОДА — изборът, който не действа, се
+  // КАЗВА, а не се рисува мъртъв (правило 15 · `app/tablitsite.ts`).
+  if (eVgradenKlyuch(m.klyuch)) {
+    return `<p class="drebno" data-bez-tab-vgradena>Вградената таблица стои на своя екран
+      от кода — табът ѝ не се избира оттук. Редактират се само ДОБАВЕНИТЕ колони;
+      кодовите живеят на екрана, който ги рисува.</p>`;
+  }
   if (punktoveNaLentata.length === 0) {
     return `<p class="drebno" data-bez-punktove>Няма живи пунктове в лентата, значи няма
       от какво да се избере таб. Хедърът стои в групата „${ekraniraj(IME_BEZ_TAB)}".</p>`;
@@ -639,13 +660,23 @@ function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): str
       <div class="glava redaktor">
         <span>Ред</span><span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
       </div>
-      ${m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')}
+      ${
+        m.glavi.length === 0
+          ? '<p class="prazno">Още няма добавени колони.<br>„Нова колона" ражда първата — тя застава СЛЕД кодовите колони на екрана.</p>'
+          : m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')
+      }
     </div>
     <div class="deystviya">
       <button type="button" class="glaven" id="nova-kolona"${dobavyamKolona ? ' disabled' : ''}>Нова колона</button>
       <p class="drebno">Работеща таблица само расте: „колони не се трият, а само се добавят" — празна колона без роля е единственото изключение, и то само за управителите.</p>
     </div>
-    ${obrazetsatNa(m)}
+    ${
+      /* Образецът е път към ФАЙЛ, а вградената не чете файлове — нейните
+         редове са същностите на програмата. Отказът се казва (правило 15). */
+      eVgradenKlyuch(m.klyuch)
+        ? '<p class="drebno" data-bez-obrazets>Образец по вградена не се сваля — редовете ѝ са записите на програмата, не файл.</p>'
+        : obrazetsatNa(m)
+    }
     ${dobavyamKolona ? formaNaKolona(m, modeli) : ''}`;
 }
 
@@ -1779,9 +1810,16 @@ export function zakachiNastroyki(
     }
   });
 
-  /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */
-  const hedarSega = async (): Promise<ModelNaTablitsa | undefined> =>
-    (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+  /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана.
+   *  Вградена без нито една добавка още няма запис — пада към празния модел,
+   *  и ПЪРВАТА колона е онова, което го записва (резен 79). */
+  const hedarSega = async (): Promise<ModelNaTablitsa | undefined> => {
+    const m = (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+    if (m) return m;
+    return VGRADENI_S_DOBAVKI.includes(izbranHedar)
+      ? prazenModelZaVgradena(izbranHedar)
+      : undefined;
+  };
 
   // ТАБЪТ НА ХЕДЪРА (И103) · поправка на модела, не нов вид събитие.
   koren

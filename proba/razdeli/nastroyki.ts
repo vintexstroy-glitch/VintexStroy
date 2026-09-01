@@ -4,6 +4,17 @@ import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
+/**
+ * Първият ВНОСЕН хедър в избора. Изборът вече реди и вградените с добавки
+ * (резен 79) ПРЕДИ вносните — „избери по номер 1" би хванал вградената Имоти
+ * и целият §21 щеше да редактира чужд модел.
+ */
+async function izberiVnosenHedar(p: KonteksNaProhoda['stranitsa']): Promise<void> {
+  const vnosen = await p.$eval('#izbor-hedar', (e) =>
+    [...(e as HTMLSelectElement).options].find((o) => o.value && !o.value.startsWith('vgraden:'))!.value);
+  await p.selectOption('#izbor-hedar', vnosen);
+}
+
 /** 19 · бутонът | 20 · колонното право | 21 · Редакторът на хедъри */
 export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: string; koloniPredi: number }> {
   const { stranitsa: p, broyach } = ctx;
@@ -184,7 +195,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     await naEkran(p, 'nastroyki', '#litse-hedari');
     proveri('едно място, две лица', (await p.$$('#litse-opis')).length, 1);
 
-    await p.selectOption('#izbor-hedar', { index: 1 });
+    await izberiVnosenHedar(p);
     await p.waitForSelector('.red.redaktor');
     const koloniPredi = (await redove(p, '.red.redaktor')).length;
     proveri('колоните на хедъра се редят', koloniPredi > 0, true);
@@ -248,7 +259,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '40 · формулната колона';
     await naEkran(p, 'nastroyki', '#litse-hedari');
-    await p.selectOption('#izbor-hedar', { index: 1 });
+    await izberiVnosenHedar(p);
     await p.waitForSelector('.red.redaktor');
 
     await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
@@ -741,4 +752,75 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       'Сверка вход↔изход: 5 → 5, разлика 0.');
 
     // ══ 62 · ТАБОВЕТЕ ОТ ТАБЛОТО · само Стопанинът (И101 т.1) ═══════════════
+}
+
+/** 137 · добавената колона на вградена таблица (резен 79 · ADR-137) */
+export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '137 · добавената колона на вградената';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // ── НАСТРОЙКИ · вградената стои в избора и се редактира като всеки хедър ──
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  // §40 остави редактора на лицето „Опис" — изборът на хедър живее в първото.
+  await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
+  await p.waitForSelector('#izbor-hedar');
+  const optsii = await p.$$eval('#izbor-hedar option', (o) =>
+    o.map((x) => ({ v: (x as HTMLOptionElement).value, t: x.textContent ?? '' })));
+  proveri('вградената Имоти стои в избора на хедър, с думата „вградена"',
+    optsii.some((x) => x.v === 'vgraden:imoti' && x.t.includes('вградена')), true);
+
+  await p.selectOption('#izbor-hedar', 'vgraden:imoti');
+  await p.waitForSelector('[data-bez-tab-vgradena]');
+  proveri('табът на вградената не се избира — и се КАЗВА (правило 15)',
+    (await p.$$('#izbor-tab-na-hedar')).length, 0);
+  proveri('образец по вградена не се сваля — и това се казва',
+    (await p.$$('[data-bez-obrazets]')).length, 1);
+  proveri('празната казва, че още няма добавки',
+    (await tekstNa(p, '[data-sektsiya=hedari]')).includes('Още няма добавени колони'), true);
+
+  // ── РАЖДАНЕТО · първата добавка е ЕДНО събитие МоделЗаписан ──────────────
+  await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
+  await p.fill('#kolona-ime', 'Изложение');
+  await sSabitie(p, () => p.click('#forma-kolona button[type=submit]'));
+  await p.waitForSelector('.red.redaktor');
+  proveri('добавката се реди в Редактора · само тя, без кодовите',
+    (await redove(p, '.red.redaktor')).length, 1);
+
+  // ── ИМОТИ · добавката застава СЛЕД кодовите, с филтърна глава ────────────
+  await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
+  await p.waitForSelector('[data-tablitsa=imoti] .glavicha[data-kolona="dobavka-0"]');
+  proveri('главата на добавката носи филтърната стрелка на двигателя',
+    (await p.$$('[data-tablitsa=imoti] .glavicha[data-kolona="dobavka-0"] [data-filtar-glava]')).length, 1);
+  const glavi = await p.$$eval('[data-tablitsa=imoti] .glava .glavicha', (e) =>
+    e.map((x) => x.getAttribute('data-ime') ?? ''));
+  proveri('и застава СЛЕД кодовите колони', glavi.at(-1), 'Изложение');
+  proveri('празната клетка се казва с „—", не с празно',
+    await p.$eval('.red.imot [data-redakt^="dobavka·"]', (e) => e.textContent?.trim()), '—');
+
+  // ── КЛЕТКАТА · двоен клик пише през Вратата, стойността ОСТАВА ───────────
+  const predi = await broySabitiya(p);
+  await p.dblclick('.red.imot [data-redakt^="dobavka·"]');
+  await p.waitForSelector('.red.imot .kletka-redaktor');
+  await p.fill('.red.imot .kletka-redaktor', 'южно');
+  await p.keyboard.press('Enter');
+  await p.waitForFunction((b) => {
+    const t = document.querySelector('[data-sabitiya]')?.textContent ?? '';
+    return Number(t) === b + 1;
+  }, predi).catch(() => {});
+  proveri('записът на клетката е ТОЧНО едно събитие', (await broySabitiya(p)) - predi, 1);
+  await p.waitForFunction(() =>
+    [...document.querySelectorAll('.red.imot [data-redakt]')].some((e) => e.textContent?.includes('южно')));
+  proveri('клетката показва записаното',
+    (await p.$$eval('.red.imot [data-redakt^="dobavka·"]', (e) =>
+      e.map((x) => x.textContent?.trim() ?? ''))).includes('южно'), true);
+
+  // смяната на екран не я губи — тя е в Журнала, не в паметта на екрана
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
+  await p.waitForSelector('[data-tablitsa=imoti] .glavicha[data-kolona="dobavka-0"]');
+  proveri('и стои след смяна на екрана — Журналът я носи',
+    (await p.$$eval('.red.imot [data-redakt^="dobavka·"]', (e) =>
+      e.map((x) => x.textContent?.trim() ?? ''))).includes('южно'), true);
 }

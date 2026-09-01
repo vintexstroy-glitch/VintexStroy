@@ -980,7 +980,19 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 /* ── редове с действия ───────────────────────────────────────────────── */
 .glava.imot, .red.imot {
   grid-template-columns: minmax(0, 360px) minmax(0, 280px) 96px 120px 108px 96px 168px;
+  /* ДОБАВЕНИТЕ колони (резен 79) падат в имплицитни писти: броят им го знае
+     моделът, не този файл, а inline style Вратата на прохода отказва. */
+  grid-auto-columns: minmax(96px, max-content);
   min-width: 960px;
+}
+/* С добавки клетките ЗАД седемте писти искат ИМПЛИЦИТНИ КОЛОНИ, не втори
+   грид-ред: подразбраното `row` пренасяше осмата клетка отдолу и §73 хвана
+   реда на 84px. Редът расте по съдържание и таблицата се скролва — иначе
+   новата писта краде ширина от гъвкавите колони и текстът им се пренася. */
+[data-s-dobavki] .glava.imot, [data-s-dobavki] .red.imot {
+  grid-auto-flow: column;
+  width: max-content;
+  min-width: 100%;
 }
 .glava.naem, .red.naem {
   grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;

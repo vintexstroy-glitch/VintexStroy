@@ -91,6 +91,7 @@ import type {
   PayloadRazhodZapisan,
   PayloadButonZapisan,
   PayloadModelZapisan,
+  PayloadKletkaNaDobavkaZapisana,
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
   PayloadKontragentZapisan,
@@ -600,6 +601,30 @@ export interface Ogledalo {
   readonly sreshti: ReadonlyMap<string, Sreshta>;
   /** ПОЛЕТАТА С ФОРМУЛА в Отчети · по свой `id` (резен 42). */
   readonly poletaSFormula: ReadonlyMap<string, PoleSFormula>;
+  /**
+   * КЛЕТКИТЕ НА ДОБАВЕНИТЕ КОЛОНИ във вградените таблици (резен 79).
+   *
+   * Ключът е `klyuchNaKletka` — „таблица · ред · колона". Последният запис
+   * БИЕ: поправката на стойност е ново събитие върху същата същност, а
+   * сторното на ПЪРВОТО писане гаси клетката (седмият вид с поправка на
+   * място). Празната клетка е ЛИПСАТА на запис — не се пази празен ред.
+   */
+  readonly dobavkiKletki: ReadonlyMap<string, KletkaNaDobavka>;
+}
+
+/** Една записана клетка на добавка · стойността + следата кой и кога. */
+interface KletkaNaDobavka {
+  readonly tablitsa: string;
+  readonly redId: string;
+  readonly kolona: number;
+  /** текстът · за всяка колона освен евро */
+  readonly stoynost?: string;
+  /** целите центове · само за колона в евро */
+  readonly stoynost_st?: number;
+  /** `seq` на ПЪРВОТО писане — него сочи сторното, което гаси клетката */
+  readonly seq: number;
+  readonly koy: string;
+  readonly kogato: string;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -672,6 +697,9 @@ export const VIDOVE_S_POPRAVKA_NA_MYASTO: readonly TipSabitie[] = Object.freeze(
   'КредитЗаписан',
   'ПогасителенПланВкаран',
   'ЗаплатаЗаписана',
+  // КЛЕТКАТА НА ДОБАВКА (резен 79): създаването и поправката са едно събитие
+  // върху адреса „таблица · ред · колона" — същата дупка, същият списък.
+  'КлеткаНаДобавкаЗаписана',
 ]);
 
 /** Един погасен запис · толкова, колкото трябва за зачертан ред. */
@@ -759,13 +787,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     return mrtvi;
   };
 
-  // ШЕСТТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
+  // СЕДЕМТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
   const stornirianiDela = storniranite('ДелоЗаписано');
   const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
   const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
   const stornianiKrediti = storniranite('КредитЗаписан');
   const stornianiPlanove = storniranite('ПогасителенПланВкаран');
   const stornianiZaplati = storniranite('ЗаплатаЗаписана');
+  const stornianiKletki = storniranite('КлеткаНаДобавкаЗаписана');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -833,6 +862,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prepiski = new Map<string, Prepiska>();
   const sreshti = new Map<string, Sreshta>();
   const poletaSFormula = new Map<string, PoleSFormula>();
+  const dobavkiKletki = new Map<string, KletkaNaDobavka>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -948,6 +978,27 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // Хедърите отпреди резен 14 не знаят на кой таб стоят. Празното е
           // ВЯРНАТА им стойност — „още не е сложен на таб" (И103), не липса.
           ekran: p.ekran ?? '',
+        });
+        break;
+      }
+
+      case 'КлеткаНаДобавкаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · поправка на стойност е ново събитие върху
+        // същия адрес „таблица · ред · колона". `seq` се пази от ПЪРВОТО
+        // писане, за да не мести сторното целта си (както при кредита).
+        const p = s.payload as unknown as PayloadKletkaNaDobavkaZapisana;
+        if (stornianiKletki.has(s.sashtnost.id)) break;
+        dobavkiKletki.set(s.sashtnost.id, {
+          tablitsa: p.tablitsa,
+          redId: p.redId,
+          kolona: p.kolona,
+          // `?? {}` не става: `stoynost: undefined` не е липсващо поле при
+          // `exactOptionalPropertyTypes` (както при ставката на разхода).
+          ...(p.stoynost === undefined ? {} : { stoynost: p.stoynost }),
+          ...(p.stoynost_st === undefined ? {} : { stoynost_st: p.stoynost_st }),
+          seq: dobavkiKletki.get(s.sashtnost.id)?.seq ?? s.seq,
+          koy: s.actor,
+          kogato: String(s.ts),
         });
         break;
       }
@@ -1858,6 +1909,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prepiski,
     sreshti,
     poletaSFormula,
+    dobavkiKletki,
   };
 }
 

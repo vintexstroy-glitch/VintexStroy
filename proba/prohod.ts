@@ -119,6 +119,9 @@ async function main(): Promise<void> {
     await smetki.blok12(ctx);
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
+    // §137 стои СЛЕД §63: пише в Настройки и в Имоти, а добавената колона
+    // остава на екрана — по-ранните броячи на глави не бива да я виждат.
+    await nastroyki.blok7(ctx);
     /**
      * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
      *

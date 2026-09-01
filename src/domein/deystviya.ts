@@ -98,6 +98,7 @@ import {
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
+import { klyuchNaKletka, proveriKletkaNaDobavka, VGRADEN_IMOTI } from './dobavki.js';
 import {
   GreshkaKontragent,
   klyuchNaKontragent,
@@ -110,6 +111,7 @@ import type {
   PayloadImotPopraven,
   PayloadButonZapisan,
   PayloadModelZapisan,
+  PayloadKletkaNaDobavkaZapisana,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
@@ -1030,6 +1032,39 @@ export class Deystviya {
    */
   async zapishiModel(danni: PayloadModelZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('МоделЗаписан', VID.model, `MODEL:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА КЛЕТКА В ДОБАВЕНА КОЛОНА на вградена таблица (резен 79 · ADR-137).
+   *
+   * Проверките са ПРЕДИ Вратата и всяка отказва с думи: таблицата е от
+   * поименния списък; колоната е родена от Настройки и НЕ е затворена
+   * (правило 23); видът ↔ полето (евро → центове, друго → текст — правило 3);
+   * и редът СЪЩЕСТВУВА — пилотът е Имоти, затова се пита картата на имотите
+   * поименно. Клетка върху изтрит ред щеше да е запис, който никой екран
+   * никога не показва — тих загубен запис.
+   *
+   * НЕ иска отключен период: клетката не е запис за месец. Ако добавена
+   * колона в евро някой ден влезе в месечни сборове, периодът ще се пита ТАМ.
+   */
+  async zapishiKletkaNaDobavka(
+    danni: PayloadKletkaNaDobavkaZapisana,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    proveriKletkaNaDobavka(o.modeli.get(danni.tablitsa), danni);
+    if (danni.tablitsa === VGRADEN_IMOTI && !o.imoti.has(danni.redId)) {
+      throw new GreshkaTablitsa(
+        `Ред „${danni.redId}" го няма сред имотите — клетка без ред няма къде да се покаже.`,
+      );
+    }
+    return this.#pusni(
+      'КлеткаНаДобавкаЗаписана',
+      VID.dobavkaKletka,
+      klyuchNaKletka(danni.tablitsa, danni.redId, danni.kolona),
+      danni,
+      z,
+    );
   }
 
   /**
