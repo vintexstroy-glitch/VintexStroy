@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 57 · Менютата · речникът е от Журнала | 57 · Менютата · четирите състояния | 57 · Менютата · следата СЛЕД записа | 58 · Още огледала · по обект | 58 · Още огледала · по контрагент */
@@ -99,10 +99,18 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('седмицата дава 7×5 + 7', koloniSedmitsa, 7 * 5 + 7);
     await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
 
-    // ФИЛТРИТЕ · три колони, независими една от друга.
-    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', 'Хисаря'));
+    // ФИЛТРИТЕ · колоните са на ДВИГАТЕЛЯ (резен 75в) — дубльорът-select падна.
+    proveri('главата-лента носи стрелка на всяка от четирите колони',
+      await p.$$eval('.gant-filtri [data-filtar-glava]', (e) => e.length), 4);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="gant:myasto"]'));
+    await deystvieSPrerisuvane(p, () =>
+      p.check('[data-filtar-grupa="gant:myasto"][value="Хисаря"]'));
     proveri('филтърът по Място оставя едно дело', (await p.$$eval('.gant-delo', (e) => e.length)), 1);
-    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', ''));
+    proveri('и скритото СЕ КАЗВА под лентата',
+      (await tekstNa(p, '[data-sektsiya=gant-izgled] .filtar-skrito')).includes('крие'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti="gant:myasto"]'));
+    // Менюто се затваря, за да не гълта първия клик на следващите проверки.
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="gant:myasto"]'));
 
     // СГЪВАНЕТО · само дела и поддела (И88). Мястото няма сгъвач.
     proveri('мястото НЯМА сгъвач',
@@ -142,16 +150,16 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.diagrama-lenta title', (e) => e.textContent.includes('→')), true);
 
     // Бутонът СКРИВА, не разменя — таблицата остава и в двете състояния.
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#kam-diagrama'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#kam-diagrama'));
     proveri('скрита диаграма НЕ отнема таблицата',
       await p.$$eval('.gant-lenta', (e) => e.length), 3);
     proveri('и диаграмата наистина я няма', await p.$$eval('svg.diagrama', (e) => e.length), 0);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#kam-diagrama'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#kam-diagrama'));
     proveri('и се връща с бутон', await p.$$eval('svg.diagrama', (e) => e.length), 1);
 
     // БУТОНЪТ СЕГА · подрежда, не решава.
     const predSega = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#sega'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#sega'));
     proveri('СЕГА не пипа нито едно дело', await broySabitiya(p), predSega);
     proveri('СЕГА филтрира по спешно и важно',
       await p.$eval('#f-otsenka', (e) => (e as any).value), 'спешно-важно');
@@ -310,22 +318,34 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и Имоти също · пет секции е повече от три',
       Boolean(await p.$('.padasht-menyu > [data-ekran=imoti]')), true);
     /**
-     * ГРАНИЦАТА: три реда в меню са повече работа от превъртането.
+     * ГРАНИЦАТА падна на ДВЕ (И125 · резен 85): „падащо меню за ВСЕКИ таб от
+     * менюто", а необходимо е точно когато има избор — от втората секция
+     * нагоре. Старият праг ЧЕТИРИ държеше Стойност (три секции) без ред.
      *
-     * ГАНТ Я МИНА в резен 30 и това е ПРАВИЛОТО, работещо както е обявено, а
-     * не дефект: списъкът на отпадналите дела е ЧЕТВЪРТА секция там, и оттам
-     * нататък падащият ред е по-евтин от превъртането (ADR-057). Странична
-     * последица е, но обявена — не премълчана.
-     *
-     * Проверката НЕ се маха: тя пази ПРАГА. Ако утре някой го смени, тук ще
-     * падне — и точно затова насреща стои екран, който още е ПОД него.
+     * Проверката НЕ се маха: тя пази НОВИЯ праг от двете посоки — Стойност
+     * (три секции) вече носи ред, а екран с ЕДНА секция не бива да го получи.
      */
-    proveri('Гант ВЕЧЕ носи ред · четвъртата секция мина прага (резен 30)',
+    proveri('Гант носи ред · мина прага още на четири (резен 30)',
       Boolean(await p.$('.padasht-menyu > [data-ekran=gant]')), true);
-    proveri('а Стойност още НЕ · три секции не правят меню',
-      Boolean(await p.$('.padasht-menyu > [data-ekran=stoynost]')), false);
+    proveri('и Стойност ВЕЧЕ носи · две секции стигат (И125)',
+      Boolean(await p.$('.padasht-menyu > [data-ekran=stoynost]')), true);
     proveri('Настройки пази СВОЯ ред · теми, не секции',
       Boolean(await p.$('.menyu-nastroyki #nastroyki-red')), true);
+
+    // ВСЕКИ таб с две и повече ПОМНЕНИ секции носи ред — след като целият
+    // проход е минал, паметта на всички е пълна и мярката е реална. Екран с
+    // една или нула секции остава гол пункт, и това също се брои.
+    const bezRed = await p.$$eval('.nav > [data-ekran], .padasht-menyu > [data-ekran]', (e) =>
+      e.filter((x) => x.id !== 'nastroyki-vhod' && !x.closest('.padasht-menyu'))
+        .map((x) => x.getAttribute('data-ekran') ?? ''));
+    const pametta = await p.evaluate(() =>
+      Object.fromEntries(
+        Object.keys(localStorage)
+          .filter((k) => k.includes('sektsii.'))
+          .map((k) => [k.split('sektsii.')[1], (JSON.parse(localStorage.getItem(k) ?? '[]') as unknown[]).length]),
+      ));
+    proveri('нито един таб с ≥2 секции не е БЕЗ падащ ред',
+      bezRed.filter((k) => (pametta[k] ?? 0) >= 2).join(' · ') || 'няма такъв', 'няма такъв');
 
     razdel = '71 · Падащият ред на екрана · какво изрежда';
     const vhodSmetki = '.padasht-menyu > [data-ekran=smetki]';

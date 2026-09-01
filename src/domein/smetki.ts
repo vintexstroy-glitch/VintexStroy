@@ -371,3 +371,30 @@ export function sveriDDSZaPerioda(o: Ogledalo, period: Period): RezultatSverka {
     dds_vneseno_st: vneseno as Stotinki,
   });
 }
+
+/**
+ * МЕСЕЦИТЕ В ОБХВАТА · от началния до крайния, включително (резен 70).
+ *
+ * Негова дума *(И124 т.11)*: „В Перид при Сметки липсва възможност за
+ * въвеждане на края на раз глеждания периода." Образецът от/до е този на
+ * коефициентите — ДВА механизма за период щяха да са разрез с правило 17.
+ *
+ * Пазачът на 120: крив вход (край преди началото минава през UI-пазача само
+ * при ръчно писан localStorage) не бива да върти вечно — реже се на десет
+ * години и толкова.
+ */
+export function mesetsiteVObhvata(ot: string, doMesets: string): readonly string[] {
+  const mesetsi: string[] = [];
+  let [g, m] = ot.split('-').map(Number) as [number, number];
+  for (let i = 0; i < 120; i += 1) {
+    const tekusht = `${g}-${String(m).padStart(2, '0')}`;
+    mesetsi.push(tekusht);
+    if (tekusht >= doMesets) break;
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      g += 1;
+    }
+  }
+  return mesetsi;
+}

@@ -39,7 +39,6 @@ import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
-import { zakachiZhiviyaHedar } from './zhiviyat-hedar.js';
 import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
 import {
   kopchetoNaLentata,
@@ -59,7 +58,7 @@ import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
-import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { lentataNaBalansa, narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { nachaloNaProbvaneto } from '../src/domein/probvane.js';
@@ -77,7 +76,10 @@ import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiZebrata } from './zebra.js';
 import { zakachiVisochinata } from './visochina.js';
-import { lostatNaGoleminata, zakachiGoleminata } from './golemina.js';
+import { zakachiGoleminata } from './golemina.js';
+import { narisuvayProfila, zakachiProfila } from './profil.js';
+import { zakachiTemata } from './tema.js';
+import { helpatEOtvoren, narisuvayHelpa, zakachiHelpa } from './help.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
@@ -109,6 +111,7 @@ import {
   poslednite2,
   rolyataNa,
 } from '../src/domein/stopanin.js';
+import { IMENA_NA_ROLITE } from '../src/yadro/samolichnost.js';
 
 /**
  * ПОКАЗАЛЕЦЪТ КЪМ ВЪРНАТ ЖУРНАЛ · местен, като запомнения вход (И100).
@@ -141,7 +144,7 @@ function zapishiPokazatelya(imeyl: string, naematel: string): void {
 }
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { zabraviIzbora } from './lichno.js';
-import { dostapenLiE, EKRANI, type Konteks, type KoyEkran } from './ekranite.js';
+import { dostapenLiE, EKRANI, REDAT_NA_LENTATA, type Konteks, type KoyEkran } from './ekranite.js';
 
 /**
  * Белегът на СЛУЖЕБНИЯ износ. Домът на четенето и писането е `obshto.ts` —
@@ -652,16 +655,6 @@ async function trugvay(): Promise<void> {
     });
   }
 
-  /**
-   * ДРЪЖКАТА НА ЖИВИЯ ХЕДЪР · пази се, за да се ОТВЪРЖЕ при следващото рисуване.
-   *
-   * Слушателят стои на `window`, не на корена, защото страницата се скролва
-   * цялата. Всяко прерисуване подменя корена, тъй че без отвързване след десет
-   * прерисувания на `window` висят десет слушателя — и всеки мери целия екран
-   * на всеки кадър. Точно лагът, който той нарочно е поискал да го няма.
-   */
-  let otvarzhiZhiviyaHedar: (() => void) | undefined;
-
   async function prerisuvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
@@ -708,12 +701,25 @@ async function trugvay(): Promise<void> {
             <h1>${opis.ime}</h1>
             <p>${opis.podnaslov}</p>
           </div>
+          ${
+            /* ПОСТОЯННАТА ЛЕНТА (И124 т.3 · т.11 · ADR-133): шапката НЕ скролва
+               (`.telo` е единствената скролираща кутия), затова каквото стои
+               тук е „видимо по всяко време на скрола". Периодът на Баланса е
+               първото ѝ парче; бутоните вдясно са САМОСТОЯТЕЛНИ — групите
+               със стрелкичка паднаха. */
+            ekran === 'smetki' ? lentataNaBalansa(dnes) : ''
+          }
           <div class="desno-gore">
-            ${/* РАЗМЕРЪТ НА ТЕКСТА · ПЪРВИ отляво в групата и затова видим на
-                  всеки екран, дори когато петте служебни пътя ги няма (личния).
-                  Рисува се в ЧЕРУПКАТА, не в екраните: инак единайсетият екран
-                  ще се роди без него, точно както се роди без `data-sektsiya`. */
-              lostatNaGoleminata()}
+            ${/* ХЕЛПЪТ (И124 т.5 · ADR-136) · планът на таба, вдясно. Бутонът
+                  е в черупката — на всеки екран, като профила. */
+              `<button type="button" class="vtorichen" id="help-vhod"
+                 aria-pressed="${helpatEOtvoren() ? 'true' : 'false'}">Хелп</button>`}
+            ${/* ПРОФИЛЪТ (И124 т.5 · ADR-135) · аватарът е на ВСЕКИ екран, а
+                  размерът на текста и темите живеят В НЕГО: „да се създаде
+                  профил и да се измести там с всичката информация за
+                  потребителя". Рисува се в ЧЕРУПКАТА, не в екраните: инак
+                  единайсетият екран ще се роди без него. */
+              narisuvayProfila(kojSam.imeyl, IMENA_NA_ROLITE[rolyataNa(kojSam.imeyl, ogledalo)])}
             ${
               /**
                * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
@@ -788,7 +794,9 @@ async function trugvay(): Promise<void> {
             }),
           })}
         </div>
-      </main>`;
+      </main>
+      ${/* ХЕЛПЪТ (И124 т.5 · ADR-136) · вдясно, скрит по подразбиране. */
+        narisuvayHelpa()}`;
 
     poslednaVest = null;
     opis.zakachi({
@@ -889,21 +897,16 @@ async function trugvay(): Promise<void> {
     // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
     // След рисуването, защото пренарежда вече нарисувани възли.
     zakachiPodredbata(koren, ekran);
-    // ГРУПАТА ДЕЙСТВИЯ · няколко действия на едно място стават един бутон със
-    // стрелкичка (ADR-057). СЛЕД подредбата: тя мести цели секции, а групата
-    // пипа бутоните вътре в тях — обратният ред би свивал възли, които после
-    // се местят.
+    // ГРУПИТЕ ОСТАНАХА САМО В РЕДОВЕТЕ (И124 т.3 · ADR-133): секционните и
+    // таб-бутоните са самостоятелни и видими; редовият лост пази височината
+    // на реда (т.4 от същото съобщение). Падна и живият хедър (резен 49):
+    // „хедъра който се лепи отгоре и се сменя за всяка таблица се маха,
+    // защото не работи добре и натоварва."
     zakachiGrupite(koren, ekran);
     // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с повече от три
     // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
     // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
-    // ЖИВИЯТ ХЕДЪР · коя глава стои горе при скрол (M15 · резен 49). НАКРАЯ:
-    // той МЕРИ вече нарисуваното, а всичко над него още мести секции и възли.
-    // Предишната закачка се отвързва, инак при всяко прерисуване се трупа още
-    // един слушател върху `window` и лагът, който той не иска, идва сам.
-    otvarzhiZhiviyaHedar?.();
-    otvarzhiZhiviyaHedar = zakachiZhiviyaHedar(koren);
     /**
      * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
      *
@@ -929,6 +932,12 @@ async function trugvay(): Promise<void> {
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
     // на редове, които после се местят.
     zakachiGoleminata(koren);
+    // ПРОФИЛЪТ И ТЕМИТЕ (резен 78 · ADR-135) · панелът, размерът и двете теми.
+    zakachiProfila(koren);
+    zakachiTemata(koren);
+    // ХЕЛПЪТ (резен 78б · ADR-136) · планът на таба се чете от живия екран,
+    // затова се закача СЛЕД рисуването — той оглежда каквото стои.
+    zakachiHelpa(koren, prerisuvay);
     zakachiIzgledaNaGanta(koren);
     zakachiVisochinata(koren);
     zakachiZebrata(koren);
@@ -971,7 +980,9 @@ function dostapniteEkrani(n: {
   readonly lichnoPipnato: boolean;
   /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
 }): readonly KoyEkran[] {
-  return (Object.keys(EKRANI) as KoyEkran[]).filter((koy) => {
+  // РЕДЪТ Е РЕШЕНИЕ, не подредба на файл (И125 · резен 85): списъкът с
+  // изворите на всяко място живее до регистъра, в `ekranite.ts`.
+  return REDAT_NA_LENTATA.filter((koy) => {
       // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
       // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
       // драйв, а полето за него живее на самия екран).
@@ -980,10 +991,10 @@ function dostapniteEkrani(n: {
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
       if (koy === 'lichno') return n.lichnoVklyucheno || !n.lichnoPipnato;
-      // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
-      // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
-      // НЕГОВИ — езикът на интерфейса и личният таб.
-      if (koy === 'nastroyki') return true;
+      // НАСТРОЙКИ СТОИ ВИНАГИ и това вече не е изключение тук: екранът няма
+      // `iskaRolya` (резен 83) — вижда го всеки, а СЕКЦИИТЕ му се стесняват
+      // по човек (`vizhdaSektsiyata`). Скрит пункт би отнел на служителя и
+      // темите, които са НЕГОВИ — езикът на интерфейса и личният таб.
       const iska = EKRANI[koy].iska;
       if (iska && !mozhe(izbor, iska)) return false;
     return dostapenLiE(koy, n.rolya);
@@ -1034,7 +1045,7 @@ function strana(
        * при натискане на настройки**". Пунктът остава на мястото си в лентата;
        * различава се само с това, което прави при натискане.
        */
-      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya), izbor);
+      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, izbor);
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';

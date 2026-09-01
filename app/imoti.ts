@@ -19,6 +19,12 @@ import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
 import { poImot } from '../src/ogledalo/izgledi.js';
 import {
+  broyatNaShablona,
+  delataOtShablona,
+  KORENAT_NA_STROEZHA,
+  SHABLON_NA_STROEZHA,
+} from '../src/domein/darvo-na-stroezha.js';
+import {
   grupirano,
   IMENA_NA_IZGLEDITE,
   IMENA_NA_STAPKITE,
@@ -30,6 +36,9 @@ import {
   type IzgledNaRegistara,
 } from '../src/domein/registar-naemi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { klyuchNaKletka, VGRADEN_IMOTI } from '../src/domein/dobavki.js';
+import { eAgregat, smetniAgregat, smetniFormula } from '../src/domein/formuli.js';
+import { vidNaKolona } from '../src/domein/kolonno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
@@ -126,6 +135,105 @@ export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): Kolon
 }
 
 /**
+ * ДОБАВЕНИТЕ КОЛОНИ НА ИМОТИ (резен 79 · ADR-137) · наслагваемият модел.
+ *
+ * Стопанинът ражда колони от Настройки; те застават в модела `vgraden:imoti`
+ * (`o.modeli`) и този екран ги ДОЛЕПЯ след кодовите: главите с филтрите идват
+ * от същия двигател, стойностите — от `o.dobavkiKletki`. Празната клетка е
+ * ЛИПСАТА на запис, не празен низ в Журнала.
+ *
+ * ФОРМУЛНАТА добавка се СМЯТА при показване от добавките на СЪЩИЯ ред
+ * (правило 20 — смятаното не се записва); недописан операнд дава празно, не
+ * измислена нула. Затворената и формулната клетка НЕ носят `data-redakt` —
+ * в тях не пише никой (правило 23).
+ */
+function dobavkiteNaImotite(o: Ogledalo): {
+  readonly koloni: readonly KolonaSFiltar<Imot>[];
+  readonly kletki: (i: Imot) => string;
+  /** новите имена на КОДОВИТЕ колони (резен 80) · номер → името от Стопанина */
+  readonly imenaNaKodovite: Readonly<Record<number, string>>;
+} {
+  const m = o.modeli.get(VGRADEN_IMOTI);
+  if (!m) return { koloni: [], kletki: () => '', imenaNaKodovite: {} };
+
+  /** Клетката като ТЕКСТ за човека и за формулите · центовете през `pishiVPole`. */
+  const tekstNa = (i: Imot, k: number): string => {
+    const kl = o.dobavkiKletki.get(klyuchNaKletka(VGRADEN_IMOTI, i.id, k));
+    if (!kl) return '';
+    return kl.stoynost_st !== undefined ? pishiVPole(kl.stoynost_st) : (kl.stoynost ?? '');
+  };
+
+  /** Суровата стойност · центове/стотни за смятаните, текст за писаните. */
+  const surovaNa = (i: Imot, k: number): number | string | null => {
+    const formula = m.formuli[k];
+    if (formula) {
+      try {
+        // АГРЕГАТЪТ ПО РЕДОВЕ (резен 81) наблюдава ЦЯЛАТА колона-източник —
+        // всеки ред показва същото число (правило 20: смята се, не се пише).
+        if (eAgregat(formula.deystvie)) {
+          return smetniAgregat(
+            formula.deystvie,
+            [...o.imoti.values()].map((red) => tekstNa(red, formula.ot[0] ?? 0)),
+            m.vidove[formula.ot[0] ?? 0] ?? 'tekst',
+          );
+        }
+        return smetniFormula(
+          formula,
+          formula.ot.map((op) => tekstNa(i, op)),
+          (op) => m.vidove[op] ?? 'tekst',
+        );
+      } catch {
+        // нечетим операнд · формулата на този ред не се смята — казва се с „—"
+        return null;
+      }
+    }
+    const kl = o.dobavkiKletki.get(klyuchNaKletka(VGRADEN_IMOTI, i.id, k));
+    if (!kl) return null;
+    return kl.stoynost_st ?? kl.stoynost ?? null;
+  };
+
+  const koloni = m.glavi.map((ime, k): KolonaSFiltar<Imot> => ({
+    klyuch: `dobavka-${k}`,
+    ime,
+    vid: m.vidove[k] ?? 'tekst',
+    vzemi: (i) => surovaNa(i, k) ?? '',
+  }));
+
+  const kletki = (i: Imot): string =>
+    m.glavi
+      .map((_, k) => {
+        const vid = m.vidove[k] ?? 'tekst';
+        const surovo = surovaNa(i, k);
+        // затворената се гледа, не се пипа (правило 23) · формулната е
+        // затворена по устройство — конструкторът я ражда в списъка
+        const pishe = vidNaKolona(m, k) === 'promenlyva';
+        const belezi = pishe
+          ? ` data-redakt="dobavka·${ekraniraj(klyuchNaKletka(VGRADEN_IMOTI, i.id, k))}" title="Двоен клик или F2 — стойност на добавката"`
+          : '';
+        if (vid === 'evro') {
+          const st = typeof surovo === 'number' ? surovo : null;
+          return `<span class="suma"${st === null ? '' : ` data-st="${st}"`}${belezi}>${st === null ? '—' : pishi(st)}</span>`;
+        }
+        // Смятаното (число от формула или агрегат) идва в СТОТНИ (правило 3
+        // по духа на `otStotni`) — изписва се за човек, не като суров запис.
+        const tekst =
+          surovo === null ? '' : typeof surovo === 'number' ? sStotni(surovo) : surovo;
+        return `<span class="kletka"${belezi}><span>${tekst === '' ? '—' : ekraniraj(tekst)}</span></span>`;
+      })
+      .join('');
+
+  return { koloni, kletki, imenaNaKodovite: m.imenaNaKodovite ?? {} };
+}
+
+/** Стотните като текст за човека · „350" → „3,5" · „300" → „3". */
+function sStotni(st: number): string {
+  const tsyalo = Math.trunc(st / 100);
+  const drobna = Math.abs(st % 100);
+  if (drobna === 0) return String(tsyalo);
+  return `${tsyalo},${String(drobna).padStart(2, '0').replace(/0$/, '')}`;
+}
+
+/**
  * ПАПКИТЕ НА ОБЕКТИТЕ · честен брой и находката „една и съща папка" (резен 37).
  *
  * „Различни за различни обекти, но те са гоогле драйва и има достъп от имейлите
@@ -184,9 +292,46 @@ export function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   ];
 }
 
+/**
+ * АДРЕСИТЕ КЪМ МОМЕНТА НА РИСУВАНЕ · за да познае записът НОВИЯ адрес.
+ * Пълни се при рисуване (там е Огледалото), чете се при запис (ADR-040).
+ */
+let adresiteSega = new Set<string>();
+
+/**
+ * ПРЕДЛОЖЕНИЕТО ЗА ДЪРВОТО (резен 69 · И124 т.1): „При започване на нов Имот
+ * с нов Обекти строителството е голямо дело с мног дървесни разклонения като
+ * в МСПроджект." Машината ПРЕДЛАГА, записва човекът (правило 18) — затова
+ * това е памет на екрана, не събитие: отказът не оставя следа в Журнала.
+ */
+let predlozhenoDarvo: { readonly myasto: string; readonly obekt: string } | null = null;
+
+function blokNaDarvoto(): string {
+  if (!predlozhenoDarvo) return '';
+  return `
+    <section class="karta izbrana" data-sektsiya="darvo-na-stroezha">
+      <div class="dyalglava">
+        <h2>Нов адрес · голямото дело на строежа</h2>
+        <span>предложение — записва човекът (правило 18)</span>
+      </div>
+      <p class="drebno">„${ekraniraj(predlozhenoDarvo.myasto)}" е НОВ адрес. Началото на
+      строителство е „${KORENAT_NA_STROEZHA}" с дървесни разклонения като в MS Project —
+      ${broyatNaShablona()} дела, всяко после се мени свободно от Управление:</p>
+      <ul class="drebno" translate="no">${SHABLON_NA_STROEZHA.map(
+        (k) => `<li><b>${ekraniraj(k.ime)}</b> · ${k.stapki.map((x) => ekraniraj(x)).join(' · ')}</li>`,
+      ).join('')}</ul>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="darvo-sazdai">Създай дървото · ${broyatNaShablona()} дела</button>
+        <button type="button" class="vtorichen" id="darvo-ne-sega">Не сега</button>
+        <span class="drebno">Отказът не записва нищо — предложение без следа.</span>
+      </div>
+    </section>`;
+}
+
 export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const { ogledalo } = sastoyanie;
   const imoti = [...ogledalo.imoti.values()];
+  adresiteSega = new Set(imoti.map((i) => i.adres.trim().toLowerCase()));
   const naemi = [...ogledalo.naemi.values()].sort(
     (a, b) => Number(a.prekraten) - Number(b.prekraten) || a.naemetel.localeCompare(b.naemetel),
   );
@@ -211,7 +356,16 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   for (const [id, spisak] of naemiPoImot) {
     zhiviPoImot.set(id, spisak.filter((n) => !n.prekraten));
   }
-  const koloniImoti = koloniNaImotite(zhiviPoImot);
+  // Добавените колони (резен 79) се ДОЛЕПЯТ след кодовите: главите, филтрите
+  // и търсенето минават през същия двигател, без да знаят кой е роден къде.
+  // Новото име на кодова колона (резен 80) бие кръщелното при показване.
+  const dobavki = dobavkiteNaImotite(ogledalo);
+  const koloniImoti = [
+    ...koloniNaImotite(zhiviPoImot).map((k, i) =>
+      dobavki.imenaNaKodovite[i] === undefined ? k : { ...k, ime: dobavki.imenaNaKodovite[i]! },
+    ),
+    ...dobavki.koloni,
+  ];
   const filtriraniNaemi = filtriray('naemi', naemi, koloniNaemi, dnes);
   const filtriraniImoti = filtriray('imoti', imoti, koloniImoti, dnes);
 
@@ -244,6 +398,8 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     </div>
 
     ${prekratyavan ? formaPrekratyavane(prekratyavan) : ''}
+
+    ${blokNaDarvoto()}
 
     <section data-sektsiya="imoti-nov" class="karta${popravyanImot ? ' izbrana' : ''}">
       <div class="dyalglava">
@@ -403,7 +559,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     <section data-sektsiya="imoti-spisak">
       <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
       ${imoti.length ? poleZaTarsene('imoti') : ''}
-      <div class="tablitsa" data-tablitsa="imoti">
+      <div class="tablitsa" data-tablitsa="imoti"${dobavki.koloni.length ? ' data-s-dobavki' : ''}>
         <div class="glava imot">
           ${glaviNaTablitsata('imoti', koloniImoti, imoti, dnes)}<span></span>
         </div>
@@ -412,7 +568,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
             ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? PRAZEN_FILTAR
-              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? [], ogledalo))
+              : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? [], ogledalo, dobavki.kletki(i)))
         }
       </div>
       ${redZaSkritoto(filtriraniImoti, 'imoti')}
@@ -670,7 +826,7 @@ function formaPrekratyavane(naem: Naem): string {
     </section>`;
 }
 
-function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
+function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo, dobavki: string): string {
   // Всички живи наеми, не само първият — нищо не изчезва тихо.
   const zhivi = naemi.filter((n) => !n.prekraten);
   const sbor = zhivi.reduce((s, n) => s + n.naem_st, 0);
@@ -682,7 +838,7 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
           : `и още ${zhivi.length - 1} · ${zhivi.slice(1).map((n) => ekraniraj(n.naemetel)).join(', ')}`
       }</span>`;
   return `
-    <div class="red imot" translate="no">
+    <div class="red imot" translate="no" data-papka-adres="${ekraniraj(imot.papka)}">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
       <span class="kletka" data-redakt="imot-ploshtad·${ekraniraj(imot.id)}" data-surovo="${imot.ploshtad_kvsm}" title="Двоен клик или F2 — поправка на място"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>
@@ -695,10 +851,17 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
             : '<span class="znachka tiha">свободен</span>'
       }</span>
       <span class="kletka" data-papka="${ekraniraj(imot.id)}" data-ima="${imot.papka === '' ? 'ne' : 'da'}">${
+        /* ВИДИМИЯТ ЛИНК ПАДНА (И124 т.3 · резен 77 · ADR-134): „зареждането
+           на фолдъра става с дясно копче само за обектите и имотите… да има
+           пътища за неща само от там". Клетката остава ЧЕСТЕН белег има/няма
+           и Е втората дръжка на менюто („⋯" за iOS) — тя не вдига реда,
+           както отделен бутон в лоста би го вдигнал (§73 го мери). */
         imot.papka === ''
           ? '<span class="drebno">без папка</span>'
-          : `<a href="${ekraniraj(imot.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
+          : `<button type="button" class="vrazka" data-mnogotochie
+               title="Менюто на реда · папката се отваря оттам">има папка ⋯</button>`
       }</span>
+      ${dobavki}
       <span class="butoni">
         ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { 'storno-imot': String(imot.seq) } })}
@@ -803,10 +966,18 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         rezhim = { kakvo: 'nov' };
         k.vest('dobre', 'Поправката е записана. Старото описание остава в Журнала.');
       } else {
+        // НОВ ли е адресът — гледа се СНИМКАТА отпреди записа: „При започване
+        // на нов Имот с нов Обекти строителството е голямо дело" (И124 т.1).
+        const novAdres = !adresiteSega.has(opis.adres.toLowerCase());
         await k.deystviya.dobaviImot(`I:${crypto.randomUUID()}`, opis, { opId: opIdImot });
         opIdImot = novOpId();
         formaImot.reset();
-        k.vest('dobre', 'Имотът е записан в Журнала.');
+        if (novAdres) {
+          predlozhenoDarvo = { myasto: opis.adres, obekt: opis.edinitsa };
+          k.vest('dobre', 'Имотът е записан. Нов адрес — предложението за голямото дело е долу.');
+        } else {
+          k.vest('dobre', 'Имотът е записан в Журнала.');
+        }
       }
       await prerisuvay();
     } catch (e) {
@@ -817,6 +988,40 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
   });
 
   // ── наем: нов или поправен ───────────────────────────────────────────────
+  // ── дървото на строежа: създава ЧОВЕКЪТ, отказът е без следа ─────────────
+  koren.querySelector<HTMLButtonElement>('#darvo-sazdai')?.addEventListener('click', async () => {
+    if (!predlozhenoDarvo) return;
+    const redove = delataOtShablona(
+      predlozhenoDarvo.myasto,
+      predlozhenoDarvo.obekt,
+      // „отговорник е този който извършва действието" (И124 т.7)
+      k.kojSam.imeyl,
+      dnesKato(),
+      () => `D:${crypto.randomUUID()}`,
+    );
+    let zapisani = 0;
+    try {
+      for (const red of redove) {
+        await k.deystviya.zapishiDelo(red.id, red.danni, { opId: `darvo:${red.id}` });
+        zapisani += 1;
+      }
+    } catch (e) {
+      k.vest('zle', dumiZaGreshka(e));
+      return;
+    }
+    // Сверка вход↔изход · и нулата се казва (правило 7).
+    k.vest(
+      'dobre',
+      `Дървото е записано: ${zapisani} от ${redove.length} дела · разлика ${redove.length - zapisani}.`,
+    );
+    predlozhenoDarvo = null;
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#darvo-ne-sega')?.addEventListener('click', async () => {
+    predlozhenoDarvo = null;
+    await prerisuvay();
+  });
+
   const formaNaem = koren.querySelector<HTMLFormElement>('#forma-naem');
   formaNaem?.addEventListener('submit', async (sabitie) => {
     sabitie.preventDefault();

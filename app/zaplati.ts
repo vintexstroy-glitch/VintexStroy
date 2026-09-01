@@ -30,13 +30,44 @@ import {
   sedmitsataNa,
   sedmitsataZaEkrana,
   sedmitsiteSZapisi,
-  ZATVORENI_ZAPLATI,
   type RedZaEkrana,
 } from '../src/domein/zaplati.js';
 import { saldoNa } from '../src/domein/otcheti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  grupiranaTablitsa,
+  poleZaTarsene,
+  PRAZEN_FILTAR,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
+
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ НА ФИЛТРИТЕ (резен 75 · И124 т.2) · „модерен филтър
+ * на всяка колона в таблица". Имената идват от `KOLONI_ZAPLATI` — един дом
+ * (правило 17); суровите стойности идват от реда, не от боядисания текст,
+ * за да групира еврото по прагове и числото като число.
+ */
+const KOLONI_S_FILTAR: readonly KolonaSFiltar<RedZaEkrana>[] = [
+  { klyuch: KOLONI_ZAPLATI[0]!, ime: KOLONI_ZAPLATI[0]!, vid: 'tekst', vzemi: (r) => (r.zaplata.proektId === '' ? '— без проект' : r.zaplata.proektId) },
+  { klyuch: KOLONI_ZAPLATI[1]!, ime: KOLONI_ZAPLATI[1]!, vid: 'tekst', vzemi: (r) => r.zaplata.ime },
+  { klyuch: KOLONI_ZAPLATI[2]!, ime: KOLONI_ZAPLATI[2]!, vid: 'tekst', vzemi: (r) => r.zaplata.dlazhnost },
+  { klyuch: KOLONI_ZAPLATI[3]!, ime: KOLONI_ZAPLATI[3]!, vid: 'tekst', vzemi: (r) => r.zaplata.obekt },
+  { klyuch: KOLONI_ZAPLATI[4]!, ime: KOLONI_ZAPLATI[4]!, vid: 'evro', vzemi: (r) => r.zaplata.dnevna_st },
+  { klyuch: KOLONI_ZAPLATI[5]!, ime: KOLONI_ZAPLATI[5]!, vid: 'chislo', vzemi: (r) => r.zaplata.dni },
+  {
+    klyuch: KOLONI_ZAPLATI[6]!,
+    ime: KOLONI_ZAPLATI[6]!,
+    vid: 'evro',
+    vzemi: (r) => r.sedmichna_st,
+    // сметната · пише я никой, гледа я всеки (правило 23)
+    zatvorena: true,
+  },
+];
 
 /** Коя седмица е отворена · ПОГЛЕД, нула събития (ADR-022). */
 function izbranata(o: Ogledalo, dnes: string): string {
@@ -72,6 +103,7 @@ export function blokNaZaplatite(o: Ogledalo, dnes: string): string {
   const s = sedmitsataZaEkrana(o, sedmitsa);
   const kesh = keshaNaZaplatite(o, saldoNa(o, DZHOBAT_NA_ZAPLATITE));
   const vsichki = sedmitsiteSZapisi(o);
+  const filtrirani = filtriray('zaplati', s.redove, KOLONI_S_FILTAR, dnes);
 
   return `
     <section data-sektsiya="zaplati" data-sedmitsa="${ekraniraj(sedmitsa)}">
@@ -187,21 +219,17 @@ export function blokNaZaplatite(o: Ogledalo, dnes: string): string {
           : `<p class="drebno" data-zamrazena="da"><b>${ekraniraj(s.zashto)}</b></p>`
       }
 
+      ${poleZaTarsene('zaplati')}
       <div class="tablitsa" data-tablitsa="zaplati">
         <div class="red glava zaplatared" translate="no">
-          ${KOLONI_ZAPLATI.map(
-            (k, i) =>
-              `<span class="kletka${
-                ZATVORENI_ZAPLATI.includes(i) ? ' zatvorena' : ''
-              }" data-kolona="${ekraniraj(k)}">${ekraniraj(k)}</span>`,
-          ).join('')}
+          ${glaviNaTablitsata('zaplati', KOLONI_S_FILTAR, s.redove, dnes)}
         </div>
         ${
           s.redove.length === 0
             ? '<p class="drebno">Няма нито един ред за тази седмица.</p>'
-            : s.redove
-                .map(
-                  (r) => `
+            : filtrirani.redove.length === 0
+              ? PRAZEN_FILTAR
+              : grupiranaTablitsa('zaplati', filtrirani.redove, KOLONI_S_FILTAR, dnes, (r) => `
         <div class="red zaplatared" translate="no" data-zaplata="${ekraniraj(r.zaplata.id)}"
              data-sedmichna="${r.sedmichna_st}">
           ${KOLONI_ZAPLATI.map(
@@ -210,11 +238,10 @@ export function blokNaZaplatite(o: Ogledalo, dnes: string): string {
                 k === 'Седмична заплата' ? ` data-st="${r.sedmichna_st}"` : ''
               }>${ekraniraj(kletkata(r, k))}</span>`,
           ).join('')}
-        </div>`,
-                )
-                .join('')
+        </div>`)
         }
       </div>
+      ${redZaSkritoto(filtrirani, 'zaplati')}
       <p class="drebno"><b>Седмичната заплата се СМЯТА</b> — дневна ставка × дни.
       Затова колоната ѝ е сива: тя не се редактира от никого, дори от Стопанина.
       Записана като поле, щеше да се разминава с двата си множителя в деня, в

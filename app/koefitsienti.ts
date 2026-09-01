@@ -19,6 +19,7 @@
  * учи човека, че приложението знае по-добре; казана причина го учи защо.
  */
 
+import { gotovitePeriodi } from '../src/domein/dyal-otchet.js';
 import { IMENA_NA_TAKTOVETE } from '../src/domein/vreme.js';
 import {
   IMENA_NA_VIDOVETE,
@@ -141,7 +142,7 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
   return `
     ${sastoyanieto(o, dnes)}
     ${formaNaSvoya()}
-    ${lentata(nalichni, k, nachalo, kraj)}
+    ${lentata(nalichni, k, nachalo, kraj, dnes)}
     ${diagramata(redica, k)}
     ${podDiagramata(k, zaTseliya, o, nachalo, kraj)}
     ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes)}`;
@@ -178,7 +179,7 @@ const POKAZALETS = KOEFITSIENTI[0]!;
  */
 function formaNaSvoya(): string {
   return `
-    <section class="karta" data-sektsiya="koef-svoy">
+    <section class="karta" data-sektsiya="koef-svoy" data-dyal="otchet">
       <div class="dyalglava">
         <h2>Свой коефициент</h2>
         <span>две величини и едно действие · формулата се сглобява сама</span>
@@ -248,7 +249,7 @@ function sastoyanieto(o: Ogledalo, dnes: string): string {
   const chakat = poVreme('period');
   const svoi = zhivite(o).filter((k) => kogatoSeSmyata(k) === 'sastoyanie');
   return `
-    <section class="karta" data-sektsiya="koef-sastoyanie">
+    <section class="karta" data-sektsiya="koef-sastoyanie" data-dyal="otchet">
       <div class="dyalglava">
         <h2>${ekraniraj(IMENA_NA_VREMENATA.sastoyanie)}</h2>
         <span>без период и без графика · ${poVreme('sastoyanie').length} на брой</span>
@@ -326,10 +327,11 @@ function lentata(
   k: Koefitsient,
   nachalo: string,
   kraj: string,
+  dnes: string,
 ): string {
   const lazhe = kadeLazhe(vidD, k.merka);
   return `
-    <section class="karta" data-sektsiya="koef-izbor">
+    <section class="karta" data-sektsiya="koef-izbor" data-dyal="otchet">
       <div class="dyalglava">
         <h2>Коефициентите</h2>
         <span>чиста диаграма · без нито един ред таблица</span>
@@ -382,6 +384,20 @@ function lentata(
           </select>
         </div>
       </div>
+      ${
+        /* ГОТОВИТЕ ПЕРИОДИ (резен 74) · „Да се добавят и бутони за избор на
+           готов период от време" (р75·[64]). Смятат се от днес — закован
+           период остарява с календара. */ ''
+      }
+      <p class="drebno">Готов период:
+        ${gotovitePeriodi(dnes)
+          .map(
+            (g) =>
+              `<button type="button" class="reden" data-gotov-period="${ekraniraj(g.klyuch)}"
+                data-ot="${ekraniraj(g.ot)}" data-do="${ekraniraj(g.do)}">${ekraniraj(g.ime)}</button>`,
+          )
+          .join(' ')}
+      </p>
       ${
         stapka === 'mesets'
           ? '<p class="drebno">Стъпка МЕСЕЦ · показани са и месечните коефициенти (събираемост, ДДС) — начисленото и ДДС-то са месечни понятия, не наш избор.</p>'
@@ -514,7 +530,7 @@ function podDiagramata(
   kraj: string,
 ): string {
   return `
-    <section class="karta" data-sektsiya="koef-izbraniyat">
+    <section class="karta" data-sektsiya="koef-izbraniyat" data-dyal="otchet">
       <div class="dyalglava">
         <h2>${ekraniraj(k.ime)}</h2>
         <span>${ekraniraj(IMENA_NA_VIDOVETE[k.vid])}</span>
@@ -563,7 +579,7 @@ function vsichkite(
   const poParcheta = parcheta.map((ch) => danniZaPerioda(o, ch.ot, ch.do));
   const sv = sveriOrientirite(dnes);
   return `
-    <section data-sektsiya="koef-vsichki">
+    <section data-sektsiya="koef-vsichki" data-dyal="otchet">
       <div class="dyalglava">
         <h2>Всички коефициенти за периода</h2>
         <span>формулата на един ред · и числото до нея</span>
@@ -732,6 +748,17 @@ export function zakachiKoefitsientite(
     zapomniEkranno('koef.godishna', kamGodina);
     await prerisuvay();
   });
+
+  // ГОТОВИЯТ ПЕРИОД (резен 74 · р75·[64]) · един натиск слага От и До.
+  for (const buton of koren.querySelectorAll<HTMLButtonElement>('[data-gotov-period]')) {
+    buton.addEventListener('click', async () => {
+      ot = buton.dataset['ot'] ?? '';
+      doo = buton.dataset['do'] ?? '';
+      zapomniEkranno('koef.ot', ot);
+      zapomniEkranno('koef.do', doo);
+      await prerisuvay();
+    });
+  }
 }
 
 

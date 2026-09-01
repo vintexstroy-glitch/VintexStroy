@@ -35,6 +35,7 @@ import {
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
+import { izboratNaTema } from './tema.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
@@ -73,9 +74,9 @@ import {
 } from '../src/domein/redaktor.js';
 import {
   DEYSTVIYA_NA_FORMULA,
-  IMENA_NA_DEYSTVIYATA,
+  DEYSTVIYA_PO_REDOVE,
+  imeNaDeystvie,
   sDumiFormula,
-  type DeystvieNaFormula,
   type Formula,
 } from '../src/domein/formuli.js';
 import { dokade, IMENA_NA_FUNKTSIITE, obyaveni, VRAZKI } from '../src/domein/vrazki.js';
@@ -107,6 +108,14 @@ import {
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import { vizhdaSektsiyata, type KoyGleda } from '../src/domein/temi-nastroyki.js';
+import {
+  eVgradenKlyuch,
+  prazenModelZaVgradena,
+  preimenuvayKodova,
+  VGRADENI_S_DOBAVKI,
+} from '../src/domein/dobavki.js';
+import { imeNaVgradena, kodoviteGlaviNa } from './tablitsite.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -150,6 +159,12 @@ let izbranHedar = '';
 let punktoveNaLentata: readonly PunktNaMenyuto[] = [];
 /** Отворена ли е формата за нова колона. */
 let dobavyamKolona = false;
+/**
+ * КРЪЩЕЛНИТЕ имена на кодовите колони на ИЗБРАНАТА вградена (резен 80).
+ * Пълни се при рисуване (там е Огледалото), чете се при закачане — същото
+ * разделение като при речниците (ADR-040) и пунктовете на лентата горе.
+ */
+let kodoviteNaIzbrania: readonly string[] = [];
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
@@ -157,8 +172,16 @@ export function narisuvayNastroyki(
   o: Ogledalo,
   sabitiya = 0,
   izbor: Izbor = izborPoPodrazbirane(),
-  /** влезлият · Стопанинът ли е (ADR-043 · ролята се СМЯТА от Журнала) */
-  negoviyat = true,
+  /**
+   * КОЙ ГЛЕДА · стопанин, служител или упълномощен (И121 т.1 · резен 83).
+   *
+   * Дотук тук влизаше `negoviyat: boolean` и екранът беше заключен ЦЯЛ
+   * (`iskaRolya`). Негови думи: „ТРябва за служителите да имат достъп до
+   * техните възможности за настройки без тези определени само за стопанина."
+   * Затова единицата на правото е СЕКЦИЯТА (както темата в падащия ред), а
+   * присъдата живее в домейна — `vizhdaSektsiyata`, един дом за двата четеца.
+   */
+  koy: KoyGleda = 'stopanin',
   /**
    * ПУНКТОВЕТЕ НА МЕНЮТО · за въпроса „на кой таб стои този хедър" (И103).
    *
@@ -181,25 +204,50 @@ export function narisuvayNastroyki(
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
+  // Присъдата на всяка секция е в домейна (`vizhdaSektsiyata`) — тук само се
+  // пита. Секция, скрита оттук с гол `if`, би се разминала с падащия ред.
+  const vizhda = (s: string): boolean => vizhdaSektsiyata(koy, s);
 
   return `
+    ${
+      /* Стеснението се КАЗВА (правило 15), веднъж и отгоре — не по секция:
+         скритите секции не са изключена отметка, а чуждо място (И121 т.1). */
+      koy === 'stopanin'
+        ? ''
+        : `<p class="drebno" data-samo-tvoite>Тук са ТВОИТЕ настройки. Стопанските —
+      хедърите, бутоните, номенклатурите — ги вижда и мени само Стопанинът.</p>`
+    }
     <div class="plochki">
-      <div class="plochka">
+      ${
+        vizhda('butoni')
+          ? `<div class="plochka">
         <span class="etiket">Бутони</span>
         <span class="chislo" translate="no">${butoni.length}</span>
         <span class="pod">${butoni.length ? `в ${papki(butoni).length} папки` : 'още няма нито един'}</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('modeli')
+          ? `<div class="plochka">
         <span class="etiket">Модели на таблици</span>
         <span class="chislo" translate="no">${modeli.length}</span>
         <span class="pod">${modeli.length ? 'карти на хедъри' : 'правят се при първото четене'}</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('sverki')
+          ? `<div class="plochka">
         <span class="etiket">Записани сверки</span>
         <span class="chislo" translate="no">${o.sverki.length}</span>
         <span class="pod">включително нулевите — правило 7</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('patishta')
+          ? `<div class="plochka">
         <span class="etiket">Построени действия</span>
         <span class="chislo" translate="no">${
           DEYSTVIYA.filter((d) => d.dokade === 'postroen').length
@@ -207,7 +255,9 @@ export function narisuvayNastroyki(
         <span class="pod">${
           DEYSTVIYA.filter((d) => d.dokade === 'bez-buton').length
         } са построени, но БЕЗ БУТОН · останалите са само обявени</span>
-      </div>
+      </div>`
+          : ''
+      }
     </div>
 
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
@@ -224,39 +274,43 @@ export function narisuvayNastroyki(
        * Сега изискването живее на ТЕМАТА (`temi-nastroyki.ts`), а тук отпадат
        * само двете ѝ секции. Правило 15: изключеното се КАЗВА, не се преглъща.
        */
-      mozhe(izbor, 'iztochnitsi')
-        ? blokNaButonite(butoni)
-        : `<section data-sektsiya="butoni">
+      !vizhda('butoni')
+        ? ''
+        : mozhe(izbor, 'iztochnitsi')
+          ? blokNaButonite(butoni)
+          : `<section data-sektsiya="butoni">
       <div class="dyalglava"><h2>Бутоните · пътищата</h2><span>иска Драйв</span></div>
       <p class="drebno">Бутонът е ПЪТ към файл в Драйва, а това издание е МЕСТНО —
       Журналът е само на устройството. Възможността не е изключена, а я НЯМА в този
       план: пътища без облак водят наникъде. Всичко останало в Настройки работи.</p>
     </section>`
     }
-    ${dobavyam ? formaNaButon(modeli) : ''}
+    ${dobavyam && vizhda('butoni') ? formaNaButon(modeli) : ''}
     ${
-      mozhe(izbor, 'iztochnitsi')
-        ? blokNaModelite(modeli)
-        : `<section data-sektsiya="modeli">
+      !vizhda('modeli')
+        ? ''
+        : mozhe(izbor, 'iztochnitsi')
+          ? blokNaModelite(modeli)
+          : `<section data-sektsiya="modeli">
       <div class="dyalglava"><h2>Модели на таблици</h2><span>иска Драйв</span></div>
       <p class="drebno">Моделът описва ВЪНШЕН файл — картата на неговата глава. Без
       Драйв няма откъде да дойде такъв файл, затова темата я няма в този план.
       Хедърите и колоните им се редактират нормално.</p>
     </section>`
     }
-    ${blokNaRedaktora(modeli, o)}
-    ${blokNaParametrite(o)}
-    ${blokNaEtapite(o)}
+    ${vizhda('hedari') ? blokNaRedaktora(modeli, o) : ''}
+    ${vizhda('parametri') ? blokNaParametrite(o) : ''}
+    ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
 
-    ${blokNaKredititeVNastroyki()}
-    ${blokNaKontragentite(o)}
-    ${blokNaSverkite(o)}
-    ${sektsiyaZhurnalat(o, sabitiya, dnes)}
-    ${sektsiyaGodinite(o, dnes, negoviyat)}
-    ${blokNaBranshovete(dnes)}
-    ${blokNaDeystviyata()}
+    ${vizhda('krediti') ? blokNaKredititeVNastroyki() : ''}
+    ${vizhda('kontragenti') ? blokNaKontragentite(o) : ''}
+    ${vizhda('sverki') ? blokNaSverkite(o) : ''}
+    ${vizhda('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
+    ${vizhda('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
+    ${vizhda('branshove') ? blokNaBranshovete(dnes) : ''}
+    ${vizhda('patishta') ? blokNaDeystviyata() : ''}
     ${blokNaPodredbata(o, dostapni)}
-    ${blokNaKartata()}`;
+    ${vizhda('karta') ? blokNaKartata() : ''}`;
 }
 
 // ── НАП · активирането със съгласие (резен 17 · И108 · И112) ────────────────
@@ -407,7 +461,16 @@ function redNaModel(m: ModelNaTablitsa): string {
  * Вратата в `actor`, не този файл.
  */
 function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): string {
-  const izbran = modeli.find((m) => m.klyuch === izbranHedar);
+  // ВГРАДЕНИТЕ С ДОБАВКИ влизат в избора (резен 79): наслагваемият модел, ако
+  // е записан, иначе празният — той се ражда в Журнала чак с ПЪРВАТА колона.
+  // Кодовите им колони не са тук (правило 17): редактира се само добавеното.
+  const zaRedaktora: ModelNaTablitsa[] = [
+    ...VGRADENI_S_DOBAVKI.map((k) => o.modeli.get(k) ?? prazenModelZaVgradena(k)),
+    ...modeli.filter((m) => !eVgradenKlyuch(m.klyuch)),
+  ];
+  const izbran = zaRedaktora.find((m) => m.klyuch === izbranHedar);
+  kodoviteNaIzbrania =
+    izbran && eVgradenKlyuch(izbran.klyuch) ? kodoviteGlaviNa(izbran.klyuch, o) : [];
   return `
     <section data-sektsiya="hedari">
       <div class="dyalglava">
@@ -424,7 +487,7 @@ function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): strin
           ? litseOpis(modeli)
           : litseNaRedaktora === 'semeystva'
             ? litseSemeystva(o)
-            : litseHedari(modeli, izbran)
+            : litseHedari(zaRedaktora, izbran)
       }
     </section>`;
 }
@@ -578,9 +641,6 @@ function litseHedari(
   modeli: readonly ModelNaTablitsa[],
   izbran: ModelNaTablitsa | undefined,
 ): string {
-  if (modeli.length === 0) {
-    return '<p class="prazno">Още няма хедъри.<br>Първата непозната таблица ражда модел — и той се редактира тук.</p>';
-  }
   return `
     <label class="pole">
       <span>Хедър</span>
@@ -589,7 +649,11 @@ function litseHedari(
         ${modeli
           .map(
             (m) =>
-              `<option value="${ekraniraj(m.klyuch)}"${m.klyuch === izbranHedar ? ' selected' : ''}>${ekraniraj(m.klyuch)} · ${m.glavi.length} колони</option>`,
+              `<option value="${ekraniraj(m.klyuch)}"${m.klyuch === izbranHedar ? ' selected' : ''}>${
+                eVgradenKlyuch(m.klyuch)
+                  ? `${ekraniraj(imeNaVgradena(m.klyuch))} · вградена · ${m.glavi.length} ${m.glavi.length === 1 ? 'добавка' : 'добавки'}`
+                  : `${ekraniraj(m.klyuch)} · ${m.glavi.length} колони`
+              }</option>`,
           )
           .join('')}
       </select>
@@ -610,6 +674,13 @@ function litseHedari(
  * хедърът. Свойство, питано на два екрана, се разминава.
  */
 function poleZaTaba(m: ModelNaTablitsa): string {
+  // Вградената стои на своя екран ОТ КОДА — изборът, който не действа, се
+  // КАЗВА, а не се рисува мъртъв (правило 15 · `app/tablitsite.ts`).
+  if (eVgradenKlyuch(m.klyuch)) {
+    return `<p class="drebno" data-bez-tab-vgradena>Вградената таблица стои на своя екран
+      от кода — табът ѝ не се избира оттук. Редактират се само ДОБАВЕНИТЕ колони;
+      кодовите живеят на екрана, който ги рисува.</p>`;
+  }
   if (punktoveNaLentata.length === 0) {
     return `<p class="drebno" data-bez-punktove>Няма живи пунктове в лентата, значи няма
       от какво да се избере таб. Хедърът стои в групата „${ekraniraj(IME_BEZ_TAB)}".</p>`;
@@ -632,19 +703,56 @@ function poleZaTaba(m: ModelNaTablitsa): string {
     <b>Служители</b>). Празното е състояние, не липса — брои се и се показва.</p>`;
 }
 
+/**
+ * КОДОВИТЕ КОЛОНИ НА ВГРАДЕНАТА · името се сменя, кръщелното остава в кода
+ * (резен 80 · И121 т.2: „могат да променят името на колоната дадено при
+ * създаването, което се показва от настройки"). Празно поле ВРЪЩА кръщелното.
+ */
+function blokNaKodovite(m: ModelNaTablitsa): string {
+  if (kodoviteNaIzbrania.length === 0) return '';
+  return `
+    <div class="tablitsa">
+      <div class="glava kodova"><span>Ред</span><span>Кръщелно от кода</span><span>Ново име</span><span></span></div>
+      ${kodoviteNaIzbrania
+        .map(
+          (ime, k) => `<div class="red kodova" translate="no">
+        <span>${k + 1}</span>
+        <span>${ekraniraj(ime)}</span>
+        <span><input translate="no" data-ime-kodova="${k}" value="${ekraniraj(m.imenaNaKodovite?.[k] ?? '')}" placeholder="${ekraniraj(ime)}" autocomplete="off"></span>
+        <span><button type="button" class="vtorichen malak" data-zapishi-kodova="${k}">Запиши</button></span>
+      </div>`,
+        )
+        .join('')}
+    </div>
+    <p class="drebno">Името се показва навсякъде, където колоната се рисува; кръщелното
+    остава в кода и ПРАЗНО поле го връща. Смяната е нов <b>МоделЗаписан</b> — поправка,
+    не презапис (правило 1).</p>`;
+}
+
 function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
   return `
+    ${eVgradenKlyuch(m.klyuch) ? blokNaKodovite(m) : ''}
     <div class="tablitsa">
       <div class="glava redaktor">
         <span>Ред</span><span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
       </div>
-      ${m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')}
+      ${
+        m.glavi.length === 0
+          ? '<p class="prazno">Още няма добавени колони.<br>„Нова колона" ражда първата — тя застава СЛЕД кодовите колони на екрана.</p>'
+          : m.glavi.map((ime, k) => redNaKolona(m, ime, k)).join('')
+      }
     </div>
     <div class="deystviya">
       <button type="button" class="glaven" id="nova-kolona"${dobavyamKolona ? ' disabled' : ''}>Нова колона</button>
       <p class="drebno">Работеща таблица само расте: „колони не се трият, а само се добавят" — празна колона без роля е единственото изключение, и то само за управителите.</p>
     </div>
-    ${obrazetsatNa(m)}
+    ${
+      /* Образецът е път към ФАЙЛ, а вградената не чете файлове — нейните
+         редове са същностите на програмата. Отказът се казва (правило 15). */
+      eVgradenKlyuch(m.klyuch)
+        ? '<p class="drebno" data-bez-obrazets>Образец по вградена не се сваля — редовете ѝ са записите на програмата, не файл.</p>'
+        : obrazetsatNa(m)
+    }
     ${dobavyamKolona ? formaNaKolona(m, modeli) : ''}`;
 }
 
@@ -780,14 +888,14 @@ function formaNaFormulata(m: ModelNaTablitsa, kolona: number, sega?: Formula): s
         <div class="pole">
           <label>Действие</label>
           <select translate="no" name="deystvie">
-            ${DEYSTVIYA_NA_FORMULA.map(
+            ${[...DEYSTVIYA_NA_FORMULA, ...DEYSTVIYA_PO_REDOVE].map(
               (d) =>
-                `<option value="${d}"${d === sega?.deystvie ? ' selected' : ''}>${IMENA_NA_DEYSTVIYATA[d]}</option>`,
+                `<option value="${d}"${d === sega?.deystvie ? ' selected' : ''}>${imeNaDeystvie(d)}</option>`,
             ).join('')}
           </select>
         </div>
         <div class="pole"><label>Първа колона</label>${izbor(1, sega?.ot[0], false)}</div>
-        <div class="pole"><label>Втора колона</label>${izbor(2, sega?.ot[1], false)}</div>
+        <div class="pole"><label>Втора · празна при „по редове"</label>${izbor(2, sega?.ot[1], true)}</div>
         <div class="pole"><label>Трета · само при сбор</label>${izbor(3, sega?.ot[2], true)}</div>
       </div>
       <p class="greshka" id="greshka-formula"></p>
@@ -851,14 +959,14 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
           <div class="poleta tesni">
             <div class="pole">
               <label for="nova-deystvie">Действие</label>
-              ${menyuNaDeystviyata('nova-deystvie')}
+              ${menyuNaDeystviyata('nova-deystvie', 'deystvie', true)}
             </div>
             ${[1, 2, 3]
               .map(
                 (nomer) => `<div class="pole">
-              <label for="nova-operand${nomer}">${nomer === 3 ? 'Трета · само при сбор' : `${nomer === 1 ? 'Първа' : 'Втора'} колона`}</label>
+              <label for="nova-operand${nomer}">${nomer === 3 ? 'Трета · само при сбор' : nomer === 2 ? 'Втора · празна при „по редове"' : 'Първа колона'}</label>
               <select translate="no" id="nova-operand${nomer}" name="operand${nomer}">
-                ${nomer === 3 ? '<option value="">— няма —</option>' : ''}
+                ${nomer >= 2 ? '<option value="">— няма —</option>' : ''}
                 ${m.glavi
                   .map((ime, k) =>
                     m.formuli[k] === undefined
@@ -1312,6 +1420,17 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
     </span>`;
 
   return `
+    <section data-sektsiya="tema-natovarvane">
+      <div class="dyalglava">
+        <h2>Темата на натоварването</h2>
+        <span>Начални или Основни · и от профила горе вдясно</span>
+      </div>
+      <p class="drebno">„Да се избира <b>и от там освен в настройки</b>" (И124 т.5) —
+      двете дръжки менят ЕДНО число: подразбраната височина на реда. Ръчното
+      влачене по ръба на реда важи за своята таблица и бие темата.</p>
+      ${izboratNaTema()}
+    </section>
+
     <section data-sektsiya="podredbata">
       <div class="dyalglava">
         <h2>Подредбата на екраните</h2>
@@ -1767,9 +1886,16 @@ export function zakachiNastroyki(
     }
   });
 
-  /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана. */
-  const hedarSega = async (): Promise<ModelNaTablitsa | undefined> =>
-    (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+  /** Текущият вид на избрания хедър — винаги от Огледалото, не от екрана.
+   *  Вградена без нито една добавка още няма запис — пада към празния модел,
+   *  и ПЪРВАТА колона е онова, което го записва (резен 79). */
+  const hedarSega = async (): Promise<ModelNaTablitsa | undefined> => {
+    const m = (await k.deystviya.ogledalo()).modeli.get(izbranHedar);
+    if (m) return m;
+    return VGRADENI_S_DOBAVKI.includes(izbranHedar)
+      ? prazenModelZaVgradena(izbranHedar)
+      : undefined;
+  };
 
   // ТАБЪТ НА ХЕДЪРА (И103) · поправка на модела, не нов вид събитие.
   koren
@@ -1885,7 +2011,7 @@ export function zakachiNastroyki(
       .map((x) => String(x ?? '').trim())
       .filter((x) => x !== '')
       .map(Number);
-    return { deystvie: String(danni.get('deystvie')) as DeystvieNaFormula, ot };
+    return { deystvie: String(danni.get('deystvie')) as Formula['deystvie'], ot };
   };
 
   // Полетата на формулата се показват само когато видът е „формулна" —
@@ -1986,6 +2112,35 @@ export function zakachiNastroyki(
       kazhi.textContent = dumiZaGreshka(err);
     }
   });
+
+  // НОВОТО ИМЕ НА КОДОВА КОЛОНА (резен 80) · празното връща кръщелното.
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-kodova]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['zapishiKodova']);
+      const ime = koren.querySelector<HTMLInputElement>(`[data-ime-kodova="${kolona}"]`)?.value ?? '';
+      try {
+        const star = await hedarSega();
+        if (!star) throw new Error('Хедърът вече го няма — избери наново.');
+        const nov = preimenuvayKodova(star, {
+          kolona,
+          ime,
+          rolya: await rolyata(),
+          kodovi: kodoviteNaIzbrania,
+        });
+        await zapishiHedar(
+          star,
+          nov,
+          ime.trim() === ''
+            ? `Колона ${kolona + 1} се върна към кръщелното си име „${kodoviteNaIzbrania[kolona] ?? ''}".`
+            : `Кодовата колона „${kodoviteNaIzbrania[kolona] ?? ''}" вече се казва „${ime.trim()}".`,
+        );
+        greshka = '';
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-kolona]')) {
     b.addEventListener('click', async () => {

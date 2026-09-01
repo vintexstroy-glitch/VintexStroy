@@ -10,7 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { EKRANI } from '../app/ekranite.js';
+import { EKRANI, REDAT_NA_LENTATA } from '../app/ekranite.js';
 import { imaIkona } from '../app/ikoni.js';
 
 const KLYUCHOVE = Object.keys(EKRANI) as (keyof typeof EKRANI & string)[];
@@ -49,16 +49,37 @@ describe('регистърът на екраните', () => {
     expect(EKRANI.lichno.iskaRolya).toBeUndefined();
   });
 
-  it('заключените по роля са ТОЧНО петте, изброени поименно', () => {
-    // Четирите от И98 плюс ТАБОВЕ: негова дума от И101 — табове, таблици и
+  it('заключените по роля са ТОЧНО четирите, изброени поименно', () => {
+    // Трите от И98 плюс ТАБОВЕ: негова дума от И101 — табове, таблици и
     // диаграми се създават и свързват само от Стопанина. Списъкът е поименен,
     // за да пада на глас, когато утре някой заключи пети екран мимоходом.
+    // НАСТРОЙКИ излезе оттук с резен 83 (И121 т.1): служителят влиза и вижда
+    // СВОИТЕ секции — правото слезе на секцията (`vizhdaSektsiyata`), точно
+    // както възможността слезе на темата (резен 18).
     const zaklyucheni = KLYUCHOVE.filter((k) => EKRANI[k].iskaRolya !== undefined).sort();
-    expect(zaklyucheni).toEqual(['ii', 'nastroyki', 'smetki', 'stoynost', 'tabove']);
+    expect(zaklyucheni).toEqual(['ii', 'smetki', 'stoynost', 'tabove']);
+    expect(EKRANI.nastroyki.iskaRolya).toBeUndefined();
   });
 
   it('имената са РАЗЛИЧНИ · два пункта с едно име не се различават в лентата', () => {
     const imena = KLYUCHOVE.map((k) => EKRANI[k].ime);
     expect(new Set(imena).size).toBe(imena.length);
+  });
+
+  it('НАЧАЛНИЯТ ред на лентата покрива регистъра едно към едно', () => {
+    // Списък с дупка значи екран, който го има в регистъра и го няма в
+    // лентата — тих пропуск; излишен ключ значи пункт към нищото.
+    expect([...REDAT_NA_LENTATA].sort()).toEqual([...KLYUCHOVE].sort());
+    expect(new Set(REDAT_NA_LENTATA).size).toBe(REDAT_NA_LENTATA.length);
+  });
+
+  it('редът е НЕГОВОТО разпределение · закован поименно (И125 · резен 85)', () => {
+    // Таблото първо (файлът му почва с двете табла · р48·[37]); Плащания
+    // Архив СЛЕД Продажби (р52·[288]); вторият ред — Контакти и Стойност
+    // (Цени), с Настройки НАКРАЯ (р52·[206]). Пада на глас при разместване.
+    expect(REDAT_NA_LENTATA).toEqual([
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
+      'kontakti', 'stoynost', 'sluzhiteli', 'tabove', 'ii', 'lichno', 'nastroyki',
+    ]);
   });
 });

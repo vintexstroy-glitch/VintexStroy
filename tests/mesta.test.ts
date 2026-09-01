@@ -180,7 +180,7 @@ describe('двата отговорника', () => {
 // ── 6 · СПИСЪКЪТ ──────────────────────────────────────────────────────────
 
 describe('списъкът на местата', () => {
-  it('показва и НЕЗАПИСАНИТЕ · инак крие точно работата', async () => {
+  it('показва САМО ЗАРЕДЕНИТЕ · И124 т.7 надживя показването на срещаните', async () => {
     const { dnevnik, deystviya } = stend();
     await deystviya.zapishiDelo('D-1', DELO, { opId: 'op-d1' });
     await deystviya.zapishiDelo('D-2', { ...DELO, myasto: 'Хисаря' }, { opId: 'op-d2' });
@@ -192,17 +192,34 @@ describe('списъкът на местата', () => {
     const o = await ogledaloto(dnevnik);
     const redove = mestata(o, zhivite([...o.dela.values()]));
 
-    expect(redove).toHaveLength(2);
-    const hisarya = redove.find((r) => r.ime === 'Хисаря')!;
-    expect(hisarya.zapisano).toBe(false);
-    expect(hisarya.dela).toBe(1);
-    const md = redove.find((r) => r.ime === 'Малинова Долина')!;
-    expect(md.zapisano).toBe(true);
+    // „Тук се появяват само заредените обекти" — Хисаря само се среща по
+    // делата и НЕ се реди; делото ѝ обаче си работи (myastotoNa го пази).
+    expect(redove).toHaveLength(1);
+    const md = redove[0]!;
+    expect(md.ime).toBe('Малинова Долина');
     expect(md.firma).toBe('А ЕООД');
+    expect(md.dela).toBe(1);
+  });
+
+  it('и носи КОЙ е записал · „отговорник е този който извършва действието"', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto(
+      { ime: 'Малинова Долина', firma: '', papka: '' },
+      { opId: 'op-m' },
+    );
+
+    const o = await ogledaloto(dnevnik);
+    const redove = mestata(o, zhivite([...o.dela.values()]));
+    expect(redove[0]!.koy).toBe(myastotoNa(o, 'Малинова Долина')!.koy);
+    expect(redove[0]!.koy.length > 0).toBe(true);
   });
 
   it('и БРОИ живите дела на всяко · отпадналото не се брои', async () => {
     const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto(
+      { ime: 'Малинова Долина', firma: '', papka: '' },
+      { opId: 'op-m-broy' },
+    );
     await deystviya.zapishiDelo('D-1', DELO, { opId: 'op-d1' });
     await deystviya.zapishiDelo('D-2', DELO, { opId: 'op-d2' });
     await deystviya.zapishiDelo(
@@ -234,15 +251,19 @@ describe('списъкът на местата', () => {
 // ── 7 · СВЕРКАТА ──────────────────────────────────────────────────────────
 
 describe('сверката на местата', () => {
-  it('брои РАЗЛИЧНИТЕ имена · и нулата се записва', async () => {
+  it('брои ЗАПИСАНИТЕ · срещаното по делата не влиза', async () => {
     const { dnevnik, deystviya } = stend();
     await deystviya.zapishiDelo('D-1', DELO, { opId: 'op-d1' });
     await deystviya.zapishiDelo('D-2', { ...DELO, myasto: 'Хисаря' }, { opId: 'op-d2' });
+    await deystviya.zapishiMyasto(
+      { ime: 'Малинова Долина', firma: '', papka: '' },
+      { opId: 'op-m' },
+    );
 
     const o = await ogledaloto(dnevnik);
     const s = sveriMestata(o, zhivite([...o.dela.values()]), KOGATO);
-    expect(s.vhod).toBe(2);
-    expect(s.izhod).toBe(2);
+    expect(s.vhod).toBe(1);
+    expect(s.izhod).toBe(1);
     expect(s.nared).toBe(true);
   });
 

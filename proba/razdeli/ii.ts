@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { adresNaPismoto, broySabitiya, deystvieSPrerisuvane, kodOtPismoto, naEkran, natisniVGrupata, plochka, redove, sKod, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { adresNaPismoto, broySabitiya, deystvieSPrerisuvane, kodOtPismoto, naEkran, natisni, plochka, redove, sKod, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /** 41 · ИИ-таблото */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -74,12 +74,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // то е празен низ, в който всяка проверка „не съдържа" минава сама.
     // Затова тук се чете `textContent`: то вижда и скритото.
     const promptat = () => p.$eval('#promptat', (e) => e.textContent);
-    await sKod(p, () => natisniVGrupata(p, '[data-prevklyuchi-umenie="matematika"]'));
+    await sKod(p, () => natisni(p, '[data-prevklyuchi-umenie="matematika"]'));
     await p.waitForFunction(() =>
       [...document.querySelectorAll('.red.umenie')].some((r) => r.textContent.includes('изключено')));
     proveri('изключеното умение изчезва от промпта',
       (await promptat()).includes('matematika'), false);
-    await sKod(p, () => natisniVGrupata(p, '[data-prevklyuchi-umenie="matematika"]'));
+    await sKod(p, () => natisni(p, '[data-prevklyuchi-umenie="matematika"]'));
     await p.waitForFunction(() =>
       document.getElementById('promptat')?.textContent.includes('matematika') === true);
     proveri('и се връща със същото действие',
@@ -130,7 +130,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('разминаването се брои', await plochka(p, 'Разминавания'), '1');
 
     // ПРИСЪДАТА · записва ЧОВЕКЪТ, и предложението остава в Журнала
-    await sSabitie(p, () => natisniVGrupata(p, '[data-priemi]'));
+    await sSabitie(p, () => natisni(p, '[data-priemi]'));
     await p.waitForFunction(() =>
       [...document.querySelectorAll('.red.predlozhenie')].some((r) => r.textContent.includes('прието')));
     proveri('приемането е ново събитие, не редакция',
@@ -266,7 +266,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ПОТВЪРЖДАВАНЕТО на задачата · пак код от писмо
     razdel = '45в · потвърждаването на задачата';
-    await natisniVGrupata(p, '[data-potvardi-zadacha]');
+    await natisni(p, '[data-potvardi-zadacha]');
     await p.waitForSelector('#otvori-pismoto');
     const pismoto2 = await adresNaPismoto(p);
     proveri('писмото казва КАКВО се потвърждава',
@@ -290,7 +290,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await sSabitie(p, () => p.click('#forma-nova-zadacha button[type=submit]'));
     await p.waitForFunction(() => document.querySelectorAll('.red.zadacha').length === 2);
     const redNorma = '.red.zadacha:has-text("дневната норма")';
-    await sKod(p, () => natisniVGrupata(p, `${redNorma} [data-potvardi-zadacha]`));
+    await sKod(p, () => natisni(p, `${redNorma} [data-potvardi-zadacha]`));
     await p.waitForFunction(() =>
       (([...document.querySelectorAll('.red.zadacha')]
         .find((r) => (r as any).innerText.includes('дневната норма')) as any)?.innerText ?? '').includes('потвърдена'));
@@ -315,7 +315,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ПУСКАНЕТО С КЛОД · и то иска свой код, защото харчи и излиза НАВЪН
     razdel = '45е · пускането и ключът';
-    await natisniVGrupata(p, '[data-pusni-zadacha]');
+    await natisni(p, '[data-pusni-zadacha]');
     await p.waitForSelector('#potvarzhdenieto');
     proveri('пускането с Клод също иска код',
       Boolean(await p.$('#potvarzhdenieto')), true);
@@ -331,7 +331,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '#klod-sastoyanie')).includes('няма ключ'), true);
     const predKlyuchKlod = await broySabitiya(p);
     await p.fill('#klod-klyuch', 'sk-ant-proba-1234');
-    await natisniVGrupata(p, '#zapishi-klyuch-klod');
+    await natisni(p, '#zapishi-klyuch-klod');
     await p.waitForFunction(() =>
       (document.querySelector('#klod-sastoyanie')?.textContent ?? '').includes('стои'));
     proveri('ключът се вижда само с опашката си',
@@ -344,7 +344,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
         Object.keys(localStorage)
           .filter((k) => k !== 'masterbook:klod-klyuch')
           .some((k) => (localStorage.getItem(k) ?? '').includes('sk-ant-proba'))), false);
-    await natisniVGrupata(p, '#zabravi-klyuch-klod');
+    await natisni(p, '#zabravi-klyuch-klod');
     await p.waitForFunction(() =>
       (document.querySelector('#klod-sastoyanie')?.textContent ?? '').includes('няма ключ'));
     proveri('и „забрави го" го маха', await p.evaluate(() =>

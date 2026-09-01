@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /** 2 · имоти | 3 · дробни стотинки */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -61,7 +61,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'imoti', '#forma-imot');
 
     // поправка на имот — наемът му НЕ се къса
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Дианабад") [data-popravi-imot]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.imot:has-text("Дианабад") [data-popravi-imot]'));
     proveri('формата се напълни със стария адрес', await p.inputValue('#imot-adres'), 'Дианабад');
     await p.fill('#imot-adres', 'Дианабад 4');
     await p.fill('#imot-prichina', 'сбъркан номер');
@@ -72,7 +72,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('наемът не се откачи', sledPopravka?.[1]?.startsWith('Стройпласт'), true);
 
     // поправка на наем — новата сума важи за напред
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Стройпласт") [data-popravi-naem]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.naem:has-text("Стройпласт") [data-popravi-naem]'));
     proveri('формата се напълни със старата сума', await p.inputValue('#naem-suma'), '1200,00');
     await p.fill('#naem-suma', '1300,00');
     await p.fill('#naem-prichina', 'вдигнат наем');
@@ -85,7 +85,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     );
 
     // прекратяване
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Домакинство") [data-prekrati]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.naem:has-text("Домакинство") [data-prekrati]'));
     await p.fill('#prekrati-kraj', '2026-02-28');
     await p.fill('#prekrati-prichina', 'изнесоха се');
     await sSabitie(p, () => p.click('#forma-prekrati button[type=submit]'));
@@ -98,11 +98,11 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('месечният наем спадна', await plochka(p, 'Месечен наем'), '1 600,00 €');
 
     // вратарят отказва, докато нещо живо виси
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Малинова") [data-storno-imot]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.imot:has-text("Малинова") [data-storno-imot]'));
     proveri('сторно на имот с наеми се отказва', (await tekstNa(p, '.vest')).includes('висят'), true);
     proveri('нищо не влезе', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.naem:has-text("Стройпласт") [data-storno-naem]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.naem:has-text("Стройпласт") [data-storno-naem]'));
     proveri(
       'сторно на наем с вземания се отказва',
       (await tekstNa(p, '.vest')).includes('начислено вземане'),
@@ -113,7 +113,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // сторно на начисление БЕЗ плащания — минава
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00 €');
-    await sSabitie(p, () => natisniVGrupata(p, '.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
+    await sSabitie(p, () => natisni(p, '.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
     proveri('шестнайсет събития', await broySabitiya(p), 16 + OTKRIVASHTOTO);
     proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00 €');
 

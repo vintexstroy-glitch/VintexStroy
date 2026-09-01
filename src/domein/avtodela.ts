@@ -163,7 +163,7 @@ export function cherveniyatSpisak(avto: readonly AvtoDelo[]): readonly AvtoDelo[
 export function kreditiBezPlan(o: Ogledalo, dnes: string): readonly string[] {
   const bez: string[] = [];
   for (const k of o.krediti.values()) {
-    if (planaNa(k, o.plashtaniyaPoKrediti, dnes).length === 0) bez.push(k.ime);
+    if (planaNa(o, k, dnes).length === 0) bez.push(k.ime);
   }
   return Object.freeze(bez.sort((a, b) => a.localeCompare(b, 'bg')));
 }
@@ -191,7 +191,7 @@ export function sveriAvtoDelata(o: Ogledalo, dnes: string, kogato: string): Sver
     // Кредит с план, чиято първа вноска пада зад хоризонта, е също „далечен“ —
     // но само ако планът МУ Е тръгнал; инак вече е преброен в `bezPlan`.
     [...o.krediti.values()].filter((k) => {
-      const plan = planaNa(k, o.plashtaniyaPoKrediti, dnes);
+      const plan = planaNa(o, k, dnes);
       return plan.length > 0 && dniDoSroka(plan[0]!.data, dnes) > NAPRED_DNI;
     }).length;
 

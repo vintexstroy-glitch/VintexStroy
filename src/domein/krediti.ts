@@ -36,6 +36,7 @@
  */
 
 import { deliZakragleno } from '../yadro/pari.js';
+import type { VnoskaOtDogovora } from './sabitiya.js';
 import {
   dvataProtsenta,
   interpoliraiPlana,
@@ -81,6 +82,8 @@ export interface PlashtanePoKredit {
 export interface OgledaloNaKrediti {
   readonly krediti: ReadonlyMap<string, Kredit>;
   readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
+  /** плановете от договорите · планът на банката БИЕ интерполацията (И124 т.12) */
+  readonly pogasitelniPlanove: ReadonlyMap<string, readonly VnoskaOtDogovora[]>;
 }
 
 // ── КОЛОНИТЕ ───────────────────────────────────────────────────────────────
@@ -127,13 +130,58 @@ export function pogasen(k: Kredit, plashtaniya: readonly PlashtanePoKredit[]): b
   return ostatakNa(k, plashtaniya) === 0;
 }
 
-/** ПЛАНЪТ на един кредит от днес нататък · интерполацията по дати. */
+/**
+ * ОТКЪДЕ ИДВА ПЛАНЪТ · казва се, не се гадае (правило 15).
+ *
+ * „наличните кредити, които работят с вкаран погасителен план" (И124 т.12):
+ * планът на банката БИЕ интерполацията; тя остава резервният път без план.
+ */
+export function izvorNaPlana(o: OgledaloNaKrediti, k: Kredit): 'договор' | 'интерполация' {
+  return (o.pogasitelniPlanove.get(k.id)?.length ?? 0) > 0 ? 'договор' : 'интерполация';
+}
+
+/**
+ * ПЛАНЪТ на един кредит от днес нататък (резен 73 · И124 т.12).
+ *
+ * С ВКАРАН ПЛАН: оставащите вноски по ДОГОВОРА — редовете след `dnes`, а
+ * „остатъкът след нея" се СМЯТА от остатъка днес минус главниците по реда
+ * (договорът не носи остатък — записан, щеше да се разминава при сторно).
+ * БЕЗ план: интерполацията, както досега.
+ */
 export function planaNa(
+  o: OgledaloNaKrediti,
   k: Kredit,
-  plashtaniya: readonly PlashtanePoKredit[],
   dnes: string,
 ): readonly VnoskaOtPlana[] {
-  return interpoliraiPlana(ostatakNa(k, plashtaniya), k.lihva_bp, k.vnoska_st, k.den, dnes);
+  const vkaran = o.pogasitelniPlanove.get(k.id) ?? [];
+  if (vkaran.length === 0) {
+    return interpoliraiPlana(
+      ostatakNa(k, o.plashtaniyaPoKrediti),
+      k.lihva_bp,
+      k.vnoska_st,
+      k.den,
+      dnes,
+    );
+  }
+  const redove: VnoskaOtPlana[] = [];
+  let ostava = ostatakNa(k, o.plashtaniyaPoKrediti);
+  for (const v of vkaran) {
+    if (v.data <= dnes || ostava <= 0) continue;
+    // Главницата се реже до остатъка — както при последната интерполирана
+    // вноска: сборът на главниците е ТОЧНО остатъкът, не повече.
+    const glavnitsa_st = Math.min(v.glavnitsa_st, ostava);
+    ostava -= glavnitsa_st;
+    redove.push(
+      Object.freeze({
+        data: v.data,
+        vnoska_st: v.lihva_st + glavnitsa_st,
+        lihva_st: v.lihva_st,
+        glavnitsa_st,
+        ostatak_st: ostava,
+      }),
+    );
+  }
+  return Object.freeze(redove);
 }
 
 /**
@@ -142,12 +190,8 @@ export function planaNa(
  * Дължината на плана, не поле. Нула при погасен кредит; нула и когато вноската
  * не стига за лихвата — тогава планът е празен и екранът казва защо.
  */
-export function mesetsiOshte(
-  k: Kredit,
-  plashtaniya: readonly PlashtanePoKredit[],
-  dnes: string,
-): number {
-  return planaNa(k, plashtaniya, dnes).length;
+export function mesetsiOshte(o: OgledaloNaKrediti, k: Kredit, dnes: string): number {
+  return planaNa(o, k, dnes).length;
 }
 
 /** Двата процента за един кредит · към остатъка ДНЕС. */
@@ -194,7 +238,7 @@ export function redProektsiya(
   let glavnitsa_st = 0;
   let broy = 0;
   for (const k of o.krediti.values()) {
-    const plan = planaNa(k, o.plashtaniyaPoKrediti, dnes);
+    const plan = planaNa(o, k, dnes);
     const vTozi = plan.filter((v) => v.data.slice(0, 7) === mesets);
     if (vTozi.length === 0) continue;
     broy += 1;
@@ -253,7 +297,7 @@ export function predstoyashtiteVnoski(
 ): readonly PredstoyashtaVnoska[] {
   const redove: PredstoyashtaVnoska[] = [];
   for (const k of o.krediti.values()) {
-    const parva = planaNa(k, o.plashtaniyaPoKrediti, dnes)[0];
+    const parva = planaNa(o, k, dnes)[0];
     if (!parva) continue;
     const dni = Math.round(
       (Date.parse(`${parva.data}T00:00:00Z`) - Date.parse(`${dnes}T00:00:00Z`)) / 86_400_000,
@@ -298,7 +342,7 @@ export function redoveNaKreditite(
           kredit: k,
           ostatak_st,
           pogasen: ostatak_st === 0,
-          mesetsiOshte: mesetsiOshte(k, o.plashtaniyaPoKrediti, dnes),
+          mesetsiOshte: mesetsiOshte(o, k, dnes),
           protsenti: protsentiteNa(k, o.plashtaniyaPoKrediti),
           izplateno_bp:
             k.ostatak_st === 0 ? 0 : deliZakragleno((k.ostatak_st - ostatak_st) * 10_000, k.ostatak_st),

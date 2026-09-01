@@ -29,7 +29,15 @@ import { narisuvayAvtoDelata } from './avtodela.js';
 import { otData } from '../src/yadro/data.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
-import type { KolonaSFiltar } from './filtri.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  glaviTh,
+  izchistiFiltrite,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import { pishi } from '../src/yadro/pari.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import {
@@ -56,6 +64,8 @@ import {
   type Delo,
   type Otsenka,
   otpadnalite,
+  vDnevniyaRed,
+  zavarshenite,
   zhivite,
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
@@ -111,8 +121,12 @@ interface PogledNaGanta {
   diagrama: boolean;
   /** негово, 31.08: „Да може да се крие" · таблицата, като диаграмата */
   tablitsa: boolean;
-  filtarMyasto: string;
-  filtarObekt: string;
+  /**
+   * ЕДИНСТВЕНИЯТ останал свой филтър: Оценката НЕ Е колона на таблицата,
+   * затова падащото ѝ меню не дублира колонен филтър и остава (резен 75в).
+   * Мястото и Обектът са колони — техните дубльори паднаха: филтрира ги
+   * двигателят (`filtriray`) през главата-лента.
+   */
   filtarOtsenka: string;
 }
 
@@ -181,8 +195,6 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     tablitsa: chetiEkranno(`${klyuch}.tablitsa`, true),
-    filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
-    filtarObekt: chetiEkranno(`${klyuch}.obekt`, ''),
     filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
   };
   POGLEDI.set(klyuch, nov);
@@ -199,8 +211,6 @@ function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.tablitsa`, p.tablitsa);
-  zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
-  zapomniEkranno(`${p.klyuch}.obekt`, p.filtarObekt);
   zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
 }
 
@@ -277,7 +287,7 @@ export function narisuvayGant(
   predstavka = 'd-',
 ): string {
   const p = pogled(klyuch);
-  const { sgunati, diagrama, tablitsa, filtarMyasto, filtarObekt, filtarOtsenka } = p;
+  const { sgunati, diagrama, tablitsa, filtarOtsenka } = p;
   // СВОЯТ ТАКТ без период е такт без решетка. Вместо празен екран се пада на
   // месец и полетата стоят отворени — правило 15: изключеното се КАЗВА.
   const svoyGotov = p.svoy.ot !== '' && p.svoy.do !== '' && p.svoy.do >= p.svoy.ot;
@@ -291,12 +301,16 @@ export function narisuvayGant(
   // Прилага се ВЪТРЕ в едно ниво: дървото е по-силно, защото дете, изкарано
   // пред родителя си, престава да е дете.
   const rachen = o.rachniyatRedNaDelata;
-  const podredeni = podredeniPoDarvo(vsichki, dnes, rachen);
-  const filtrirani = podredeni.filter(
-    (d) =>
-      (!filtarMyasto || d.myasto === filtarMyasto) &&
-      (!filtarObekt || d.obekt === filtarObekt) &&
-      (!filtarOtsenka || d.otsenka === filtarOtsenka),
+  // ДНЕВНИЯТ РЕД (И124 т.6): завършеното „не е в дневния ред" — то е в
+  // архивната таблица долу, заредена по периода на изгледа.
+  const podredeni = podredeniPoDarvo(vDnevniyaRed(vsichki), dnes, rachen);
+  // Двигателят реже по колоните (Място · Дело · Обект · Отговорник) и по
+  // търсенето; Оценката остава свой филтър, защото не е колона. Дървовидната
+  // наредба се пази: филтърът маха редове, не разбърква останалите.
+  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място');
+  const fDvigatel = filtriray(klyuch, podredeni, koloniDela, dnes);
+  const filtrirani = fDvigatel.redove.filter(
+    (d) => !filtarOtsenka || d.otsenka === filtarOtsenka,
   );
   // СГЪВАЧИТЕ се броят ПРЕДИ сгъването и веднъж за целия екран. Сметнати от
   // видимото, свитото дело оставаше без бутон — сгъването беше еднопосочно.
@@ -316,9 +330,6 @@ export function narisuvayGant(
     r.koloni,
     sumiZaObhvat(o, parvata.ot, poslednata.do, p.razrez),
   );
-
-  const mesta = [...new Set(vsichki.map((d) => d.myasto))].sort();
-  const obekti = [...new Set(vsichki.map((d) => d.obekt).filter(Boolean))].sort();
 
   return `
     <div class="plochki">
@@ -401,15 +412,18 @@ export function narisuvayGant(
               )}</span>`
         }
       </div>
+      ${poleZaTarsene(klyuch)}
+      <div class="red glava gant-filtri" translate="no">
+        ${
+          /*
+           * БЕЗ ПОДРЕДБА: дървото има СВОЙ закон за реда — детето след
+           * родителя, ръчният ред побеждава — и колонна подредба би го
+           * разкъсала. Дръжка, която нищо не мени, е надпис (ADR-041).
+           */
+          glaviNaTablitsata(klyuch, koloniDela, podredeni, dnes, true)
+        }
+      </div>
       <div class="poleta tesni">
-        <div class="pole">
-          <label for="f-myasto">Място</label>
-          <select translate="no" id="f-myasto">${opcii(mesta, filtarMyasto, 'всички')}</select>
-        </div>
-        <div class="pole">
-          <label for="f-obekt">Обект</label>
-          <select translate="no" id="f-obekt">${opcii(obekti, filtarObekt, 'всички')}</select>
-        </div>
         <div class="pole">
           <label for="f-otsenka">Оценка</label>
           <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
@@ -422,9 +436,11 @@ export function narisuvayGant(
           ).join('')}</select>
         </div>
       </div>
-      <p class="drebno">Три колони с филтри, не три нива — филтрира се по която и да е, независимо от другите.
-      „Разбий по" е ЧЕТВЪРТО нещо и не е филтър: то не маха редове, а реже СБОРА на части —
+      <p class="drebno">Колоните се филтрират от главата-лента — всяка поотделно,
+      с отметки и търсене. „Оценка" остава свое падащо меню, защото НЕ Е колона.
+      „Разбий по" не е филтър: то не маха редове, а реже СБОРА на части —
       ${ekraniraj(String(sumi.length))} ${sumi.length === 1 ? 'ред' : 'реда'} под решетката, чийто сбор е същият.</p>
+      ${redZaSkritoto(fDvigatel, klyuch)}
     </section>
 
     ${
@@ -463,6 +479,8 @@ export function narisuvayGant(
 
     ${blokNaMestata(o, dnes, predstavka)}
 
+    ${blokNaZavarshenite(o, predstavka, parvata.ot, poslednata.do)}
+
     ${blokNaOtpadnalite(o, predstavka)}
 
     ${formaDelo(o, dnes, predstavka, nadpisi)}`;
@@ -485,45 +503,55 @@ export function narisuvayGant(
  * „още не е записано". Списък само от записаните щеше да КРИЕ точно работата —
  * човек вижда къде има какво да допълни, вместо да се сеща сам.
  */
+/** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
+const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; dela: number; koy: string }>[] = [
+  { klyuch: 'ime', ime: 'Място', vid: 'tekst', vzemi: (r) => r.ime },
+  { klyuch: 'firma', ime: 'Фирма · управлява проекта', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
+  { klyuch: 'koy', ime: 'Записал', vid: 'tekst', vzemi: (r) => r.koy },
+  { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
+];
+
 function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
+  // САМО ЗАРЕДЕНИТЕ (И124 т.7 · ADR-134): „Тук се появяват само заредените
+  // обекти и отговорник е този който извършва действието." Само-срещаните по
+  // делата вече не се редят тук; „Записал" е извършващият (правило 14).
   const redove = mestata(o, zhivite([...o.dela.values()]));
-  const bezZapis = redove.filter((r) => !r.zapisano).length;
   const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
+  const filtriraniMesta = filtriray('mestata', redove, KOLONI_MESTATA, dnes);
 
   return `
-    <section data-sektsiya="gant-mesta" data-broy="${redove.length}" data-bez-zapis="${bezZapis}">
+    <section data-sektsiya="gant-mesta" data-broy="${redove.length}">
       <div class="dyalglava">
         <h2>Местата · проектите</h2>
-        <span>отговорникът на МЯСТОТО е ФИРМА · на ДЕЛОТО е ЧОВЕК</span>
+        <span>само заредените · отговорникът на ДЕЙСТВИЕТО е записалият</span>
       </div>
 
       ${
         redove.length === 0
-          ? '<p class="drebno">Още няма нито едно място — то се появява с първото дело или се записва оттук.</p>'
-          : `<div class="skrolkutiya">
+          ? '<p class="drebno">Още няма нито едно записано място — записва се от формата тук. Място, което само се среща по делата, не се реди само (И124 т.7).</p>'
+          : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="mestata">
           <thead>
-            <tr><th>Място</th><th>Фирма · управлява проекта</th><th>Папка</th><th class="chislo">Дела</th></tr>
+            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}<th></th></tr>
           </thead>
-          <tbody>${redove
+          <tbody>${filtriraniMesta.redove
             .map(
               (r) => `
-            <tr data-myasto="${ekraniraj(r.ime)}"${r.zapisano ? '' : ' class="bez-zapis"'}>
-              <td translate="no">${ekraniraj(r.ime)}${
-                r.zapisano ? '' : ' <span class="drebno">още не е записано</span>'
-              }</td>
+            <tr data-myasto="${ekraniraj(r.ime)}" data-papka-adres="${ekraniraj(r.papka)}">
+              <td translate="no">${ekraniraj(r.ime)}</td>
               <td translate="no">${ekraniraj(r.firma) || '<span class="drebno">—</span>'}</td>
-              <td translate="no">${
-                r.papka === ''
-                  ? '<span class="drebno">—</span>'
-                  : `<a href="${ekraniraj(r.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
-              }</td>
+              <td translate="no">${ekraniraj(r.koy)}</td>
               <td class="chislo" translate="no">${r.dela}</td>
+              <td><button type="button" class="vtorichen malak" data-mnogotochie
+                aria-label="Менюто на реда" title="Менюто на реда">⋯</button></td>
             </tr>`,
             )
             .join('')}</tbody>
         </table>
-      </div>`
+      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}
+      <p class="drebno">Папката на мястото се отваря с ДЕСЕН БУТОН върху реда
+      (или „⋯") — „да има пътища за неща само от там" (И124 т.3). Видим линк в
+      колона вече няма.</p>`
       }
 
       <form class="forma" id="${predstavka}forma-myasto">
@@ -559,11 +587,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
       </form>
 
       <p class="drebno" data-mesta-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
-      разлика ${sv.razlika}.${
-        bezZapis === 0
-          ? ' Всяко място си има запис.'
-          : ` ${bezZapis} ${bezZapis === 1 ? 'място чака' : 'места чакат'} фирма и папка.`
-      }</p>
+      разлика ${sv.razlika}. Показват се само заредените.</p>
     </section>`;
 }
 
@@ -585,6 +609,78 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
  * Блокът стои и при НУЛА · проверената нула е различна от премълчаната
  * (правило 7), а и оттук човек научава, че такова състояние изобщо има.
  */
+/** Един ред от архива · завършено и отпаднало споделят клетките си. */
+function redVArhiva(d: Delo, atributi: string, dopalnitelni: readonly string[]): string {
+  const kletki = [d.myasto, d.obekt, d.ime, d.otgovornik]
+    .map((k) => ekraniraj(k))
+    .concat(dopalnitelni, ekraniraj(d.promeneno.slice(0, 10)), ekraniraj(d.promeniGo))
+    .map((k) => `<td translate="no">${k}</td>`)
+    .join('\n              ');
+  return `
+            <tr ${atributi}>
+              ${kletki}
+            </tr>`;
+}
+
+/** Обвивката на архивната таблица · една за завършени и отпаднали. */
+function arhivnaTablitsa(klyuch: string, glavi: readonly string[], redove: readonly string[]): string {
+  return `<div class="skrolkutiya">
+        <table class="tablitsa" data-tablitsa="${klyuch}">
+          <thead>
+            <tr>${glavi.map((g) => `<th>${g}</th>`).join('')}</tr>
+          </thead>
+          <tbody>${redove.join('')}</tbody>
+        </table>
+      </div>`;
+}
+
+/**
+ * ЗАВЪРШЕНИТЕ ДЕЛА · архивната таблица (И124 т.6).
+ *
+ * „Завършено се определя от Състояние… не е в дневния ред и влиза в друга
+ * таблица която се ползва за архивиране и използване само когато от
+ * управление или сметки се зареди период който я включва."
+ *
+ * Периодът Е зареденият изглед на решетката (тактът · своят от-до) — и в
+ * Управление, и в Сметки секцията живее до нея, тъй че думата му важи и на
+ * двете места. Показва се завършеното СЪС СРОК В ПЕРИОДА; колко има общо се
+ * КАЗВА, за да не изглежда празният период като празен архив (правило 7).
+ */
+function blokNaZavarshenite(o: Ogledalo, predstavka: string, ot: string, doD: string): string {
+  const vsichkite = zavarshenite([...o.dela.values()]);
+  const vPerioda = vsichkite.filter((d) => d.do >= ot && d.do <= doD);
+  const skriti = chetiEkranno<boolean>(`${predstavka}.zavarshenite`, false);
+
+  return `
+    <section data-sektsiya="gant-zavarsheni" data-broy="${vPerioda.length}" data-obshto="${vsichkite.length}">
+      <div class="dyalglava">
+        <h2>Завършени дела</h2>
+        <span>архивът на свършеното · зарежда се по периода на изгледа</span>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="${predstavka}zavarsheni-prevkl">
+          ${skriti ? 'Покажи завършените' : 'Скрий завършените'}
+        </button>
+        <span class="drebno">${
+          vsichkite.length === 0
+            ? 'Нито едно завършено дело.'
+            : `${vPerioda.length} в периода ${ot} → ${doD} · всичко ${vsichkite.length} · без оценка, извън дневния ред`
+        }</span>
+      </div>
+      ${
+        skriti || vPerioda.length === 0
+          ? ''
+          : arhivnaTablitsa(
+              'zavarsheni-dela',
+              ['Място', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
+              vPerioda.map((d) =>
+                redVArhiva(d, `data-zavarsheno="${ekraniraj(d.id)}"`, [ekraniraj(d.do)]),
+              ),
+            )
+      }
+    </section>`;
+}
+
 function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
   const redove = otpadnalite([...o.dela.values()]);
   const skriti = chetiEkranno<boolean>(`${predstavka}.otpadnalite`, false);
@@ -608,44 +704,19 @@ function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
       ${
         skriti || redove.length === 0
           ? ''
-          : `<div class="skrolkutiya">
-        <table class="tablitsa" data-tablitsa="otpadnali-dela">
-          <thead>
-            <tr><th>Място</th><th>Обект</th><th>Дело</th><th>Отговорник</th><th>Отпаднало на</th><th>От кого</th></tr>
-          </thead>
-          <tbody>${redove
-            .map(
-              (d) => `
-            <tr data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo">
-              <td translate="no">${ekraniraj(d.myasto)}</td>
-              <td translate="no">${ekraniraj(d.obekt)}</td>
-              <td translate="no">${ekraniraj(d.ime)}</td>
-              <td translate="no">${ekraniraj(d.otgovornik)}</td>
-              <td translate="no">${ekraniraj(d.promeneno.slice(0, 10))}</td>
-              <td translate="no">${ekraniraj(d.promeniGo)}</td>
-            </tr>`,
+          : arhivnaTablitsa(
+              'otpadnali-dela',
+              ['Място', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
+              redove.map((d) =>
+                redVArhiva(d, `data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo"`, []),
+              ),
             )
-            .join('')}</tbody>
-        </table>
-      </div>`
       }
     </section>`;
 }
 
 function broyPo(dela: readonly Delo[], dnes: string, kakvo: string): number {
   return dela.filter((d) => svetofar(d, dnes) === kakvo).length;
-}
-
-function opcii(spisak: readonly string[], izbrano: string, prazno: string): string {
-  return (
-    `<option value=""${izbrano ? '' : ' selected'}>— ${prazno} —</option>` +
-    spisak
-      .map(
-        (x) =>
-          `<option value="${ekraniraj(x)}"${x === izbrano ? ' selected' : ''}>${ekraniraj(x)}</option>`,
-      )
-      .join('')
-  );
 }
 
 function opciiOtsenki(izbrano: string): string {
@@ -734,7 +805,7 @@ export function tablitsataSOcveteniPoleta(
         <h2>${ekraniraj(nadpisi.zaglavie)}</h2>
         <span>${dela.length} дела · първата колона е ДНЕС</span>
       </div>
-      <div class="gant" data-koloni="${r.koloni.length}">
+      <div class="gant" data-tablitsa="gant-redove" data-koloni="${r.koloni.length}">
         <div class="gant-imena">
           <div class="gant-glava">${ekraniraj(nadpisi.glavaNaImenata)}</div>
           ${[...poMyasto.entries()]
@@ -955,6 +1026,11 @@ export function formaDelo(
             <input translate="no" id="${id('do')}" name="do" type="date" value="${dnes}" required>
           </div>
           <div class="pole">
+            <label for="${id('chas')}">Час (по избор)</label>
+            <input translate="no" id="${id('chas')}" name="chas" type="time">
+            <span class="drebno">Право, не задължение — „когато е необходимо". Празен час значи „само дата".</span>
+          </div>
+          <div class="pole">
             <label for="${id('otsenka')}">Оценка</label>
             <select translate="no" id="${id('otsenka')}" name="otsenka">
               ${OTSENKI.map((x) => `<option value="${x}">${IMENA_NA_OTSENKITE[x]}</option>`).join('')}
@@ -1073,6 +1149,13 @@ export function zakachiGant(
       zapomniEkranno(klyuchat, !chetiEkranno<boolean>(klyuchat, false));
       await prerisuvay();
     });
+  koren
+    .querySelector<HTMLButtonElement>(`#${predstavka}zavarsheni-prevkl`)
+    ?.addEventListener('click', async () => {
+      const klyuchat = `${predstavka}.zavarshenite`;
+      zapomniEkranno(klyuchat, !chetiEkranno<boolean>(klyuchat, false));
+      await prerisuvay();
+    });
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {
@@ -1100,8 +1183,8 @@ export function zakachiGant(
    * нито едно дело (правило 18).
    */
   koren.querySelector<HTMLButtonElement>('#sega')?.addEventListener('click', async () => {
-    p.filtarMyasto = '';
-    p.filtarObekt = '';
+    // Колонните филтри са на двигателя — чистят се през неговата дръжка.
+    izchistiFiltrite(p.klyuch);
     p.filtarOtsenka = 'спешно-важно';
     p.sgunati.clear();
     zapomniPogleda(p);
@@ -1146,7 +1229,7 @@ export function zakachiGant(
           {
             myasto: delo.myasto, obekt: delo.obekt, ime: delo.ime,
             otgovornik: delo.otgovornik, ot: delo.ot, do: delo.do,
-            otsenka: delo.otsenka, sastoyanie: delo.sastoyanie,
+            chas: delo.chas, otsenka: delo.otsenka, sastoyanie: delo.sastoyanie,
             nadDelo: nov, dokument: delo.dokument,
           },
           { opId: crypto.randomUUID() },
@@ -1225,14 +1308,6 @@ export function zakachiGant(
       await prerisuvay();
     });
   };
-  vrazhi('#f-myasto', (v) => {
-    p.filtarMyasto = v;
-    zapomniPogleda(p);
-  });
-  vrazhi('#f-obekt', (v) => {
-    p.filtarObekt = v;
-    zapomniPogleda(p);
-  });
   vrazhi('#f-otsenka', (v) => {
     p.filtarOtsenka = v;
     zapomniPogleda(p);
@@ -1386,6 +1461,22 @@ export function zakachiFormataNaDelo(
   predstavka = 'd-',
 ): void {
   const forma = koren.querySelector<HTMLFormElement>(`#${predstavka}forma-delo`);
+  // ОЦЕНКАТА СЕ ИЗКЛЮЧВА при завършено (И124 т.6) — и изборът, който не
+  // действа, се КАЗВА (правило 15), не се преглъща: полето посивява с думи.
+  {
+    const sastoyanieIzbor = forma?.querySelector<HTMLSelectElement>('[name=sastoyanie]');
+    const otsenkaIzbor = forma?.querySelector<HTMLSelectElement>('[name=otsenka]');
+    const pokazhi = (): void => {
+      if (!sastoyanieIzbor || !otsenkaIzbor) return;
+      const zavarsheno = sastoyanieIzbor.value === 'завършено';
+      otsenkaIzbor.disabled = zavarsheno;
+      otsenkaIzbor.title = zavarsheno
+        ? 'Завършеното дело е без оценка — Състоянието решава (И124 т.6).'
+        : '';
+    };
+    sastoyanieIzbor?.addEventListener('change', pokazhi);
+    pokazhi();
+  }
   forma?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const izhod = koren.querySelector<HTMLElement>(`#${predstavka}greshka-delo`)!;
@@ -1422,7 +1513,10 @@ export function zakachiFormataNaDelo(
           otgovornik: String(d.get('otgovornik') ?? '').trim(),
           ot,
           do: doData,
-          otsenka: String(d.get('otsenka')) as Otsenka,
+          chas: String(d.get('chas') ?? ''),
+          // Изключеното (disabled) поле не влиза във FormData — а при
+          // завършено точно това искаме: празна оценка, не „null".
+          otsenka: String(d.get('otsenka') ?? '') as Otsenka,
           sastoyanie: String(d.get('sastoyanie')),
           nadDelo: String(d.get('nadDelo') ?? ''),
           dokument: '',

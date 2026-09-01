@@ -46,11 +46,42 @@ export const IMENA_NA_DEYSTVIYATA: Readonly<Record<DeystvieNaFormula, string>> =
   protsent: 'процент от',
 });
 
+/**
+ * АГРЕГАТИТЕ ПО РЕДОВЕ · трите вертикални действия (резен 81 · И121 т.2).
+ *
+ * Негова дума: „нещо да се смята с **комбинация от други редове**, да
+ * **наблюдава сметка от други добавени редове**." Хоризонталната формула
+ * (горе) смята клетка ОТ СЪЩИЯ ред; агрегатът смята ЕДНО число от ЦЯЛАТА
+ * колона-източник — сбор · брой · средно — и всеки ред го показва: колоната
+ * е наблюдател, не втори запис. ОТДЕЛЕН списък, защото полето с формула в
+ * Отчети (две числа-извори) няма какво да прави с „по редове".
+ */
+export const DEYSTVIYA_PO_REDOVE = ['sbor-redove', 'broy-redove', 'sredno-redove'] as const;
+
+export type DeystviePoRedove = (typeof DEYSTVIYA_PO_REDOVE)[number];
+
+export const IMENA_PO_REDOVE: Readonly<Record<DeystviePoRedove, string>> = Object.freeze({
+  'sbor-redove': 'сбор по редове',
+  'broy-redove': 'брой по редове',
+  'sredno-redove': 'средно по редове',
+});
+
+/** Агрегат ли е действието · вертикално, по редове (резен 81). */
+export function eAgregat(d: Formula['deystvie']): d is DeystviePoRedove {
+  return (DEYSTVIYA_PO_REDOVE as readonly string[]).includes(d);
+}
+
+/** Името на всяко действие, от двата списъка — за екрана и Описа. */
+export function imeNaDeystvie(d: Formula['deystvie']): string {
+  return eAgregat(d) ? IMENA_PO_REDOVE[d] : IMENA_NA_DEYSTVIYATA[d];
+}
+
 export interface Formula {
-  readonly deystvie: DeystvieNaFormula;
+  readonly deystvie: DeystvieNaFormula | DeystviePoRedove;
   /**
    * Операндите — НОМЕРА на колони в същия модел. Номерът не мърда при
    * преименуване; при махане на колона Редакторът преномерира или отказва.
+   * Агрегатът по редове сочи ТОЧНО една колона — източника си.
    */
   readonly ot: readonly number[];
 }
@@ -76,6 +107,14 @@ export function otStotni(tekst: string): number {
 
 /** Колко операнда иска всяко действие. Сборът е 2 или 3; другите — точно 2. */
 function proveriBroya(f: Formula): void {
+  if (eAgregat(f.deystvie)) {
+    if (f.ot.length !== 1) {
+      throw new GreshkaFormula(
+        `„${IMENA_PO_REDOVE[f.deystvie]}" иска точно ЕДНА колона — източника, по чиито редове смята.`,
+      );
+    }
+    return;
+  }
   if (f.deystvie === 'sbor') {
     if (f.ot.length < 2 || f.ot.length > 3) {
       throw new GreshkaFormula('Сборът иска две или три колони.');
@@ -97,6 +136,20 @@ function proveriBroya(f: Formula): void {
 export function vidNaFormulata(f: Formula, vidNaKolona: (k: number) => VidStoynost): VidStoynost {
   const vidove = f.ot.map(vidNaKolona);
   const [parvi, vtori] = vidove;
+
+  // АГРЕГАТЪТ ПО РЕДОВЕ (резен 81): броят е число, каквото и да брои;
+  // сборът и средното носят вида на източника — а сбор от ставки е число
+  // без смисъл, затова процентът има само средно.
+  if (eAgregat(f.deystvie)) {
+    if (f.deystvie === 'broy-redove') return 'chislo';
+    if (parvi === 'evro' || parvi === 'chislo') return parvi;
+    if (parvi === 'protsent' && f.deystvie === 'sredno-redove') return parvi;
+    throw new GreshkaFormula(
+      f.deystvie === 'sredno-redove'
+        ? '„Средно по редове" иска колона в евро, число или процент.'
+        : '„Сбор по редове" иска колона в евро или число — сбор от ставки е число без смисъл.',
+    );
+  }
 
   if (f.deystvie === 'sbor' || f.deystvie === 'razlika') {
     if (!vidove.every((v) => v === parvi)) {
@@ -131,7 +184,10 @@ export function proveriFormula(
   f: Formula,
   sebe?: number,
 ): VidStoynost {
-  if (!(DEYSTVIYA_NA_FORMULA as readonly string[]).includes(f.deystvie)) {
+  if (
+    !(DEYSTVIYA_NA_FORMULA as readonly string[]).includes(f.deystvie) &&
+    !(DEYSTVIYA_PO_REDOVE as readonly string[]).includes(f.deystvie)
+  ) {
     throw new GreshkaFormula(`Няма такова действие: „${f.deystvie}".`);
   }
   proveriBroya(f);
@@ -170,6 +226,14 @@ export function smetniFormula(
   surovi: readonly string[],
   vidNaKolona: (k: number) => VidStoynost,
 ): number | null {
+  const deystvie = f.deystvie;
+  if (eAgregat(deystvie)) {
+    // Празен отговор без питане е по-скъп от липсващ (ADR-041): агрегатът
+    // смята от ЦЯЛАТА колона, а тук има само един ред — вика се другият.
+    throw new GreshkaFormula(
+      `„${IMENA_PO_REDOVE[deystvie]}" се смята от всички редове — през smetniAgregat, не ред по ред.`,
+    );
+  }
   const chisla: number[] = [];
   for (let i = 0; i < f.ot.length; i += 1) {
     const surovo = (surovi[i] ?? '').trim();
@@ -179,7 +243,7 @@ export function smetniFormula(
   }
 
   const [a, b] = chisla;
-  switch (f.deystvie) {
+  switch (deystvie) {
     case 'sbor':
       return chisla.reduce((s, x) => s + x, 0);
     case 'razlika':
@@ -193,10 +257,33 @@ export function smetniFormula(
   }
 }
 
+/**
+ * АГРЕГАТЪТ ПО РЕДОВЕ · едно число от цялата колона-източник (резен 81).
+ *
+ * Броят брои НЕПРАЗНИТЕ клетки, каквито и да са — и текст; сборът и
+ * средното четат числата по вида на източника. Празните се ПРОПУСКАТ, не
+ * стават нули (проверената нула е различна от нулата, за която никой не е
+ * питал); колона без нито една стойност дава `null` — празно, не нула.
+ * Средното се закръгля към най-близкото и се ПОКАЗВА — закръгленото никога
+ * не влиза в сбор (`/matematika`); нечетима клетка ХВЪРЛЯ, гласно.
+ */
+export function smetniAgregat(
+  deystvie: DeystviePoRedove,
+  surovi: readonly string[],
+  vidNaIztochnika: VidStoynost,
+): number | null {
+  const neprazni = surovi.map((s) => s.trim()).filter((s) => s !== '');
+  if (deystvie === 'broy-redove') return neprazni.length * 100;
+  if (neprazni.length === 0) return null;
+  const chisla = neprazni.map((s) => (vidNaIztochnika === 'evro' ? otSuma(s) : otStotni(s)));
+  const sbor = chisla.reduce((a, b) => a + b, 0);
+  return deystvie === 'sbor-redove' ? sbor : Math.round(sbor / chisla.length);
+}
+
 /** Формулата с думи, за екрана и Описа: „сбор(Наем · ДДС)". */
 export function sDumiFormula(m: ModelNaTablitsa, f: Formula): string {
   const imena = f.ot.map((k) => (m.glavi[k] ?? `колона ${k + 1}`).trim());
-  return `${IMENA_NA_DEYSTVIYATA[f.deystvie]}(${imena.join(' · ')})`;
+  return `${imeNaDeystvie(f.deystvie)}(${imena.join(' · ')})`;
 }
 
 /** Един смятан ред: номерът му в таблицата и стойността на формулата. */
@@ -244,15 +331,36 @@ export function smetniKolonite(
     const spanali: number[] = [];
     let sbor = 0;
 
-    for (const red of danni.redove) {
+    // АГРЕГАТЪТ ПО РЕДОВЕ (резен 81): едно число от цялата колона-източник,
+    // показано на всеки ред. „Сборът" му е самата стойност — сумирането на
+    // наблюдател по броя редове би умножило истината.
+    if (eAgregat(f.deystvie)) {
+      let stoynost: number | null = null;
       try {
-        const stoynost = smetniFormula(f, f.ot.map((k) => danni.kletka(red, k)), (k) => m.vidove[k] ?? 'tekst');
-        redove.push({ red, stoynost });
-        if (stoynost !== null) sbor += stoynost;
+        stoynost = smetniAgregat(
+          f.deystvie,
+          danni.redove.map((red) => danni.kletka(red, f.ot[0] ?? 0)),
+          m.vidove[f.ot[0] ?? 0] ?? 'tekst',
+        );
       } catch (greshka) {
         if (!(greshka instanceof GreshkaPari)) throw greshka;
-        spanali.push(red);
-        redove.push({ red, stoynost: null });
+        spanali.push(...danni.redove);
+      }
+      for (const red of danni.redove) redove.push({ red, stoynost });
+      // „сборът" на наблюдателя е самата стойност — сумиран по броя редове,
+      // той би умножил истината.
+      sbor = stoynost ?? 0;
+    } else {
+      for (const red of danni.redove) {
+        try {
+          const stoynost = smetniFormula(f, f.ot.map((k) => danni.kletka(red, k)), (k) => m.vidove[k] ?? 'tekst');
+          redove.push({ red, stoynost });
+          if (stoynost !== null) sbor += stoynost;
+        } catch (greshka) {
+          if (!(greshka instanceof GreshkaPari)) throw greshka;
+          spanali.push(red);
+          redove.push({ red, stoynost: null });
+        }
       }
     }
 

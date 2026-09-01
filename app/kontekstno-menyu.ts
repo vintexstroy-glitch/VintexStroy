@@ -37,8 +37,22 @@ let zakacheno = false;
 export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
   if (zakacheno) return;
   zakacheno = true;
+  // „⋯" · ВТОРАТА ДРЪЖКА за iOS (И124 т.3 · резен 77 · ADR-134): там
+  // `contextmenu` не се вдига от докосване. Бутонът не носи свое меню — той
+  // ВДИГА същото събитие върху реда си: една врата, две дръжки (ADR-022 §6).
+  koren.addEventListener('click', (e) => {
+    const dratska = (e.target as HTMLElement).closest<HTMLElement>('[data-mnogotochie]');
+    if (!dratska) return;
+    e.stopPropagation();
+    const kade = dratska.getBoundingClientRect();
+    dratska.dispatchEvent(
+      new MouseEvent('contextmenu', { bubbles: true, clientX: kade.left, clientY: kade.bottom }),
+    );
+  });
   koren.addEventListener('contextmenu', (e) => {
-    const red = (e.target as HTMLElement).closest<HTMLElement>('.red');
+    // Освен `.red` менюто се вдига и на ОБЕКТЕН ред от истинска `<table>`
+    // (местата) — той се познава по адреса на папката си (резен 77).
+    const red = (e.target as HTMLElement).closest<HTMLElement>('.red, [data-papka-adres]');
     if (!red) return; // извън ред браузърното меню си е на мястото
     e.preventDefault();
     zatvori();
@@ -58,6 +72,30 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
       });
       menyu.append(b);
     };
+
+    // ── ПЪТЯТ НА ОБЕКТА (И124 т.3 · т.7 · резен 77 · ADR-134) ──────────────
+    //
+    // „Зареждането на фолдъра става с дясно копче САМО за обектите и имотите"
+    // и „да има пътища за неща само от там". Редът, който носи папка
+    // (`data-papka-adres`), я отваря ОТТУК — видимият линк в колоната падна.
+    // Обект без папка го КАЗВА (правило 15), вместо редът да изглежда като
+    // ред без път.
+    const papkaAdres = red.dataset['papkaAdres'];
+    if (papkaAdres !== undefined) {
+      if (papkaAdres === '') {
+        const nyama = document.createElement('span');
+        nyama.className = 'drebno';
+        nyama.setAttribute('role', 'menuitem');
+        nyama.setAttribute('aria-disabled', 'true');
+        nyama.textContent = 'Папката в Драйва · още няма линк';
+        menyu.append(nyama);
+      } else {
+        dobavi('Папката в Драйва', () => {
+          window.open(papkaAdres, '_blank', 'noopener,noreferrer');
+        });
+      }
+      menyu.append(document.createElement('hr'));
+    }
 
     // Копирането минава през СЪЩАТА врата като Ctrl+C върху селекция —
     // един текст на клетка, същите чисти числа от `data-st`.
@@ -94,9 +132,10 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
       }
     }
 
-    // Бутоните на реда, като редове в менюто. Без дубликати по име.
+    // Бутоните на реда, като редове в менюто. Без дубликати по име. „⋯" не
+    // влиза — то е дръжката на СЪЩОТО това меню, не действие (резен 77).
     const butoni = [...red.querySelectorAll<HTMLButtonElement>('button')].filter(
-      (b) => b.textContent!.trim() !== '' && !b.disabled,
+      (b) => b.textContent!.trim() !== '' && !b.disabled && b.dataset['mnogotochie'] === undefined,
     );
     if (butoni.length > 0) menyu.append(document.createElement('hr'));
     const videni = new Set<string>();

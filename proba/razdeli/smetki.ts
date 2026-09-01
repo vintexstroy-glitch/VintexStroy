@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -96,7 +96,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('сверката на разхода', sverkiR[2]?.[1], '2 600,00 €');
 
     // сторно на фактурата — входящият ДДС си отива с нея
-    await sSabitie(p, () => natisniVGrupata(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
+    await sSabitie(p, () => natisni(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
     proveri('деветнайсет събития', await broySabitiya(p), 19 + OTKRIVASHTOTO);
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');
@@ -218,7 +218,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     await p.setInputFiles('#fayl-iztochnik', krivo);
     await p.waitForSelector('.red.propusnat');
     proveri('непозволена ставка не се закръгля — казва се', (await redove(p, '.red.propusnat'))[0]?.[1]?.includes('Ставка 21 не съществува'), true);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#otkazhi-plan'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#otkazhi-plan'));
 
 
     // ══ 19 · бутонът · моделът на ПЪТЯ ═══════════════════════════════════
@@ -286,7 +286,7 @@ export async function blok4(
     // Изтритото меню ЗАКЛЮЧВА името (ред 1994)
     await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
     await p.waitForSelector('.red.redaktor');
-    await sSabitie(p, () => natisniVGrupata(p, '[data-iztriy-menyu]'));
+    await sSabitie(p, () => natisni(p, '[data-iztriy-menyu]'));
     await p.waitForSelector('.red.redaktor input:disabled');
     proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
     proveri(
@@ -307,7 +307,7 @@ export async function blok4(
 
     const parvoto = await p.$eval('[data-vid-stoynost]', (e) => (e as any).value);
     await p.selectOption('[data-vid-stoynost]', parvoto === 'evro' ? 'protsent' : 'evro');
-    await sSabitie(p, () => natisniVGrupata(p, '[data-zapishi-kolona="0"]'));
+    await sSabitie(p, () => natisni(p, '[data-zapishi-kolona="0"]'));
     proveri('смяната на вида ражда ЕДНО събитие и се задържа',
       await p.$eval('[data-vid-stoynost]', (e) => (e as any).value),
       parvoto === 'evro' ? 'protsent' : 'evro');
@@ -330,8 +330,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
 
     // Формата за салдата стои ГОРЕ — негова дума: „Редактируеми отгоре в Сметки".
+    // Периодът вече НЕ е секция в тялото (И124 т.11 · ADR-133): той живее в
+    // постоянната лента най-горе, а Салда остава първата секция след плочките.
     const redNaSekcii = await p.$$eval('section .dyalglava h2', (h) => h.map((x) => x.textContent.trim()));
-    proveri('Салда стои преди Период', redNaSekcii.indexOf('Салда') < redNaSekcii.indexOf('Период'), true);
+    proveri('Период вече НЕ е секция в тялото · той е в постоянната лента',
+      redNaSekcii.includes('Период'), false);
+    proveri('Салда стои преди Баланс', redNaSekcii.indexOf('Салда') < redNaSekcii.indexOf('Баланс'), true);
     // Дялът вече носи НЕГОВИТЕ ТРИ ИМЕНА (резен 50 · „Слей ги в гнезда"), а не
     // само „Отчети": гнездата са три и заглавието на дяла ги казва и трите.
     proveri('дялът носи трите гнезда', redNaSekcii.includes('Отчети · Пари · Регистър'), true);
@@ -367,12 +371,16 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('Вземанията НЕ крият празната половина',
       (await p.$$eval('[data-pole="vzemaniya"] .formula .ime', (e) => e.map((x) => x.textContent))).length, 2);
 
-    // САЛДОТО · записва се, вижда се в Ликвидността, поправя се без втори ред.
-    // Ликвидността вече носи движенията от по-ранните раздели, затова се мери
-    // РАЗЛИКАТА, не абсолютното число: салдото трябва да добави точно 10 000.
+    // САЛДОТО · „Вкарва само в трезора" (И124 т.9 · резен 71): формата пише
+    // ТРЕЗОРА; банката се закотвя от сверката с извлечението и се ИЗЧИСЛЯВА.
     const likvidnostPredi = await chisloNaPoleto(p, 'likvidnost');
     const predSaldoto = await broySabitiya(p);
-    await p.selectOption('#saldo-kade', 'banka');
+    proveri('изборът на джоб ГО НЯМА · формата пише само трезора',
+      await p.$$eval('#saldo-kade', (e) => e.length), 0);
+    proveri('и отказът за банката се КАЗВА с думи (правило 15)',
+      (await tekstNa(p, '[data-sektsiya=smetki-salda]')).includes('банково салдо на ръка НЯМА'), true);
+    proveri('банката ЧАКА първата котва',
+      await p.$eval('[data-banka-izvor]', (e) => (e as any).dataset.bankaIzvor), 'няма начало');
     await p.fill('#saldo-suma', '10 000,00');
     await p.fill('#saldo-ot', '2026-08-01');
     await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
@@ -380,8 +388,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     const likvidnost1 = await chisloNaPoleto(p, 'likvidnost');
     proveri('началото добавя ТОЧНО 10 000 към Ликвидността', likvidnost1 - likvidnostPredi, 10_000_00);
-    proveri('и вече не чака Банка',
-      (await p.$eval('[data-pole="likvidnost"] .chaka', (e) => e.textContent)).includes('Банка'), false);
+    proveri('но полето ЧАКА котвата на Банка, не мълчи',
+      (await p.$eval('[data-pole="likvidnost"] .chaka', (e) => e.textContent)).includes('котвата на Банка'), true);
 
     // Поправка на същия джоб · последният запис бие, втори ред не се ражда.
     await p.fill('#saldo-suma', '12 500,00');
@@ -389,9 +397,9 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await sSabitie(p, () => p.click('#forma-saldo button[type=submit]'));
     const likvidnost2 = await chisloNaPoleto(p, 'likvidnost');
     proveri('поправката добавя разликата, не второ салдо', likvidnost2 - likvidnost1, 2_500_00);
-    proveri('Банка се показва веднъж в формулата',
+    proveri('Трезорът се показва веднъж в формулата',
       (await p.$$eval('[data-pole="likvidnost"] .formula .ime',
-        (e) => e.filter((x) => x.textContent.includes('Банка')).length)), 1);
+        (e) => e.filter((x) => x.textContent.includes('Трезор')).length)), 1);
 
     // СВЕРКАТА вход↔изход на Капитала · нулата се ПОКАЗВА (правило 7).
     // ОБХВАТ: ГНЕЗДОТО „ОТЧЕТИ" · сверката на Капитала живее вътре в него, не е
@@ -497,6 +505,36 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('[data-chakat-period]', (e) => e.getAttribute('data-chakat-period')), '12');
     proveri('поименно, не като празно място',
       (await p.$eval('[data-chakat-period]', (e) => e.textContent)).includes('Марж'), true);
+
+    // ══ 123б · ДЯЛЪТ „ОТЧЕТ" (резен 74 · И124 т.12) ══════════════════════
+    //
+    // „Тук събери секцията Сметки наречена Сметки Прогноза с Отчет, Отчет са
+    //  цялата работа с коефициентите и диаграмите, таблиците за тях."
+    razdel = '123б · дялът Отчет · Прогнозата + коефициентите под едно име';
+
+    proveri('банерът на дяла стои и БРОИ състава',
+      await p.$eval('[data-otchet-sastav]', (e) => e.getAttribute('data-otchet-sastav')), '6');
+    proveri('и шестте секции носят белега на дяла',
+      await p.$$eval('section[data-dyal="otchet"]', (e) =>
+        e.map((x) => (x as HTMLElement).dataset['sektsiya']).join(' · ')),
+      'smetki-otcheti · koef-sastoyanie · koef-svoy · koef-izbor · koef-izbraniyat · koef-vsichki');
+    proveri('чакащото по отчета се КАЗВА поименно · екселът и симулацията',
+      await p.$eval('[data-otchet-chaka]', (e) => e.getAttribute('data-otchet-chaka')), '2');
+
+    // ГОТОВИЯТ ПЕРИОД (р75·[64]) · един натиск слага От и До.
+    proveri('готовите периоди са ТРИ бутона',
+      await p.$$eval('[data-gotov-period]', (e) => e.length), 3);
+    const granitsi = await p.$eval('[data-gotov-period="minalata"]', (e) => ({
+      ot: (e as HTMLElement).dataset['ot'],
+      do: (e as HTMLElement).dataset['do'],
+    }));
+    await deystvieSPrerisuvane(p, () => p.click('[data-gotov-period="minalata"]'));
+    proveri('От застава на 1 януари на миналата година',
+      await p.$eval('#koef-ot', (e) => (e as HTMLInputElement).value), granitsi.ot);
+    proveri('а До — на 31 декември',
+      await p.$eval('#koef-do', (e) => (e as HTMLInputElement).value), granitsi.do);
+    // Връщаме дванайсетте месеца · следващите проверки очакват подразбираното.
+    await deystvieSPrerisuvane(p, () => p.click('[data-gotov-period="dvanayset"]'));
 
     // ══ 125 · СВОЙ КОЕФИЦИЕНТ · от формата до Журнала (резен 54) ═════════
     //
@@ -1138,7 +1176,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · закачането е ТОЧНО ЕДНО събитие';
   const predi = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('границата се КАЗВА, не се подразбира',
     (await tekstNa(p, '.istoriya-karta')).includes('не качва'), true);
@@ -1155,7 +1193,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · СЪЩИЯТ файл втори път е НУЛА събития';
   const predVtoriya = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('редът на документа стои в списъка',
     await p.$$eval('.dokument-red', (e) => e.length), 1);
@@ -1179,7 +1217,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · вторият РАЗЛИЧЕН файл влиза';
   const predTretiya = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   await p.selectOption('#forma-dokument select[name=vid]', 'platezhno');
   await p.setInputFiles('#dokument-fayl', patPlatezhno);
@@ -1189,7 +1227,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · махането е ЗАПИС, не триене';
   const predMahaneto = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('двата реда стоят', await p.$$eval('.dokument-red', (e) => e.length), 2);
   await deystvieSPrerisuvane(p, () => p.click('.dokument-red [data-mahni-dokument]'));
@@ -1202,7 +1240,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'imoti', '#forma-imot');
   proveri('имотът носи същото копче',
     (await p.$$eval('.red.imot [data-dokumenti]', (e) => e.length)) > 0, true);
-  await natisniVGrupata(p, '.red.imot [data-dokumenti]');
+  await natisni(p, '.red.imot [data-dokumenti]');
   await p.waitForSelector('#forma-dokument');
   proveri('и същият прозорец се отваря',
     (await tekstNa(p, '.istoriya-karta h3')).includes('имот'), true);
@@ -1211,7 +1249,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'gant', '.gant-delo');
   proveri('делото носи същото копче',
     (await p.$$eval('.gant-delo [data-dokumenti]', (e) => e.length)) > 0, true);
-  await natisniVGrupata(p, '.gant-delo [data-dokumenti]');
+  await natisni(p, '.gant-delo [data-dokumenti]');
   await p.waitForSelector('#forma-dokument');
   proveri('и пак същият прозорец',
     (await tekstNa(p, '.istoriya-karta h3')).includes('дело'), true);
@@ -1232,40 +1270,60 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   razdel = '91 · Сверката с извлечението · трите начина';
+  // МЕСЕЦЪТ НА СВЕРКАТА Е ПОДВИЖЕН · четиринайсет месеца след „днес".
+  // Твърдият септември работеше, докато „днес" не ВЛЕЗЕ в него: разходът
+  // „проба" се пише с днешна дата (урокът от §24) и щом календарът стигна
+  // 01.09, цъфна в сверката като „липсва". А „два месеца напред" се оказа
+  // зает: ноември носи закованите записи на §24 и §88 (Доставчик 1–6,
+  // Стройпласт), и „Нов Доставчик" открадна реда на банката. Четиринайсет
+  // месеца бягат и от днешното, и от всяка закована 2026 дата — и се МЕСТЯТ
+  // с календара, за да не ги настигне никога.
+  const MESETSAT = (() => {
+    const d = new Date();
+    d.setUTCDate(1);
+    d.setUTCMonth(d.getUTCMonth() + 14);
+    return d.toISOString().slice(0, 7);
+  })();
+  const denVMesetsa = (den: string): string => `${MESETSAT}-${den}`;
+  const bgDen = (den: string): string => `${den}.${MESETSAT.slice(5, 7)}.${MESETSAT.slice(0, 4)}`;
   await naEkran(p, 'smetki', '#forma-period');
-  await p.fill('#smetki-period', '2026-09');
+  await p.fill('#smetki-period', MESETSAT);
   await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
 
   // ТРИ разхода, по един на начин · и СВОИ имена, за да не зависят от чужд блок
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Банка ООД',
-    opis: 'по банка', suma: '100,00', nachin: 'банка', data: '2026-09-10', dokument: 'B-1',
+    opis: 'по банка', suma: '100,00', nachin: 'банка', data: denVMesetsa('10'), dokument: 'B-1',
   });
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Карта ООД',
-    opis: 'с карта', suma: '200,00', nachin: 'карта', data: '2026-09-11', dokument: 'K-1',
+    opis: 'с карта', suma: '200,00', nachin: 'карта', data: denVMesetsa('11'), dokument: 'K-1',
   });
   await zapishiRazhod(p, {
     potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Кеш ООД',
-    opis: 'в брой', suma: '300,00', nachin: 'в брой', data: '2026-09-12', dokument: 'V-1',
+    opis: 'в брой', suma: '300,00', nachin: 'в брой', data: denVMesetsa('12'), dokument: 'V-1',
   });
   proveri('и трите начина се предлагат в падащото меню',
     await p.$$eval('#razhod-nachin option', (e) => e.length), 3);
 
   proveri('преди файла секцията КАЗВА какво прави',
     (await tekstNa(p, '[data-sektsiya=smetki-izvlechenie]')).includes('не влиза в Журнала'), true);
+  // Резен 73 · И124 т.12: той дели наемите на ДВЕ, кодът има ТРИ начина —
+  // разликата е нарочна (картата Е банков джоб) и се КАЗВА, не се преглъща.
+  proveri('двете му думи и трите начина · разликата се казва',
+    (await tekstNa(p, '[data-dvete-i-trite]')).includes('картата Е банков джоб'), true);
 
   razdel = '91 · Сверката с извлечението · банката и картата се намират';
   // Банката носи ДВАТА · кешът НЕ е в нея, и това е нормално, не находка.
   // Редът на картата е с ДЕН по-късно — прозорецът от три дни го лови.
   const IZVLECHENIE =
     'Дата;Описание;Сума;Референция;Салдо\n' +
-    '10.09.2026;БАНКА ООД;-100,00;R-1;900,00\n' +
-    '12.09.2026;КАРТА ООД;-200,00;R-2;700,00\n' +
-    '20.09.2026;НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00';
+    `${bgDen('10')};БАНКА ООД;-100,00;R-1;900,00\n` +
+    `${bgDen('12')};КАРТА ООД;-200,00;R-2;700,00\n` +
+    `${bgDen('20')};НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00`;
   const predSverkata = await broySabitiya(p);
   await p.setInputFiles('#fayl-izvlechenie', {
-    name: 'izvlechenie-septemvri.csv',
+    name: 'izvlechenie-mesets.csv',
     mimeType: 'text/csv',
     buffer: Buffer.from(IZVLECHENIE, 'utf8'),
   });
@@ -1310,10 +1368,75 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   await deystvieSPrerisuvane(p, () => p.click('#zapishi-sverka-izvlechenie'));
   proveri('едно събитие, не две', await broySabitiya(p), predZapisa + 1);
 
+  razdel = '91б · КОТВАТА на банката (резен 71 · И124 т.9)';
+  // Сверката е записана — крайното салдо на извлечението е КОТВА: банката се
+  // закотвя и до следващата сверка се ИЗЧИСЛЯВА.
+  proveri('банката вече стои на КОТВА',
+    await p.$eval('[data-banka-izvor]', (e) => (e as any).dataset.bankaIzvor), 'котва');
+  proveri('и котвата е крайното салдо на извлечението · −77,00',
+    await p.$eval('[data-banka-saldo]', (e) => (e as any).dataset.bankaSaldo), '-7700');
+  proveri('и се КАЗВА откъде идва',
+    (await tekstNa(p, '[data-sektsiya=smetki-salda]')).includes('котва от извлечението за'), true);
+  // Празният списък „чака" не рисува елемент — затова се броят всички.
+  proveri('Ликвидността спира да чака котвата',
+    (await p.$$eval('[data-pole="likvidnost"] .chaka', (e) => e.map((x) => x.textContent).join(' ')))
+      .includes('котвата на Банка'), false);
+
   razdel = '91 · Сверката с извлечението · затварянето маха ЕКРАНА, не записа';
   await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
   proveri('таблицата си отива', await p.$$eval('[data-tablitsa=izvlechenie]', (e) => e.length), 0);
   proveri('и затварянето НЕ пише нищо', await broySabitiya(p), predZapisa + 1);
+
+  // ══ 91в · ПРОВЕРКИ ОТ СВЕРКИ (резен 72 · И124 т.10) ══════════════════════
+  //
+  // „Да има таблица Проверки от Сверки където се показва грешки и
+  //  оставащотото в извлеченията което не е участвалов сверки и справки
+  //  събрано по теми. Банкови такси, Грешни преводи, Гршни плащания с
+  //  карта… и в двете посоки ако има, ако е вкарано с карта, а липсва в
+  //  извлечението."
+  razdel = '91в · Проверки от Сверки · остатъкът по теми, в двете посоки';
+  // Запис С КАРТА, който банката НЯМА — неговият пример, дословно.
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Липсваща Карта ООД',
+    opis: 'с карта, без ред в банката', suma: '400,00', nachin: 'карта',
+    data: denVMesetsa('13'), dokument: 'K-2',
+  });
+  // Извлечение с ЦЕЛИЯ остатък: такса, грешен превод навътре, непознат навън.
+  const IZVLECHENIE_S_OSTATAK =
+    'Дата;Описание;Сума;Референция;Салдо\n' +
+    `${bgDen('10')};БАНКА ООД;-100,00;R-1;900,00\n` +
+    `${bgDen('12')};КАРТА ООД;-200,00;R-2;700,00\n` +
+    `${bgDen('20')};НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00\n` +
+    `${bgDen('25')};ТАКСА УПРАВЛЕНИЕ СМЕТКА;-5,00;R-4;-82,00\n` +
+    `${bgDen('26')};ВРЪЩАНЕ ОТ ДОСТАВЧИК;50,00;R-5;-32,00`;
+  await p.setInputFiles('#fayl-izvlechenie', {
+    name: 'izvlechenie-s-ostatak.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(IZVLECHENIE_S_OSTATAK, 'utf8'),
+  });
+  await p.waitForSelector('[data-tablitsa=proverki-ot-sverki]');
+
+  proveri('остатъкът е ЧЕТИРИ реда · 3 от извлечението + 1 от книгата',
+    await p.$$eval('[data-proverka-tema]', (e) => e.length), 4);
+  proveri('темите с редове са четири, в заковния ред',
+    await p.$$eval('[data-tablitsa=proverki-ot-sverki] [data-tema]',
+      (e) => e.map((x) => (x as HTMLElement).dataset['tema']).join(' · ')),
+    'Банкови такси · Грешни преводи · Грешни плащания с карта · Вкарано, а липсва в извлечението');
+  proveri('и празната тема се КАЗВА с нулата си (правило 15)',
+    (await tekstNa(p, '[data-proverki-po-temi]')).includes('Пасват няколко реда · 0'), true);
+  proveri('вкараното с карта, а липсващо, идва от КНИГАТА',
+    (await tekstNa(p, '[data-proverka-tema="Вкарано, а липсва в извлечението"]'))
+      .includes('банката мълчи'), true);
+  proveri('кешът НЕ е остатък · ненамереният кеш е нормално състояние',
+    (await tekstNa(p, '[data-tablitsa=proverki-ot-sverki]')).includes('Кеш ООД'), false);
+  proveri('сверката редове ↔ находки затваря · и нулата се казва',
+    await p.$eval('[data-proverki-sverka]', (e) => (e as HTMLElement).dataset['proverkiSverka']), '0');
+  proveri('и четенето пак НЕ пише нищо в Журнала',
+    await broySabitiya(p), predZapisa + 2);
+
+  await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
+  proveri('със затварянето си отиват и Проверките · те живеят колкото извлечението',
+    await p.$$eval('[data-tablitsa=proverki-ot-sverki]', (e) => e.length), 0);
 
   // ══ 114 · ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР (резен 36 · ADR-096) ══════════════
   //
@@ -1394,7 +1517,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('записаната сверка стои в Журнала и се вижда',
     (await tekstNa(p, '[data-sektsiya=sverki]')).includes('Сверка с извлечението'), true);
   proveri('и носи СВОЯ период',
-    (await tekstNa(p, '[data-sektsiya=sverki]')).includes('2026-09'), true);
+    (await tekstNa(p, '[data-sektsiya=sverki]')).includes(MESETSAT), true);
   await naEkran(p, 'imoti', '#forma-imot');
 }
 

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +27,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
     razdel = '9 · верига';
-    await natisniVGrupata(p, '#proveri');
+    await natisni(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е'));
     // Един бутон, ДВА отговора (ADR-055): „цяла ли е моята верига" и
     // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
@@ -39,7 +39,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 10 · износ ═══════════════════════════════════════════════════════
     razdel = '10 · износ';
-    const [svaleno] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#iznesi')]);
+    const [svaleno] = await Promise.all([p.waitForEvent('download'), natisni(p, '#iznesi')]);
     const patyat = await svaleno.path();
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
     proveri('изнесени 12 събития + откриващото', izneseni.length, 12 + OTKRIVASHTOTO);
@@ -199,7 +199,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     await p.reload();
     await p.waitForSelector('#proveri');
-    await natisniVGrupata(p, '#proveri');
+    await natisni(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата се къса'));
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
@@ -303,7 +303,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-03');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
-    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Сметки'), '200,00 €');
+    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Баланс'), '200,00 €');
 
     await p.fill('#spravka-data', '2026-04-10');
     await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
@@ -336,7 +336,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('внесено докрай', await p.evaluate(() => document.body.innerText.includes('внесено докрай')), true);
 
     // архивът за Ексел се сваля и е истински .xlsx (PK отпред)
-    const [arhiv] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#arhiv')]);
+    const [arhiv] = await Promise.all([p.waitForEvent('download'), natisni(p, '#arhiv')]);
     const arhivPat = await arhiv.path();
     const parviBajtove = new Uint8Array((await readFile(arhivPat)).buffer).slice(0, 2);
     proveri('архивът е ZIP (PK)', String.fromCharCode(...parviBajtove), 'PK');
@@ -550,6 +550,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const redove: string[] = [];
     let nayMnogoGoli = 0;
     let nayMnogoPrazno = 0;
+    let nayMnogoKuli = 0;
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
@@ -568,7 +569,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
           return r.width > 0 && r.height > 0;
         };
         const telo = document.querySelector('.telo');
-        if (!telo) return { goli: 0, vGrupa: 0, prazno: 0 };
+        if (!telo) return { goli: 0, vGrupa: 0, prazno: 0, kuli: 0 };
         // БРОИ СЕ ЧЕРУПКАТА, не данните.
         //
         // Първият ми опит броеше ВСИЧКИ бутони под `.telo` и даваше 476 за
@@ -586,24 +587,38 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
           // черупка, не което я добавя. Броен, той щеше да наказва точно
           // лекарството: всеки нов сгъваем дял вдига числото с едно.
           .filter((b) => !(b as HTMLElement).dataset['sgavane']);
-        const vGrupa = upravleniya.filter((b) => b.closest('.grupa-deystviya')).length;
         const shirina = telo.getBoundingClientRect().width;
         let nayShirok = 0;
         for (const v of telo.querySelectorAll('*')) {
           const r = (v as HTMLElement).getBoundingClientRect();
           if (r.height > 0 && r.width > nayShirok && r.width <= shirina + 1) nayShirok = r.width;
         }
+        // РЕДЪТ-КУЛА · две и повече ВИДИМИ действия с дума в един ред С ДАННИ.
+        // Редовият лост (ADR-133 §4) трябва да ги е свил до едно — видимото до
+        // него е стрелкичката, а тя няма дума. Прагът е НУЛА, не днешно число:
+        // една кула връща точно шума, който резените 63–76 платиха да падне
+        // (резен 84 · И121 т.6). ГЛАВИТЕ не се броят: бутонът в глава е
+        // филтърът на колоната — той самият е негова поръчка (И124 т.2).
+        const kuli = [...telo.querySelectorAll('.red:not(.glava)')].filter((red) => {
+          const deystviya = [...red.querySelectorAll('button')]
+            .filter(vidim)
+            .filter((b) => /\p{L}/u.test((b.querySelector('.duma') ?? b).textContent ?? ''));
+          return deystviya.length >= 2;
+        }).length;
+        // „В група" вече няма (И124 т.3 · ADR-133): бутоните са самостоятелни
+        // по негова дума, значи всяко видимо управление се брои голо.
         return {
-          goli: upravleniya.length - vGrupa,
-          vGrupa,
+          goli: upravleniya.length,
           prazno: Math.round(shirina - nayShirok),
+          kuli,
         };
       });
       redove.push(
-        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · в група ${String(m.vGrupa).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px`,
+        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px · кули ${m.kuli}`,
       );
       if (m.goli > nayMnogoGoli) nayMnogoGoli = m.goli;
       if (m.prazno > nayMnogoPrazno) nayMnogoPrazno = m.prazno;
+      if (m.kuli > nayMnogoKuli) nayMnogoKuli = m.kuli;
     }
     console.log(`\n  ПЛЪТНОСТТА НА ЕКРАНА (праг ${PRAG_GOLI} голи · ${PRAG_PRAZNO}px празно)\n${redove.join('\n')}\n`);
 
@@ -617,21 +632,26 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       nayMnogoPrazno <= PRAG_PRAZNO ? 'да' : `не · ${nayMnogoPrazno}px`,
       'да',
     );
+    proveri(
+      'нито един ред-кула · лостът свива действията до едно (резен 84)',
+      nayMnogoKuli === 0 ? 'да' : `не · ${nayMnogoKuli}`,
+      'да',
+    );
 
     // ── СГЪВАНЕТО НА ДЯЛА · „да е СКРИТО с дребни бутончета" (И101) ────────
     razdel = '134б · дялът се сгъва';
     await naEkran(p, 'smetki', '#forma-period');
     const vidimiPoleta = async (): Promise<number> =>
-      p.$$eval('[data-sektsiya=smetki-period] input, [data-sektsiya=smetki-period] button:not([data-sgavane])', (e) =>
+      p.$$eval('[data-sektsiya=smetki-salda] input, [data-sektsiya=smetki-salda] button:not([data-sgavane])', (e) =>
         e.filter((x) => {
           const r = x.getBoundingClientRect();
           return r.width > 0 && r.height > 0;
         }).length,
       );
     proveri('всеки дял носи ЕДИН знак за сгъване, не два бутона',
-      await p.$$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.length), 1);
+      await p.$$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.length), 1);
     proveri('и по подразбиране е РАЗТВОРЕН · нищо не се крие само',
-      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      await p.$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
       'true');
     const predSgavane = await vidimiPoleta();
     proveri('дялът показва полетата си', predSgavane > 0, true);
@@ -640,11 +660,11 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // СГЪВАНЕТО НЕ ПРЕРИСУВА екрана — то е местен превключвател. Затова тук не
     // се чака прерисуване, а самото СЪСТОЯНИЕ: четене веднага след клик е
     // точно това, което обход Е брои (`docs/11`).
-    await p.click('[data-sektsiya=smetki-period] [data-sgavane]');
-    await p.waitForSelector('[data-sektsiya=smetki-period] [data-sgavane][aria-expanded=false]');
+    await p.click('[data-sektsiya=smetki-salda] [data-sgavane]');
+    await p.waitForSelector('[data-sektsiya=smetki-salda] [data-sgavane][aria-expanded=false]');
     proveri('сгънатият дял не показва НИЩО освен главата си', await vidimiPoleta(), 0);
     proveri('и знакът го КАЗВА на четеца на екран',
-      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      await p.$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
       'false');
     proveri('сгъването е ПОГЛЕД · нула събития', await broySabitiya(p), predSabitiyaSg);
 
@@ -652,25 +672,157 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // ЧАКА СЕ СЕКЦИЯТА, не поле в нея: сгънатият дял НЯМА видимо поле, и
     // чакането щеше да виси трийсет секунди върху собствения си успех.
     await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-period]');
+    await naEkran(p, 'smetki', '[data-sektsiya=smetki-salda]');
     proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
 
     // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
     await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
     // ПРЕЗ ГРУПАТА · трите действия на картата станаха група (ADR-057) и
-    // видимо стои само последно избраното. Точно за това е `natisniVGrupata`.
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-razgani-vsichki="smetki"]'));
+    // видимо стои само последно избраното. Точно за това е `natisni`.
+    await deystvieSPrerisuvane(p, () => natisni(p, '[data-razgani-vsichki="smetki"]'));
     await naEkran(p, 'smetki', '#forma-period');
     proveri('„Разтвори всички" връща дяла разтворен', await vidimiPoleta(), predSgavane);
+
+    // ── ВИСОЧИНАТА СЕ СПАЗВА · на ВСЕКИ екран, не само на Имоти ───────────
+    // Неговата т.4 (И124): „височините… са забравени и не са спазени. Намери
+    // и ги направи." Дотук §75 мереше САМО `.red.imot` — девет истински
+    // <table> таблици и Гантът стояха невидими за мярката, и точно там
+    // височината беше декорация. Отсега редът се мери там, където е.
+    razdel = '135 · височината се спазва на всеки екран';
+    let premereniObshto = 0;
+    const schupeniObshto: string[] = [];
+    for (const [ekran, znak] of [
+      ['imoti', '#forma-imot'],
+      ['pari', '#forma-nachisli'],
+      ['smetki', '#razhod-dostavchik'],
+      ['gant', '#d-forma-delo'],
+      ['kontakti', '#forma-kontakt'],
+      ['stoynost', '#cheti-ploshti'],
+      ['tabove', '#izbor-tab'],
+      ['nastroyki', '#nov-buton'],
+      ['ii', '#nov-agent'],
+      ['tablo', '#tablo-lichno'],
+    ] as const) {
+      await naEkran(p, ekran, znak);
+      const m = await p.evaluate(() => {
+        const vidim = (e: Element): boolean => {
+          const r = e.getBoundingClientRect();
+          return r.width > 0 && r.height > 0;
+        };
+        const schupeni: string[] = [];
+        let premereni = 0;
+        for (const t of document.querySelectorAll<HTMLElement>('.tablitsa, .gant')) {
+          if (!vidim(t)) continue;
+          const uslovena = Number.parseFloat(
+            getComputedStyle(t).getPropertyValue('--red-visochina'),
+          );
+          if (!Number.isFinite(uslovena)) {
+            schupeni.push(`${t.dataset['tablitsa'] ?? t.className} · без --red-visochina`);
+            continue;
+          }
+          const redove = [
+            ...t.querySelectorAll<HTMLElement>('.red, tbody > tr, .gant-delo, .gant-red'),
+          ].filter(vidim);
+          for (const red of redove) {
+            premereni += 1;
+            // Височината е МИНИМУМ: съдържание на два реда я разпъва и това е
+            // правилно. Счупеното е ред ПОД числото на своята таблица.
+            if (red.getBoundingClientRect().height + 1 < uslovena) {
+              schupeni.push(
+                `${t.dataset['tablitsa'] ?? t.className} · ред ${Math.round(
+                  red.getBoundingClientRect().height,
+                )}px < ${uslovena}px`,
+              );
+            }
+          }
+        }
+        return { premereni, schupeni };
+      });
+      premereniObshto += m.premereni;
+      schupeniObshto.push(...m.schupeni.map((s) => `${ekran}: ${s}`));
+    }
+    console.log(`\n  ВИСОЧИНАТА ПО ЕКРАНИТЕ: ${premereniObshto} премерени реда\n`);
+    proveri('има какво да се мери · редове по десетте екрана', premereniObshto > 100, true);
+    proveri(
+      'нито един ред под височината на своята таблица',
+      schupeniObshto.length === 0 ? 'да' : schupeniObshto.slice(0, 5).join(' · '),
+      'да',
+    );
+
+    // ── ГАНТЪТ · „Редовете в таблицата и колоната са едно" (И104) ──────────
+    razdel = '135б · Гантът · редовете са едно';
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const dvete = await p.evaluate(() => ({
+      delo: Math.round(document.querySelector('.gant-delo')!.getBoundingClientRect().height),
+      red: Math.round(document.querySelector('.gant-red:not(.prazen):not(.sumi)')!.getBoundingClientRect().height),
+    }));
+    // 26 е ЗАКОВАНО С РЪКА: подразбраното на Ганта, същото в `stil.css` и в
+    // `gant-diagrama.ts`. Смени ли се едното, тази проверка го казва.
+    proveri('редът на имената е подразбраните 26px', dvete.delo, 26);
+    proveri('редът на времето е СЪЩОТО число', dvete.red, dvete.delo);
+
+    // ЛОСТЪТ НА ГЪСТОТИТЕ ПАДНА (резен 78 · ADR-135) — височината на Ганта
+    // се мени с ВЛАЧЕНЕ по ръба или пада от подразбраното; двете половини
+    // („редовете са едно") се проверяват през ПАМЕТТА, както влаченето би я
+    // записало, а диаграмата се изравнява при следващото рисуване.
+    await p.evaluate(() => localStorage.setItem('ui.v1.red.visochina.gant-redove', '68'));
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    const shiroko = await p.evaluate(() => ({
+      delo: Math.round(document.querySelector('.gant-delo')!.getBoundingClientRect().height),
+      red: Math.round(document.querySelector('.gant-red:not(.prazen):not(.sumi)')!.getBoundingClientRect().height),
+    }));
+    proveri('изтегленото нагоре вдига реда на имената', shiroko.delo > dvete.delo, true);
+    proveri('и МЕСТИ и колоната на времето · двете са едно', shiroko.red, shiroko.delo);
+
+    const svg = await p.evaluate(() => {
+      const lenta = document.querySelector('.diagrama-red:not(.poddelo) rect.diagrama-lenta');
+      return lenta === null ? -1 : Math.round(Number.parseFloat(lenta.getAttribute('height') ?? '0'));
+    });
+    // Лентата е редът минус 8 (по 4 въздух отгоре и отдолу).
+    proveri('диаграмата рисува същата височина след прерисуване', svg, 68 - 8);
+
+    // Чистене: височината на Ганта се връща на подразбраната, за да не
+    // подпира следващите раздели на чуждо число.
+    await p.evaluate(() => localStorage.removeItem('ui.v1.red.visochina.gant-redove'));
+    await naEkran(p, 'imoti', '#forma-imot');
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('връщането на подразбраното връща 26',
+      await p.$eval('.gant-delo', (e) => Math.round(e.getBoundingClientRect().height)), 26);
+
+    // ── ВЛАЧЕНЕТО ПО РЪБА · и при истинска <table> ─────────────────────────
+    razdel = '135в · влаченето по ръба стига и до <table>';
+    // „Местата" е истинска <table> с <tr> — дотук ръбът ѝ беше глух: нито
+    // височината я стигаше, нито влаченето. Мери се С РЪКА, не с клик.
+    // Редът първо се ДОВЛИЧА в средата на екрана: мишката работи с видими
+    // координати, а под сгъвката „r.bottom − 2" сочи извън прозореца.
+    const redNaMyasto = await p.$eval('[data-tablitsa=mestata] tbody tr', (e) => {
+      e.scrollIntoView({ block: 'center' });
+      const r = e.getBoundingClientRect();
+      return { x: r.left + r.width / 2, y: r.bottom - 2, visok: Math.round(r.height) };
+    });
+    await p.mouse.move(redNaMyasto.x, redNaMyasto.y);
+    await p.mouse.down();
+    await p.mouse.move(redNaMyasto.x, redNaMyasto.y + 24, { steps: 6 });
+    await p.mouse.up();
+    proveri('дърпането надолу вдига реда на истинската <table>',
+      await p.$eval('[data-tablitsa=mestata] tbody tr',
+        (e) => Math.round(e.getBoundingClientRect().height)) > redNaMyasto.visok, true);
+    // И тук се чисти след мярката.
+    await p.evaluate(() => localStorage.removeItem('ui.v1.red.visochina.mestata'));
+    await naEkran(p, 'imoti', '#forma-imot');
 }
 
 /**
  * ХРАПОВИТЕ ПРАГОВЕ · днешните числа, които могат само да ПАДАТ.
  *
  * Вдигане на праг е решение, не поправка: то се вижда в диф-а и иска дума.
+ * Затегнати в резен 84 (78 → 50 · 40 → 38): резените 63–78 свалиха шума и
+ * храповото ЗАДЪРЖА спечеленото — най-натовареният екран е 46 голи, а
+ * най-празният 37px. Луфтът е малък нарочно.
  */
-const PRAG_GOLI = 78;
-const PRAG_PRAZNO = 40;
+const PRAG_GOLI = 50;
+const PRAG_PRAZNO = 38;
 
 /** 48 · джобът накрая */
 export async function blok5(ctx: KonteksNaProhoda): Promise<void> {

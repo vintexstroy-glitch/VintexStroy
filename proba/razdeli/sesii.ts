@@ -8,7 +8,8 @@ import { broySabitiya, naEkran, napishiVPoleto } from '../yadro/pomoshtni.ts';
  *
  *   · книгата се чете С БУТОН, не при всяко рисуване на Настройки;
  *   · изключеният филтър показва ДНЕШНИЯ ден, и екранът го КАЗВА;
- *   · датата и името СТЕСНЯВАТ — „дата и име на журнала за търсене в него";
+ *   · датата и името СТЕСНЯВАТ — „дата и име на журнала за търсене в него" —
+ *     вече през ФИЛТЪРНИЯ ДВИГАТЕЛ (резен 75в): От–До на „Ден", търсачката;
  *   · сесията носи името, деня, часовете и редовете по ТАЙМИНГА НА ЗАПИСА;
  *   · сверката вход↔изход показва разлика, дори когато е нула;
  *   · и НИЩО от гледането не влиза в Журнала.
@@ -67,9 +68,26 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     true,
   );
 
-  // ── ФИЛТЪРЪТ · дата и име, негово „за търсене в него" ────────────────────
-  await napishi('#sesii-ot', '2020-01-01');
+  // ── ФИЛТЪРЪТ Е НА ДВИГАТЕЛЯ (резен 75в) · дубльорът от четири полета падна ──
+  proveri(
+    'главата-лента носи стрелка на всяка от четирите колони',
+    await p.$$eval('.sesii-glava [data-filtar-glava]', (e) => e.length),
+    4,
+  );
+
+  // От–До на „Ден" · широкият обхват пали филтъра → показва ЦЯЛАТА история.
+  await p.click('[data-filtar-glava="zhurnal-sesii:den"]');
+  await p.waitForSelector('[data-filtar-ot="zhurnal-sesii:den"]');
+  await p.fill('[data-filtar-ot="zhurnal-sesii:den"]', '2020-01-01');
   await p.waitForSelector('[data-sektsiya=zhurnal-sesii][data-izklyuchen=ne]');
+  // Менюто остава отворено по избор (75а) и ВИСИ върху редовете под лентата —
+  // затваря се, за да не гълта кликовете на следващите проверки.
+  await p.click('[data-filtar-glava="zhurnal-sesii:den"]');
+  await p.waitForFunction(
+    () => document.querySelector('[data-menyu]') === null,
+    undefined,
+    { timeout: 5_000 },
+  );
   const sVsichki = await p.$$eval('[data-sesiya]', (e) => e.length);
   proveri('с широк обхват сесиите са повече от нула', sVsichki > 0, true);
 
@@ -87,7 +105,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     true,
   );
 
-  await napishi('#sesii-koy', 'няма-такъв@никъде.бг');
+  // Търсенето през всички колони · непознато име не намира нищо.
+  await napishi('[data-tarsi-tablitsa="zhurnal-sesii"]', 'няма-такъв@никъде.бг');
   await p.waitForFunction(
     () => document.querySelectorAll('[data-sesiya]').length === 0,
     undefined,
@@ -101,7 +120,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     true,
   );
 
-  await p.click('#sesii-izchisti');
+  // „Покажи всичко" гаси всичко наведнъж → законът за деня се връща.
+  await p.click('[data-filtar-izchisti-vsichko="zhurnal-sesii"]');
   await p.waitForSelector('[data-sektsiya=zhurnal-sesii][data-izklyuchen=da]');
   proveri('изчистването връща изключения филтър', true, true);
 

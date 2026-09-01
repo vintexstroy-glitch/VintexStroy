@@ -34,11 +34,37 @@ import {
   ZATVORENI_PLASHTANIYA,
   type RedNaPlashtane,
 } from '../src/domein/plashtaniya-arhiv.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  poleZaTarsene,
+  PRAZEN_FILTAR,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import { imetoNaSedmichniyaFayl, sedmichenFayl } from '../src/iznos/sedmichen-fayl.js';
 import { sedmitsataNa } from '../src/domein/zaplati.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
+
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ НА ФИЛТРИТЕ (резен 75б · И124 т.2) · извеждат се от
+ * закования списък (правило 17): парите по `PARICHNI_PLASHTANIYA`, датата по
+ * името си, останалото е текст; затворените — по `ZATVORENI_PLASHTANIYA`.
+ */
+const KOLONI_S_FILTAR: readonly KolonaSFiltar<RedNaPlashtane>[] = KOLONI_PLASHTANIYA_ARHIV.map(
+  (k, i) => ({
+    klyuch: k,
+    ime: k,
+    vid: PARICHNI_PLASHTANIYA.includes(k) ? 'evro' : k === 'Дата' ? 'data' : 'tekst',
+    vzemi: (r: RedNaPlashtane) =>
+      PARICHNI_PLASHTANIYA.includes(k)
+        ? Number(kletkata(r, k) || 0)
+        : String(kletkata(r, k) === '' ? '—' : kletkata(r, k)),
+    zatvorena: ZATVORENI_PLASHTANIYA.includes(i),
+  }),
+);
 
 /** Коя седмица е отворена · ПОГЛЕД, нула събития (ADR-022). */
 function izbranata(o: Ogledalo, dnes: string): string {
@@ -76,6 +102,7 @@ export function narisuvayPlashtaniyaArhiv(o: Ogledalo, dnes: string): string {
   const sedmitsa = izbranata(o, dnes);
   const s = sedmitsataZaEkrana(o, sedmitsa, `${dnes}T00:00:00.000Z`);
   const vsichki = sedmitsiSPlashtaniya(o);
+  const filtrirani = filtriray('plashtaniya-arhiv', s.redove, KOLONI_S_FILTAR, dnes);
 
   return `
     <section data-sektsiya="plashtaniya-arhiv" data-sedmitsa="${ekraniraj(sedmitsa)}">
@@ -135,19 +162,17 @@ export function narisuvayPlashtaniyaArhiv(o: Ogledalo, dnes: string): string {
           .join('')}
       </datalist>
 
+      ${poleZaTarsene('plashtaniya-arhiv')}
       <div class="tablitsa" data-tablitsa="plashtaniya-arhiv">
         <div class="red glava plashtred" translate="no">
-          ${KOLONI_PLASHTANIYA_ARHIV.map(
-            (k, i) =>
-              `<span class="kletka${
-                ZATVORENI_PLASHTANIYA.includes(i) ? ' zatvorena' : ''
-              }" data-kolona="${ekraniraj(k)}">${ekraniraj(k)}</span>`,
-          ).join('')}
+          ${glaviNaTablitsata('plashtaniya-arhiv', KOLONI_S_FILTAR, s.redove, dnes)}
         </div>
         ${
           s.redove.length === 0
             ? '<p class="drebno">Няма нито едно плащане за тази седмица. Файлът пак се сваля — с трите листа и нула реда, защото „нямаше карта" и „нямаше карта ТАЗИ седмица" не са едно и също.</p>'
-            : s.redove
+            : filtrirani.redove.length === 0
+              ? PRAZEN_FILTAR
+              : filtrirani.redove
                 .map(
                   (r) => `
         <div class="red plashtred" translate="no" data-plashtane="${ekraniraj(r.id)}"
@@ -171,6 +196,7 @@ export function narisuvayPlashtaniyaArhiv(o: Ogledalo, dnes: string): string {
                 .join('')
         }
       </div>
+      ${redZaSkritoto(filtrirani, 'plashtaniya-arhiv')}
 
       <p class="drebno"><b>Тук нищо не се записва.</b> Редът е ОГЛЕДАЛО на вече
       записаното — заплатата от таба Заплати, фактурата от Разходи по потока

@@ -32,7 +32,7 @@ import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
-import type { Otsenka } from '../domein/dela.js';
+import { prevediOtsenkata } from '../domein/dela.js';
 import type { PoleSFormula } from '../domein/pole-s-formula.js';
 import type { DeystvieNaFormula } from '../domein/formuli.js';
 import type {
@@ -91,6 +91,7 @@ import type {
   PayloadRazhodZapisan,
   PayloadButonZapisan,
   PayloadModelZapisan,
+  PayloadKletkaNaDobavkaZapisana,
   PayloadSpravkaPodadena,
   PayloadParametarNaVhodaZapisan,
   PayloadKontragentZapisan,
@@ -110,6 +111,8 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadPogasitelenPlanVkaran,
+  VnoskaOtDogovora,
   PayloadKeshZahranen,
   PayloadSedmitsaPrehvarlena,
   PayloadTablitsaOtFaylSazdadena,
@@ -250,6 +253,8 @@ export interface ZapisanaSverka {
   readonly razlika_st: number;
   readonly izvori: readonly string[];
   readonly propusnati: number;
+  /** котвата на банката · крайното салдо от извлечението (резен 71) */
+  readonly saldoKray_st?: number;
 }
 
 export interface Ogledalo {
@@ -358,6 +363,14 @@ export interface Ogledalo {
 
   /** Плащанията по кредити · ДОБАВЯТ се; сторнираното вече го няма тук. */
   readonly plashtaniyaPoKrediti: readonly PlashtanePoKredit[];
+
+  /**
+   * ПОГАСИТЕЛНИТЕ ПЛАНОВЕ от договорите (резен 73 · И124 т.12) · по кредит.
+   *
+   * Планът на банката БИЕ интерполацията (`krediti.ts` избира); ново вкарване
+   * заменя целия план — последната дума бие, както при самия кредит.
+   */
+  readonly pogasitelniPlanove: ReadonlyMap<string, readonly VnoskaOtDogovora[]>;
 
   /**
    * ЗАПЛАТИТЕ · редовете по седмици (резен 20 · ADR-080).
@@ -588,6 +601,30 @@ export interface Ogledalo {
   readonly sreshti: ReadonlyMap<string, Sreshta>;
   /** ПОЛЕТАТА С ФОРМУЛА в Отчети · по свой `id` (резен 42). */
   readonly poletaSFormula: ReadonlyMap<string, PoleSFormula>;
+  /**
+   * КЛЕТКИТЕ НА ДОБАВЕНИТЕ КОЛОНИ във вградените таблици (резен 79).
+   *
+   * Ключът е `klyuchNaKletka` — „таблица · ред · колона". Последният запис
+   * БИЕ: поправката на стойност е ново събитие върху същата същност, а
+   * сторното на ПЪРВОТО писане гаси клетката (седмият вид с поправка на
+   * място). Празната клетка е ЛИПСАТА на запис — не се пази празен ред.
+   */
+  readonly dobavkiKletki: ReadonlyMap<string, KletkaNaDobavka>;
+}
+
+/** Една записана клетка на добавка · стойността + следата кой и кога. */
+interface KletkaNaDobavka {
+  readonly tablitsa: string;
+  readonly redId: string;
+  readonly kolona: number;
+  /** текстът · за всяка колона освен евро */
+  readonly stoynost?: string;
+  /** целите центове · само за колона в евро */
+  readonly stoynost_st?: number;
+  /** `seq` на ПЪРВОТО писане — него сочи сторното, което гаси клетката */
+  readonly seq: number;
+  readonly koy: string;
+  readonly kogato: string;
 }
 
 /** Мигът, в който една година е обявена за затворена · и кой я е затворил. */
@@ -658,7 +695,11 @@ export const VIDOVE_S_POPRAVKA_NA_MYASTO: readonly TipSabitie[] = Object.freeze(
   'ЛичноДвижениеЗаписано',
   'ПродажбаЗаписана',
   'КредитЗаписан',
+  'ПогасителенПланВкаран',
   'ЗаплатаЗаписана',
+  // КЛЕТКАТА НА ДОБАВКА (резен 79): създаването и поправката са едно събитие
+  // върху адреса „таблица · ред · колона" — същата дупка, същият списък.
+  'КлеткаНаДобавкаЗаписана',
 ]);
 
 /** Един погасен запис · толкова, колкото трябва за зачертан ред. */
@@ -746,12 +787,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     return mrtvi;
   };
 
-  // ПЕТТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
+  // СЕДЕМТЕ вида · разсъждението живее ЕДИН път, при списъка (правило 17).
   const stornirianiDela = storniranite('ДелоЗаписано');
   const stornianiDvizheniya = storniranite('ЛичноДвижениеЗаписано');
   const stornianiProdazhbi = storniranite('ПродажбаЗаписана');
   const stornianiKrediti = storniranite('КредитЗаписан');
+  const stornianiPlanove = storniranite('ПогасителенПланВкаран');
   const stornianiZaplati = storniranite('ЗаплатаЗаписана');
+  const stornianiKletki = storniranite('КлеткаНаДобавкаЗаписана');
 
   const imoti = new Map<string, Imot>();
   const naemi = new Map<string, Naem>();
@@ -778,6 +821,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
+  const pogasitelniPlanove = new Map<string, readonly VnoskaOtDogovora[]>();
   const zaplati = new Map<string, RedNaZaplata>();
   const prehvarleniSedmitsi = new Map<string, PrehvarlenaSedmitsa>();
   const zahranvaniyaNaKesha: ZahranvaneNaKesha[] = [];
@@ -818,6 +862,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prepiski = new Map<string, Prepiska>();
   const sreshti = new Map<string, Sreshta>();
   const poletaSFormula = new Map<string, PoleSFormula>();
+  const dobavkiKletki = new Map<string, KletkaNaDobavka>();
 
   for (const s of sabitiya) {
     if (pogaseni.has(klyuchNaZveno(s))) {
@@ -933,6 +978,27 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // Хедърите отпреди резен 14 не знаят на кой таб стоят. Празното е
           // ВЯРНАТА им стойност — „още не е сложен на таб" (И103), не липса.
           ekran: p.ekran ?? '',
+        });
+        break;
+      }
+
+      case 'КлеткаНаДобавкаЗаписана': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · поправка на стойност е ново събитие върху
+        // същия адрес „таблица · ред · колона". `seq` се пази от ПЪРВОТО
+        // писане, за да не мести сторното целта си (както при кредита).
+        const p = s.payload as unknown as PayloadKletkaNaDobavkaZapisana;
+        if (stornianiKletki.has(s.sashtnost.id)) break;
+        dobavkiKletki.set(s.sashtnost.id, {
+          tablitsa: p.tablitsa,
+          redId: p.redId,
+          kolona: p.kolona,
+          // `?? {}` не става: `stoynost: undefined` не е липсващо поле при
+          // `exactOptionalPropertyTypes` (както при ставката на разхода).
+          ...(p.stoynost === undefined ? {} : { stoynost: p.stoynost }),
+          ...(p.stoynost_st === undefined ? {} : { stoynost_st: p.stoynost_st }),
+          seq: dobavkiKletki.get(s.sashtnost.id)?.seq ?? s.seq,
+          koy: s.actor,
+          kogato: String(s.ts),
         });
         break;
       }
@@ -1269,8 +1335,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           otgovornik: p.otgovornik,
           ot: p.ot,
           do: p.do,
-          otsenka: p.otsenka as Delo['otsenka'],
-          sastoyanie: p.sastoyanie as Delo['sastoyanie'],
+          chas: p.chas ?? '',
+          // Старите Журнали носят петата оценка „завършено" — чете се
+          // ПОИМЕННО и се превежда (И124 т.6 · образецът на ADR-106).
+          ...(prevediOtsenkata(p.otsenka, p.sastoyanie) as {
+            otsenka: Delo['otsenka']; sastoyanie: Delo['sastoyanie'];
+          }),
           nadDelo: p.nadDelo,
           dokument: p.dokument,
           // КОГА и КОЙ · от ПОСЛЕДНОТО записване, не от създаването (резен 30).
@@ -1397,6 +1467,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'ПогасителенПланВкаран': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · планът е хартията на банката, идва ЦЯЛ (резен
+        // 73 · И124 т.12). Ново вкарване го заменя; сторнираният не се чете.
+        const p = s.payload as unknown as PayloadPogasitelenPlanVkaran;
+        if (stornianiPlanove.has(s.sashtnost.id)) break;
+        pogasitelniPlanove.set(p.kreditId, p.vnoski);
+        break;
+      }
+
       case 'ЗаплатаЗаписана': {
         // ПОСЛЕДНАТА ДУМА БИЕ · редът идва наведнъж. `seq` се пази от ПЪРВИЯ
         // запис, за да не мести сторното целта си (както при сделката).
@@ -1477,7 +1556,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // ѝ смисъл — „не е казано". Стар запис не се пренаписва (правило 1).
           chas: p.chas ?? '',
           otgovornik: p.otgovornik ?? '',
-          otsenka: (p.otsenka ?? 'нито-едно') as Otsenka,
+          // Липсващата (преди резен 41) пада на „нито-едно"; старата пета
+          // „завършено" се ИЗКЛЮЧВА — както при делото (И124 т.6).
+          otsenka: prevediOtsenkata(p.otsenka ?? 'нито-едно', '').otsenka,
           zakachenaKam: (p.zakachenaKam ?? '') as VidNaZakachaneto,
           zakachenaId: p.zakachenaId ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaPrepiska,
@@ -1493,8 +1574,12 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         sreshti.set(s.sashtnost.id, {
           id: s.sashtnost.id,
           kontakt: p.kontakt,
+          // Запис отпреди резен 68 няма вид и час: той Е среща само с дата —
+          // празното е точният му смисъл, старото не се пренаписва (правило 1).
+          vid: p.vid ?? 'среща',
           adres: p.adres,
           data: p.data,
+          chas: p.chas ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
           // ПЪРВИЯТ `seq` остава · поправката мени съдържанието, не рождението.
           seq: sreshti.get(s.sashtnost.id)?.seq ?? s.seq,
@@ -1781,6 +1866,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     etapiNaProdazhbite,
     krediti,
     plashtaniyaPoKrediti,
+    pogasitelniPlanove,
     zaplati,
     prehvarleniSedmitsi,
     zahranvaniyaNaKesha,
@@ -1823,6 +1909,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prepiski,
     sreshti,
     poletaSFormula,
+    dobavkiKletki,
   };
 }
 

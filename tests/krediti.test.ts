@@ -411,8 +411,8 @@ describe('остатъкът се СМЯТА · няма поле', () => {
     const o = await ogledaloto(dnevnik);
     const k = o.krediti.get('KR-1')!;
     expect(pogasen(k, o.plashtaniyaPoKrediti)).toBe(true);
-    expect(mesetsiOshte(k, o.plashtaniyaPoKrediti, DNES)).toBe(0);
-    expect(planaNa(k, o.plashtaniyaPoKrediti, DNES)).toHaveLength(0);
+    expect(mesetsiOshte(o, k, DNES)).toBe(0);
+    expect(planaNa(o, k, DNES)).toHaveLength(0);
     expect(protsentiteNa(k, o.plashtaniyaPoKrediti).zashto).toContain('погасен');
   });
 });

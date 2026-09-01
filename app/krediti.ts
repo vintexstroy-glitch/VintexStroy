@@ -30,24 +30,35 @@ import { ekraniraj } from './obshto.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { otLeva, pishi } from '../src/yadro/pari.js';
 import {
+  izvorNaPlana,
   KOLONI_KREDITI,
   obshtOstatak,
   planaNa,
   predstoyashtiteVnoski,
   redoveNaKreditite,
   redProektsiya,
-  ZATVORENI_KREDITI,
   type RedNaKredita,
 } from '../src/domein/krediti.js';
 import {
   CHAKA_NEGOVA_DUMA,
   IMENA_NA_VIDOVETE_KREDIT,
+  interpoliraiPlana,
   predlozhiVnoska,
   VIDOVE_KREDIT,
   type VidKredit,
 } from '../src/domein/kredit-matematika.js';
+import type { VnoskaOtDogovora } from '../src/domein/sabitiya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  grupiranaTablitsa,
+  poleZaTarsene,
+  PRAZEN_FILTAR,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
@@ -55,6 +66,25 @@ import type { Konteks } from './ekranite.js';
 function izbraniyat(): string {
   return chetiEkranno('krediti.izbran', '');
 }
+
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ НА ФИЛТРИТЕ (резен 75 · И124 т.2). Имената идват от
+ * `KOLONI_KREDITI` (един дом, правило 17); суровите стойности — от реда.
+ * Затворените са СМЕТНАТИТЕ (правило 23): пише ги никой, филтрира ги всеки.
+ */
+const KOLONI_S_FILTAR: readonly KolonaSFiltar<RedNaKredita>[] = [
+  { klyuch: KOLONI_KREDITI[0]!, ime: KOLONI_KREDITI[0]!, vid: 'tekst', vzemi: (r) => r.kredit.ime },
+  { klyuch: KOLONI_KREDITI[1]!, ime: KOLONI_KREDITI[1]!, vid: 'tekst', vzemi: (r) => IMENA_NA_VIDOVETE_KREDIT[r.kredit.vid] },
+  { klyuch: KOLONI_KREDITI[2]!, ime: KOLONI_KREDITI[2]!, vid: 'tekst', vzemi: (r) => (r.kredit.proektId === '' ? '— без проект' : r.kredit.proektId) },
+  { klyuch: KOLONI_KREDITI[3]!, ime: KOLONI_KREDITI[3]!, vid: 'tekst', vzemi: (r) => r.kredit.otgovornik },
+  { klyuch: KOLONI_KREDITI[4]!, ime: KOLONI_KREDITI[4]!, vid: 'evro', vzemi: (r) => r.kredit.ostatak_st },
+  { klyuch: KOLONI_KREDITI[5]!, ime: KOLONI_KREDITI[5]!, vid: 'evro', vzemi: (r) => r.ostatak_st, zatvorena: true },
+  { klyuch: KOLONI_KREDITI[6]!, ime: KOLONI_KREDITI[6]!, vid: 'evro', vzemi: (r) => r.kredit.vnoska_st },
+  { klyuch: KOLONI_KREDITI[7]!, ime: KOLONI_KREDITI[7]!, vid: 'chislo', vzemi: (r) => r.kredit.den },
+  { klyuch: KOLONI_KREDITI[8]!, ime: KOLONI_KREDITI[8]!, vid: 'protsent', vzemi: (r) => r.protsenti.dogovoren_bp / 100 },
+  { klyuch: KOLONI_KREDITI[9]!, ime: KOLONI_KREDITI[9]!, vid: 'protsent', vzemi: (r) => r.protsenti.kamDenya_bp / 100, zatvorena: true },
+  { klyuch: KOLONI_KREDITI[10]!, ime: KOLONI_KREDITI[10]!, vid: 'chislo', vzemi: (r) => r.mesetsiOshte, zatvorena: true },
+];
 
 /** Включена ли е таблицата · негова опция от Настройки, лична памет. */
 function tablitsataEVklyuchena(): boolean {
@@ -64,6 +94,84 @@ function tablitsataEVklyuchena(): boolean {
 /** Процент от базисни пунктове · един дом, за да не се пише на три места. */
 function protsent(bp: number): string {
   return `${(bp / 100).toFixed(2)} %`;
+}
+
+/**
+ * КАЛКУЛАТОРЪТ (резен 73 · И124 т.12) · „В Сметки един прост груп йалкулато
+ * за вкарване ръчно на кредит за експеримент на прогноза."
+ *
+ * ЕКСПЕРИМЕНТ значи НУЛА събития: смята се на място върху готовата
+ * интерполация и се забравя с презареждането. Никакъв запис, никаква памет.
+ */
+let kalkulator: { ostatak_st: number; lihva_bp: number; vnoska_st: number; den: number } | null =
+  null;
+
+function blokNaKalkulatora(dnes: string): string {
+  const glava = `
+      <div class="dyalglava">
+        <h2>Кредитен калкулатор</h2>
+        <span>експеримент за прогноза · нула събития</span>
+      </div>
+      <form id="forma-kalkulator" class="redditsa">
+        <label class="pole">
+          <span>Сума</span>
+          <input translate="no" name="ostatak" id="kalk-ostatak" inputmode="decimal" placeholder="100 000,00">
+        </label>
+        <label class="pole">
+          <span>Лихва · %</span>
+          <input translate="no" name="lihva" id="kalk-lihva" inputmode="decimal" placeholder="3,45">
+        </label>
+        <label class="pole">
+          <span>Вноска</span>
+          <input translate="no" name="vnoska" id="kalk-vnoska" inputmode="decimal" placeholder="500,00">
+        </label>
+        <label class="pole">
+          <span>Ден</span>
+          <input translate="no" type="number" min="1" max="31" name="den" id="kalk-den" value="15">
+        </label>
+        <button type="submit">Сметни</button>
+      </form>`;
+  if (kalkulator === null) {
+    return `${glava}
+      <p class="drebno">Сметнатото се показва тук и се забравя — нищо не влиза в
+      Журнала. За истински кредит се пише договорът горе.</p>`;
+  }
+  const plan = interpoliraiPlana(
+    kalkulator.ostatak_st,
+    kalkulator.lihva_bp,
+    kalkulator.vnoska_st,
+    kalkulator.den,
+    dnes,
+  );
+  if (plan.length === 0) {
+    return `${glava}
+      <p class="drebno" data-kalk-mesetsi="0">Вноската не покрива дори лихвата за
+      месеца — остатъкът не пада и план няма. Вдигни вноската или свали лихвата.</p>`;
+  }
+  const lihvaObshto = plan.reduce((s, v) => s + v.lihva_st, 0);
+  return `${glava}
+      <div class="plochki">
+        <div class="plochka">
+          <span class="etiket">Месеци</span>
+          <span class="chislo" translate="no" data-kalk-mesetsi="${plan.length}">${plan.length}</span>
+          <span class="pod">до последната вноска</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Последна вноска</span>
+          <span class="chislo" translate="no" data-kalk-kray="${ekraniraj(plan.at(-1)!.data)}">${ekraniraj(
+            plan.at(-1)!.data,
+          )}</span>
+          <span class="pod">планът по дати</span>
+        </div>
+        <div class="plochka">
+          <span class="etiket">Лихва общо</span>
+          <span class="chislo" translate="no" data-kalk-lihva="${lihvaObshto}">${pishi(lihvaObshto)}</span>
+          <span class="pod">цената на кредита</span>
+        </div>
+      </div>
+      <p class="drebno">Смята СЪЩАТА интерполация, с която живее планът на всеки
+      истински кредит (правило 17) — прогнозата и истината не бива да се
+      разминават по формула.</p>`;
 }
 
 // ── РЕД-ПРОЕКЦИЯТА ─────────────────────────────────────────────────────────
@@ -132,13 +240,18 @@ function redNaKredita(r: RedNaKredita): string {
 /** ПЛАНЪТ на избрания кредит · интерполацията, показана ред по ред. */
 function blokNaPlana(o: Ogledalo, r: RedNaKredita, dnes: string): string {
   const k = r.kredit;
-  const plan = planaNa(k, o.plashtaniyaPoKrediti, dnes);
+  const plan = planaNa(o, k, dnes);
+  const izvor = izvorNaPlana(o, k);
   const predlozhenie = predlozhiVnoska(Math.max(r.ostatak_st, 0), k.lihva_bp, k.vnoska_st);
   return `
-    <section data-sektsiya="krediti-plan">
+    <section data-sektsiya="krediti-plan" data-plan-izvor="${izvor}">
       <div class="dyalglava">
         <h2>Планът по дати</h2>
-        <span>${ekraniraj(k.ime)} · интерполация на оставащите вноски</span>
+        <span>${ekraniraj(k.ime)} · ${
+          izvor === 'договор'
+            ? 'ВКАРАНИЯТ план от договора · банката е сметнала'
+            : 'интерполация на оставащите вноски'
+        }</span>
       </div>
 
       <div class="plochki">
@@ -224,6 +337,20 @@ function blokNaPlana(o: Ogledalo, r: RedNaKredita, dnes: string): string {
              24 от ${plan.length} вноски. Останалите се смятат по същия път.</p>`
           : ''
       }
+
+      <form id="forma-plan" class="redditsa">
+        <label class="pole shiroko">
+          <span>Погасителният план от договора · ред на вноска: дата;вноска;главница;лихва</span>
+          <textarea translate="no" name="plan" id="plan-tekst" rows="4"
+            placeholder="2026-10-15;300,00;250,00;50,00&#10;2026-11-15;300,00;251,00;49,00"></textarea>
+        </label>
+        <button type="submit">Вкарай плана</button>
+      </form>
+      <p class="greshka" id="greshka-plan"></p>
+      <p class="drebno">„наличните кредити, които <b>работят с вкаран погасителен
+      план</b>" (И124 т.12). Вкараният план БИЕ интерполацията — тя остава
+      резервният път, докато план няма, и заглавието горе казва кой от двата
+      гледаш. Ново вкарване заменя целия план: последната дума бие.</p>
 
       <form id="forma-plashtane" class="redditsa">
         <label class="pole">
@@ -324,6 +451,7 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
 
   const redove = redoveNaKreditite(o, dnes);
   const izbran = redove.find((r) => r.kredit.id === izbraniyat());
+  const filtrirani = filtriray('krediti', redove, KOLONI_S_FILTAR, dnes);
   return `
     <section data-sektsiya="krediti" data-vklyuchena="da">
       <div class="dyalglava">
@@ -390,21 +518,20 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
       Заплати, Фактури Кеш и Фактури Карта". Тук се въвежда ДОГОВОРЪТ; вноските
       идват от плана, а платеното се записва отделно.</p>
 
+      ${poleZaTarsene('krediti')}
       <div class="tablitsa" data-tablitsa="krediti">
         <div class="red glava krediteured" translate="no">
-          ${KOLONI_KREDITI.map(
-            (kol, i) =>
-              `<span class="kletka${
-                ZATVORENI_KREDITI.includes(i) ? ' zatvorena' : ''
-              }" data-kolona="${ekraniraj(kol)}">${ekraniraj(kol)}</span>`,
-          ).join('')}
+          ${glaviNaTablitsata('krediti', KOLONI_S_FILTAR, redove, dnes)}
         </div>
         ${
           redove.length === 0
             ? '<p class="drebno">Няма нито един кредит. Нула кредита значи НУЛА дълг — истинско число, не липсващо.</p>'
-            : redove.map((r) => redNaKredita(r)).join('')
+            : filtrirani.redove.length === 0
+              ? PRAZEN_FILTAR
+              : grupiranaTablitsa('krediti', filtrirani.redove, KOLONI_S_FILTAR, dnes, (r) => redNaKredita(r))
         }
       </div>
+      ${redZaSkritoto(filtrirani, 'krediti')}
       <p class="drebno">Трите сиви колони не се редактират от никого: те се
       СМЯТАТ (правило 23). Остатъкът е начален минус платените главници;
       сторнирано плащане го вдига обратно, без нито един ред код за това.</p>
@@ -419,6 +546,10 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
              </section>`
           : blokNaPlana(o, izbran, dnes)
       }
+
+      <section data-sektsiya="kredit-kalkulator">
+        ${blokNaKalkulatora(dnes)}
+      </section>
     </section>`;
 }
 
@@ -513,6 +644,55 @@ export function zakachiKreditite(
     } catch (err) {
       kazhi.textContent = dumiZaGreshka(err);
     }
+  });
+
+  const formaPlan = koren.querySelector<HTMLFormElement>('#forma-plan');
+  formaPlan?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const kazhi = koren.querySelector<HTMLElement>('#greshka-plan')!;
+    kazhi.textContent = '';
+    const tekst = String(new FormData(formaPlan).get('plan') ?? '');
+    try {
+      const vnoski: VnoskaOtDogovora[] = tekst
+        .split('\n')
+        .map((red) => red.trim())
+        .filter((red) => red !== '')
+        .map((red) => {
+          const chasti = red.split(/[;\t]/).map((c) => c.trim());
+          if (chasti.length !== 4) {
+            throw new Error(
+              `Редът „${red}" няма четирите части: дата;вноска;главница;лихва.`,
+            );
+          }
+          return {
+            data: chasti[0]!,
+            vnoska_st: otLeva(chasti[1]!),
+            glavnitsa_st: otLeva(chasti[2]!),
+            lihva_st: otLeva(chasti[3]!),
+          };
+        });
+      await k.deystviya.zapishiPogasitelenPlan(
+        { kreditId: izbraniyat(), vnoski },
+        { opId: `pogasitelen-plan:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', `Планът е вкаран · ${vnoski.length} вноски по договора.`);
+      await prerisuvay();
+    } catch (err) {
+      kazhi.textContent = dumiZaGreshka(err);
+    }
+  });
+
+  const formaKalk = koren.querySelector<HTMLFormElement>('#forma-kalkulator');
+  formaKalk?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const danni = new FormData(formaKalk);
+    kalkulator = {
+      ostatak_st: otLeva(String(danni.get('ostatak') || '0')),
+      lihva_bp: otLeva(String(danni.get('lihva') || '0')),
+      vnoska_st: otLeva(String(danni.get('vnoska') || '0')),
+      den: Number(danni.get('den') ?? 15),
+    };
+    await prerisuvay();
   });
 
   const formaPl = koren.querySelector<HTMLFormElement>('#forma-plashtane');

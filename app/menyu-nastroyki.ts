@@ -42,31 +42,22 @@ let otvoren = false;
 /**
  * Рисува пункта „Настройки" с падащия си ред.
  *
- * Пунктът е ЕДИН бутон с две задачи и това е нарочно: натискането отваря реда,
- * а изборът в реда води до темата. Два отделни бутона („Настройки" и стрелка)
- * биха питали човека нещо, което той не се е сещал да пита.
+ * Пунктът е ЕДИН бутон с две задачи и това е нарочно: натискането отваря реда
+ * И екрана, а изборът в реда води до темата. Два отделни бутона („Настройки" и
+ * стрелка) биха питали човека нещо, което той не се е сещал да пита.
+ *
+ * `data-ekran` стои за ВСЕКИГО (резен 83 · И121 т.1): екранът вече не е
+ * заключен цял — служителят влиза и вижда СВОИТЕ секции, стопанските ги
+ * няма (`vizhdaSektsiyata`). Дотук пунктът му отваряше само реда.
  */
-export function redNaNastroykite(koy: KoyGleda, sEkran: boolean, izbor: Izbor): string {
+export function redNaNastroykite(koy: KoyGleda, izbor: Izbor): string {
   // ИЗБОРЪТ влиза, за да отпаднат темите, чиято възможност планът не дава
   // (двете, които искат Драйва). Дотук екранът искаше `iztochnitsi` ЦЕЛИЯТ и
   // на локалните планове пунктът водеше обратно на Имоти — без дума защо.
   const grupi = temiPoGrupi(koy, izbor);
   return `
     <div class="menyu-nastroyki${otvoren ? ' otvoreno' : ''}">
-      <button type="button" class="navred nastroyki-vhod" id="nastroyki-vhod"${
-        /**
-         * ДВЕ ЗАДАЧИ, ЕДИН БУТОН · и това е нарочно.
-         *
-         * Натискането отваря реда И — на онзи, който има право на екрана —
-         * отваря самия екран. Два бутона („Настройки" и стрелка до него) биха
-         * питали човека нещо, което той не се е сещал да пита.
-         *
-         * Служителят вижда СЪЩИЯ пункт, но без `data-ekran`: неговите теми
-         * живеят в Таблото, а екранът „Настройки" му е заключен. Скрит пункт
-         * би му отнел и темите, които са НЕГОВИ (езикът, личното).
-         */
-        sEkran ? ' data-ekran="nastroyki"' : ''
-      }
+      <button type="button" class="navred nastroyki-vhod" id="nastroyki-vhod" data-ekran="nastroyki"
               aria-expanded="${otvoren ? 'true' : 'false'}" aria-controls="nastroyki-red">
         ${ikona('nastroyki', 'ikona navikona')}<span class="navime">Настройки</span>
         <span class="strelka-dolu" aria-hidden="true">▾</span>

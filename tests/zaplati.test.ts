@@ -17,6 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { bankovotoSaldo } from '../src/domein/otcheti.ts';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
@@ -262,10 +263,6 @@ describe('сторното · сборът пада САМ', () => {
 describe('кеш-джобът · един, и салдото му се СМЯТА', () => {
   it('захранването вдига кеша · и НЕ пипа банката', async () => {
     const { dnevnik, deystviya } = stend();
-    await deystviya.zapishiSaldo(
-      { kade: 'banka', saldo_st: 10_000_00, ot: '2026-08-01' },
-      { opId: 'op-b' },
-    );
     const predi = await ogledaloto(dnevnik);
     expect(keshaNaZaplatite(predi, 0).saldo_st).toBe(0);
 
@@ -277,8 +274,9 @@ describe('кеш-джобът · един, и салдото му се СМЯТ�
     const kesh = keshaNaZaplatite(sled, 0);
     expect(kesh.saldo_st).toBe(2_000_00);
     expect(kesh.zahraneno_st).toBe(2_000_00);
-    // БАНКАТА не е мръднала с нито един цент.
-    expect(sled.salda.get('banka')!.saldo_st).toBe(10_000_00);
+    // БАНКАТА не е мръднала: захранването е кеш, не банково движение.
+    // (Ръчно банково салдо вече няма — И124 т.9 — банката се СМЯТА.)
+    expect(bankovotoSaldo(sled).saldo_st).toBe(bankovotoSaldo(predi).saldo_st);
   });
 
   it('прехвърлената седмица ИЗВАЖДА от кеша', async () => {

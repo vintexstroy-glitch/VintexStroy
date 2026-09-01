@@ -25,6 +25,7 @@ import {
   TEMI,
   temiPoGrupi,
   temiZa,
+  vizhdaSektsiyata,
   vizhdaTemata,
 } from '../src/domein/temi-nastroyki.js';
 import { imaIkona } from '../app/ikoni.js';
@@ -279,5 +280,55 @@ describe('пиновете · броевете се твърдят с ръка (
   it('групите са ПЕТ, а темите — СЕДЕМНАЙСЕТ', () => {
     expect(GRUPI).toHaveLength(5);
     expect(TEMI).toHaveLength(17);
+  });
+});
+
+/**
+ * СЕКЦИИТЕ НА ЕКРАН „НАСТРОЙКИ" ПО ЧОВЕК (резен 83 · И121 т.1).
+ *
+ * Негови думи: „ТРябва за служителите да имат достъп до техните възможности
+ * за настройки без тези определени само за стопанина които създава трие и
+ * променя всичко." Екранът вече не се заключва ЦЯЛ — присъдата е на секция,
+ * и живее тук, а не в `if`-ове по заглавията.
+ */
+describe('секциите на Настройки по човек (резен 83)', () => {
+  it('стопанинът вижда ВСЯКА секция · и с тема, и без', () => {
+    for (const s of ['hedari', 'butoni', 'modeli', 'kontragenti', 'sverki', 'godinite', 'branshove', 'patishta', 'karta', 'podredbata']) {
+      expect(vizhdaSektsiyata('stopanin', s), s).toBe(true);
+    }
+  });
+
+  it('служителят вижда СВОИТЕ · сверките и личните две', () => {
+    for (const s of ['sverki', 'tema-natovarvane', 'podredbata']) {
+      expect(vizhdaSektsiyata('sluzhitel', s), s).toBe(true);
+    }
+  });
+
+  it('а стопанските ги НЯМА за него · изброени поименно', () => {
+    for (const s of ['hedari', 'butoni', 'modeli', 'parametri', 'etapi-prodazhbi', 'krediti', 'kontragenti', 'zhurnalat', 'godinite', 'branshove', 'patishta', 'karta']) {
+      expect(vizhdaSektsiyata('sluzhitel', s), s).toBe(false);
+    }
+  });
+
+  it('упълномощеният е най-тесен · само личните две', () => {
+    expect(vizhdaSektsiyata('upalnomoshten', 'sverki')).toBe(false);
+    expect(vizhdaSektsiyata('upalnomoshten', 'podredbata')).toBe(true);
+    expect(vizhdaSektsiyata('upalnomoshten', 'tema-natovarvane')).toBe(true);
+  });
+
+  it('НЕПОЗНАТА секция пада към стопанска, не към видима', () => {
+    // Секция, добавена утре без тема и без ред в списъка на личните, се ражда
+    // СКРИТА за служителя — обратното би било втора врата към достъпа (п. 23).
+    expect(vizhdaSektsiyata('stopanin', 'utreshna-sektsiya')).toBe(true);
+    expect(vizhdaSektsiyata('sluzhitel', 'utreshna-sektsiya')).toBe(false);
+  });
+
+  it('секцията с ТЕМА слуша темата · един дом, два четеца', () => {
+    // „Записани сверки" е за РАБОТЕЩИТЕ по описа на темите — и точно това
+    // казва и присъдата на секцията, без втори списък.
+    const sverki = TEMI.find((t) => t.klyuch === 'sverki')!;
+    for (const koy of KOY_GLEDA) {
+      expect(vizhdaSektsiyata(koy, 'sverki'), koy).toBe(sverki.za.includes(koy));
+    }
   });
 });

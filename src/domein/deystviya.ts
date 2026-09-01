@@ -12,7 +12,8 @@
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
-import { praviTsikal, SASTOYANIYA as SASTOYANIYA_NA_DELO } from './dela.js';
+import { praviTsikal, proveriOtsenkata, SASTOYANIYA as SASTOYANIYA_NA_DELO, ZAVARSHENO } from './dela.js';
+import { proveriChasa } from './kontakti.js';
 import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
 import {
   GreshkaZadacha,
@@ -98,6 +99,13 @@ import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
 import {
+  eRedNaSesiya,
+  klyuchNaKletka,
+  proveriKletkaNaDobavka,
+  VGRADEN_IMOTI,
+  VGRADEN_ZHURNAL,
+} from './dobavki.js';
+import {
   GreshkaKontragent,
   klyuchNaKontragent,
   proveriKontragent,
@@ -109,6 +117,7 @@ import type {
   PayloadImotPopraven,
   PayloadButonZapisan,
   PayloadModelZapisan,
+  PayloadKletkaNaDobavkaZapisana,
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLichnoPrevklyucheno,
@@ -150,6 +159,7 @@ import type {
   PayloadEtapNaProdazhbaZapisan,
   PayloadKreditZapisan,
   PayloadPlashtanePoKredit,
+  PayloadPogasitelenPlanVkaran,
   PayloadKeshZahranen,
   PayloadTablitsaOtFaylSazdadena,
   PayloadKategoriyaZadadena,
@@ -346,6 +356,21 @@ export class Deystviya {
           `${SASTOYANIYA_NA_DELO.join(' · ')}.`,
       );
     }
+    // ОЦЕНКАТА (И124 т.6) · „когато то е Завършено директно оценката става
+    // изключена" — неговата дума казва ДИРЕКТНО, затова изключването е тук,
+    // не отказ. Всичко останало пази `proveriOtsenkata`, нарочно и с думи:
+    // петата стойност е отказ, върнатото от архива иска нова оценка.
+    if (danni.sastoyanie === ZAVARSHENO && danni.otsenka !== '') {
+      danni = { ...danni, otsenka: '' };
+    }
+    const zaOtsenkata = proveriOtsenkata(danni.otsenka, danni.sastoyanie);
+    if (zaOtsenkata !== '') {
+      throw new GreshkaTablitsa(zaOtsenkata);
+    }
+    // ЧАСЪТ Е ПРАВО, не задължение (И124 т.1) — празното е „само дата".
+    // Проверката е СЪЩАТА като при преписката (един дом, правило 17); срокът
+    // `do` играе ролята на датата, без която час не свети.
+    proveriChasa(danni.chas ?? '', danni.do);
     const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
     if (prehvarleno) {
       throw new GreshkaTablitsa(
@@ -669,6 +694,15 @@ export class Deystviya {
    * Същността е ДЖОБЪТ — повторният запис поправя салдото му, не ражда втори.
    */
   async zapishiSaldo(danni: PayloadSaldoZapisano, z: Zayavka): Promise<Rezultat> {
+    // „Вкарва само в трезора" (И124 т.9 · резен 71): банковото салдо идва от
+    // КОТВАТА на месечната сверка с извлечението и се изчислява до следващата.
+    // Старите банкови записи в Журнала се четат (правило 1); нови не влизат.
+    if (danni.kade === 'banka') {
+      throw new GreshkaTablitsa(
+        'Банковото салдо не се вкарва на ръка — вкарва се само в трезора (И124 т.9). ' +
+          'Банката се закотвя от месечната сверка с извлечението и се изчислява до следващата.',
+      );
+    }
     return this.#pusni('СалдоЗаписано', VID.saldo, `SALDO:${danni.kade}`, danni, z);
   }
 
@@ -845,7 +879,7 @@ export class Deystviya {
    * Обратното щеше да направи от вписването на контакт вратар на срещата.
    */
   async zapishiSreshta(id: string, danni: PayloadSreshtaZapisana, z: Zayavka): Promise<Rezultat> {
-    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie);
+    proveriSreshtata(danni.kontakt, danni.data, danni.sastoyanie, danni.vid, danni.chas);
     return this.#pusni('СрещаЗаписана', VID.sreshta, id, danni, z);
   }
 
@@ -1004,6 +1038,46 @@ export class Deystviya {
    */
   async zapishiModel(danni: PayloadModelZapisan, z: Zayavka): Promise<Rezultat> {
     return this.#pusni('МоделЗаписан', VID.model, `MODEL:${danni.klyuch}`, danni, z);
+  }
+
+  /**
+   * ЗАПИСВА КЛЕТКА В ДОБАВЕНА КОЛОНА на вградена таблица (резен 79 · ADR-137).
+   *
+   * Проверките са ПРЕДИ Вратата и всяка отказва с думи: таблицата е от
+   * поименния списък; колоната е родена от Настройки и НЕ е затворена
+   * (правило 23); видът ↔ полето (евро → центове, друго → текст — правило 3);
+   * и редът СЪЩЕСТВУВА — пилотът е Имоти, затова се пита картата на имотите
+   * поименно. Клетка върху изтрит ред щеше да е запис, който никой екран
+   * никога не показва — тих загубен запис.
+   *
+   * НЕ иска отключен период: клетката не е запис за месец. Ако добавена
+   * колона в евро някой ден влезе в месечни сборове, периодът ще се пита ТАМ.
+   */
+  async zapishiKletkaNaDobavka(
+    danni: PayloadKletkaNaDobavkaZapisana,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    proveriKletkaNaDobavka(o.modeli.get(danni.tablitsa), danni);
+    if (danni.tablitsa === VGRADEN_IMOTI && !o.imoti.has(danni.redId)) {
+      throw new GreshkaTablitsa(
+        `Ред „${danni.redId}" го няма сред имотите — клетка без ред няма къде да се покаже.`,
+      );
+    }
+    // Сесията се СМЯТА от потока и Огледалото не я държи (резен 82) — затова
+    // тук се проверява ФОРМАТА на реда „ден | кой", не съществуването му.
+    if (danni.tablitsa === VGRADEN_ZHURNAL && !eRedNaSesiya(danni.redId)) {
+      throw new GreshkaTablitsa(
+        `Ред „${danni.redId}" не е сесия — Журналът реди „ден | кой" (2026-09-01|imeyl).`,
+      );
+    }
+    return this.#pusni(
+      'КлеткаНаДобавкаЗаписана',
+      VID.dobavkaKletka,
+      klyuchNaKletka(danni.tablitsa, danni.redId, danni.kolona),
+      danni,
+      z,
+    );
   }
 
   /**
@@ -1318,6 +1392,67 @@ export class Deystviya {
       'ПлащанеПоКредит',
       VID.plashtaneKredit,
       `PLK:${danni.plashtaneId}`,
+      danni,
+      z,
+    );
+  }
+
+  /**
+   * ВКАРВА ПОГАСИТЕЛНИЯ ПЛАН от договора (резен 73 · И124 т.12).
+   *
+   * „наличните кредити, които работят с вкаран погасителен план" — планът на
+   * банката БИЕ интерполацията. ЧЕТИРИ проверки:
+   *
+   *   1. КРЕДИТЪТ СЪЩЕСТВУВА · план без кредит не движи нищо;
+   *   2. ПОНЕ ЕДНА ВНОСКА · празен план не е план, а изтриване — а планът се
+   *      надживява с НОВ запис, не с празен;
+   *   3. ДВЕТЕ ЧАСТИ СЪБИРАТ вноската · в договорния план вноската е главница
+   *      плюс лихва, точно — банката я е сметнала;
+   *   4. ДАТИТЕ РАСТАТ · разбъркан план чете се като счупен остатък.
+   *
+   * Планът НЕ е счетоводен запис с дата в месец — той е хартия за бъдещето —
+   * затова замразяването не го спира (правило 9 пази ЧИСЛАТА на месеца).
+   */
+  async zapishiPogasitelenPlan(
+    danni: PayloadPogasitelenPlanVkaran,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!o.krediti.has(danni.kreditId)) {
+      throw new GreshkaKredit('Няма такъв кредит. План без кредит не движи ничий остатък.');
+    }
+    if (danni.vnoski.length === 0) {
+      throw new GreshkaKredit(
+        'Планът иска поне една вноска. Нов договор се вкарва като НОВ план — ' +
+          'празен план не е поправка, а изтриване.',
+      );
+    }
+    let predishna = '';
+    for (const v of danni.vnoski) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.data)) {
+        throw new GreshkaKredit(`Датата на вноска се пише „ГГГГ-ММ-ДД"; получено: „${v.data}".`);
+      }
+      if (v.data <= predishna) {
+        throw new GreshkaKredit(
+          `Датите на плана трябва да растат: „${v.data}" идва след „${predishna}". ` +
+            'Разбъркан план се чете като счупен остатък.',
+        );
+      }
+      predishna = v.data;
+      if (v.glavnitsa_st < 0 || v.lihva_st < 0) {
+        throw new GreshkaKredit('Главница и лихва в плана не може да са отрицателни.');
+      }
+      if (v.glavnitsa_st + v.lihva_st !== v.vnoska_st) {
+        throw new GreshkaKredit(
+          `Вноската на ${v.data} не се събира: ${v.glavnitsa_st} + ${v.lihva_st} ≠ ` +
+            `${v.vnoska_st} (в цели центове). Банката е сметнала точно — грешката е в преписа.`,
+        );
+      }
+    }
+    return this.#pusni(
+      'ПогасителенПланВкаран',
+      VID.pogasitelenPlan,
+      `PPL:${danni.kreditId}`,
       danni,
       z,
     );

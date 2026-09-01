@@ -31,6 +31,7 @@ import { narisuvayTabove, zakachiTabove } from './tabove.js';
 import { narisuvayLichno, pokanaZaLichno, zakachiLichno } from './lichno.js';
 import { mozhe, type Izbor, type Vazmozhnost } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import { koyGleda } from '../src/domein/temi-nastroyki.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
 import { godinite } from '../src/domein/godishna-ravnosmetka.js';
@@ -220,6 +221,46 @@ interface OpisNaEkran {
   readonly zakachi: (z: ZaZakachane) => void;
 }
 
+/**
+ * НАЧАЛНИЯТ РЕД НА ЛЕНТАТА · разпределението е НЕГОВО, събрано (И125 · резен 85).
+ *
+ * Дотук редът беше страничен ефект от подредбата на този файл — точно
+ * „бъркотията", която И121 т.6 назова. Отсега е РЕШЕНИЕ, с извора на всяко
+ * място:
+ *
+ *   · ТАБЛОТО е първо — неговият файл почва с двете ТАБЛА (р48·[37]), а
+ *     Таблото е и пътят обратно (ADR-066);
+ *   · РАБОТНИЯТ блок — Имоти (наемите), Пари, Баланс, Управление, Продажби;
+ *     „Плащания Архив сложен СЛЕД Продажби Архив" е дословно негово (р52·[288]);
+ *   · ВТОРИЯТ РЕД, пак дословно (р52·[206]): „втория да почва с Преписки,
+ *     контакти, продажби архив, цени и настройки" — Контактите (преписките са
+ *     секция в тях), Стойност на Състояние (наследникът на таб Цени) и
+ *     Настройки НАКРАЯ;
+ *   · неказаните къде да седят (Служители · Табове · ИИ · Лично) стоят при
+ *     системните, най-близо до Настройки — „всичко което не съм казал къде да
+ *     седи го дръж в настройки" (И121 т.6).
+ *
+ * Това е НАЧАЛНИЯТ ред (долният слой на ADR-066): Стопанинът го пренарежда
+ * със събитие, всеки — за себе си отгоре. Тестът пази, че списъкът и
+ * регистърът се покриват едно към едно.
+ */
+export const REDAT_NA_LENTATA: readonly KoyEkran[] = Object.freeze([
+  'tablo',
+  'imoti',
+  'pari',
+  'smetki',
+  'gant',
+  'prodazhbi',
+  'plashtaniya',
+  'kontakti',
+  'stoynost',
+  'sluzhiteli',
+  'tabove',
+  'ii',
+  'lichno',
+  'nastroyki',
+]);
+
 export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   imoti: {
     ime: 'Имоти',
@@ -236,8 +277,11 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     zakachi: (z) => zakachiPari(z.koren, z.k, z.prerisuvay),
   },
   smetki: {
-    ime: 'Сметки',
-    podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
+    // „Името е не Сметки а Баланс който включва Приход и Разход и всички
+    // разпивки" (И124 т.11 · ADR-120 §6). Ключът `smetki` остава — той е
+    // кодов адрес (памети, права, пътища), не име на екрана.
+    ime: 'Баланс',
+    podnaslov: 'Приход и Разход и всички разбивки · цените са с ДДС',
     ikona: 'ekran-smetki',
     iska: 'smetki-dds',
     iskaRolya: 'redaktor',
@@ -261,15 +305,20 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      * Изискването слезе на ТЕМАТА (`temi-nastroyki.ts` · поле `iska`), където
      * му е мястото: две теми искат Драйва, останалите не. Това връща и
      * обещанието „ВСЯКО издание работи офлайн" на локалните планове.
+     *
+     * И БЕЗ `iskaRolya` (резен 83 · И121 т.1): „ТРябва за служителите да имат
+     * достъп до техните възможности за настройки без тези определени само за
+     * стопанина." Заключеният ЦЯЛ екран отнемаше на служителя и сверките, и
+     * подредбата — неговите. Единицата на правото е СЕКЦИЯТА: кой коя вижда
+     * казва `vizhdaSektsiyata` (домейнът), а екранът само пита.
      */
-    iskaRolya: 'sobstvenik',
     narisuvay: (r) =>
       narisuvayNastroyki(
         r.ogledalo,
         r.broySabitiya,
         r.izbor,
-        // СТОПАНИНЪТ се СМЯТА от Журнала, не от самоличността (ADR-043).
-        r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
+        // КОЙ ГЛЕДА се СМЯТА от Журнала, не от самоличността (ADR-043).
+        koyGleda(r.kojSam.imeyl, r.ogledalo),
         // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
         punktoveNaMenyuto(r),
         r.dnes,
@@ -396,7 +445,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      * ролята при доставчика и колонното право (правило 23), а не втора врата
      * на екрана.
      */
-    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo),
+    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiProdazhbite(z.koren, z.k, z.prerisuvay),
   },
   plashtaniya: {

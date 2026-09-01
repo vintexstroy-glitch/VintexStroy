@@ -118,18 +118,14 @@ export async function naEkran(p: Page, koy: string, znak: string): Promise<void>
 }
 
 /**
- * НАТИСКА бутон, който може да е СВИТ в група (ADR-057).
+ * НАТИСКА бутон от действията на екрана · и през РЕДОВИЯ лост, ако е свит.
  *
- * Няколко действия на едно място стават един бутон със стрелкичка; видимият е
- * онзи, който човекът е избрал последно. Затова проходът прави точно трите
- * стъпки на човека: отваря стрелкичката, избира действието ПО ДУМАТА МУ, и
- * чак тогава натиска. Ако бутонът вече се вижда, се натиска направо — както
- * би направил и човек.
- *
- * Не е заобикаляне на групата, а проверка ПРЕЗ нея: скрит бутон не се натиска
- * от Playwright, и точно това е причината да не може да се направи наум.
+ * Групите по секциите и в шапката паднаха (И124 т.3 · ADR-133): „Тези бутони
+ * са самостоятелни и са видими" — там натискането е директно. В РЕДОВЕТЕ
+ * лостът остана (той пази ниския ред, т.4): скрит редов бутон се стига по
+ * трите стъпки на човека — стрелкичка, избор по думата, натискане.
  */
-export async function natisniVGrupata(p: Page, izbor: string): Promise<void> {
+export async function natisni(p: Page, izbor: string): Promise<void> {
   const svit = await p.$eval(izbor, (e) => (e as HTMLElement).hidden);
   if (svit) {
     const duma = await p.$eval(izbor, (e) =>
@@ -382,11 +378,13 @@ export interface DeloVhod {
   readonly nad?: string;
   /** по избор · подразбраното е първото в менюто, „чака" (резен 30) */
   readonly sastoyanie?: string;
+  /** по избор · правото на час (резен 68 · И124 т.1) */
+  readonly chas?: string;
 }
 
 export async function zapishiDelo(
   p: Page,
-  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie }: DeloVhod,
+  { myasto, obekt, ime, otgovornik, ot, do: doData, otsenka, nad, sastoyanie, chas }: DeloVhod,
 ): Promise<void> {
   await p.fill('#d-myasto', myasto);
   await p.fill('#d-obekt', obekt);
@@ -395,6 +393,7 @@ export async function zapishiDelo(
   await p.fill('#d-ot', ot);
   await p.fill('#d-do', doData);
   await p.selectOption('#d-otsenka', otsenka);
+  if (chas) await p.fill('#d-chas', chas);
   // СЪСТОЯНИЕТО по избор · подразбраното е първото в менюто („чака"), тъй че
   // старите викащи не се менят (резен 30).
   if (sastoyanie) await p.selectOption('#d-sastoyanie', sastoyanie);

@@ -104,68 +104,59 @@ export interface RedNaMyasto {
   readonly papka: string;
   /** колко ЖИВИ дела стоят на това място */
   readonly dela: number;
-  /** записано ли е · или само се среща по делата */
-  readonly zapisano: boolean;
+  /** КОЙ е записал мястото · извършващият действието (И124 т.7 · правило 14) */
+  readonly koy: string;
 }
 
 /**
- * ВСИЧКИ МЕСТА · и записаните, и онези, които само се срещат по делата.
+ * САМО ЗАРЕДЕНИТЕ МЕСТА (И124 т.7 · резен 77 · ADR-134).
  *
- * Вторите се показват СЪС същия ред, но с `zapisano: false` — така човек вижда
- * къде има какво да допълни, вместо мястото да го няма, докато не се сети да го
- * запише. Списък само от записаните щеше да крие точно работата.
+ * Негова дума, 31.08: „Тук се появяват само заредените обекти и отговорник е
+ * този който извършва действието." Тя надживя избора от резен 31, който
+ * показваше и само-срещаните по делата с белег „още не е записано" —
+ * последната дума бие (правило 28); надживеният избор е записан с датата си
+ * в ADR-134. Броят на делата ПАК се смята от живите дела — той е поглед,
+ * не запис.
  */
 export function mestata(
   o: Ogledalo,
   zhiviDela: readonly { readonly myasto: string }[],
 ): readonly RedNaMyasto[] {
   const broy = new Map<string, number>();
-  const dosloven = new Map<string, string>();
   for (const d of zhiviDela) {
     const k = svedenotoMyasto(d.myasto);
     if (k === '') continue;
     broy.set(k, (broy.get(k) ?? 0) + 1);
-    if (!dosloven.has(k)) dosloven.set(k, d.myasto);
   }
 
-  const klyuchove = new Set<string>([...o.mesta.keys(), ...broy.keys()]);
-  const redove: RedNaMyasto[] = [];
-  for (const k of [...klyuchove].sort()) {
-    const zapis = o.mesta.get(k);
-    redove.push(
-      Object.freeze({
-        // Записаното име бие: то е онова, което човекът е написал НАРОЧНО.
-        ime: zapis?.ime ?? dosloven.get(k) ?? k,
-        firma: zapis?.firma ?? '',
-        papka: zapis?.papka ?? '',
+  return Object.freeze(
+    [...o.mesta.keys()].sort().map((k) => {
+      const zapis = o.mesta.get(k)!;
+      return Object.freeze({
+        ime: zapis.ime,
+        firma: zapis.firma,
+        papka: zapis.papka,
         dela: broy.get(k) ?? 0,
-        zapisano: zapis !== undefined,
-      }),
-    );
-  }
-  return Object.freeze(redove);
+        koy: zapis.koy,
+      });
+    }),
+  );
 }
 
 /**
  * СВЕРКАТА · вход↔изход, и нулата се записва (правило 7).
  *
- * Входът са РАЗЛИЧНИТЕ места, които книгата познава (по делата и по записите);
- * изходът е дължината на списъка. Място, изгубено по пътя, значи дело, чието
- * място не се вижда никъде.
+ * Входът са ЗАПИСАНИТЕ места в Огледалото; изходът е дължината на списъка.
+ * Място, изгубено по пътя, значи запис, който екранът не показва никъде.
  */
 export function sveriMestata(
   o: Ogledalo,
   zhiviDela: readonly { readonly myasto: string }[],
   kogato: string,
 ): Sverka {
-  const razlichni = new Set<string>(o.mesta.keys());
-  for (const d of zhiviDela) {
-    const k = svedenotoMyasto(d.myasto);
-    if (k !== '') razlichni.add(k);
-  }
   return sverka(
-    'местата · различни имена',
-    razlichni.size,
+    'местата · записаните',
+    o.mesta.size,
     mestata(o, zhiviDela).length,
     kogato,
     MERKA.broy,

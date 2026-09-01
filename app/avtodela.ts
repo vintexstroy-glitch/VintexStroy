@@ -18,9 +18,17 @@ import {
   kreditiBezPlan,
   NAPRED_DNI,
   sveriAvtoDelata,
+  type AvtoDelo,
 } from '../src/domein/avtodela.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { ekraniraj } from './obshto.js';
+import {
+  filtriray,
+  glaviTh,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 
 /** Как се чете едно „остават N дни" на човешки. */
 function dumiZaDni(dni: number): string {
@@ -30,11 +38,21 @@ function dumiZaDni(dni: number): string {
   return `след ${dni} дни`;
 }
 
+/** Колоните за двигателя на филтрите (резен 75б · И124 т.2). */
+const KOLONI_S_FILTAR: readonly KolonaSFiltar<AvtoDelo>[] = [
+  { klyuch: 'izvor', ime: 'Извор', vid: 'tekst', vzemi: (a) => a.izvor },
+  { klyuch: 'ime', ime: 'Какво', vid: 'tekst', vzemi: (a) => a.ime },
+  { klyuch: 'kogo', ime: 'С кого', vid: 'tekst', vzemi: (a) => (a.kogo === '' ? '—' : a.kogo) },
+  { klyuch: 'do', ime: 'Срок', vid: 'data', vzemi: (a) => a.do },
+  { klyuch: 'dni', ime: 'Остават', vid: 'chislo', vzemi: (a) => a.dni },
+];
+
 export function narisuvayAvtoDelata(o: Ogledalo, dnes: string): string {
   const avto = avtoDelata(o, dnes);
   const cherveni = cherveniyatSpisak(avto);
   const bezPlan = kreditiBezPlan(o, dnes);
   const sv = sveriAvtoDelata(o, dnes, dnes);
+  const filtrirani = filtriray('avtodela', avto, KOLONI_S_FILTAR, dnes);
 
   return `
     <section data-sektsiya="avtodela">
@@ -50,12 +68,12 @@ export function narisuvayAvtoDelata(o: Ogledalo, dnes: string): string {
       ${
         avto.length === 0
           ? `<p class="prazno">Нищо не чака в следващите ${NAPRED_DNI} дни.</p>`
-          : `<div class="skrolkutiya">
+          : `${poleZaTarsene('avtodela')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="avtodela">
           <thead>
-            <tr><th>Извор</th><th>Какво</th><th>С кого</th><th>Срок</th><th>Остават</th></tr>
+            <tr>${glaviTh('avtodela', KOLONI_S_FILTAR, avto, dnes)}</tr>
           </thead>
-          <tbody>${avto
+          <tbody>${filtrirani.redove
             .map(
               (a) => `
             <tr data-avtodelo="${ekraniraj(a.izvorId)}" data-izvor="${ekraniraj(a.izvor)}"
@@ -69,7 +87,7 @@ export function narisuvayAvtoDelata(o: Ogledalo, dnes: string): string {
             )
             .join('')}</tbody>
         </table>
-      </div>`
+      </div>${redZaSkritoto(filtrirani, 'avtodela')}`
       }
 
       <p class="drebno">Тези редове се СМЯТАТ и не се записват: авто-делото не се

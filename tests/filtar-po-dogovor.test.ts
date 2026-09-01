@@ -62,9 +62,10 @@ function stend() {
     zapis({ klyuch: 'razhod:d', suma_st: stotinki(100_00), posoka: 'razhod', koy: 'Баумит' }),
   ];
   // Банката вижда ДВА от четирите, плюс един свой ред без насрещен запис.
+  // Имената носят платците — името е ТРЕТИЯТ белег на срещата (резен 73).
   const izvlechenie = [
-    bankov({ klyuch: 'b1', suma_st: stotinki(500_00) }),
-    bankov({ klyuch: 'b2', suma_st: stotinki(200_00) }),
+    bankov({ klyuch: 'b1', suma_st: stotinki(500_00), koy: 'ПРЕВОД ОТ ИВАН' }),
+    bankov({ klyuch: 'b2', suma_st: stotinki(200_00), koy: 'ПРЕВОД ОТ МАРИЯ' }),
     bankov({ klyuch: 'b3', suma_st: stotinki(777_00), koy: 'Непознат' }),
   ];
   return sverkaSIzvlechenie({

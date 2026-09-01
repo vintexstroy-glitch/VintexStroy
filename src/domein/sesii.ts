@@ -29,65 +29,22 @@
  *
  * Целият модул е ЧЕТИВО върху Журнала: нула нови събития, нула нови полета.
  * Затова и работи назад през цялата история, а не само откакто е построен.
+ *
+ * ═══ КОЙ СТЕСНЯВА (резен 75в · И124 т.2) ═══
+ *
+ * Датата, името и текстът стесняват през ФИЛТЪРНИЯ ДВИГАТЕЛ на екрана
+ * (`app/filtri.ts`) — същите отметки, От–До и търсене като на всяка таблица.
+ * Домейнът получава ВЕЧЕ стеснената книга и пази двата закона, които не са
+ * на двигателя: изключеният филтър значи ДНЕШНИЯ ден, не „покажи всичко";
+ * и сверката вход↔изход минава ПРЕЗ стесненото, та ред да не пада тихо.
  */
 
 import { MERKA, sverka, type Sverka } from '../yadro/sverka.js';
 import type { Sabitie } from '../yadro/index.js';
 
-/** Какво стеснява гледането · празното поле значи „не стеснявай". */
-export interface FiltarNaZhurnala {
-  /** ISO `ГГГГ-ММ-ДД` · включително */
-  readonly ot: string;
-  /** ISO `ГГГГ-ММ-ДД` · включително */
-  readonly do_: string;
-  /** името (имейлът) на редактора · частично съвпадение */
-  readonly koy: string;
-  /** свободен текст · търси във вида, същността и товара */
-  readonly tarsi: string;
-}
-
-export const PRAZEN_FILTAR: FiltarNaZhurnala = Object.freeze({
-  ot: '',
-  do_: '',
-  koy: '',
-  tarsi: '',
-});
-
-/** Изключен ли е филтърът · негово „когато е изключен фултъра". */
-export function filtaratEIzklyuchen(f: FiltarNaZhurnala): boolean {
-  return f.ot === '' && f.do_ === '' && f.koy === '' && f.tarsi === '';
-}
-
 /** Денят на едно събитие · `ts` е ISO, денят са първите десет знака. */
 export function denyaNa(s: Sabitie): string {
   return String(s.ts).slice(0, 10);
-}
-
-/**
- * СВЕДЕНОТО за търсене · NFC, малки букви, без околни празни (правило 12).
- *
- * Без него „Иван" и „иван" щяха да са двама редактора, а „й" от две различни
- * клавиатури — две различни имена.
- */
-function svedeno(v: string): string {
-  return v.normalize('NFC').trim().toLocaleLowerCase('bg');
-}
-
-/** Текстът, в който търсенето рови · вид, същност и товар, слепени веднъж. */
-function tekstaNa(s: Sabitie): string {
-  return svedeno(
-    `${s.type} ${s.sashtnost.vid} ${s.sashtnost.id} ${JSON.stringify(s.payload)}`,
-  );
-}
-
-/** Минава ли едно събитие през филтъра. */
-export function prezFiltara(s: Sabitie, f: FiltarNaZhurnala): boolean {
-  const den = denyaNa(s);
-  if (f.ot !== '' && den < f.ot) return false;
-  if (f.do_ !== '' && den > f.do_) return false;
-  if (f.koy !== '' && !svedeno(s.actor).includes(svedeno(f.koy))) return false;
-  if (f.tarsi !== '' && !tekstaNa(s).includes(svedeno(f.tarsi))) return false;
-  return true;
 }
 
 /** Една сесия · всичко, което ЕДИН човек е записал в ЕДИН ден. */
@@ -116,13 +73,9 @@ function chasa(s: Sabitie): string {
  * една и съща. `seq` е монотонен в своята верига и разчупва равенството, без
  * да въвежда ново поле (същият довод като при такта, `takt.ts`).
  */
-export function sesiite(
-  sabitiya: readonly Sabitie[],
-  f: FiltarNaZhurnala = PRAZEN_FILTAR,
-): readonly Sesiya[] {
+export function sesiite(sabitiya: readonly Sabitie[]): readonly Sesiya[] {
   const po = new Map<string, Sabitie[]>();
   for (const s of sabitiya) {
-    if (!prezFiltara(s, f)) continue;
     // Разделителят е знак, който НЕ може да е в имейл — иначе адрес с „·"
     // би слял два редактора. Нулевият знак не оцелява в никое поле.
     const klyuch = `${denyaNa(s)}\u0000${s.actor}`;
@@ -166,58 +119,53 @@ export function dnevnitteSesii(
   sabitiya: readonly Sabitie[],
   dnes: string,
 ): readonly Sesiya[] {
-  return sesiite(sabitiya, { ...PRAZEN_FILTAR, ot: dnes, do_: dnes });
-}
-
-/** Редакторите, срещани в Журнала · за менюто „име". */
-export function redaktorite(sabitiya: readonly Sabitie[]): readonly string[] {
-  return Object.freeze([...new Set(sabitiya.map((s) => s.actor))].sort());
+  return sesiite(sabitiya.filter((s) => denyaNa(s) === dnes));
 }
 
 /**
  * СВЕРКА ВХОД↔ИЗХОД · нито един ред не пада между сесиите (правило 7).
  *
- * ВХОД: колко събития минават филтъра. ИЗХОД: колко реда носят сесиите.
- * Разликата се записва и когато е нула — тя лови точно едно: събитие, което
- * филтърът е пуснал, а групирането е изгубило. Такова нещо на екран изглежда
- * като „човекът не е работил", а не като грешка.
+ * ВХОД: колко събития са минали стесняването. ИЗХОД: колко реда носят
+ * сесиите. Разликата се записва и когато е нула — тя лови точно едно:
+ * събитие, което филтърът е пуснал, а групирането е изгубило. Такова нещо
+ * на екран изглежда като „човекът не е работил", а не като грешка.
  */
 export function sveriSesiite(
-  sabitiya: readonly Sabitie[],
+  prezFiltara: readonly Sabitie[],
   sesii: readonly Sesiya[],
-  f: FiltarNaZhurnala,
   kogato: string,
 ): Sverka {
-  const vhod = sabitiya.filter((s) => prezFiltara(s, f)).length;
   const izhod = sesii.reduce((sbor, s) => sbor + s.broy, 0);
-  return sverka('сесии на редактора', vhod, izhod, kogato, MERKA.broy);
+  return sverka('сесии на редактора', prezFiltara.length, izhod, kogato, MERKA.broy);
 }
 
-/** Целият изглед · сесиите, редакторите и сверката, на едно място. */
+/** Целият изглед · сесиите и сверката, на едно място. */
 export interface ZhurnalatZaEkrana {
-  readonly filtar: FiltarNaZhurnala;
   readonly izklyuchen: boolean;
   readonly sesii: readonly Sesiya[];
-  readonly redaktori: readonly string[];
   readonly sverka: Sverka;
 }
 
+/**
+ * `filtrirani` е книгата СЛЕД стесняването от двигателя на екрана;
+ * `null` значи „нито един филтър не е пипнат" — тогава важи законът за
+ * ДНЕШНИЯ ден. Двете не се сливат: празен резултат от истински филтър е
+ * отговор, а не покана да се покаже друго.
+ */
 export function zhurnalatZaEkrana(
   sabitiya: readonly Sabitie[],
-  f: FiltarNaZhurnala,
+  filtrirani: readonly Sabitie[] | null,
   dnes: string,
   kogato: string,
 ): ZhurnalatZaEkrana {
-  const izklyuchen = filtaratEIzklyuchen(f);
-  const deystvasht: FiltarNaZhurnala = izklyuchen
-    ? { ...PRAZEN_FILTAR, ot: dnes, do_: dnes }
-    : f;
-  const sesii = sesiite(sabitiya, deystvasht);
+  const izklyuchen = filtrirani === null;
+  const deystvashti = izklyuchen
+    ? sabitiya.filter((s) => denyaNa(s) === dnes)
+    : filtrirani;
+  const sesii = sesiite(deystvashti);
   return Object.freeze({
-    filtar: f,
     izklyuchen,
     sesii,
-    redaktori: redaktorite(sabitiya),
-    sverka: sveriSesiite(sabitiya, sesii, deystvasht, kogato),
+    sverka: sveriSesiite(deystvashti, sesii, kogato),
   });
 }

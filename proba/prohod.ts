@@ -119,6 +119,12 @@ async function main(): Promise<void> {
     await smetki.blok12(ctx);
     await udobstvoto.blok2(ctx);
     await nastroyki.blok6(ctx);
+    // §137 стои СЛЕД §63: пише в Настройки и в Имоти, а добавената колона
+    // остава на екрана — по-ранните броячи на глави не бива да я виждат.
+    await nastroyki.blok7(ctx);
+    await nastroyki.blok8(ctx);
+    await nastroyki.blok9(ctx);
+    await nastroyki.blok10(ctx);
     /**
      * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
      *
@@ -134,6 +140,7 @@ async function main(): Promise<void> {
     await prodazhbi.blok2(ctx);
     await prodazhbi.blok3(ctx);
     await krediti.blok1(ctx);
+    await krediti.blok3(ctx);
     await krediti.blok2(ctx);
     await zaplati.blok1(ctx);
     await zaplati.blok2(ctx);
@@ -157,6 +164,10 @@ async function main(): Promise<void> {
     // състояние под следващия, е по-скъп от липсващ.
     await menyuta.blok4(ctx);
     await udobstvoto.blok5(ctx);
+    // §141 е ПОСЛЕДЕН нарочно: излиза и влиза като ДРУГ човек (служителя),
+    // а презареждането при изхода чисти всяко модулно състояние — блок след
+    // него би тръгнал от нула, без да го казва.
+    await nastroyki.blok11(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

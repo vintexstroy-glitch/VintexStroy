@@ -40,12 +40,18 @@ import {
   zashtoNeSePriema,
   type Predlozhenie,
 } from '../src/domein/zhurnal-ot-tablitsa.js';
+import { denyaNa, zhurnalatZaEkrana, type Sesiya } from '../src/domein/sesii.js';
+import { klyuchNaKletka, VGRADEN_ZHURNAL } from '../src/domein/dobavki.js';
+import { vidNaKolona } from '../src/domein/kolonno.js';
+import { pishi } from '../src/yadro/pari.js';
 import {
-  PRAZEN_FILTAR,
-  zhurnalatZaEkrana,
-  type FiltarNaZhurnala,
-  type Sesiya,
-} from '../src/domein/sesii.js';
+  filtarAktiven,
+  filtriray,
+  glaviNaTablitsata,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Sabitie } from '../src/yadro/index.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
@@ -57,7 +63,34 @@ import type { Konteks } from './ekranite.js';
  * се показва и когато никой не я гледа. Чете се, когато човек поиска.
  */
 let kniga: readonly Sabitie[] | null = null;
-let filtar: FiltarNaZhurnala = PRAZEN_FILTAR;
+
+/**
+ * КОЛОНИТЕ НА КНИГАТА за филтърния двигател (резен 75в · И124 т.2).
+ *
+ * Дотук секцията носеше СВОИ четири полета (от · до · кой · търси) — дубльор
+ * на способности, които двигателят вече има: От–До на датова колона, отметки
+ * по стойност и търсене през всички колони. Дубльорът падна; законът
+ * „изключен филтър = днешният ден" остана в домейна (`zhurnalatZaEkrana`).
+ * Товарът се търси, но не стои като визуална колона (`samoZaTarsene`).
+ */
+export const KOLONI_SESII: readonly KolonaSFiltar<Sabitie>[] = [
+  { klyuch: 'den', ime: 'Ден', vid: 'data', vzemi: denyaNa },
+  { klyuch: 'koy', ime: 'Кой', vid: 'tekst', vzemi: (s) => s.actor },
+  { klyuch: 'vid', ime: 'Вид', vid: 'tekst', vzemi: (s) => s.type },
+  {
+    klyuch: 'sashtnost',
+    ime: 'Същност',
+    vid: 'tekst',
+    vzemi: (s) => `${s.sashtnost.vid} · ${s.sashtnost.id}`,
+  },
+  {
+    klyuch: 'tovar',
+    ime: 'Товар',
+    vid: 'tekst',
+    samoZaTarsene: true,
+    vzemi: (s) => JSON.stringify(s.payload),
+  },
+];
 
 /** Прочетеното живее, докато секцията стои отворена. */
 let predlozheno: Predlozhenie | null = null;
@@ -98,7 +131,7 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number, dnes: string): 
       ${svrazki.length ? tablitsaNaSvrazkite(svrazki) : ''}
     </section>
 
-    ${blokNaSesiite(dnes)}`;
+    ${blokNaSesiite(o, dnes)}`;
 }
 
 /**
@@ -111,7 +144,7 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number, dnes: string): 
  * Книгата се чете С БУТОН, а не при всяко рисуване на Настройки: тя е цялата
  * история, а секцията стои на екрана и когато никой не я гледа.
  */
-function blokNaSesiite(dnes: string): string {
+function blokNaSesiite(o: Ogledalo, dnes: string): string {
   if (kniga === null) {
     return `
     <section data-sektsiya="zhurnal-sesii" data-otvoren="ne">
@@ -129,7 +162,11 @@ function blokNaSesiite(dnes: string): string {
     </section>`;
   }
 
-  const izgled = zhurnalatZaEkrana(kniga, filtar, dnes, new Date().toISOString());
+  // Стеснява ДВИГАТЕЛЯТ (същите отметки, От–До и търсене като на всяка
+  // таблица); домейнът получава стесненото и пази закона за днешния ден.
+  const aktiven = filtarAktiven('zhurnal-sesii', KOLONI_SESII);
+  const f = aktiven ? filtriray('zhurnal-sesii', kniga, KOLONI_SESII, dnes) : null;
+  const izgled = zhurnalatZaEkrana(kniga, f && f.redove, dnes, new Date().toISOString());
   return `
     <section data-sektsiya="zhurnal-sesii" data-otvoren="da"
              data-izklyuchen="${izgled.izklyuchen ? 'da' : 'ne'}">
@@ -140,23 +177,18 @@ function blokNaSesiite(dnes: string): string {
         }${izgled.izklyuchen ? ` · днешният ден (${ekraniraj(dnes)})` : ' · по филтъра'}</span>
       </div>
 
-      <div class="poleta">
-        <label class="pole"><span>От дата</span>
-          <input translate="no" type="date" id="sesii-ot" value="${ekraniraj(filtar.ot)}"></label>
-        <label class="pole"><span>До дата</span>
-          <input translate="no" type="date" id="sesii-do" value="${ekraniraj(filtar.do_)}"></label>
-        <label class="pole"><span>Име</span>
-          <input translate="no" id="sesii-koy" list="spisak-redaktori"
-                 value="${ekraniraj(filtar.koy)}" placeholder="имейл или част от него"></label>
-        <label class="pole"><span>Търси</span>
-          <input translate="no" id="sesii-tarsi" value="${ekraniraj(filtar.tarsi)}"
-                 placeholder="вид · същност · товар"></label>
+      ${poleZaTarsene('zhurnal-sesii')}
+      <div class="red glava sesii-glava" translate="no">
+        ${
+          /*
+           * БЕЗ ПОДРЕДБА: сесиите имат СВОЙ закон за реда — най-новата отпред,
+           * вътре по тайминга на записа (негово, дословно) — и дръжка, която
+           * не може да го промени, би била надпис в маскировка.
+           */
+          glaviNaTablitsata('zhurnal-sesii', KOLONI_SESII, kniga, dnes, true)
+        }
       </div>
-      <datalist id="spisak-redaktori" translate="no">
-        ${izgled.redaktori.map((x) => `<option value="${ekraniraj(x)}"></option>`).join('')}
-      </datalist>
       <div class="deystviya">
-        <button type="button" class="vtorichen" id="sesii-izchisti">Изчисти филтъра</button>
         <button type="button" class="vtorichen" id="sesii-zatvori">Затвори</button>
       </div>
 
@@ -171,8 +203,9 @@ function blokNaSesiite(dnes: string): string {
       ${
         izgled.sesii.length === 0
           ? '<p class="prazno">Нито една сесия по този филтър. Празното е отговор, не грешка.</p>'
-          : izgled.sesii.map(redNaSesiya).join('')
+          : izgled.sesii.map((s) => redNaSesiya(o, s)).join('')
       }
+      ${f ? redZaSkritoto(f, 'zhurnal-sesii') : ''}
 
       <div class="tablitsa">
         <div class="red sverka" translate="no">
@@ -189,8 +222,39 @@ function blokNaSesiite(dnes: string): string {
     </section>`;
 }
 
+/**
+ * ДОБАВКИТЕ НА ЕДНА СЕСИЯ (резен 82 · ADR-140) · „и в самия журнал".
+ *
+ * Редът на журнала е СЕСИЯТА (ден | кой) — клетката на добавка е бележка
+ * върху нея, не пипане по събитие: събитията са замразени (правило 1).
+ * ФОРМУЛНАТА добавка тук се казва с „—": сесиите не са табличен изглед и
+ * сметката им чака своя (казано, не преглътнато).
+ */
+function dobavkiteNaSesiyata(o: Ogledalo, s: Sesiya): string {
+  const m = o.modeli.get(VGRADEN_ZHURNAL);
+  if (!m || m.glavi.length === 0) return '';
+  const redId = `${s.den}|${s.koy}`;
+  return `<div class="sesiya-dobavki" translate="no">${m.glavi
+    .map((ime, k) => {
+      const kl = o.dobavkiKletki.get(klyuchNaKletka(VGRADEN_ZHURNAL, redId, k));
+      const formulna = m.formuli[k] !== undefined;
+      const pishe = !formulna && vidNaKolona(m, k) === 'promenlyva';
+      const tekst = formulna
+        ? '—'
+        : kl?.stoynost_st !== undefined
+          ? pishi(kl.stoynost_st)
+          : (kl?.stoynost ?? '') || '—';
+      return `<span class="sesiya-dobavka"><b>${ekraniraj(ime)}:</b> <span class="kletka"${
+        pishe
+          ? ` data-redakt="dobavka·${ekraniraj(klyuchNaKletka(VGRADEN_ZHURNAL, redId, k))}" title="Двоен клик или F2 — стойност на добавката"`
+          : ''
+      }><span>${ekraniraj(tekst)}</span></span></span>`;
+    })
+    .join('')}</div>`;
+}
+
 /** Една сесия · името, денят, часовете, и редовете под тях. */
-function redNaSesiya(s: Sesiya): string {
+function redNaSesiya(o: Ogledalo, s: Sesiya): string {
   return `
     <div class="karta sesiya" data-sesiya="${ekraniraj(`${s.den}·${s.koy}`)}"
          data-broy="${s.broy}">
@@ -200,6 +264,7 @@ function redNaSesiya(s: Sesiya): string {
           s.broy
         } ${s.broy === 1 ? 'запис' : 'записа'}</span>
       </div>
+      ${dobavkiteNaSesiyata(o, s)}
       ${s.redove
         .map(
           (r) => `<div class="istoriya-sabitie" translate="no" data-seq="${r.seq}">
@@ -338,25 +403,11 @@ export function zakachiZhurnalat(
   });
   koren.querySelector<HTMLButtonElement>('#sesii-zatvori')?.addEventListener('click', async () => {
     // Пуска книгата от паметта · тя е цялата история и няма защо да стои.
+    // Стесняването е на филтърния двигател и живее в паметта на екрана —
+    // затварянето не го пипа, както не пипа филтъра на никоя друга таблица.
     kniga = null;
-    filtar = PRAZEN_FILTAR;
     await prerisuvay();
   });
-  koren.querySelector<HTMLButtonElement>('#sesii-izchisti')?.addEventListener('click', async () => {
-    filtar = PRAZEN_FILTAR;
-    await prerisuvay();
-  });
-  for (const [znak, pole] of [
-    ['#sesii-ot', 'ot'],
-    ['#sesii-do', 'do_'],
-    ['#sesii-koy', 'koy'],
-    ['#sesii-tarsi', 'tarsi'],
-  ] as const) {
-    koren.querySelector<HTMLInputElement>(znak)?.addEventListener('change', async (e) => {
-      filtar = { ...filtar, [pole]: (e.target as HTMLInputElement).value.trim() };
-      await prerisuvay();
-    });
-  }
 
   koren.querySelector<HTMLButtonElement>('#zhurnal-iznesi')?.addEventListener('click', async () => {
     try {

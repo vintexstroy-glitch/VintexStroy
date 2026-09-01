@@ -155,6 +155,7 @@ export async function prenesiDela(n: {
       otgovornik: d.otgovornik,
       ot: d.ot,
       do: d.do,
+      chas: d.chas,
       otsenka: d.otsenka,
       sastoyanie: d.sastoyanie,
       // надделото пътува само ако е В партидата — иначе се изпразва

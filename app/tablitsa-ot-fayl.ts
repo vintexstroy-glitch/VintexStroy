@@ -32,7 +32,7 @@ import {
   sDumi,
   type PredlozhenieZaTablitsa,
 } from '../src/domein/tablitsa-ot-fayl.js';
-import { IMENA_NA_DEYSTVIYATA } from '../src/domein/formuli.js';
+import { imeNaDeystvie } from '../src/domein/formuli.js';
 import { IMENA_NA_VIDOVETE_STOYNOST, VIDOVE_STOYNOST, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
@@ -317,7 +317,7 @@ function predlozhenieto(p: PredlozhenieZaTablitsa): string {
             k.formula === undefined
               ? '—'
               : ekraniraj(
-                  `${IMENA_NA_DEYSTVIYATA[k.formula.deystvie]} на ${k.formula.ot
+                  `${imeNaDeystvie(k.formula.deystvie)} на ${k.formula.ot
                     .map((x) => p.koloni[x]?.ime ?? `колона ${x + 1}`)
                     .join(' · ')}`,
                 )

@@ -1,4 +1,10 @@
-import { DEYSTVIYA_NA_FORMULA, IMENA_NA_DEYSTVIYATA } from '../src/domein/formuli.js';
+import {
+  DEYSTVIYA_NA_FORMULA,
+  DEYSTVIYA_PO_REDOVE,
+  imeNaDeystvie,
+  type DeystvieNaFormula,
+  type DeystviePoRedove,
+} from '../src/domein/formuli.js';
 /**
  * ОБЩОТО НА ЕКРАНИТЕ · четирите помощника, които всички ползват.
  *
@@ -141,10 +147,13 @@ export function bezopasnoIme(tekst: string): string {
  * щеше да се появи в едното меню и да липсва в другото, без нищо да падне.
  * `npm run chistota` го хвана като пет еднакви реда.
  */
-export function menyuNaDeystviyata(id: string, ime = 'deystvie'): string {
+export function menyuNaDeystviyata(id: string, ime = 'deystvie', sRedove = false): string {
+  // Агрегатите по редове (резен 81) влизат само където има РЕДОВЕ — полето
+  // с формула в Отчети смята две числа-извори и няма какво да прави с тях.
+  const deystviya: readonly (DeystvieNaFormula | DeystviePoRedove)[] = sRedove
+    ? [...DEYSTVIYA_NA_FORMULA, ...DEYSTVIYA_PO_REDOVE]
+    : DEYSTVIYA_NA_FORMULA;
   return `<select translate="no" id="${id}" name="${ime}">
-    ${DEYSTVIYA_NA_FORMULA.map(
-      (d) => `<option value="${d}">${IMENA_NA_DEYSTVIYATA[d]}</option>`,
-    ).join('')}
+    ${deystviya.map((d) => `<option value="${d}">${imeNaDeystvie(d)}</option>`).join('')}
   </select>`;
 }

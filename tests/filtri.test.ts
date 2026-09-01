@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { podrediGrupi } from '../app/filtri.js';
+import { filtarAktiven, filtriray, podrediGrupi, prezOtdo, slozhiOtdo } from '../app/filtri.js';
 
 function grupi(...imena: string[]): Map<string, number> {
   return new Map(imena.map((i, k) => [i, k + 1]));
@@ -87,5 +87,69 @@ describe('другите видове запазват своя ред', () => {
     const r = imena(podrediGrupi('data', grupi('2026-07', 'Вчера', '2026-08', 'Днес')));
     expect(r.slice(0, 2)).toEqual(['Днес', 'Вчера']);
     expect(r.slice(2)).toEqual(['2026-08', '2026-07']);
+  });
+});
+
+/**
+ * ОТ–ДО НА ДАТОВА КОЛОНА (резен 75 · И124 т.2) · погълнатата способност.
+ *
+ * Дубльорите по екраните даваха точен обхват, а готовите групи — не. Преди
+ * дубльор да падне, двигателят трябва да може всичко, което той може.
+ */
+describe('От–До на датова колона', () => {
+  it('реже по двете граници · включително самите гранични дни', () => {
+    const granitsi = { ot: '2026-05-01', do_: '2026-05-31' };
+    expect(prezOtdo('2026-05-01', granitsi)).toBe(true);
+    expect(prezOtdo('2026-05-31', granitsi)).toBe(true);
+    expect(prezOtdo('2026-04-30', granitsi)).toBe(false);
+    expect(prezOtdo('2026-06-01', granitsi)).toBe(false);
+    // и стойност с час се реже по ДЕНЯ си, не по низа
+    expect(prezOtdo('2026-05-31T23:59:00.000Z', granitsi)).toBe(true);
+  });
+
+  it('празната граница значи ОТВОРЕНО натам', () => {
+    expect(prezOtdo('1999-01-01', { ot: '', do_: '2026-05-31' })).toBe(true);
+    expect(prezOtdo('2099-01-01', { ot: '2026-05-01', do_: '' })).toBe(true);
+    expect(prezOtdo('2026-04-30', { ot: '2026-05-01', do_: '' })).toBe(false);
+  });
+
+  it('празни и двете — записът пада целият · „нищо въведено" не е филтър', () => {
+    slozhiOtdo('proba:Дата', 'ot', '2026-05-01');
+    slozhiOtdo('proba:Дата', 'ot', '');
+    // Няма как да пипнем скритата карта отвън — но filtriray я чете: без
+    // граници нито един ред не пада.
+    const koloni = [
+      { klyuch: 'Дата', ime: 'Дата', vid: 'data' as const, vzemi: (r: { data: string }) => r.data },
+    ];
+    const redove = [{ data: '1999-01-01' }, { data: '2099-12-31' }];
+    expect(filtriray('proba', redove, koloni, '2026-09-01').redove).toHaveLength(2);
+  });
+
+  it('filtriray реже по От–До, а „изчистването" връща всичко', () => {
+    const koloni = [
+      { klyuch: 'Дата', ime: 'Дата', vid: 'data' as const, vzemi: (r: { data: string }) => r.data },
+    ];
+    const redove = [{ data: '2026-05-10' }, { data: '2026-06-10' }, { data: '2026-07-10' }];
+    slozhiOtdo('proba2:Дата', 'ot', '2026-06-01');
+    slozhiOtdo('proba2:Дата', 'do_', '2026-06-30');
+    const f = filtriray('proba2', redove, koloni, '2026-09-01');
+    expect(f.redove.map((r) => r.data)).toEqual(['2026-06-10']);
+    expect(f.skriti).toBe(2);
+    slozhiOtdo('proba2:Дата', 'ot', '');
+    slozhiOtdo('proba2:Дата', 'do_', '');
+    expect(filtriray('proba2', redove, koloni, '2026-09-01').redove).toHaveLength(3);
+  });
+});
+
+describe('активен ли е филтърът · Журналът пита, за да пази закона за деня', () => {
+  it('чистата таблица е ИЗКЛЮЧЕНА · пипнато От–До я пали, махнато я гаси', () => {
+    const koloni = [
+      { klyuch: 'Дата', ime: 'Дата', vid: 'data' as const, vzemi: (r: { data: string }) => r.data },
+    ];
+    expect(filtarAktiven('proba3', koloni)).toBe(false);
+    slozhiOtdo('proba3:Дата', 'ot', '2026-06-01');
+    expect(filtarAktiven('proba3', koloni)).toBe(true);
+    slozhiOtdo('proba3:Дата', 'ot', '');
+    expect(filtarAktiven('proba3', koloni)).toBe(false);
   });
 });

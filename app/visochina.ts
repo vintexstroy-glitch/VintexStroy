@@ -10,13 +10,13 @@
  * ръба на кой да е ред, всички стават толкова. Колоната НЕ следва това правило:
  * всяка си остава своя (ADR-013 · видът и ширината живеят в колоната).
  *
- * ═══ ДВА ЛОСТА, ЕДНО ЧИСЛО ═══
+ * ═══ ТЕМАТА ДАВА ПОДРАЗБРАНОТО · ВЛАЧЕНЕТО БИЕ (резен 78 · И124 т.5) ═══
  *
- * Негов избор беше „и двете": влачене по ръба, като в Ексел, И три готови
- * гъстоти. Те не са две настройки — те пипат ЕДНО число. Гъстотата е име на
- * число; влаченето е същото число, казано с ръка. Затова изборът се помни като
- * ПИКСЕЛИ, а името се СМЯТА обратно (`gastotaNa`): две памети за едно нещо се
- * разминават при първото влачене.
+ * Трите готови гъстоти и лостът им (☰ на всяка секция) са НАДЖИВЕНИ: „те да
+ * са 2 броя и да са теми за натоварването" — двете теми живеят в профила
+ * (`app/tema.ts`) и слагат подразбраната височина на корена. Тук остава
+ * Ексел-жестът: влаченето по ръба, което пипа СВОЯТА таблица и бие темата.
+ * Изборът се помни като ПИКСЕЛИ — име за смятане обратно вече няма.
  *
  * ═══ ЗАЩО В ПАМЕТТА НА ЕКРАНА ═══
  *
@@ -33,27 +33,11 @@
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 
-/** Трите готови гъстоти · име на число, не отделна настройка. */
-export const GASTOTI = ['sbito', 'sredno', 'shiroko'] as const;
-export type Gastota = (typeof GASTOTI)[number];
-
-const IMENA_NA_GASTOTITE: Readonly<Record<Gastota, string>> = Object.freeze({
-  sbito: 'Сбито',
-  sredno: 'Средно',
-  shiroko: 'Широко',
-});
-
 /**
- * ВИСОЧИНИТЕ · в пиксели.
- *
- * „Средно" е 48 — премереният ред след резен 8 (`ВИСОЧИНА НА РЕД: 49px`).
- * Тоест подразбраното НЕ мени нищо: то е онова, което вече стои на екрана.
+ * ПОДРАЗБРАНАТА ВИСОЧИНА · премереният ред след резен 8 (49px).
+ * Темите (`tema.ts`) я предефинират през `--tema-red-visochina` на корена.
  */
-export const VISOCHINI: Readonly<Record<Gastota, number>> = Object.freeze({
-  sbito: 32,
-  sredno: 48,
-  shiroko: 68,
-});
+export const PODRAZBRANA = 48;
 
 /** Под 24px не се пипа с пръст, над 160px редът престава да е ред. */
 export const NAY_MALKO = 24;
@@ -61,32 +45,23 @@ export const NAY_GOLYAMO = 160;
 
 /** Пиксели в позволеното · чиста функция. */
 export function ogranichi(px: number): number {
-  if (!Number.isFinite(px)) return VISOCHINI.sredno;
+  if (!Number.isFinite(px)) return PODRAZBRANA;
   return Math.min(NAY_GOLYAMO, Math.max(NAY_MALKO, Math.round(px)));
-}
-
-/**
- * КОЯ ГЪСТОТА Е ТОВА ЧИСЛО · най-близката, не точното съвпадение.
- *
- * След влачене числото рядко пада точно върху предварително число, а лостът пак
- * трябва да покаже кое от трите е отбелязано. Точното съвпадение би оставило и
- * трите неотбелязани веднага след първото дръпване.
- */
-export function gastotaNa(px: number): Gastota {
-  let nay: Gastota = 'sredno';
-  let razlika = Infinity;
-  for (const g of GASTOTI) {
-    const r = Math.abs(VISOCHINI[g] - px);
-    if (r < razlika) {
-      razlika = r;
-      nay = g;
-    }
-  }
-  return nay;
 }
 
 function klyuchat(tablitsa: string): string {
   return `red.visochina.${tablitsa}`;
+}
+
+/**
+ * Запомнената височина за този ключ · за рисувачи, които не минават през CSS.
+ *
+ * Диаграмата на Ганта е SVG и смята координати с числа, не с променливи —
+ * тя чете СЪЩАТА памет при всяко рисуване, за да важи И104: „Редовете в
+ * таблицата и колоната са едно."
+ */
+export function zapomnenaVisochina(klyuch: string, nachalo: number): number {
+  return ogranichi(chetiEkranno<number>(klyuchat(klyuch), nachalo));
 }
 
 /** Ключът на таблицата · свой, ако го има; инак този на секцията ѝ. */
@@ -97,9 +72,25 @@ function klyuchNaTablitsata(t: HTMLElement): string {
   return sektsiya?.dataset['sektsiya'] ?? '';
 }
 
+/**
+ * Началната височина на ТАЗИ таблица · чете се от нейния CSS, не се преписва.
+ *
+ * Таблиците подразбират 48 (`.tablitsa`), а Гантът 26 (`.gant`) — двете числа
+ * живеят в `stil.css` и само там (правило 17). Прочете ли се оттам, влизането
+ * на Ганта в двигателя не му мени изгледа: подразбраното Е днешното.
+ */
+function nachalotoNa(t: HTMLElement): number {
+  // Изричен разбор, не parseFloat: празна или чужда стойност пада на
+  // подразбраното ПОИМЕННО, вместо NaN да тръгне към екрана.
+  const surovo = /^(\d+(?:\.\d+)?)px$/.exec(
+    getComputedStyle(t).getPropertyValue('--red-visochina').trim(),
+  );
+  return surovo === null ? PODRAZBRANA : Number(surovo[1]);
+}
+
 /** Колко е висок редът на тази таблица сега. */
-function visochinataNa(tablitsa: string): number {
-  return ogranichi(chetiEkranno<number>(klyuchat(tablitsa), VISOCHINI.sredno));
+function visochinataNa(tablitsa: string, nachalo: number): number {
+  return zapomnenaVisochina(tablitsa, nachalo);
 }
 
 /** Широчината на зоната за влачене по долния ръб на реда. */
@@ -113,57 +104,21 @@ const RAB = 6;
  * трябва да се повтори за всеки нов ред.
  */
 export function zakachiVisochinata(koren: HTMLElement): void {
-  for (const t of koren.querySelectorAll<HTMLElement>('.tablitsa')) {
+  // `.gant` е втората шарка на таблица: редовете му са `.gant-delo` (имената)
+  // и `.gant-red` (колоната на времето), не `.red` — но височината е СЪЩОТО
+  // едно число, защото „редовете в таблицата и колоната са едно" (И104).
+  for (const t of koren.querySelectorAll<HTMLElement>('.tablitsa, .gant')) {
     const klyuch = klyuchNaTablitsata(t);
     if (klyuch === '') continue;
+    const nachalo = nachalotoNa(t);
+    // ЛОСТЪТ НА ГЪСТОТИТЕ ГО НЯМА ВЕЧЕ (резен 78 · ADR-135): подразбраното
+    // идва от ТЕМАТА на корена; тук се слага само ръчно извлаченото.
     const postavi = (px: number): void => {
       t.style.setProperty('--red-visochina', `${px}px`);
-      const g = gastotaNa(px);
-      t.dataset['gastota'] = g;
-      // Отбелязаната гъстота се СМЯТА от числото, не се пази втори път.
-      for (const b of glavata(t)?.querySelectorAll<HTMLButtonElement>('[data-gastota]') ?? []) {
-        if (b.dataset['za'] !== klyuch) continue;
-        b.setAttribute('aria-pressed', b.dataset['gastota'] === g ? 'true' : 'false');
-      }
     };
-    postavi(visochinataNa(klyuch));
-    lostaNaGastotite(t, klyuch, postavi);
-    vlacheneToPoRaba(t, klyuch, postavi);
-  }
-}
-
-/** Главата на секцията, в която живее лостът · един дом за този въпрос. */
-function glavata(t: HTMLElement): Element | null {
-  return t.closest('[data-sektsiya]')?.querySelector('.dyalglava') ?? null;
-}
-
-/** Трите гъстоти · в главата на секцията, до стрелките за подредба. */
-function lostaNaGastotite(
-  t: HTMLElement,
-  klyuch: string,
-  postavi: (px: number) => void,
-): void {
-  const glava = glavata(t);
-  if (!glava || glava.querySelector(`[data-gastota][data-za="${CSS.escape(klyuch)}"]`)) return;
-  const kutiya = document.createElement('span');
-  kutiya.className = 'gastotata';
-  kutiya.setAttribute('role', 'group');
-  kutiya.setAttribute('aria-label', 'Височина на реда');
-  kutiya.innerHTML = GASTOTI.map(
-    (g) =>
-      `<button type="button" data-gastota="${g}" data-za="${klyuch}" title="${
-        IMENA_NA_GASTOTITE[g]
-      } · ${VISOCHINI[g]}px" aria-label="${IMENA_NA_GASTOTITE[g]}">${
-        g === 'sbito' ? '≡' : g === 'sredno' ? '☰' : '▤'
-      }</button>`,
-  ).join('');
-  glava.append(kutiya);
-  for (const b of kutiya.querySelectorAll<HTMLButtonElement>('[data-gastota]')) {
-    b.addEventListener('click', () => {
-      const px = VISOCHINI[b.dataset['gastota'] as Gastota];
-      zapomniEkranno(klyuchat(klyuch), px);
-      postavi(px);
-    });
+    const svoya = chetiEkranno<number | null>(klyuchat(klyuch), null);
+    if (svoya !== null) postavi(ogranichi(svoya));
+    vlacheneToPoRaba(t, klyuch, nachalo, postavi);
   }
 }
 
@@ -186,16 +141,22 @@ function lostaNaGastotite(
 function vlacheneToPoRaba(
   t: HTMLElement,
   klyuch: string,
+  nachaloNaTablitsata: number,
   postavi: (px: number) => void,
 ): void {
   t.addEventListener('pointerdown', (e) => {
-    const red = (e.target as HTMLElement).closest<HTMLElement>('.red');
+    // Редът има три лица: `.red` (решетъчните таблици), `tbody > tr`
+    // (истинските `<table>` — дотук влаченето не ги познаваше и височината
+    // там беше декорация), и двете половини на Ганта (И104).
+    const red = (e.target as HTMLElement).closest<HTMLElement>(
+      '.red, tbody > tr, .gant-delo, .gant-red',
+    );
     if (!red || !t.contains(red)) return;
     const ramka = red.getBoundingClientRect();
     if (e.clientY < ramka.bottom - RAB) return;
     e.preventDefault();
     const nachalo = e.clientY;
-    const beshe = visochinataNa(klyuch);
+    const beshe = visochinataNa(klyuch, nachaloNaTablitsata);
     t.setPointerCapture(e.pointerId);
     let sega = beshe;
 

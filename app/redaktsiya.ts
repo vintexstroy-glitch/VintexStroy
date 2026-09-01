@@ -305,26 +305,103 @@ function otvori(kletka: HTMLElement): void {
   const beleg = kletka.dataset['redakt']!;
   const tochka = beleg.indexOf('·');
   const vidNaRedaktora = beleg.slice(0, tochka);
+  // ДОБАВКАТА (резен 79) върви по свой клон: стойността ѝ не е число от
+  // екрана, а запис в Огледалото, и видът ѝ го казва КОЛОНАТА (ADR-014).
+  if (vidNaRedaktora === 'dobavka') {
+    void otvoriDobavka(kletka, beleg.slice(tochka + 1));
+    return;
+  }
   const redaktor = REDAKTORI[vidNaRedaktora];
   const id = beleg.slice(tochka + 1);
   const surovo = Number(kletka.dataset['surovo']);
   if (!redaktor || !Number.isFinite(surovo)) return;
-  const k = konteks;
-  const prerisuvay = prerisuvayEkrana;
+  const vrata = predPole();
+  if (!vrata) return;
+  const { k, prerisuvay } = vrata;
 
-  // Правило 23 · питаме ПРЕДИ да отворим поле. Поле, което се отваря и после
-  // отказва при Enter, обещава запис, който няма да стане.
+  poleNaMyastoto(kletka, redaktor.kamTekst(surovo), async (pole, e, dvete) => {
+    let novo: number;
+    try {
+      novo = redaktor.otTekst(pole.value);
+    } catch (greshka) {
+      // отказът е с думи и полето ОСТАВА отворено — човекът поправя, не гадае
+      pole.classList.add('zle');
+      pole.title = dumiZaGreshka(greshka);
+      return;
+    }
+
+    // Ctrl+Enter · въведеното ляга ВЪВ ВСИЧКИ избрани клетки от същия вид —
+    // жестът на Excel за „едно число на много редове". Изборът е опънат с
+    // Shift ПРЕДИ F2; редакторът не го е убил.
+    if (e.ctrlKey || e.metaKey) {
+      const tseli = redaktiruemiOtIzbora().filter((t) => t.vid === vidNaRedaktora);
+      if (tseli.length > 1) {
+        dvete.zatvori();
+        await zapishiVMnogo(vidNaRedaktora, tseli, novo, 'Ctrl+Enter · във всички избрани');
+        return;
+      }
+      // една клетка в избора — жестът е единичен запис, пада надолу
+    }
+
+    if (novo === surovo) {
+      // нищо не се е сменило — нищо не влиза в Журнала (правило 20)
+      dvete.otkazhi();
+      return;
+    }
+    dvete.zatvori(); // прерисуването след записа не бива да „отказва"
+    try {
+      await redaktor.zapis(
+        k,
+        id,
+        novo,
+        prichinaZaRedaktsiya(redaktor.sDumi(surovo), redaktor.sDumi(novo)),
+      );
+      k.vest(
+        'dobre',
+        `Поправено: ${redaktor.sDumi(surovo)} → ${redaktor.sDumi(novo)}. Старото остава в Журнала.`,
+      );
+    } catch (greshka) {
+      k.vest('zle', dumiZaGreshka(greshka));
+    }
+    await prerisuvay();
+  });
+}
+
+/**
+ * ПАЗАЧЪТ НА ДВАТА КЛОНА · контекстът и правило 23, питани ПРЕДИ полето.
+ * Поле, което се отваря и после отказва при Enter, обещава запис, който
+ * няма да стане — затова отказът е тук, с думи, преди каквото и да е поле.
+ */
+function predPole(): { k: Konteks; prerisuvay: () => Promise<void> } | null {
+  if (!konteks || !prerisuvayEkrana) return null;
   const otgovor = mozheDaPopraviKletka(rolyata);
   if (!otgovor.mozhe) {
-    k.vest('zle', otgovor.prichina);
-    return;
+    konteks.vest('zle', otgovor.prichina);
+    return null;
   }
+  return { k: konteks, prerisuvay: prerisuvayEkrana };
+}
 
+/**
+ * ПОЛЕТО НА МЯСТОТО НА КЛЕТКАТА · общият скелет на двата клона (числовият и
+ * добавката): снимка на старото съдържание, поле с целия текст избран, клик
+ * другаде = отказ, Escape затваря РЕДАКТОРА, Enter подава на клона. Записва
+ * човекът, явно — единствено Enter пише.
+ */
+function poleNaMyastoto(
+  kletka: HTMLElement,
+  nachalno: string,
+  priEnter: (
+    pole: HTMLInputElement,
+    e: KeyboardEvent,
+    dvete: { readonly otkazhi: () => void; readonly zatvori: () => void },
+  ) => Promise<void>,
+): void {
   const staroto = [...kletka.childNodes];
   const pole = document.createElement('input');
   pole.className = 'kletka-redaktor';
   pole.setAttribute('translate', 'no');
-  pole.value = redaktor.kamTekst(surovo);
+  pole.value = nachalno;
   kletka.replaceChildren(pole);
   pole.focus();
   pole.select(); // цялата стойност — писането направо я заменя, като в Excel
@@ -345,45 +422,80 @@ function otvori(kletka: HTMLElement): void {
       return;
     }
     if (e.key !== 'Enter') return;
-    let novo: number;
-    try {
-      novo = redaktor.otTekst(pole.value);
-    } catch (greshka) {
-      // отказът е с думи и полето ОСТАВА отворено — човекът поправя, не гадае
-      pole.classList.add('zle');
-      pole.title = dumiZaGreshka(greshka);
-      return;
-    }
+    await priEnter(pole, e, { otkazhi, zatvori: () => void (zatvoreno = true) });
+  });
+}
 
-    // Ctrl+Enter · въведеното ляга ВЪВ ВСИЧКИ избрани клетки от същия вид —
-    // жестът на Excel за „едно число на много редове". Изборът е опънат с
-    // Shift ПРЕДИ F2; редакторът не го е убил.
-    if (e.ctrlKey || e.metaKey) {
-      const tseli = redaktiruemiOtIzbora().filter((t) => t.vid === vidNaRedaktora);
-      if (tseli.length > 1) {
-        zatvoreno = true;
-        await zapishiVMnogo(vidNaRedaktora, tseli, novo, 'Ctrl+Enter · във всички избрани');
+/**
+ * КЛЕТКАТА НА ДОБАВЕНА КОЛОНА (резен 79 · ADR-137) · същата врата, свой клон.
+ *
+ * Жестът е ЕДИН (двоен клик / F2) и пазачът на правило 23 е СЪЩИЯТ — но
+ * записът не е поправка на чужда същност, а `КлеткаНаДобавкаЗаписана` върху
+ * адреса „таблица · ред · колона", който клетката носи в `data-redakt`
+ * дословно: той е и ключът в `o.dobavkiKletki`.
+ *
+ * Групите (Ctrl+D · Ctrl+Enter) НЕ хващат добавките: те искат `data-surovo`
+ * число, а добавката може да е текст. Казано в ADR-137 §5, не преглътнато.
+ */
+async function otvoriDobavka(kletka: HTMLElement, adres: string): Promise<void> {
+  const vrata = predPole();
+  if (!vrata) return;
+  const { k, prerisuvay } = vrata;
+
+  const chasti = adres.split('·');
+  const tablitsa = chasti[0] ?? '';
+  const redId = chasti[1] ?? '';
+  const kolona = Number(chasti[2]);
+  const o = await k.deystviya.ogledalo();
+  const m = o.modeli.get(tablitsa);
+  const ime = m?.glavi[kolona];
+  if (!m || ime === undefined || kletka.querySelector('input')) return;
+  const evro = (m.vidove[kolona] ?? 'tekst') === 'evro';
+  const zapisano = o.dobavkiKletki.get(adres);
+  const staro = evro
+    ? zapisano?.stoynost_st !== undefined
+      ? pishiVPole(zapisano.stoynost_st)
+      : ''
+    : (zapisano?.stoynost ?? '');
+
+  poleNaMyastoto(kletka, staro, async (pole, _e, dvete) => {
+    let tovar: { stoynost?: string; stoynost_st?: number };
+    let sDumi: string;
+    if (evro) {
+      let novo_st: number;
+      try {
+        // празното НЕ е нула: нулата се пише „0,00", а празно поле е отказ
+        novo_st = otSuma(pole.value);
+      } catch (greshka) {
+        pole.classList.add('zle');
+        pole.title = dumiZaGreshka(greshka);
         return;
       }
-      // една клетка в избора — жестът е единичен запис, пада надолу
+      if (zapisano?.stoynost_st === novo_st) {
+        dvete.otkazhi();
+        return;
+      }
+      tovar = { stoynost_st: novo_st };
+      sDumi = pishi(novo_st);
+    } else {
+      const novo = pole.value.trim();
+      if ((zapisano?.stoynost ?? '') === novo) {
+        // нищо не се е сменило — нищо не влиза в Журнала (правило 20)
+        dvete.otkazhi();
+        return;
+      }
+      tovar = { stoynost: novo };
+      sDumi = novo === '' ? 'празно' : `„${novo}"`;
     }
-
-    if (novo === surovo) {
-      // нищо не се е сменило — нищо не влиза в Журнала (правило 20)
-      otkazhi();
-      return;
-    }
-    zatvoreno = true; // прерисуването след записа не бива да „отказва"
+    dvete.zatvori();
     try {
-      await redaktor.zapis(
-        k,
-        id,
-        novo,
-        prichinaZaRedaktsiya(redaktor.sDumi(surovo), redaktor.sDumi(novo)),
+      await k.deystviya.zapishiKletkaNaDobavka(
+        { tablitsa, redId, kolona, ...tovar },
+        { opId: `redaktsiya:${crypto.randomUUID()}` },
       );
       k.vest(
         'dobre',
-        `Поправено: ${redaktor.sDumi(surovo)} → ${redaktor.sDumi(novo)}. Старото остава в Журнала.`,
+        `Записано в „${ime}": ${sDumi}.${zapisano ? ' Старата стойност остава в Журнала.' : ''}`,
       );
     } catch (greshka) {
       k.vest('zle', dumiZaGreshka(greshka));

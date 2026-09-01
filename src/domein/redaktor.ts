@@ -83,10 +83,14 @@ function otpechatakOtGlavi(glavi: readonly string[]): string {
   return glavi.map(svedenaGlava).join('|');
 }
 
-/** Старият отпечатък влиза в историята веднъж — списъкът расте, не се дублира. */
+/** Старият отпечатък влиза в историята веднъж — списъкът расте, не се дублира.
+ *  ПРАЗНИЯТ отпечатък не е история: той е „още нищо" — празният наслагваем
+ *  модел на вградена (резен 79). Влезе ли в `predishni`, всеки празен модел
+ *  става „роднина" на всеки друг и семейството разнася колони между чужди
+ *  таблици (платено с §140: колоната на Журнала отиде и при Имоти). */
 function sPredishen(m: ModelNaTablitsa, novi: readonly string[]): readonly string[] {
   const nov = otpechatakOtGlavi(novi);
-  if (nov === m.otpechatak) return m.predishni;
+  if (nov === m.otpechatak || m.otpechatak === '') return m.predishni;
   return m.predishni.includes(m.otpechatak)
     ? m.predishni
     : Object.freeze([...m.predishni, m.otpechatak]);
@@ -571,7 +575,10 @@ export function semeystvo(
   modeli: readonly ModelNaTablitsa[],
   m: ModelNaTablitsa,
 ): readonly ModelNaTablitsa[] {
-  const negovite = new Set([m.otpechatak, ...m.predishni]);
+  // Празният отпечатък НЕ е роднинство — той значи „още нито една колона"
+  // (празният наслагваем модел, резен 79). Пази се и тук, за да не слепи
+  // модел, чиито `predishni` вече носят '' от стар запис.
+  const negovite = new Set([m.otpechatak, ...m.predishni].filter((o) => o !== ''));
   return modeli.filter(
     (drug) =>
       drug.klyuch !== m.klyuch &&

@@ -34,7 +34,7 @@ import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Samolichnost, Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import { IMENA_NA_ROLITE } from '../src/yadro/samolichnost.js';
 import { napraviSluzhitel, podredeni } from '../src/domein/sluzhiteli.js';
-import { zhivite } from '../src/domein/dela.js';
+import { vDnevniyaRed } from '../src/domein/dela.js';
 import { svediImeyl } from '../src/domein/akaunt.js';
 import {
   chakashti,
@@ -463,7 +463,7 @@ function formaZaPrashtane(
   dnes: string,
   sKalendar: boolean,
 ): string {
-  const dela = zhivite([...o.dela.values()]).filter((d) => d.otsenka !== 'завършено');
+  const dela = vDnevniyaRed([...o.dela.values()]);
   return `
     <section data-sektsiya="sluzhiteli-prashtane" class="karta">
       <div class="dyalglava">
