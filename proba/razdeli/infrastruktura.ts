@@ -550,6 +550,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const redove: string[] = [];
     let nayMnogoGoli = 0;
     let nayMnogoPrazno = 0;
+    let nayMnogoKuli = 0;
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
@@ -568,7 +569,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
           return r.width > 0 && r.height > 0;
         };
         const telo = document.querySelector('.telo');
-        if (!telo) return { goli: 0, vGrupa: 0, prazno: 0 };
+        if (!telo) return { goli: 0, vGrupa: 0, prazno: 0, kuli: 0 };
         // БРОИ СЕ ЧЕРУПКАТА, не данните.
         //
         // Първият ми опит броеше ВСИЧКИ бутони под `.telo` и даваше 476 за
@@ -592,18 +593,32 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
           const r = (v as HTMLElement).getBoundingClientRect();
           if (r.height > 0 && r.width > nayShirok && r.width <= shirina + 1) nayShirok = r.width;
         }
+        // РЕДЪТ-КУЛА · две и повече ВИДИМИ действия с дума в един ред С ДАННИ.
+        // Редовият лост (ADR-133 §4) трябва да ги е свил до едно — видимото до
+        // него е стрелкичката, а тя няма дума. Прагът е НУЛА, не днешно число:
+        // една кула връща точно шума, който резените 63–76 платиха да падне
+        // (резен 84 · И121 т.6). ГЛАВИТЕ не се броят: бутонът в глава е
+        // филтърът на колоната — той самият е негова поръчка (И124 т.2).
+        const kuli = [...telo.querySelectorAll('.red:not(.glava)')].filter((red) => {
+          const deystviya = [...red.querySelectorAll('button')]
+            .filter(vidim)
+            .filter((b) => /\p{L}/u.test((b.querySelector('.duma') ?? b).textContent ?? ''));
+          return deystviya.length >= 2;
+        }).length;
         // „В група" вече няма (И124 т.3 · ADR-133): бутоните са самостоятелни
         // по негова дума, значи всяко видимо управление се брои голо.
         return {
           goli: upravleniya.length,
           prazno: Math.round(shirina - nayShirok),
+          kuli,
         };
       });
       redove.push(
-        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px`,
+        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px · кули ${m.kuli}`,
       );
       if (m.goli > nayMnogoGoli) nayMnogoGoli = m.goli;
       if (m.prazno > nayMnogoPrazno) nayMnogoPrazno = m.prazno;
+      if (m.kuli > nayMnogoKuli) nayMnogoKuli = m.kuli;
     }
     console.log(`\n  ПЛЪТНОСТТА НА ЕКРАНА (праг ${PRAG_GOLI} голи · ${PRAG_PRAZNO}px празно)\n${redove.join('\n')}\n`);
 
@@ -615,6 +630,11 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri(
       `най-празен екран · неизползвано отдясно под ${PRAG_PRAZNO}px`,
       nayMnogoPrazno <= PRAG_PRAZNO ? 'да' : `не · ${nayMnogoPrazno}px`,
+      'да',
+    );
+    proveri(
+      'нито един ред-кула · лостът свива действията до едно (резен 84)',
+      nayMnogoKuli === 0 ? 'да' : `не · ${nayMnogoKuli}`,
       'да',
     );
 
@@ -797,9 +817,12 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
  * ХРАПОВИТЕ ПРАГОВЕ · днешните числа, които могат само да ПАДАТ.
  *
  * Вдигане на праг е решение, не поправка: то се вижда в диф-а и иска дума.
+ * Затегнати в резен 84 (78 → 50 · 40 → 38): резените 63–78 свалиха шума и
+ * храповото ЗАДЪРЖА спечеленото — най-натовареният екран е 46 голи, а
+ * най-празният 37px. Луфтът е малък нарочно.
  */
-const PRAG_GOLI = 78;
-const PRAG_PRAZNO = 40;
+const PRAG_GOLI = 50;
+const PRAG_PRAZNO = 38;
 
 /** 48 · джобът накрая */
 export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
