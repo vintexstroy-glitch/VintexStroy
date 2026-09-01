@@ -32,7 +32,7 @@ import type { ZakacheniDokumenti } from '../domein/dokumenti.js';
 import { klyuchNaDokumenti } from '../domein/dokumenti.js';
 import type { DvizhenieNaProdazhba, Prodazhba } from '../domein/prodazhbi.js';
 import type { Kredit, PlashtanePoKredit } from '../domein/krediti.js';
-import type { Otsenka } from '../domein/dela.js';
+import { prevediOtsenkata } from '../domein/dela.js';
 import type { PoleSFormula } from '../domein/pole-s-formula.js';
 import type { DeystvieNaFormula } from '../domein/formuli.js';
 import type {
@@ -1269,8 +1269,11 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           otgovornik: p.otgovornik,
           ot: p.ot,
           do: p.do,
-          otsenka: p.otsenka as Delo['otsenka'],
-          sastoyanie: p.sastoyanie as Delo['sastoyanie'],
+          // Старите Журнали носят петата оценка „завършено" — чете се
+          // ПОИМЕННО и се превежда (И124 т.6 · образецът на ADR-106).
+          ...(prevediOtsenkata(p.otsenka, p.sastoyanie) as {
+            otsenka: Delo['otsenka']; sastoyanie: Delo['sastoyanie'];
+          }),
           nadDelo: p.nadDelo,
           dokument: p.dokument,
           // КОГА и КОЙ · от ПОСЛЕДНОТО записване, не от създаването (резен 30).
@@ -1477,7 +1480,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // ѝ смисъл — „не е казано". Стар запис не се пренаписва (правило 1).
           chas: p.chas ?? '',
           otgovornik: p.otgovornik ?? '',
-          otsenka: (p.otsenka ?? 'нито-едно') as Otsenka,
+          // Липсващата (преди резен 41) пада на „нито-едно"; старата пета
+          // „завършено" се ИЗКЛЮЧВА — както при делото (И124 т.6).
+          otsenka: prevediOtsenkata(p.otsenka ?? 'нито-едно', '').otsenka,
           zakachenaKam: (p.zakachenaKam ?? '') as VidNaZakachaneto,
           zakachenaId: p.zakachenaId ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaPrepiska,

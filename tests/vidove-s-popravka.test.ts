@@ -89,7 +89,7 @@ const DELO = {
   otgovornik: 'vintexstroy@gmail.com',
   ot: '2026-08-01',
   do: '2026-08-20',
-  otsenka: 'sredna',
+  otsenka: 'важно-неспешно',
   sastoyanie: 'чака',
   nadDelo: '',
   dokument: '',

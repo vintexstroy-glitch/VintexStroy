@@ -12,7 +12,7 @@
 import type { Dnevnik, Operatsiya, Rezultat, Sabitie, Vrata } from '../yadro/index.js';
 import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
-import { praviTsikal, SASTOYANIYA as SASTOYANIYA_NA_DELO } from './dela.js';
+import { praviTsikal, proveriOtsenkata, SASTOYANIYA as SASTOYANIYA_NA_DELO, ZAVARSHENO } from './dela.js';
 import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
 import {
   GreshkaZadacha,
@@ -345,6 +345,17 @@ export class Deystviya {
         `Непознато състояние „${danni.sastoyanie}". Изброените са: ` +
           `${SASTOYANIYA_NA_DELO.join(' · ')}.`,
       );
+    }
+    // ОЦЕНКАТА (И124 т.6) · „когато то е Завършено директно оценката става
+    // изключена" — неговата дума казва ДИРЕКТНО, затова изключването е тук,
+    // не отказ. Всичко останало пази `proveriOtsenkata`, нарочно и с думи:
+    // петата стойност е отказ, върнатото от архива иска нова оценка.
+    if (danni.sastoyanie === ZAVARSHENO && danni.otsenka !== '') {
+      danni = { ...danni, otsenka: '' };
+    }
+    const zaOtsenkata = proveriOtsenkata(danni.otsenka, danni.sastoyanie);
+    if (zaOtsenkata !== '') {
+      throw new GreshkaTablitsa(zaOtsenkata);
     }
     const prehvarleno = (await this.ogledalo()).prehvarleni.get(id);
     if (prehvarleno) {

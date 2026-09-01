@@ -22,6 +22,10 @@ import {
   IMENA_NA_OTSENKITE,
   OTSENKI,
   podredi,
+  prevediOtsenkata,
+  proveriOtsenkata,
+  vDnevniyaRed,
+  zavarshenite,
   svetofar,
   vidimi,
   type Delo,
@@ -114,21 +118,73 @@ describe('делото · трите колони, не трите нива', ()
   });
 });
 
-describe('оценката · Айзенхауер + завършено', () => {
-  it('е ПЕТ, не четири — четирите квадранта плюс изхода от матрицата', () => {
-    expect(OTSENKI.length).toBe(5);
+describe('оценката · ЧЕТИРИТЕ квадранта на Айзенхауер (И124 т.6)', () => {
+  it('е ЧЕТИРИ · „завършено" вече не е оценка, а Състояние', () => {
+    expect(OTSENKI.length).toBe(4);
+    expect(OTSENKI).not.toContain('завършено');
     expect(IMENA_NA_OTSENKITE['спешно-важно']).toBe('Спешно и Важно');
     expect(IMENA_NA_OTSENKITE['нито-едно']).toBe('Не важно и Не спешно');
   });
 
-  it('подрежда спешност → Оценка → завършените ДОЛУ', () => {
+  it('подрежда спешност → Оценка · изключената оценка пада накрая', () => {
     const dela = [
-      delo({ id: 'A', ime: 'завършено дело', otsenka: 'завършено' }),
+      delo({ id: 'A', ime: 'без оценка', otsenka: '' }),
       delo({ id: 'B', ime: 'нито едно', otsenka: 'нито-едно' }),
       delo({ id: 'C', ime: 'спешно и важно', otsenka: 'спешно-важно' }),
       delo({ id: 'D', ime: 'важно, не спешно', otsenka: 'важно-неспешно' }),
     ];
     expect(podredi(dela, DNES).map((d) => d.id)).toEqual(['C', 'D', 'B', 'A']);
+  });
+
+  it('завършеното НЕ Е в дневния ред · то е в архива', () => {
+    const dela = [
+      delo({ id: 'A', ime: 'работи се', sastoyanie: 'в процес' }),
+      delo({ id: 'B', ime: 'свършено', sastoyanie: 'завършено', otsenka: '' }),
+      delo({ id: 'C', ime: 'без предмет', sastoyanie: 'отпаднало' }),
+    ];
+    expect(vDnevniyaRed(dela).map((d) => d.id)).toEqual(['A']);
+    expect(zavarshenite(dela).map((d) => d.id)).toEqual(['B']);
+  });
+});
+
+describe('преводът на старите Журнали · поименно, не с триене (образец ADR-106)', () => {
+  it('старата пета оценка „завършено" прави делото ЗАВЪРШЕНО и без оценка', () => {
+    expect(prevediOtsenkata('завършено', 'в процес')).toEqual({
+      otsenka: '',
+      sastoyanie: 'завършено',
+    });
+  });
+
+  it('завършено състояние ИЗКЛЮЧВА каквато и да е стара оценка', () => {
+    expect(prevediOtsenkata('спешно-важно', 'завършено')).toEqual({
+      otsenka: '',
+      sastoyanie: 'завършено',
+    });
+  });
+
+  it('живото дело минава непокътнато', () => {
+    expect(prevediOtsenkata('нито-едно', 'чака')).toEqual({
+      otsenka: 'нито-едно',
+      sastoyanie: 'чака',
+    });
+  });
+});
+
+describe('пазачът на оценката при запис · нарочно и с думи', () => {
+  it('петата стойност се ОТКАЗВА и отказът сочи Състоянието', () => {
+    expect(proveriOtsenkata('завършено', 'в процес')).toContain('Състояние');
+  });
+
+  it('живото дело без оценка се отказва · върнатото от архива иска нова', () => {
+    expect(proveriOtsenkata('', 'в процес')).toContain('една от четирите');
+  });
+
+  it('свободната дума пада НАРОЧНО, не тихо', () => {
+    expect(proveriOtsenkata('свръхспешно', 'чака')).toContain('Непозната оценка');
+  });
+
+  it('завършеното с празна оценка минава · изключването е директно', () => {
+    expect(proveriOtsenkata('', 'завършено')).toBe('');
   });
 });
 

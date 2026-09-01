@@ -56,6 +56,8 @@ import {
   type Delo,
   type Otsenka,
   otpadnalite,
+  vDnevniyaRed,
+  zavarshenite,
   zhivite,
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
@@ -291,7 +293,9 @@ export function narisuvayGant(
   // Прилага се ВЪТРЕ в едно ниво: дървото е по-силно, защото дете, изкарано
   // пред родителя си, престава да е дете.
   const rachen = o.rachniyatRedNaDelata;
-  const podredeni = podredeniPoDarvo(vsichki, dnes, rachen);
+  // ДНЕВНИЯТ РЕД (И124 т.6): завършеното „не е в дневния ред" — то е в
+  // архивната таблица долу, заредена по периода на изгледа.
+  const podredeni = podredeniPoDarvo(vDnevniyaRed(vsichki), dnes, rachen);
   const filtrirani = podredeni.filter(
     (d) =>
       (!filtarMyasto || d.myasto === filtarMyasto) &&
@@ -463,6 +467,8 @@ export function narisuvayGant(
 
     ${blokNaMestata(o, dnes, predstavka)}
 
+    ${blokNaZavarshenite(o, predstavka, parvata.ot, poslednata.do)}
+
     ${blokNaOtpadnalite(o, predstavka)}
 
     ${formaDelo(o, dnes, predstavka, nadpisi)}`;
@@ -585,6 +591,78 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
  * Блокът стои и при НУЛА · проверената нула е различна от премълчаната
  * (правило 7), а и оттук човек научава, че такова състояние изобщо има.
  */
+/** Един ред от архива · завършено и отпаднало споделят клетките си. */
+function redVArhiva(d: Delo, atributi: string, dopalnitelni: readonly string[]): string {
+  const kletki = [d.myasto, d.obekt, d.ime, d.otgovornik]
+    .map((k) => ekraniraj(k))
+    .concat(dopalnitelni, ekraniraj(d.promeneno.slice(0, 10)), ekraniraj(d.promeniGo))
+    .map((k) => `<td translate="no">${k}</td>`)
+    .join('\n              ');
+  return `
+            <tr ${atributi}>
+              ${kletki}
+            </tr>`;
+}
+
+/** Обвивката на архивната таблица · една за завършени и отпаднали. */
+function arhivnaTablitsa(klyuch: string, glavi: readonly string[], redove: readonly string[]): string {
+  return `<div class="skrolkutiya">
+        <table class="tablitsa" data-tablitsa="${klyuch}">
+          <thead>
+            <tr>${glavi.map((g) => `<th>${g}</th>`).join('')}</tr>
+          </thead>
+          <tbody>${redove.join('')}</tbody>
+        </table>
+      </div>`;
+}
+
+/**
+ * ЗАВЪРШЕНИТЕ ДЕЛА · архивната таблица (И124 т.6).
+ *
+ * „Завършено се определя от Състояние… не е в дневния ред и влиза в друга
+ * таблица която се ползва за архивиране и използване само когато от
+ * управление или сметки се зареди период който я включва."
+ *
+ * Периодът Е зареденият изглед на решетката (тактът · своят от-до) — и в
+ * Управление, и в Сметки секцията живее до нея, тъй че думата му важи и на
+ * двете места. Показва се завършеното СЪС СРОК В ПЕРИОДА; колко има общо се
+ * КАЗВА, за да не изглежда празният период като празен архив (правило 7).
+ */
+function blokNaZavarshenite(o: Ogledalo, predstavka: string, ot: string, doD: string): string {
+  const vsichkite = zavarshenite([...o.dela.values()]);
+  const vPerioda = vsichkite.filter((d) => d.do >= ot && d.do <= doD);
+  const skriti = chetiEkranno<boolean>(`${predstavka}.zavarshenite`, false);
+
+  return `
+    <section data-sektsiya="gant-zavarsheni" data-broy="${vPerioda.length}" data-obshto="${vsichkite.length}">
+      <div class="dyalglava">
+        <h2>Завършени дела</h2>
+        <span>архивът на свършеното · зарежда се по периода на изгледа</span>
+      </div>
+      <div class="deystviya">
+        <button type="button" class="vtorichen" id="${predstavka}zavarsheni-prevkl">
+          ${skriti ? 'Покажи завършените' : 'Скрий завършените'}
+        </button>
+        <span class="drebno">${
+          vsichkite.length === 0
+            ? 'Нито едно завършено дело.'
+            : `${vPerioda.length} в периода ${ot} → ${doD} · всичко ${vsichkite.length} · без оценка, извън дневния ред`
+        }</span>
+      </div>
+      ${
+        skriti || vPerioda.length === 0
+          ? ''
+          : arhivnaTablitsa(
+              'zavarsheni-dela',
+              ['Място', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
+              vPerioda.map((d) =>
+                redVArhiva(d, `data-zavarsheno="${ekraniraj(d.id)}"`, [ekraniraj(d.do)]),
+              ),
+            )
+      }
+    </section>`;
+}
+
 function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
   const redove = otpadnalite([...o.dela.values()]);
   const skriti = chetiEkranno<boolean>(`${predstavka}.otpadnalite`, false);
@@ -608,26 +686,13 @@ function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
       ${
         skriti || redove.length === 0
           ? ''
-          : `<div class="skrolkutiya">
-        <table class="tablitsa" data-tablitsa="otpadnali-dela">
-          <thead>
-            <tr><th>Място</th><th>Обект</th><th>Дело</th><th>Отговорник</th><th>Отпаднало на</th><th>От кого</th></tr>
-          </thead>
-          <tbody>${redove
-            .map(
-              (d) => `
-            <tr data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo">
-              <td translate="no">${ekraniraj(d.myasto)}</td>
-              <td translate="no">${ekraniraj(d.obekt)}</td>
-              <td translate="no">${ekraniraj(d.ime)}</td>
-              <td translate="no">${ekraniraj(d.otgovornik)}</td>
-              <td translate="no">${ekraniraj(d.promeneno.slice(0, 10))}</td>
-              <td translate="no">${ekraniraj(d.promeniGo)}</td>
-            </tr>`,
+          : arhivnaTablitsa(
+              'otpadnali-dela',
+              ['Място', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
+              redove.map((d) =>
+                redVArhiva(d, `data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo"`, []),
+              ),
             )
-            .join('')}</tbody>
-        </table>
-      </div>`
       }
     </section>`;
 }
@@ -1073,6 +1138,13 @@ export function zakachiGant(
       zapomniEkranno(klyuchat, !chetiEkranno<boolean>(klyuchat, false));
       await prerisuvay();
     });
+  koren
+    .querySelector<HTMLButtonElement>(`#${predstavka}zavarsheni-prevkl`)
+    ?.addEventListener('click', async () => {
+      const klyuchat = `${predstavka}.zavarshenite`;
+      zapomniEkranno(klyuchat, !chetiEkranno<boolean>(klyuchat, false));
+      await prerisuvay();
+    });
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-takt]')) {
     b.addEventListener('click', async () => {
@@ -1386,6 +1458,22 @@ export function zakachiFormataNaDelo(
   predstavka = 'd-',
 ): void {
   const forma = koren.querySelector<HTMLFormElement>(`#${predstavka}forma-delo`);
+  // ОЦЕНКАТА СЕ ИЗКЛЮЧВА при завършено (И124 т.6) — и изборът, който не
+  // действа, се КАЗВА (правило 15), не се преглъща: полето посивява с думи.
+  {
+    const sastoyanieIzbor = forma?.querySelector<HTMLSelectElement>('[name=sastoyanie]');
+    const otsenkaIzbor = forma?.querySelector<HTMLSelectElement>('[name=otsenka]');
+    const pokazhi = (): void => {
+      if (!sastoyanieIzbor || !otsenkaIzbor) return;
+      const zavarsheno = sastoyanieIzbor.value === 'завършено';
+      otsenkaIzbor.disabled = zavarsheno;
+      otsenkaIzbor.title = zavarsheno
+        ? 'Завършеното дело е без оценка — Състоянието решава (И124 т.6).'
+        : '';
+    };
+    sastoyanieIzbor?.addEventListener('change', pokazhi);
+    pokazhi();
+  }
   forma?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const izhod = koren.querySelector<HTMLElement>(`#${predstavka}greshka-delo`)!;
@@ -1422,7 +1510,9 @@ export function zakachiFormataNaDelo(
           otgovornik: String(d.get('otgovornik') ?? '').trim(),
           ot,
           do: doData,
-          otsenka: String(d.get('otsenka')) as Otsenka,
+          // Изключеното (disabled) поле не влиза във FormData — а при
+          // завършено точно това искаме: празна оценка, не „null".
+          otsenka: String(d.get('otsenka') ?? '') as Otsenka,
           sastoyanie: String(d.get('sastoyanie')),
           nadDelo: String(d.get('nadDelo') ?? ''),
           dokument: '',

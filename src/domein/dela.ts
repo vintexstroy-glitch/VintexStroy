@@ -22,41 +22,104 @@
  *   „Приоритета го покажи в ъправлението и ги промени както са по Айзенхауер:
  *    Спешно и Важно, Спешно и Не важно, Важно и Не Спешно и Не важно и Не пешно."
  *
- * Четирите му квадранта плюс ЗАВЪРШЕНО — петият цвят *(р69·[30]·10.08)*.
- * Завършеното не е квадрант; то е изход от матрицата и затова има свой цвят и
- * свое място: най-долу *(р75·[50])*.
+ * ЧЕТИРИТЕ квадранта — и НИЩО ПОВЕЧЕ. „Завършено" беше пета стойност
+ * (петият цвят, р69·[30]·10.08) до 31.08, когато той я свали *(И124 т.6)*:
+ *
+ *   „Искам да махнеш от оценка Завършено. Завършено се определя от Състояние
+ *    и когато то е Завършено директно оценката става изключена просто без
+ *    оценка, не е в дневния ред и влиза в друга таблица която се ползва за
+ *    архивиране."
+ *
+ * Надживените думи стоят с датите си: петият цвят (р69·[30]) и „завършените
+ * долу" (р75·[50]) — домът им е ADR-122. Старите Журнали носят петата
+ * стойност и тя се чете ПОИМЕННО (`prevediOtsenkata`), не се трие.
  */
 export const OTSENKI = [
   'спешно-важно',
   'спешно-неважно',
   'важно-неспешно',
   'нито-едно',
-  'завършено',
 ] as const;
 
 export type Otsenka = (typeof OTSENKI)[number];
+
+/** Изключената оценка · завършеното дело е „просто без оценка" (И124 т.6). */
+export type OtsenkaNaRed = Otsenka | '';
+
+/** Името на състоянието „завършено" · и на СТАРАТА пета оценка в Журнала. */
+export const ZAVARSHENO = 'завършено';
 
 export const IMENA_NA_OTSENKITE: Readonly<Record<Otsenka, string>> = Object.freeze({
   'спешно-важно': 'Спешно и Важно',
   'спешно-неважно': 'Спешно и Не важно',
   'важно-неспешно': 'Важно и Не спешно',
   'нито-едно': 'Не важно и Не спешно',
-  завършено: 'Завършено',
 });
+
+/** Изписването на реда · изключената оценка е тире, не празно петно. */
+export function imeNaOtsenkata(o: OtsenkaNaRed): string {
+  return o === '' ? '—' : IMENA_NA_OTSENKITE[o];
+}
 
 /**
  * Тежестта при подредба · по-малкото е по-нагоре.
  *
- * Негово правило за началната подредба *(р75·[50])*:
- * „**По правилото (спешност → Оценка → завършените долу)**".
+ * Негово правило за началната подредба *(р75·[50])*: „По правилото (спешност
+ * → Оценка → завършените долу)". „Завършените долу" е НАДЖИВЯНО от И124 т.6 —
+ * завършеното не е долу, а в архивната таблица; тук останаха четирите.
  */
 export const TEZHEST: Readonly<Record<Otsenka, number>> = Object.freeze({
   'спешно-важно': 0,
   'спешно-неважно': 1,
   'важно-неспешно': 2,
   'нито-едно': 3,
-  завършено: 9,
 });
+
+/**
+ * ПОИМЕННИЯТ ПРЕВОД на старите Журнали (образецът е „ВалутаИзбрана" ·
+ * ADR-106): записът не се пипа (правило 1), чете се с днешните очи.
+ *
+ *   · стара оценка „завършено" ⇒ делото Е завършено: състоянието го казва,
+ *     оценката се изключва;
+ *   · завършено СЪСТОЯНИЕ с каквато и да е оценка ⇒ оценката се изключва —
+ *     „директно оценката става изключена просто без оценка".
+ */
+export function prevediOtsenkata(
+  otsenka: string,
+  sastoyanie: string,
+): { readonly otsenka: OtsenkaNaRed; readonly sastoyanie: string } {
+  if (otsenka === ZAVARSHENO) return { otsenka: '', sastoyanie: ZAVARSHENO };
+  if (sastoyanie === ZAVARSHENO) return { otsenka: '', sastoyanie };
+  return { otsenka: otsenka as OtsenkaNaRed, sastoyanie };
+}
+
+/**
+ * ПАЗАЧЪТ НА ОЦЕНКАТА при запис · връща причината за отказ, или празно.
+ *
+ * Проверява се НАРОЧНО и с думи (прецедентът на състоянието, резен 30):
+ * свободна дума в Журнала пада тихо в грешна кофа.
+ */
+export function proveriOtsenkata(otsenka: string, sastoyanie: string): string {
+  // Завършеното е БЕЗ оценка — тя се изключва ДИРЕКТНО при записа („директно
+  // оценката става изключена", И124 т.6), затова тук няма какво да се откаже.
+  if (sastoyanie === ZAVARSHENO) return '';
+  if (otsenka === ZAVARSHENO) {
+    return (
+      '„Завършено" вече не е оценка, а Състояние (И124 т.6). Запиши ' +
+      'състояние „завършено" — оценката се изключва сама.'
+    );
+  }
+  if (otsenka === '') {
+    return (
+      'Делото не е завършено, а е без оценка — върнато от архива към работа, ' +
+      `то иска една от четирите: ${OTSENKI.join(' · ')}.`
+    );
+  }
+  if (!(OTSENKI as readonly string[]).includes(otsenka)) {
+    return `Непозната оценка „${otsenka}". Изброените са: ${OTSENKI.join(' · ')}.`;
+  }
+  return '';
+}
 
 /**
  * СЪСТОЯНИЕТО на едно дело.
@@ -110,6 +173,26 @@ export function otpadnalite<T extends { readonly sastoyanie: string }>(
   return dela.filter((d) => d.sastoyanie === OTPADNALO);
 }
 
+/**
+ * ДНЕВНИЯТ РЕД · живите, по които СЕ РАБОТИ.
+ *
+ * Завършеното „не е в дневния ред и влиза в друга таблица която се ползва за
+ * архивиране" (И124 т.6) — като отпадналото, но по своя причина: отпадналото
+ * няма предмет, завършеното е свършено. Двете таблици са две, не една.
+ */
+export function vDnevniyaRed<T extends { readonly sastoyanie: string }>(
+  dela: readonly T[],
+): readonly T[] {
+  return dela.filter((d) => d.sastoyanie !== OTPADNALO && d.sastoyanie !== ZAVARSHENO);
+}
+
+/** Архивът на свършеното · зарежда се по период, не виси в реда. */
+export function zavarshenite<T extends { readonly sastoyanie: string }>(
+  dela: readonly T[],
+): readonly T[] {
+  return dela.filter((d) => d.sastoyanie === ZAVARSHENO);
+}
+
 export interface Delo {
   readonly id: string;
   /** seq на събитието, което го създаде — сторното сочи именно него */
@@ -126,7 +209,8 @@ export interface Delo {
   readonly ot: string;
   /** YYYY-MM-DD · край; равен на `ot` значи ЕДНОДНЕВНО дело */
   readonly do: string;
-  readonly otsenka: Otsenka;
+  /** изключена (празна), когато състоянието е „завършено" (И124 т.6) */
+  readonly otsenka: OtsenkaNaRed;
   readonly sastoyanie: SastoyanieDelo;
   /** id на дело, под което това е ПОДДЕЛО; празно значи самостоятелно */
   readonly nadDelo: string;
@@ -207,7 +291,9 @@ export function svetofarNaSroka(srok: string, dnes: string): Svetofar {
 export function svetofar(d: Delo, dnes: string): Svetofar {
   // ОТПАДНАЛОТО НЕ СВЕТИ · срок, който никой няма да гони, не е спешен.
   if (d.sastoyanie === OTPADNALO) return 'normalno';
-  if (d.sastoyanie === 'завършено' || d.otsenka === 'завършено') return 'normalno';
+  // Завършеното не гори. Оценката вече НЕ може да е „завършено" — старите
+  // Журнали се превеждат при четене (`prevediOtsenkata`), тук пита Състоянието.
+  if (d.sastoyanie === ZAVARSHENO) return 'normalno';
   return svetofarNaSroka(d.do, dnes);
 }
 
@@ -222,10 +308,10 @@ export function svetofar(d: Delo, dnes: string): Svetofar {
  */
 export function podredi(dela: readonly Delo[], dnes: string): Delo[] {
   const gori = (d: Delo) => (svetofar(d, dnes) === 'prosrocheno' ? 0 : 1);
-  // Непозната оценка (стар Журнал, чужд внос) пада НАКРАЯ, при завършените.
+  // Непозната или изключена оценка (стар Журнал, чужд внос) пада НАКРАЯ.
   // Без предпазителя изваждането даваше NaN, NaN е лъжливо за ||, и
   // сравнителят ставаше непоследователен — подредбата се обръщаше мълчешком.
-  const tezhest = (d: Delo) => TEZHEST[d.otsenka] ?? 9;
+  const tezhest = (d: Delo) => (d.otsenka === '' ? 9 : (TEZHEST[d.otsenka] ?? 9));
   return [...dela].sort(
     (a, b) =>
       tezhest(a) - tezhest(b) ||

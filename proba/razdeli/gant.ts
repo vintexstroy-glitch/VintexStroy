@@ -142,6 +142,55 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('връщането ги показва пак',
       await p.$$eval('[data-tablitsa=otpadnali-dela] [data-otpadnalo]', (e) => e.length), 1);
 
+    // ══ 108в · ЗАВЪРШЕНОТО напуска дневния ред (И124 т.6 · ADR-122) ═══════
+    //
+    // „Завършено се определя от Състояние и когато то е Завършено директно
+    // оценката става изключена просто без оценка, не е в дневния ред и влиза
+    // в друга таблица която се ползва за архивиране."
+    razdel = '108в · Завършеното · оценката се изключва и КАЗВА защо';
+    proveri('оценката вече е ЧЕТИРИ квадранта · „завършено" не е сред тях',
+      await p.$$eval('#d-otsenka option', (o) => o.map((x) => (x as any).value)),
+      ['спешно-важно', 'спешно-неважно', 'важно-неспешно', 'нито-едно']);
+    await p.selectOption('#d-sastoyanie', 'завършено');
+    // Чака се СЪСТОЯНИЕТО, не се чете веднага след действието (обход Е).
+    await p.waitForSelector('#d-otsenka:disabled');
+    proveri('изборът „завършено" ИЗКЛЮЧВА оценката',
+      await p.$eval('#d-otsenka', (e) => (e as HTMLSelectElement).disabled), true);
+    proveri('и изключеното се КАЗВА, не се преглъща (правило 15)',
+      (await p.$eval('#d-otsenka', (e) => (e as HTMLSelectElement).title))
+        .includes('без оценка'), true);
+    await p.selectOption('#d-sastoyanie', 'чака');
+    await p.waitForSelector('#d-otsenka:not(:disabled)');
+    proveri('връщането отключва оценката',
+      await p.$eval('#d-otsenka', (e) => (e as HTMLSelectElement).disabled), false);
+
+    razdel = '108в · Завършеното · извън дневния ред, В архива';
+    const prediZavarshvane = await p.$$eval('.gant-delo', (e) => e.length);
+    proveri('блокът на завършените стои и при НУЛА в периода',
+      Boolean(await p.$('[data-sektsiya=gant-zavarsheni]')), true);
+    await zapishiDelo(p, { myasto: 'Хисаря', obekt: '', ime: 'Приключен оглед',
+      otgovornik: 'Ивайло Петков', ot: denOtDnes(0), do: denOtDnes(0),
+      otsenka: 'спешно-важно', sastoyanie: 'завършено' });
+    proveri('дневният ред НЕ порасна · завършеното не е в него',
+      await p.$$eval('.gant-delo', (e) => e.length), prediZavarshvane);
+    proveri('но делото СТОИ в архива на периода',
+      await p.$$eval('[data-tablitsa=zavarsheni-dela] [data-zavarsheno]', (e) => e.length), 1);
+    proveri('и блокът брои · в периода',
+      await p.$eval('[data-sektsiya=gant-zavarsheni]', (e) => (e as any).dataset.broy), '1');
+    proveri('и казва „без оценка, извън дневния ред"',
+      (await p.$eval('[data-sektsiya=gant-zavarsheni]', (e) => (e as any).innerText))
+        .includes('без оценка'), true);
+
+        razdel = '108в · Завършеното · скриването е ЛИЧНО, нула събития';
+    const prediSkrivaneZ = await broySabitiya(p);
+    await deystvieSPrerisuvane(p, () => p.click('#d-zavarsheni-prevkl'));
+    proveri('скриването маха таблицата',
+      await p.$$eval('[data-tablitsa=zavarsheni-dela]', (e) => e.length), 0);
+    proveri('но НЕ пише в Журнала', await broySabitiya(p), prediSkrivaneZ);
+    await deystvieSPrerisuvane(p, () => p.click('#d-zavarsheni-prevkl'));
+    proveri('връщането го показва пак',
+      await p.$$eval('[data-tablitsa=zavarsheni-dela] [data-zavarsheno]', (e) => e.length), 1);
+
     // ══ 112 · РЪЧНИЯТ РЕД ПОБЕЖДАВА (резен 34 · ADR-094) ══════════════════
     //
     // „★ Ръчният ред побеждава (колона „поредност"; Състоянието е бутон

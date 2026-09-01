@@ -42,7 +42,7 @@
  */
 
 import { sverka, MERKA, type Sverka } from '../yadro/sverka.js';
-import { OTSENKI, type Otsenka } from './dela.js';
+import { OTSENKI, type OtsenkaNaRed } from './dela.js';
 
 export class GreshkaKontakt extends Error {
   constructor(message: string) {
@@ -138,8 +138,9 @@ export interface Prepiska {
   readonly chas: string;
   /** ОТ УПРАВЛЕНИЕ · кой я върши · празно значи „още не е казано" */
   readonly otgovornik: string;
-  /** ОТ УПРАВЛЕНИЕ · Айзенхауер, същите пет думи като при делото */
-  readonly otsenka: Otsenka;
+  /** ОТ УПРАВЛЕНИЕ · Айзенхауер, същите ЧЕТИРИ като при делото (И124 т.6);
+   * празна = изключена — стар запис с петата „завършено", преведен при четене */
+  readonly otsenka: OtsenkaNaRed;
   /** КЪМ КАКВО е закачена · „имот" · „дело" · празно значи „към нищо" */
   readonly zakachenaKam: VidNaZakachaneto;
   /** идентификаторът на закаченото · празен, когато видът е празен */

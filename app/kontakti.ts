@@ -31,6 +31,7 @@ import {
 } from '../src/domein/kontakti.js';
 import {
   IMENA_NA_OTSENKITE,
+  imeNaOtsenkata,
   nomeraPoDarvo,
   OTSENKI,
   podredeniPoDarvo,
@@ -236,7 +237,7 @@ function sektsiyaPrepiski(
                 kogaEZaVzimane(p) === '' ? '—' : ekraniraj(kogaEZaVzimane(p))
               }</td>
               <td translate="no">${p.otgovornik === '' ? '—' : ekraniraj(p.otgovornik)}</td>
-              <td data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(IMENA_NA_OTSENKITE[p.otsenka])}</td>
+              <td data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(imeNaOtsenkata(p.otsenka))}</td>
               <td translate="no" data-zakachena="${ekraniraj(p.zakachenaKam)}"${
                 zakachanetoNa(p, o.imoti, o.dela).nameren ? '' : ' data-izgubena'
               }>${ekraniraj(zakachanetoNa(p, o.imoti, o.dela).nadpis)}</td>
