@@ -280,6 +280,37 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('„покажи всичко" връща редовете',
       await broyDoTarsachkata(tarsachkaPari), broyPredi);
 
+    // ══ 32б · ОТ–ДО НА ДАТОВАТА КОЛОНА (резен 75 · И124 т.2) ═══════════
+    //
+    // Погълнатата способност: дубльорите даваха точен обхват, готовите групи
+    // („Днес", „Тази седмица") — не. Преди дубльор да падне, двигателят
+    // трябва да може всичко, което той може.
+    razdel = '32б · От–До на датовата колона';
+    await naEkran(p, 'pari', '[data-tablitsa=prosrocheni]');
+    const platenoPredi = await p.$$eval('[data-tablitsa=prosrocheni] .red', (r) => r.length);
+    proveri('просрочените имат редове преди обхвата', platenoPredi > 0, true);
+
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="prosrocheni:padezh"]'));
+    proveri('менюто на датовата колона носи От и До',
+      await p.$$eval('[data-filtar-ot="prosrocheni:padezh"], [data-filtar-do="prosrocheni:padezh"]',
+        (e) => e.length), 2);
+
+    // Обхват, в който няма нито едно плащане → всичко се крие и СЕ КАЗВА.
+    // `fill` пуска и `change` — двигателят прерисува от него.
+    await deystvieSPrerisuvane(p, () => p.fill('[data-filtar-do="prosrocheni:padezh"]', '2000-01-01'));
+    proveri('обхватът без плащания крие всички редове',
+      await p.$$eval('[data-tablitsa=prosrocheni] .red', (r) => r.length), 0);
+    proveri('и скритото се казва',
+      (await tekstNa(p, '.filtar-skrito')).includes('крие'),
+      true);
+    proveri('стрелката на колоната свети',
+      await p.$$eval('[data-filtar-glava="prosrocheni:padezh"].aktivna', (e) => e.length), 1);
+
+    // „Изчисти филтъра" маха обхвата и връща редовете · менюто е още отворено.
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti="prosrocheni:padezh"]'));
+    proveri('изчистването връща редовете',
+      await p.$$eval('[data-tablitsa=prosrocheni] .red', (r) => r.length), platenoPredi);
+
     // ══ 33 · групирането по колона · групата СУМИРА ═════════════════════
     razdel = '33 · групирането';
     await naEkran(p, 'imoti', '#forma-imot');

@@ -40,6 +40,12 @@ export interface KolonaSFiltar<T> {
    * редът има клетки, и излишните преливат на втори ред в решетката.
    */
   readonly samoZaTarsene?: boolean;
+  /**
+   * СМЕТНАТА колона · не се редактира от никого (правило 23). Главата носи
+   * класа `zatvorena`, за да я вижда окото сива — филтрира се обаче свободно:
+   * затворено е ПИСАНЕТО, не погледът.
+   */
+  readonly zatvorena?: boolean;
 }
 
 /**
@@ -63,6 +69,16 @@ const tarseno = new Map<string, string>();
 
 /** Групирането · по таблица, една колона (ADR-022 · вълна 2, предложение 12). */
 const grupirano = new Map<string, string>();
+
+/**
+ * ОТ–ДО НА ДАТОВА КОЛОНА (резен 75 · И124 т.2) · погълната способност.
+ *
+ * Дубльорите (периодните полета по екраните) даваха точен обхват, а
+ * готовите групи („Днес", „Тази седмица", месец) — не. Преди дубльор да
+ * падне, двигателят трябва да може всичко, което той може — иначе падането
+ * е загуба, не чистене. Празна граница значи „отворено натам".
+ */
+const otdo = new Map<string, { ot: string; do_: string }>();
 
 /** Сгънатите групи · по таблица. Сгъната група крие редовете, не сбора си. */
 const sgunati = new Map<string, Set<string>>();
@@ -88,6 +104,11 @@ for (const [k, v] of Object.entries(chetiEkranno<Record<string, string>>('filtri
 }
 for (const [k, v] of Object.entries(chetiEkranno<Record<string, string[]>>('filtri.sgunati', {}))) {
   sgunati.set(k, new Set(v));
+}
+for (const [k, v] of Object.entries(
+  chetiEkranno<Record<string, { ot: string; do_: string }>>('filtri.otdo', {}),
+)) {
+  otdo.set(k, v);
 }
 
 /**
@@ -117,6 +138,31 @@ function zapomniFiltrite(): void {
   zapomniEkranno('filtri.tarseno', Object.fromEntries(tarseno));
   zapomniEkranno('filtri.grupirano', Object.fromEntries(grupirano));
   zapomniEkranno('filtri.sgunati', Object.fromEntries([...sgunati].map(([k, v]) => [k, [...v]])));
+  zapomniEkranno('filtri.otdo', Object.fromEntries(otdo));
+}
+
+/** Активен ли е От–До на тази колона · празните две граници значат „не". */
+function otdoAktivno(pald: string): boolean {
+  const o = otdo.get(pald);
+  return o !== undefined && (o.ot !== '' || o.do_ !== '');
+}
+
+/**
+ * СЛАГА едната граница на От–До · изнесена, за да я пази тест.
+ * Празни и двете — записът пада целият: „нищо въведено" не е филтър.
+ */
+export function slozhiOtdo(pald: string, koya: 'ot' | 'do_', stoynost: string): void {
+  const sega = otdo.get(pald) ?? { ot: '', do_: '' };
+  const nov = { ...sega, [koya]: stoynost.trim() };
+  if (nov.ot === '' && nov.do_ === '') otdo.delete(pald);
+  else otdo.set(pald, nov);
+  zapomniFiltrite();
+}
+
+/** МИНАВА ли една дата през От–До · чиста, за да я пази тест. */
+export function prezOtdo(den: string, granitsi: { ot: string; do_: string }): boolean {
+  const samoDen = den.slice(0, 10);
+  return (granitsi.ot === '' || samoDen >= granitsi.ot) && (granitsi.do_ === '' || samoDen <= granitsi.do_);
 }
 
 function klyuchNa(tablitsa: string, kolona: string): string {
@@ -272,6 +318,13 @@ export function filtriray<T>(
           aktivni.every((k) => izbrano.get(klyuchNa(tablitsa, k.klyuch))!.has(grupaNa(k, red, dnes))),
         );
 
+  // ОТ–ДО реже след групите · точният обхват, погълнат от дубльорите (резен 75).
+  const sOtdo = koloni.filter((k) => k.vid === 'data' && otdoAktivno(klyuchNa(tablitsa, k.klyuch)));
+  for (const k of sOtdo) {
+    const granitsi = otdo.get(klyuchNa(tablitsa, k.klyuch))!;
+    ostanali = ostanali.filter((red) => prezOtdo(String(k.vzemi(red)), granitsi));
+  }
+
   // ТЪРСЕНЕТО реже след филтрите · по всички описани колони, без регистър.
   const iskano = svedeno(tarseno.get(tablitsa) ?? '').trim();
   if (iskano !== '') {
@@ -397,12 +450,12 @@ function glavaSFiltar<T>(
   if (k.samoZaTarsene) return '';
   const suma = k.vid === 'evro';
   const pald = klyuchNa(tablitsa, k.klyuch);
-  const broy = izbrano.get(pald)?.size ?? 0;
+  const broy = (izbrano.get(pald)?.size ?? 0) + (otdoAktivno(pald) ? 1 : 0);
   const podredba = podredbi.get(tablitsa);
   const aktivnaPodredba = podredba?.kolona === k.klyuch;
   // Името на колоната Е бутонът за подредба — както в Explorer и Excel:
   // клик подрежда нагоре, втори клик надолу, трети връща изходния ред.
-  return `<span class="glavicha${suma ? ' suma' : ''}" data-kolona="${ekraniraj(k.klyuch)}" data-ime="${ekraniraj(k.ime)}">
+  return `<span class="glavicha${suma ? ' suma' : ''}${k.zatvorena ? ' zatvorena' : ''}" data-kolona="${ekraniraj(k.klyuch)}" data-ime="${ekraniraj(k.ime)}">
     <button type="button" class="ime-kolona${aktivnaPodredba ? ' podredena' : ''}"
       data-podredi="${ekraniraj(pald)}"
       aria-label="Подреди по ${ekraniraj(k.ime)}">${ekraniraj(k.ime)}${
@@ -442,8 +495,17 @@ function menyu<T>(
   // Търсачката стеснява СПИСЪКА С ОТМЕТКИ на живо, без прерисуване — точно
   // както във филтъра на Explorer. Показва се, щом групите станат много.
   const sTarsachka = grupi.size > 8;
+  const granitsi = otdo.get(pald) ?? { ot: '', do_: '' };
   return `<span class="filtar-menyu" data-menyu>
     ${sTarsachka ? '<input translate="no" type="text" class="filtar-tarsi" data-filtar-tarsi placeholder="търси…" autocomplete="off">' : ''}
+    ${
+      k.vid !== 'data'
+        ? ''
+        : `<span class="filtar-otdo" translate="no">
+        <label>От <input type="date" data-filtar-ot="${ekraniraj(pald)}" value="${ekraniraj(granitsi.ot)}"></label>
+        <label>До <input type="date" data-filtar-do="${ekraniraj(pald)}" value="${ekraniraj(granitsi.do_)}"></label>
+      </span>`
+    }
     ${podrediGrupi(k.vid, grupi)
       .map(
         ([grupa, broy]) => `<label class="otmetka">
@@ -454,7 +516,7 @@ function menyu<T>(
       )
       .join('')}
     ${
-      izbor.size
+      izbor.size || otdoAktivno(pald)
         ? `<button type="button" class="izchisti-filtar" data-filtar-izchisti="${ekraniraj(pald)}">Изчисти филтъра</button>`
         : ''
     }
@@ -558,9 +620,24 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar-izchisti]')) {
     b.addEventListener('click', async () => {
       izbrano.delete(b.dataset['filtarIzchisti']!);
+      otdo.delete(b.dataset['filtarIzchisti']!);
       zapomniFiltrite();
       await prerisuvay();
     });
+  }
+
+  // ── От–До на датова колона · границата се сменя, менюто остава отворено ──
+  for (const [beleg, koya] of [
+    ['data-filtar-ot', 'ot'],
+    ['data-filtar-do', 'do_'],
+  ] as const) {
+    for (const pole of koren.querySelectorAll<HTMLInputElement>(`[${beleg}]`)) {
+      pole.addEventListener('click', (e) => e.stopPropagation());
+      pole.addEventListener('change', async () => {
+        slozhiOtdo(pole.getAttribute(beleg)!, koya, pole.value);
+        await prerisuvay();
+      });
+    }
   }
 
   // ── групирането: пали се от менюто на колоната, гаси се от същото място ──
@@ -599,6 +676,9 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
       const tablitsa = b.dataset['filtarIzchistiVsichko']!;
       for (const pald of [...izbrano.keys()]) {
         if (pald.startsWith(`${tablitsa}:`)) izbrano.delete(pald);
+      }
+      for (const pald of [...otdo.keys()]) {
+        if (pald.startsWith(`${tablitsa}:`)) otdo.delete(pald);
       }
       // „Покажи всичко" маха и търсенето — то също крие редове. Подредбата
       // остава: тя нарежда, не крие.

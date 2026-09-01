@@ -59,13 +59,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   );
   proveri(
     'главата на таблицата носи ЕДИНАЙСЕТ колони',
-    await p.$$eval('[data-tablitsa=krediti] .glava .kletka', (e) => e.length),
+    await p.$$eval('[data-tablitsa=krediti] .glava .glavicha', (e) => e.length),
     11,
   );
   proveri(
     'и трите СМЕТНАТИ колони са затворени · те не се редактират от никого',
     (
-      await p.$$eval('[data-tablitsa=krediti] .glava .kletka.zatvorena', (e) =>
+      await p.$$eval('[data-tablitsa=krediti] .glava .glavicha.zatvorena', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),

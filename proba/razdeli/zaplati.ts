@@ -22,7 +22,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   proveri(
     'главата носи СЕДЕМ колони, с ПРОЕКТА най-отпред',
     (
-      await p.$$eval('[data-tablitsa=zaplati] .glava .kletka', (e) =>
+      await p.$$eval('[data-tablitsa=zaplati] .glava .glavicha', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),
@@ -31,7 +31,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   proveri(
     'и СМЕТНАТАТА колона е затворена · тя не се редактира от никого',
     (
-      await p.$$eval('[data-tablitsa=zaplati] .glava .kletka.zatvorena', (e) =>
+      await p.$$eval('[data-tablitsa=zaplati] .glava .glavicha.zatvorena', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),

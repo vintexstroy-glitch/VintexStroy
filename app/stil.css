@@ -1523,6 +1523,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
   padding: 7px 8px; border-radius: 4px; cursor: pointer; min-height: 34px;
 }
 .otmetka:hover { background: var(--panel); }
+/* От–До на датова колона (резен 75) · двете граници, една под друга */
+.filtar-otdo { display: flex; flex-direction: column; gap: 4px; padding: 4px 8px 8px; border-bottom: 1px solid var(--panel); margin-bottom: 4px; }
+.filtar-otdo label { display: flex; align-items: center; gap: 6px; font-size: 0.821rem; color: var(--mastilo2); }
+.filtar-otdo input { flex-grow: 1; font-size: 0.821rem; padding: 2px 4px; }
 .otmetka input { accent-color: var(--aktsent); width: 15px; height: 15px; flex-shrink: 0; }
 .otmetka span { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .otmetka b { font-size: 0.821rem; color: var(--mastilo2); font-weight: 500; font-variant-numeric: tabular-nums; }

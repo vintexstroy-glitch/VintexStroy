@@ -37,7 +37,6 @@ import {
   predstoyashtiteVnoski,
   redoveNaKreditite,
   redProektsiya,
-  ZATVORENI_KREDITI,
   type RedNaKredita,
 } from '../src/domein/krediti.js';
 import {
@@ -51,6 +50,15 @@ import {
 import type { VnoskaOtDogovora } from '../src/domein/sabitiya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  grupiranaTablitsa,
+  poleZaTarsene,
+  PRAZEN_FILTAR,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
@@ -58,6 +66,25 @@ import type { Konteks } from './ekranite.js';
 function izbraniyat(): string {
   return chetiEkranno('krediti.izbran', '');
 }
+
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ НА ФИЛТРИТЕ (резен 75 · И124 т.2). Имената идват от
+ * `KOLONI_KREDITI` (един дом, правило 17); суровите стойности — от реда.
+ * Затворените са СМЕТНАТИТЕ (правило 23): пише ги никой, филтрира ги всеки.
+ */
+const KOLONI_S_FILTAR: readonly KolonaSFiltar<RedNaKredita>[] = [
+  { klyuch: KOLONI_KREDITI[0]!, ime: KOLONI_KREDITI[0]!, vid: 'tekst', vzemi: (r) => r.kredit.ime },
+  { klyuch: KOLONI_KREDITI[1]!, ime: KOLONI_KREDITI[1]!, vid: 'tekst', vzemi: (r) => IMENA_NA_VIDOVETE_KREDIT[r.kredit.vid] },
+  { klyuch: KOLONI_KREDITI[2]!, ime: KOLONI_KREDITI[2]!, vid: 'tekst', vzemi: (r) => (r.kredit.proektId === '' ? '— без проект' : r.kredit.proektId) },
+  { klyuch: KOLONI_KREDITI[3]!, ime: KOLONI_KREDITI[3]!, vid: 'tekst', vzemi: (r) => r.kredit.otgovornik },
+  { klyuch: KOLONI_KREDITI[4]!, ime: KOLONI_KREDITI[4]!, vid: 'evro', vzemi: (r) => r.kredit.ostatak_st },
+  { klyuch: KOLONI_KREDITI[5]!, ime: KOLONI_KREDITI[5]!, vid: 'evro', vzemi: (r) => r.ostatak_st, zatvorena: true },
+  { klyuch: KOLONI_KREDITI[6]!, ime: KOLONI_KREDITI[6]!, vid: 'evro', vzemi: (r) => r.kredit.vnoska_st },
+  { klyuch: KOLONI_KREDITI[7]!, ime: KOLONI_KREDITI[7]!, vid: 'chislo', vzemi: (r) => r.kredit.den },
+  { klyuch: KOLONI_KREDITI[8]!, ime: KOLONI_KREDITI[8]!, vid: 'protsent', vzemi: (r) => r.protsenti.dogovoren_bp / 100 },
+  { klyuch: KOLONI_KREDITI[9]!, ime: KOLONI_KREDITI[9]!, vid: 'protsent', vzemi: (r) => r.protsenti.kamDenya_bp / 100, zatvorena: true },
+  { klyuch: KOLONI_KREDITI[10]!, ime: KOLONI_KREDITI[10]!, vid: 'chislo', vzemi: (r) => r.mesetsiOshte, zatvorena: true },
+];
 
 /** Включена ли е таблицата · негова опция от Настройки, лична памет. */
 function tablitsataEVklyuchena(): boolean {
@@ -424,6 +451,7 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
 
   const redove = redoveNaKreditite(o, dnes);
   const izbran = redove.find((r) => r.kredit.id === izbraniyat());
+  const filtrirani = filtriray('krediti', redove, KOLONI_S_FILTAR, dnes);
   return `
     <section data-sektsiya="krediti" data-vklyuchena="da">
       <div class="dyalglava">
@@ -490,21 +518,20 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
       Заплати, Фактури Кеш и Фактури Карта". Тук се въвежда ДОГОВОРЪТ; вноските
       идват от плана, а платеното се записва отделно.</p>
 
+      ${poleZaTarsene('krediti')}
       <div class="tablitsa" data-tablitsa="krediti">
         <div class="red glava krediteured" translate="no">
-          ${KOLONI_KREDITI.map(
-            (kol, i) =>
-              `<span class="kletka${
-                ZATVORENI_KREDITI.includes(i) ? ' zatvorena' : ''
-              }" data-kolona="${ekraniraj(kol)}">${ekraniraj(kol)}</span>`,
-          ).join('')}
+          ${glaviNaTablitsata('krediti', KOLONI_S_FILTAR, redove, dnes)}
         </div>
         ${
           redove.length === 0
             ? '<p class="drebno">Няма нито един кредит. Нула кредита значи НУЛА дълг — истинско число, не липсващо.</p>'
-            : redove.map((r) => redNaKredita(r)).join('')
+            : filtrirani.redove.length === 0
+              ? PRAZEN_FILTAR
+              : grupiranaTablitsa('krediti', filtrirani.redove, KOLONI_S_FILTAR, dnes, (r) => redNaKredita(r))
         }
       </div>
+      ${redZaSkritoto(filtrirani, 'krediti')}
       <p class="drebno">Трите сиви колони не се редактират от никого: те се
       СМЯТАТ (правило 23). Остатъкът е начален минус платените главници;
       сторнирано плащане го вдига обратно, без нито един ред код за това.</p>
