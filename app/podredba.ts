@@ -178,7 +178,18 @@ function sektsiiteNa(koren: ParentNode): HTMLElement[] {
  * прерисуване тук би било по-скъпо и би изгубило отвореното (падащ ред, форма
  * по средата на попълване).
  */
-export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
+export function zakachiPodredbata(
+  koren: HTMLElement,
+  ekran: string,
+  /**
+   * НАЧАЛНИЯТ ИЗГЛЕД от Стопанина (резен 86 · И126) · средният слой.
+   *
+   * Подава се от `main.ts` (Огледалото живее там), не се чете тук: този модул
+   * е за ЛИЧНИЯ поглед и не бива да научава Журнала. Липсва (`undefined`) —
+   * работи се както преди, само с двата слоя.
+   */
+  nachalen?: { readonly red: readonly string[]; readonly sganati: readonly string[] },
+): void {
   const sektsii = sektsiiteNa(koren);
   if (sektsii.length < 2) return;
 
@@ -198,7 +209,9 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
   const prevedeno = prevediZapomnenoto(zapomneno, kartaNaKlyuchovete(sektsii));
   if (prevedeno.join('|') !== zapomneno.join('|')) zapomniEkranno(klyuchat(ekran), [...prevedeno]);
 
-  const red = podredi(imena, prevedeno);
+  // ТРИТЕ СЛОЯ, като при лентата (ADR-066): нарисуваното → началният на
+  // Стопанина → моят отгоре. Всеки следващ подрежда само каквото познава.
+  const red = podredi(podredi(imena, nachalen?.red ?? []), prevedeno);
 
   /**
    * МЕСТИ САМО КОГАТО РЕДЪТ НАИСТИНА СЕ РАЗЛИЧАВА.
@@ -235,7 +248,7 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
     sektsii.map((e) => ({ klyuch: klyuchNaSektsiya(e), ime: zaglavieNa(e) || klyuchNaSektsiya(e) })),
   );
 
-  prilozhiSgavaneto(koren, ekran, sektsii);
+  prilozhiSgavaneto(koren, ekran, sektsii, nachalen?.sganati ?? []);
 }
 
 // ── СГЪВАНЕТО НА ДЯЛА · резен 64 ────────────────────────────────────────────
@@ -263,14 +276,28 @@ export function zakachiPodredbata(koren: HTMLElement, ekran: string): void {
  */
 const KLYUCH_SGANATI = 'podredba.sganati';
 
-function sganatiteNa(ekran: string): readonly string[] {
-  return chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {})[ekran] ?? [];
+/**
+ * КОИ ДЯЛОВЕ СА СГЪНАТИ · двата слоя (резен 86 · И126).
+ *
+ * ЛИПСВАЩ личен запис (`undefined`) пада към НАЧАЛНОТО на Стопанина; личният
+ * запис — и празният! — бие. Разликата „не е пипано" ≠ „разтворил съм всичко"
+ * е точно каквато при личното (три състояния, не булев): слее ли се, човекът,
+ * разтворил началното-сгънато, ще го намира сгънато при всяко отваряне.
+ */
+export function sganatiteNa(ekran: string, nachalni: readonly string[] = []): readonly string[] {
+  return chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {})[ekran] ?? nachalni;
 }
 
 /** Сгъва или разтваря един дял · връща новия списък на сгънатите. */
-export function preobarniSgavaneto(ekran: string, klyuch: string): readonly string[] {
+export function preobarniSgavaneto(
+  ekran: string,
+  klyuch: string,
+  nachalni: readonly string[] = [],
+): readonly string[] {
   const vsichki = chetiEkranno<Record<string, string[]>>(KLYUCH_SGANATI, {});
-  const sega = new Set(vsichki[ekran] ?? []);
+  // Първото лично пипане тръгва ОТ началното, не от нула — инак едно
+  // щракване би разтворило наведнъж всичко, което Стопанинът е сгънал.
+  const sega = new Set(vsichki[ekran] ?? nachalni);
   if (sega.has(klyuch)) sega.delete(klyuch);
   else sega.add(klyuch);
   const nov = [...sega];
@@ -295,8 +322,13 @@ export function broySganati(ekran: string): number {
  * Съдържанието се СКРИВА с `hidden`, не се маха: махнатото щеше да губи
  * попълнена форма при всяко сгъване.
  */
-function prilozhiSgavaneto(koren: HTMLElement, ekran: string, sektsii: readonly HTMLElement[]): void {
-  const sganati = new Set(sganatiteNa(ekran));
+function prilozhiSgavaneto(
+  koren: HTMLElement,
+  ekran: string,
+  sektsii: readonly HTMLElement[],
+  nachalni: readonly string[],
+): void {
+  const sganati = new Set(sganatiteNa(ekran, nachalni));
   for (const vazel of sektsii) {
     const klyuch = klyuchNaSektsiya(vazel);
     const glava = vazel.querySelector('.dyalglava');
@@ -316,8 +348,8 @@ function prilozhiSgavaneto(koren: HTMLElement, ekran: string, sektsii: readonly 
       znak.className = 'dyalsgavach';
       znak.dataset['sgavane'] = klyuch;
       znak.addEventListener('click', () => {
-        preobarniSgavaneto(ekran, klyuch);
-        prilozhiSgavaneto(koren, ekran, sektsii);
+        preobarniSgavaneto(ekran, klyuch, nachalni);
+        prilozhiSgavaneto(koren, ekran, sektsii, nachalni);
       });
       glava.prepend(znak);
     }

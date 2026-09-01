@@ -85,6 +85,19 @@ import { ostatakNa } from './krediti.js';
 import { SUMATA_NAD_NULA } from '../yadro/pari.js';
 import { eLichenKlyuch, svediImeyl } from './akaunt.js';
 import { napraviRedNaLentata } from './lenta.js';
+import { proveriSpisaka } from './red-ot-klyuchove.js';
+
+/**
+ * Списък от секции за началния изглед · същата строгост като при лентата
+ * (дубликат, записан веднъж, е ЗАВИНАГИ — правило 1), със своите думи.
+ */
+function proveriSektsii(red: readonly string[]): readonly string[] {
+  return proveriSpisaka(
+    red,
+    { edinitsa: 'Секция', kakvo: 'ключ на секция', sKakvo: 'ключове', koeSeRisuva: 'дялът' },
+    (s) => new GreshkaStopanin(s),
+  );
+}
 import { napraviRachniyaRed } from './porednost.js';
 import { proveriPapkata } from './papki.js';
 import { iztochnitsiteNaChisla } from './iztochnitsi-na-chisla.js';
@@ -143,6 +156,7 @@ import type {
   PayloadKontragentZapisan,
   PayloadStopaninSmenen,
   PayloadLentaPodredena,
+  PayloadNachalenIzgledZadaden,
   PayloadDelaPodredeni,
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
@@ -795,6 +809,35 @@ export class Deystviya {
       VID.lenta,
       'LENTA',
       { red: napraviRedNaLentata(danni.red) },
+      z,
+    );
+  }
+
+  /**
+   * ЗАДАВА НАЧАЛНИЯ ИЗГЛЕД НА ЕДИН ЕКРАН · ред на секциите + сгънатите
+   * (резен 86 · И126 · ADR-144). Дословният брат на `podrediLentata`: само
+   * Стопанинът, цяла снимка, а личното отгоре не минава оттук — то е поглед.
+   */
+  async zadayNachalenIzgled(danni: PayloadNachalenIzgledZadaden, z: Zayavka): Promise<Rezultat> {
+    const o = await this.ogledalo();
+    if (!eStopanin(this.#actor, o)) {
+      throw new GreshkaStopanin(
+        'Началният изглед на екрана се задава само от Стопанина — той е онова, което ' +
+          'ВСИЧКИ получават. Своя ред и своето сгъване всеки си нагласява сам, без запис.',
+      );
+    }
+    if (danni.ekran.trim() === '') {
+      throw new GreshkaStopanin('Началният изглед иска ЕКРАН — празно име не сочи никъде.');
+    }
+    return this.#pusni(
+      'НачаленИзгледЗададен',
+      VID.izgled,
+      `IZGLED:${danni.ekran}`,
+      {
+        ekran: danni.ekran,
+        red: proveriSektsii(danni.red),
+        sganati: proveriSektsii(danni.sganati),
+      },
       z,
     );
   }

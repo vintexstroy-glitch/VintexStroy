@@ -101,6 +101,7 @@ import {
   broySganati,
   ekraniSPodredba,
   premestiSektsiya,
+  sganatiteNa,
   sganiVsichki,
   videniteSektsii,
   zabraviRedaNaSektsiite,
@@ -309,7 +310,7 @@ export function narisuvayNastroyki(
     ${vizhda('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
     ${vizhda('branshove') ? blokNaBranshovete(dnes) : ''}
     ${vizhda('patishta') ? blokNaDeystviyata() : ''}
-    ${blokNaPodredbata(o, dostapni)}
+    ${blokNaPodredbata(o, dostapni, koy === 'stopanin')}
     ${vizhda('karta') ? blokNaKartata() : ''}`;
 }
 
@@ -1406,7 +1407,7 @@ function blokNaDeystviyata(): string {
  * И двете са ЛИЧНИ (паметта на екрана, нула събития). Началният ред на лентата
  * си остава на Стопанина и живее в Журнала (ADR-066); тук се мести МОЯТ отгоре.
  */
-function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
+function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: boolean): string {
   const punktove = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
   const ekrani = ekraniSPodredba().filter((e: string) => videniteSektsii(e).length > 1);
   const posleden = punktove.length - 1;
@@ -1453,6 +1454,17 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
       </div>
       <div class="deystviya">
         <button type="button" class="vtorichen malak" id="zabravi-reda-lenta">Върни реда на лентата</button>
+        ${
+          /* НАЧАЛНИЯТ ИЗГЛЕД (резен 86 · И126 · ADR-144) · само Стопанинът, и
+             ЕДИН бутон за всички екрани, не по един на карта: дванайсет
+             еднакви бутона са точно шумът, който мярката на плътността брои
+             (ADR-142) — тя го хвана на първия пуск, 46 → 58 голи. Снимката на
+             МОЯ ред и сгъване става по едно събитие на екран; всеки пак
+             пренарежда за себе си отгоре (ADR-066). */
+          stopanski
+            ? `<button type="button" class="vtorichen malak" id="zapishi-nachalen-izgled">Моят изглед — начален за всички</button>`
+            : ''
+        }
       </div>
 
       ${
@@ -1481,7 +1493,9 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[]): string {
             <button type="button" class="vtorichen malak" data-zabravi-ekran="${ekraniraj(e)}">Върни реда</button>
             <button type="button" class="vtorichen malak" data-sgani-vsichki="${ekraniraj(e)}">Сгъни всички</button>
             <button type="button" class="vtorichen malak" data-razgani-vsichki="${ekraniraj(e)}">Разтвори всички</button>
-            <span class="drebno">${broySganati(e)} от ${sektsii.length} са сгънати</span>
+            <span class="drebno">${broySganati(e)} от ${sektsii.length} са сгънати${
+              o.nachalniIzgledi.has(e) ? ' · има зададен начален изглед' : ''
+            }</span>
           </div>
         </div>`;
               })
@@ -1739,6 +1753,34 @@ export function zakachiNastroyki(
       await prerisuvay();
     });
   }
+  // НАЧАЛНИЯТ ИЗГЛЕД ЗА ВСИЧКИ (резен 86 · И126 · ADR-144) · снимката на
+  // ДЕЙСТВАЩИЯ изглед — моят ред и моето сгъване върху сегашния начален —
+  // става по едно събитие на отварян екран. Проверката „ти ли си Стопанинът"
+  // е в действието.
+  koren.querySelector<HTMLButtonElement>('#zapishi-nachalen-izgled')?.addEventListener('click', async () => {
+    try {
+      const o = await k.deystviya.ogledalo();
+      // Същото сито като картите на екрана: една секция няма какво да подрежда.
+      const ekranite = ekraniSPodredba().filter((e) => videniteSektsii(e).length > 1);
+      for (const ekranat of ekranite) {
+        await k.deystviya.zadayNachalenIzgled(
+          {
+            ekran: ekranat,
+            red: videniteSektsii(ekranat).map((x) => x.klyuch),
+            sganati: sganatiteNa(ekranat, o.nachalniIzgledi.get(ekranat)?.sganati ?? []),
+          },
+          { opId: `izgled:${crypto.randomUUID()}` },
+        );
+      }
+      k.vest(
+        'dobre',
+        `Началният изглед е записан за ${ekranite.length} екрана. Всички го получават; всеки може да го пренареди за себе си.`,
+      );
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+    }
+    await prerisuvay();
+  });
   // СГЪВАНЕТО НАВЕДНЪЖ · за екран с двайсет дяла двайсет натискания не са
   // функция. Кой дял има екранът, знае паметта — същият списък, който се
   // подрежда точно отгоре.
