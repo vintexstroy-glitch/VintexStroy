@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -381,4 +381,40 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     (await p.$$('[data-semeystvo="Фактурите"]')).length,
     0,
   );
+
+  // ══ 143 · СЕМЕЙСТВОТО КАТО ЕДНА ТАБЛИЦА (резен 87 · И126 · ADR-145) ══════
+  //
+  // Дългът: „sborNaObshtaKolona е построен и проверен, но екран още няма."
+  // Тук екранът се проверява: живо семейство → Баланс го показва като ЕДНА
+  // таблица — редовете на всичките му таблици през ОБЩАТА глава, сбор на
+  // паричната обща колона, и сверка вход↔изход, казана и на нула.
+  const proveri143 = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri('143 · семейството като ЕДНА таблица', kakvo, vidyano, ochakvano);
+  await p.fill('#ime-semeystvo', 'Фактурите две');
+  await sSabitie(p, () => p.click('#forma-semeystvo button[type=submit]'));
+
+  await naEkran(p, 'smetki', '[data-sektsiya=semeystvo-kato-edna]');
+  const kartata143 = '[data-semeystvo-kato-edna="Фактурите две"]';
+  proveri143('семейството има карта с името си',
+    Boolean(await p.$(kartata143)), true);
+  const obshtiRedove = await p.$$eval(`${kartata143} [data-obsht-red]`, (e) =>
+    e.map((x) => x.getAttribute('data-obsht-red') ?? ''));
+  proveri143('редовете на „Фактури от файл" са вътре · и четирите',
+    obshtiRedove.filter((r) => r.startsWith('Фактури от файл·')).length, 4);
+  proveri143('и всеки ред КАЗВА от коя таблица е',
+    obshtiRedove.every((r) => r.includes('·')), true);
+  proveri143('паричната ОБЩА колона носи сбор',
+    (await p.$$(`${kartata143} [data-obsht-sbor]`)).length >= 1, true);
+  const sverka143 = await tekstNa(p, `${kartata143} [data-semeystvo-sverka]`);
+  proveri143('сверката вход↔изход се КАЗВА, и на нула',
+    sverka143.includes('4 реда → 4, разлика 0'), true);
+
+  // РАЗПУСНАТОТО МАХА СЕКЦИЯТА · тя няма предмет без живо семейство.
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await deystvieSPrerisuvane(p, () => natisni(p, '#litse-semeystva'));
+  await p.waitForSelector('[data-razpusni="Фактурите две"]');
+  await sSabitie(p, () => p.click('[data-razpusni="Фактурите две"]'));
+  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  proveri143('без живо семейство секцията НЕ се ражда · няма предмет',
+    Boolean(await p.$('[data-sektsiya=semeystvo-kato-edna]')), false);
 }

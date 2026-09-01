@@ -43,6 +43,8 @@ import type { PayloadTablitsaOtFaylSazdadena } from '../src/domein/sabitiya.js';
 import type { RedNaTablitsa } from '../src/domein/redove-na-tablitsa.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { kakvoPishe, otSuma, stotinki } from '../src/yadro/pari.js';
+import { redoveVObshtataGlava, sborNaObshtaKolona } from '../src/domein/obshta-glava.js';
+import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import {
   redovete,
   sborNaKolona,
@@ -125,7 +127,84 @@ export function blokNaTablitsaOtFayl(o: Ogledalo): string {
       }
       ${predlozhenie === undefined ? '' : predlozhenieto(predlozhenie)}
     </section>
-    ${blokNaSazdadenite(o)}`;
+    ${blokNaSazdadenite(o)}${blokNaSemeystvataKatoEdna(o)}`;
+}
+
+/**
+ * СЕМЕЙСТВОТО КАТО ЕДНА ТАБЛИЦА (резен 87 · И126 · ADR-145).
+ *
+ * Дългът от `docs/10`: „сборовете на общата глава на екрана —
+ * `sborNaObshtaKolona` е построен и проверен, но екран още няма." Тук е
+ * екранът: редовете на ВСИЧКИ таблици от едно живо семейство, преведени към
+ * ОБЩАТА глава (ADR-116), със сбор на всяка парична обща колона и сверка
+ * вход↔изход, казана и на нула (правило 7).
+ *
+ * Без нито едно живо семейство секцията НЕ се ражда: тя няма предмет, а не
+ * изключена отметка — същото решение като при празните групи (ADR-045).
+ */
+function blokNaSemeystvataKatoEdna(o: Ogledalo): string {
+  const zhivi = [...o.semeystvataNaGlavite.values()].filter((s) => !s.mahnato);
+  if (zhivi.length === 0) return '';
+  return `
+    <section data-sektsiya="semeystvo-kato-edna">
+      <div class="dyalglava">
+        <h2>Семейството като ЕДНА таблица</h2>
+        <span>редовете на всички таблици от семейството · през общата глава</span>
+      </div>
+      ${zhivi.map((s) => ednoSemeystvoKatoTablitsa(s, o)).join('')}
+    </section>`;
+}
+
+function ednoSemeystvoKatoTablitsa(
+  s: { readonly klyuch: string; readonly tablitsi: readonly string[]; readonly koloni: readonly string[]; readonly kartata: Readonly<Record<string, Readonly<Record<string, string>>>> },
+  o: Ogledalo,
+): string {
+  const ch = redoveVObshtataGlava({ tablitsi: s.tablitsi, kartata: s.kartata }, o.redoveNaTablitsi);
+  const nomera = s.koloni.map((_, i) => String(i));
+  // ПАРИЧНА е общата колона, в която поне един ред носи пари: видът при
+  // семейството се вижда от данните на превода, защото общата глава е ИМЕНА,
+  // а видовете живеят по таблиците (ADR-014 не пада — сборът събира само
+  // `pari_st`, тоест само каквото ВСЯКА таблица е обявила за пари).
+  const parichni = new Set(nomera.filter((k) => ch.redove.some((r) => r.pari_st[k] !== undefined)));
+  const kletka = (r: (typeof ch.redove)[number], k: string): string => {
+    const st = r.pari_st[k];
+    if (st !== undefined) return ekraniraj(kakvoPishe(stotinki(st)));
+    const n = r.chisla[k];
+    if (n !== undefined) return ekraniraj(String(n));
+    return ekraniraj(r.tekst[k] ?? '—');
+  };
+  return `
+      <div class="karta" data-semeystvo-kato-edna="${ekraniraj(s.klyuch)}">
+        <div class="dyalglava"><h3 translate="no">${ekraniraj(s.klyuch)}</h3>
+          <span translate="no">${s.tablitsi.map(ekraniraj).join(' + ')}</span></div>
+        <div class="tablitsa" data-tablitsa="semeystvo-kato-edna">
+          <div class="glava opis"><span>Таблица</span><span>Ред</span>${nomera
+            .map((k) => `<span>${ekraniraj(s.koloni[Number(k)]!)}</span>`)
+            .join('')}</div>
+          ${ch.redove
+            .map(
+              (r) => `<div class="red opis" translate="no" data-obsht-red="${ekraniraj(`${r.tablitsa}·${r.red}`)}">
+            <span>${ekraniraj(r.tablitsa)}</span><span><b>${ekraniraj(r.red)}</b></span>
+            ${nomera.map((k) => `<span>${kletka(r, k)}</span>`).join('')}
+          </div>`,
+            )
+            .join('')}
+          ${
+            parichni.size > 0
+              ? `<div class="red opis sumi" translate="no"><span><b>Сбор</b></span><span></span>${nomera
+                  .map((k) =>
+                    parichni.has(k)
+                      ? `<span data-obsht-sbor="${k}"><b>${ekraniraj(kakvoPishe(stotinki(sborNaObshtaKolona(ch.redove, k))))}</b></span>`
+                      : '<span></span>',
+                  )
+                  .join('')}</div>`
+              : ''
+          }
+        </div>
+        <p class="drebno" data-semeystvo-sverka>Сверка вход↔изход: ${ch.sverka.vhod} реда →
+        ${ch.sverka.izhod}, разлика ${ch.sverka.razlika} · клетки без дом в общата глава:
+        ${ch.sverka.bezDom}. ${ZASHTO_I_NULATA}</p>
+      </div>`;
 }
 
 /**
