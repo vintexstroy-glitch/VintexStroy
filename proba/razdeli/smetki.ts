@@ -1661,3 +1661,51 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
     predNedeklarirani - (await plochkaNaSpravka('nedeklariraniNoPlateni')) + 40_000, 40_000);
   await naEkran(p, 'imoti', '#forma-imot');
 }
+
+/**
+ * 144 · ВРЪЗКАТА КЪМ ПРЕПИСКАТА · `prepId` (М12 · р69·[48] · резен 89)
+ *
+ * „Да — нова колона prepId (връзка към преписка в Регистъра), prep остава
+ * разчетът-число." Полето е ПО ИЗБОР и се РАЖДА чак когато Регистърът има
+ * какво да предложи; записаният ред КАЗВА закачената преписка по контакта ѝ.
+ * Мястото на блока е СЛЕД §116–119 (`udobstvoto.blok5`): преписките, които
+ * изборът предлага, се записват там — блок преди тях би заварил само
+ * липсващото поле.
+ */
+export async function blok13(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  razdel = '144 · връзката към преписката';
+  await naEkran(p, 'smetki', '#forma-razhod');
+  // Свой месец: проверка върху чуждо състояние пада в деня, в който онзи
+  // блок се промени, не в деня, в който нещо наистина се счупи (§90).
+  await p.fill('#smetki-period', '2026-12');
+  await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
+  proveri('полето се е РОДИЛО · Регистърът вече има преписки',
+    await p.$$eval('#razhod-prepiska', (e) => e.length), 1);
+  proveri('и връзката е ПО ИЗБОР · първият ред е „без преписка"',
+    await p.$eval('#razhod-prepiska option', (e) => (e.textContent ?? '').trim()),
+    '— без преписка —');
+
+  // Закача се ПЪРВАТА истинска преписка — която и да е тя: блокът чете какво
+  // предлага изборът, вместо да преписва какво е записал §116.
+  const izbrana = await p.$eval('#razhod-prepiska option:nth-child(2)', (e) => ({
+    id: (e as HTMLOptionElement).value,
+    kontakt: ((e as HTMLOptionElement).textContent ?? '').split(' · ')[0]!.trim(),
+  }));
+
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Прикачен ЕООД',
+    opis: 'разход с преписка', suma: '85,00', nachin: 'банка',
+    data: '2026-12-03', dokument: '3001', prepiska: izbrana.id,
+  });
+
+  proveri('редът КАЗВА закачената преписка по контакта ѝ',
+    (await tekstNa(p, '.red.razhod:has-text("Прикачен ЕООД")')).includes(`преп. ${izbrana.kontakt}`),
+    true);
+  await naEkran(p, 'imoti', '#forma-imot');
+}

@@ -1093,3 +1093,65 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('а казаното стеснение го НЯМА при него',
     Boolean(await p.$('[data-samo-tvoite]')), false);
 }
+
+/**
+ * 142 · НАЧАЛНИЯТ ИЗГЛЕД от Стопанина за всички (резен 86 · И126 · ADR-144).
+ *
+ * Зъбът на проверката: личната памет се ТРИЕ, а редът и сгъването остават —
+ * значи изгледът е СЪБИТИЕ в Журнала, не поглед на това устройство. Пилотът е
+ * Стойност на Състояние: малък екран, който никой по-късен блок не гледа —
+ * оставеният начален изглед не мести нищо под чужди проверки.
+ */
+export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '142 · началният изглед от Стопанина';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // Стойност се отваря, за да напълни паметта си със секциите.
+  await naEkran(p, 'stoynost', '.telo [data-sektsiya]');
+  await naEkran(p, 'nastroyki', '[data-podredba-ekran="stoynost"]');
+
+  const kartata = '[data-podredba-ekran="stoynost"]';
+  const redPredi = await p.$$eval(`${kartata} [data-sektsiya-red]`, (e) =>
+    e.map((x) => x.getAttribute('data-sektsiya-red') ?? ''));
+  proveri('картата на Стойност реди поне две секции', redPredi.length >= 2, true);
+
+  // ЛИЧНО: първата секция слиза надолу и всичко се сгъва.
+  await deystvieSPrerisuvane(p, () =>
+    p.click(`${kartata} [data-sektsiya-red="${redPredi[0]}"] [data-posoka=dolu]`));
+  await deystvieSPrerisuvane(p, () => p.click(`[data-sgani-vsichki="stoynost"]`));
+
+  // СНИМКАТА СТАВА НАЧАЛНА · по едно събитие на ОТВАРЯН екран, с един бутон:
+  // по един бутон на карта беше точно шумът, който мярката на плътността
+  // брои (ADR-142) — тя го хвана на първия пуск, 46 → 58 голи.
+  const broyEkrani = await p.$$eval('[data-podredba-ekran]', (e) => e.length);
+  await sSabitiya(p, broyEkrani, () => p.click('#zapishi-nachalen-izgled'));
+  proveri('и екранът го КАЗВА, с броя',
+    (await tekstNa(p, '.vest')).includes('Началният изглед е записан'), true);
+  proveri('картата отбелязва, че начален изглед ИМА',
+    (await tekstNa(p, kartata)).includes('има зададен начален изглед'), true);
+
+  // ЛИЧНАТА ПАМЕТ СЕ ТРИЕ · каквото оцелее, идва от Журнала.
+  await p.evaluate(() => {
+    localStorage.removeItem('ui.v1.podredba.stoynost');
+    const surovo = localStorage.getItem('ui.v1.podredba.sganati');
+    if (surovo) {
+      const vsichki = JSON.parse(surovo) as Record<string, unknown>;
+      delete vsichki['stoynost'];
+      localStorage.setItem('ui.v1.podredba.sganati', JSON.stringify(vsichki));
+    }
+  });
+  await naEkran(p, 'stoynost', '.telo [data-sektsiya]');
+  proveri('редът ОЦЕЛЯВА изтритата лична памет · начело е преместената',
+    await p.$eval('.telo [data-sektsiya]', (e) => e.getAttribute('data-sektsiya')), redPredi[1]);
+  proveri('и сгъването оцелява · всички дялове тръгват сгънати',
+    await p.$$eval('.telo .sganat', (e) => e.length) >= 2, true);
+
+  // ЛИЧНОТО ПАК БИЕ ОТГОРЕ: едно щракване разтваря само своя дял, за себе си.
+  await p.click('.telo [data-sgavane]');
+  await p.waitForFunction(() => document.querySelector('.telo [data-sektsiya]:not(.sganat)'));
+  proveri('личното разтваряне ляга върху началното, без запис',
+    await p.$$eval('.telo .sganat', (e) => e.length) >= 1, true);
+  await naEkran(p, 'imoti', '#forma-imot');
+}

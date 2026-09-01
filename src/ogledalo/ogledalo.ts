@@ -101,6 +101,7 @@ import type {
   PayloadSverkaZapisana,
   PayloadSvrazkaZapisana,
   PayloadLentaPodredena,
+  PayloadNachalenIzgledZadaden,
   PayloadDelaPodredeni,
   PayloadKontaktZapisan,
   PayloadPrepiskaZapisana,
@@ -196,6 +197,8 @@ export interface Plashtane {
   readonly suma_st: number;
   readonly nachin: string;
   readonly data: string;
+  /** закачената преписка — разчетът-число (М12); липсва при запис без нея */
+  readonly prepId?: string;
 }
 
 /** Един разход — другата страна на ДДС-то. */
@@ -220,6 +223,8 @@ export interface Razhod {
   readonly klyuch: string;
   /** кой файл и коя негова версия го донесе */
   readonly izvor: string;
+  /** закачената преписка — разчетът-число (М12); липсва при запис без нея */
+  readonly prepId?: string;
 }
 
 /** Подадената ДДС-справка — ключалката на периода. */
@@ -255,6 +260,13 @@ export interface ZapisanaSverka {
   readonly propusnati: number;
   /** котвата на банката · крайното салдо от извлечението (резен 71) */
   readonly saldoKray_st?: number;
+}
+
+/** НАЧАЛНИЯТ ИЗГЛЕД на един екран · ред на секциите + сгънатите (резен 86).
+ *  Не се изнася: четците стигат до него през картата, типът се извежда. */
+interface NachalenIzgled {
+  readonly red: readonly string[];
+  readonly sganati: readonly string[];
 }
 
 export interface Ogledalo {
@@ -508,6 +520,15 @@ export interface Ogledalo {
    * връзка пази съгласието, за да се вижда кой го е дал, ако се включи пак.
    */
   readonly redNaLentata: readonly string[];
+  /**
+   * НАЧАЛНИТЕ ИЗГЛЕДИ ПО ЕКРАН · ред на секциите + сгънатите (резен 86 · И126).
+   *
+   * Ключът е екранът; последното събитие бие. Празните списъци са ВАЛИДНА
+   * отмяна. Сливането с живите секции става при рисуване (`podredi`), не тук:
+   * Огледалото не знае кои секции екранът рисува днес — дословният прецедент
+   * на `redNaLentata`.
+   */
+  readonly nachalniIzgledi: ReadonlyMap<string, NachalenIzgled>;
   /**
    * РЪЧНИЯТ РЕД НА ДЕЛАТА · идентификаторите, в реда на човека (резен 34).
    *
@@ -843,6 +864,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prehvarleni = new Map<string, PayloadDeloPrehvarleno>();
   const prenosi = new Map<string, PayloadPrenosOtcheten>();
   let redNaLentata: readonly string[] = [];
+  const nachalniIzgledi = new Map<string, NachalenIzgled>();
   let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
   let lichnoMyasto = '';
@@ -951,6 +973,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           ...(p.stavka === undefined ? {} : { stavka: p.stavka }),
           klyuch: p.klyuch ?? '',
           izvor: p.izvor ?? '',
+          ...(p.prepId === undefined ? {} : { prepId: p.prepId }),
         });
         break;
       }
@@ -1162,6 +1185,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // книга може да дойде отвън (чужда верига, върнат архив). Дублиран ключ
         // тук значи пункт, нарисуван ДВА пъти — и двата закачени.
         redNaLentata = redOtZhurnala(p.red);
+        break;
+      }
+
+      case 'НачаленИзгледЗададен': {
+        const p = s.payload as unknown as PayloadNachalenIzgledZadaden;
+        // Последната дума бие ПО ЕКРАН · целият изглед идва наведнъж (резен 86).
+        // Двата празни списъка са ВАЛИДНА отмяна — записът остава, за да се
+        // види, че Стопанинът е върнал нарисуваното, а не че никога не е пипал.
+        nachalniIzgledi.set(p.ekran, { red: redOtZhurnala(p.red), sganati: redOtZhurnala(p.sganati) });
         break;
       }
 
@@ -1808,6 +1840,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           suma_st: p.suma_st,
           nachin: p.nachin,
           data: p.data,
+          ...(p.prepId === undefined ? {} : { prepId: p.prepId }),
         });
         const vzemane = vzemaniya.get(p.vzemaneId);
         if (vzemane) {
@@ -1890,6 +1923,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prehvarleni,
     prenosi,
     redNaLentata,
+    nachalniIzgledi,
     rachniyatRedNaDelata,
     lichnoVklyucheno,
     lichnoMyasto,

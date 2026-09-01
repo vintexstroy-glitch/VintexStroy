@@ -894,9 +894,10 @@ async function trugvay(): Promise<void> {
       zakachiRedaktsiya(koren, k, prerisuvay, rolyataNa(kojSam.imeyl, ogledalo));
     }
     zakachiChernovata(koren);
-    // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
+    // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045),
+    // ВЪРХУ началния изглед на Стопанина (резен 86 · И126 · ADR-144).
     // След рисуването, защото пренарежда вече нарисувани възли.
-    zakachiPodredbata(koren, ekran);
+    zakachiPodredbata(koren, ekran, ogledalo.nachalniIzgledi.get(ekran));
     // ГРУПИТЕ ОСТАНАХА САМО В РЕДОВЕТЕ (И124 т.3 · ADR-133): секционните и
     // таб-бутоните са самостоятелни и видими; редовият лост пази височината
     // на реда (т.4 от същото съобщение). Падна и живият хедър (резен 49):

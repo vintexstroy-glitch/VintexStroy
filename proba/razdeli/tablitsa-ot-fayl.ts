@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -381,4 +381,142 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     (await p.$$('[data-semeystvo="Фактурите"]')).length,
     0,
   );
+
+  // ══ 143 · СЕМЕЙСТВОТО КАТО ЕДНА ТАБЛИЦА (резен 87 · И126 · ADR-145) ══════
+  //
+  // Дългът: „sborNaObshtaKolona е построен и проверен, но екран още няма."
+  // Тук екранът се проверява: живо семейство → Баланс го показва като ЕДНА
+  // таблица — редовете на всичките му таблици през ОБЩАТА глава, сбор на
+  // паричната обща колона, и сверка вход↔изход, казана и на нула.
+  const proveri143 = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri('143 · семейството като ЕДНА таблица', kakvo, vidyano, ochakvano);
+  await p.fill('#ime-semeystvo', 'Фактурите две');
+  await sSabitie(p, () => p.click('#forma-semeystvo button[type=submit]'));
+
+  await naEkran(p, 'smetki', '[data-sektsiya=semeystvo-kato-edna]');
+  const kartata143 = '[data-semeystvo-kato-edna="Фактурите две"]';
+  proveri143('семейството има карта с името си',
+    Boolean(await p.$(kartata143)), true);
+  const obshtiRedove = await p.$$eval(`${kartata143} [data-obsht-red]`, (e) =>
+    e.map((x) => x.getAttribute('data-obsht-red') ?? ''));
+  proveri143('редовете на „Фактури от файл" са вътре · и четирите',
+    obshtiRedove.filter((r) => r.startsWith('Фактури от файл·')).length, 4);
+  proveri143('и всеки ред КАЗВА от коя таблица е',
+    obshtiRedove.every((r) => r.includes('·')), true);
+  proveri143('паричната ОБЩА колона носи сбор',
+    (await p.$$(`${kartata143} [data-obsht-sbor]`)).length >= 1, true);
+  const sverka143 = await tekstNa(p, `${kartata143} [data-semeystvo-sverka]`);
+  proveri143('сверката вход↔изход се КАЗВА, и на нула',
+    sverka143.includes('4 реда → 4, разлика 0'), true);
+
+  // РАЗПУСНАТОТО МАХА СЕКЦИЯТА · тя няма предмет без живо семейство.
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await deystvieSPrerisuvane(p, () => natisni(p, '#litse-semeystva'));
+  await p.waitForSelector('[data-razpusni="Фактурите две"]');
+  await sSabitie(p, () => p.click('[data-razpusni="Фактурите две"]'));
+  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  proveri143('без живо семейство секцията НЕ се ражда · няма предмет',
+    Boolean(await p.$('[data-sektsiya=semeystvo-kato-edna]')), false);
+}
+
+/**
+ * 145 · ROLLUP · сбор от ДРУГА таблица по закачената връзка (резен 88)
+ *
+ * Последното от трите, които чакаха редовете (`docs/10` · ADR-113 §„Какво НЕ
+ * влиза"). Блокът върви КЪСНО в прохода: таблиците и редовете им ги е създал
+ * §128–132, а закачките искат екрана Табове. Числата са ПИСАНИ С РЪКА
+ * (100,00 + 23,45 → 12345 стотинки), не преписани от сметката, която проверяват
+ * (поуката на ADR-113 §Счупванията).
+ */
+export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '145 · rollup от друга таблица';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // Изборът е ПОИМЕНЕН (поуката на §132а), но вече избраното не се прещраква:
+  // select на същата стойност не ражда change, прерисуване не тръгва и
+  // чакането умира с „белегът staro стои". Важи за ВСЯКО меню тук — блокът
+  // върви късно и заварва каквото по-ранните раздели са оставили избрано.
+  const izberi = async (selektor: string, stoynost: string): Promise<void> => {
+    const segashna = await p.$eval(selektor, (e) => (e as HTMLSelectElement).value);
+    if (segashna === stoynost) return;
+    await deystvieSPrerisuvane(p, () => p.selectOption(selektor, stoynost));
+  };
+  const kamTablitsa = (ime: string): Promise<void> => izberi('#izbor-sazdadena', ime);
+
+  // ── редът В-1 на „Втори обект" · гледаната страна ─────────────────────────
+  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  await kamTablitsa('Втори обект');
+  const poletaV = await p.$$eval('#forma-red-na-tablitsa input[data-vid]', (e) =>
+    e.map((x) => ({ id: x.id, vid: (x as HTMLElement).dataset['vid'] ?? '' })),
+  );
+  const poleTekstV = poletaV.find((x) => x.vid === 'tekst');
+  await p.fill('#red-klyuch', 'В-1');
+  if (poleTekstV) await p.fill(`#${poleTekstV.id}`, 'Обект едно');
+  await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
+  // Проверката е ПОИМЕННА: първият пуск намери В-1 в ЧУЖДАТА таблица —
+  // екранът показваше „Втори обект", а записът падаше към първата по ред
+  // на създаване. Оттам дойде `gledanataTablitsa` (един дом · правило 17).
+  proveri('В-1 е в СВОЯТА таблица · записът пише където екранът показва',
+    await p.$$eval('[data-tablitsa=redove-na-sazdadena] [data-red="В-1"]', (e) => e.length), 1);
+
+  // ── два реда с ИЗВЕСТНИ пари на „Фактури от файл" · изворната страна ──────
+  await kamTablitsa('Фактури от файл');
+  const poletaF = await p.$$eval('#forma-red-na-tablitsa input[data-vid]', (e) =>
+    e.map((x) => ({ id: x.id, vid: (x as HTMLElement).dataset['vid'] ?? '' })),
+  );
+  const poleEvro = poletaF.find((x) => x.vid === 'evro')!;
+  // Номерът на паричната колона · от `red-k-<номер>` — със същия номер после
+  // се избира колоната на rollup-а, вместо да се гадае по надписа.
+  const kolonaEvro = poleEvro.id.replace('red-k-', '');
+  for (const [red, suma] of [['Ф-8', '100,00'], ['Ф-9', '23,45']] as const) {
+    await p.fill('#red-klyuch', red);
+    await p.fill(`#${poleEvro.id}`, suma);
+    await sSabitie(p, () => p.click('#forma-red-na-tablitsa button[type=submit]'));
+  }
+
+  // ── закачките В-1 ↔ Ф-8 · В-1 ↔ Ф-9 · от екрана Табове ───────────────────
+  await naEkran(p, 'tabove', '#izbor-tab');
+  await izberi('#zak-vid-a', 'red');
+  await izberi('#zak-tablitsa-a', 'Втори обект');
+  await izberi('#zak-red-a', 'В-1');
+  await izberi('#zak-vid-b', 'red');
+  await izberi('#zak-tablitsa-b', 'Фактури от файл');
+  for (const izvoren of ['Ф-8', 'Ф-9']) {
+    // Десният ред НЯМА прерисуващ обработчик — стойността му се чете чак при
+    // „Закачи" (`app/tabove.ts`), затова селектът е гол, без чакане на екран.
+    await p.selectOption('#zak-red-b', izvoren);
+    await sSabitie(p, () => p.click('#zak-zakachi'));
+  }
+
+  // ── сметката · на екрана на създадените таблици ───────────────────────────
+  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  await kamTablitsa('Втори обект');
+  proveri('без избор няма rollup · сметка не се появява сама',
+    await p.$$eval('[data-tablitsa=rollup]', (e) => e.length), 0);
+
+  await izberi('#izbor-rollup', 'Фактури от файл');
+  proveri('изборът на таблица вади менюто за колона, но още НЕ смята',
+    Boolean(await p.$('#izbor-rollup-kolona')) &&
+      (await p.$$eval('[data-tablitsa=rollup]', (e) => e.length)) === 0,
+    true);
+
+  await izberi('#izbor-rollup-kolona', kolonaEvro);
+  proveri('редът В-1 събира ДВАТА закачени · 100,00 + 23,45',
+    await p.$eval('[data-rollup-red="В-1"] [data-rollup-sbor]', (e) =>
+      (e as HTMLElement).dataset['rollupSbor']),
+    '12345');
+  proveri('и КАЗВА колко реда са влезли в сбора му',
+    (await tekstNa(p, '[data-rollup-red="В-1"]')).replace(/\s+/g, ' ').includes(' 2 '), true);
+  const sverkata = (await tekstNa(p, '#sverka-rollup')).replace(/\s+/g, ' ');
+  proveri('сверката брои РАЗЛИЧНИТЕ влезли изворни редове',
+    sverkata.includes('влезли: 2'), true);
+  proveri('и казва закачките към махнати, и на нула (правило 7)',
+    sverkata.includes('закачки към махнати: 0'), true);
+
+  await izberi('#izbor-rollup', '');
+  proveri('и се прибира, щом изборът падне',
+    await p.$$eval('[data-tablitsa=rollup]', (e) => e.length), 0);
+  await naEkran(p, 'imoti', '#forma-imot');
 }

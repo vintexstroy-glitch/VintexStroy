@@ -119,6 +119,7 @@ import {
   optsiiNaStavkata,
   poleSIzbor,
   poleSMenyu,
+  poleZaPrepiska,
   rechnitsite,
   sDumiZaNovite,
   zakachiMenyuta,
@@ -913,6 +914,7 @@ function formaRazhod(o: Ogledalo, mesets: string): string {
             <label for="razhod-dokument">Документ (по избор)</label>
             <input translate="no" id="razhod-dokument" name="dokument" placeholder="номер на фактура" autocomplete="off">
           </div>
+          ${poleZaPrepiska('razhod-prepiska', o.prepiski)}
         </div>
         ${legendata()}
         <p class="greshka" id="greshka-razhod"></p>
@@ -994,7 +996,13 @@ function redNaRazhod(r: Razhod, o: Ogledalo): string {
     <div class="red razhod" translate="no">
       <span class="kletka"><b>${ekraniraj(r.dostavchik)}</b><span>${ekraniraj(r.opis)} · ${ekraniraj(r.data)}${
         r.dokument ? ` · док. ${ekraniraj(r.dokument)}` : ''
-      } · ${ekraniraj(r.nachin)}</span></span>
+      } · ${ekraniraj(r.nachin)}${
+        // Изгубеното закачане се КАЗВА, не се преглъща (ADR-101): преписка,
+        // която Огледалото вече не намира, стои като „преп. ?".
+        r.prepId === undefined
+          ? ''
+          : ` · преп. ${ekraniraj(o.prepiski.get(r.prepId)?.kontakt ?? '?')}`
+      }</span></span>
       <span class="kletka"><span>${ekraniraj(potok(r.potok)?.ime ?? r.potok)}</span></span>
       <span class="kletka"><span>${ekraniraj(a.sektor)} · ${stavka}%${
         r.stavka === undefined ? '' : ' · от реда'
@@ -1624,6 +1632,10 @@ export function zakachiSmetki(
           data,
           dokument: String(danni.get('dokument') ?? '').trim(),
           stavka,
+          // Празният избор НЕ пътува: липсваща връзка е липсващо поле, не ''.
+          ...(String(danni.get('prepiska') ?? '') === ''
+            ? {}
+            : { prepId: String(danni.get('prepiska')) }),
         },
         { opId: opIdRazhod },
       );
