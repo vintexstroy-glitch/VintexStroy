@@ -145,9 +145,19 @@ export async function postaviGoogle(stranitsa: Page): Promise<void> {
               b.type = 'button';
               b.textContent = 'Влез с Google';
               b.addEventListener('click', async () => {
+                /**
+                 * КОЙ ВЛИЗА · по подразбиране Стопанинът; проходът може да
+                 * подложи ДРУГ (`__kojVliza`, сложен с `p.evaluate` СЛЕД
+                 * презареждане) — резен 83 влиза като служителя. Презареждането
+                 * го чисти само: `evaluate` не преживява навигация.
+                 */
+                const kojVliza =
+                  (globalThis as unknown as { __kojVliza?: Record<string, unknown> }).__kojVliza ?? {};
                 const zheton = await (
-                  globalThis as unknown as { __napraviZheton: (n: string) => Promise<string> }
-                ).__napraviZheton(nastroyki!.nonce);
+                  globalThis as unknown as {
+                    __napraviZheton: (n: string, promeni?: Record<string, unknown>) => Promise<string>;
+                  }
+                ).__napraviZheton(nastroyki!.nonce, kojVliza);
                 nastroyki!.callback({ credential: zheton });
               });
               kade.append(b);

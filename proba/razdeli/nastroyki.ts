@@ -987,3 +987,109 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
       e.map((x) => x.textContent?.trim() ?? ''))).includes('проверена'), true);
   await deystvieSPrerisuvane(p, () => p.click('#sesii-zatvori'));
 }
+
+/**
+ * 141 · НАСТРОЙКИТЕ НА СЛУЖИТЕЛЯ · без стопанските (резен 83 · И121 т.1).
+ *
+ * Негови думи: „ТРябва за служителите да имат достъп до техните възможности
+ * за настройки без тези определени само за стопанина които създава трие и
+ * променя всичко."
+ *
+ * Блокът ВЛИЗА като служителя — не пита кода „какво би нарисувал", а гледа
+ * какво ПИШЕ НА ЕКРАНА на другия човек. Стои НАКРАЯ на прохода: излизането
+ * презарежда страницата и никой блок след него не бива да разчита на
+ * състоянието отпреди. Накрая се връща стопанинът — проходът оставя книгата
+ * на онзи, който я е почнал.
+ *
+ * КНИГАТА НА СЛУЖИТЕЛЯ иска стопанската верига ВЪТРЕ: на своето устройство
+ * той отваря книга под СВОЯ ключ, а чуждите вериги пристигат по Драйва
+ * (ADR-055). Проходът играе Драйва по похвата на §67 — пише веригата на
+ * Стопанина (откриващото + вписването на служителя) направо в носителя,
+ * ПРЕДИ входа. Без нея служителят е стопанин на празна книга и вижда всичко —
+ * вярно по устройство, но не е сценарият на резена.
+ */
+export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '141 · Настройките на служителя';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // ── излизане и влизане като СЛУЖИТЕЛЯ от §20 (редактор „Бамстера") ────────
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  // Подложката се слага СЛЕД презареждането — то чисти всичко от `evaluate`.
+  await p.evaluate(() => {
+    (globalThis as unknown as { __kojVliza: unknown }).__kojVliza = {
+      email: 'Ivaylo85Petkov@gmail.com', name: 'Бамстера', sub: '5556667778',
+    };
+  });
+  // Стопанската верига в КНИГАТА НА СЛУЖИТЕЛЯ · проходът играе Драйва (§67).
+  await p.evaluate(async () => {
+    const db = await new Promise((da, ne) => {
+      const z = indexedDB.open('masterbook');
+      z.onsuccess = () => da(z.result);
+      z.onerror = () => ne(z.error);
+    });
+    const veriga = 'ivaylo85petkov@gmail.com#pero:vintexstroy@gmail.com';
+    const dvete = [
+      {
+        opId: 'prohod-chuzhd-stopanin', ts: '2026-08-01T08:00:00.000Z', naematel: veriga,
+        actor: 'vintexstroy@gmail.com', seq: 1, prevHash: '', hash: 'prohod-chuzhd-1',
+        type: 'СтопанинЗаписан', sashtnost: { vid: 'stopanin', id: 'vintexstroy@gmail.com' },
+        payload: { imeyl: 'vintexstroy@gmail.com' },
+      },
+      {
+        opId: 'prohod-chuzhd-sluzhitel', ts: '2026-08-01T08:01:00.000Z', naematel: veriga,
+        actor: 'vintexstroy@gmail.com', seq: 2, prevHash: 'prohod-chuzhd-1', hash: 'prohod-chuzhd-2',
+        type: 'СлужителЗаписан', sashtnost: { vid: 'sluzhitel', id: 'SLUZHITEL:ivaylo85petkov@gmail.com' },
+        payload: { imeyl: 'ivaylo85petkov@gmail.com', ime: 'Бамстера', rolya: 'redaktor' },
+      },
+    ];
+    for (const sabitie of dvete) {
+      await new Promise<void>((da, ne) => {
+        const z = (db as IDBDatabase).transaction('sabitiya', 'readwrite').objectStore('sabitiya').add(sabitie);
+        z.onsuccess = () => da();
+        z.onerror = () => ne(z.error);
+      });
+    }
+  });
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+
+  proveri('пунктът Настройки ВОДИ и служителя · не само отваря реда',
+    await p.$eval('#nastroyki-vhod', (e) => e.hasAttribute('data-ekran')), true);
+  await naEkran(p, 'nastroyki', '[data-samo-tvoite]');
+  await p.keyboard.press('Escape'); // падащият ред се отвори с пункта · маха се от пътя
+  proveri('падащият ред знае кой гледа',
+    (await tekstNa(p, '#nastroyki-red .za-kogo')).includes('служител'), true);
+  proveri('стеснението се КАЗВА, веднъж и отгоре',
+    (await tekstNa(p, '[data-samo-tvoite]')).includes('Стопанинът'), true);
+
+  // НЕГОВИТЕ секции стоят · присъдата е на домейна, екранът само пита.
+  proveri('Записаните сверки СТОЯТ · те са на работещите',
+    Boolean(await p.$('[data-sektsiya=sverki]')), true);
+  proveri('и личните две стоят · подредбата',
+    Boolean(await p.$('[data-sektsiya=podredbata]')), true);
+  proveri('и темата на натоварването',
+    Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), true);
+
+  // СТОПАНСКИТЕ ги НЯМА · изброени поименно, не „всичко останало".
+  for (const s of ['hedari', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
+    proveri(`стопанската секция „${s}" я НЯМА за служителя`,
+      Boolean(await p.$(`[data-sektsiya=${s}]`)), false);
+  }
+
+  // ── обратно стопанинът · екранът се връща ЦЯЛ ─────────────────────────────
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+  await naEkran(p, 'nastroyki', '[data-sektsiya=hedari]');
+  await p.keyboard.press('Escape');
+  proveri('за стопанина хедърите пак стоят · нищо не е отнето',
+    Boolean(await p.$('[data-sektsiya=hedari]')), true);
+  proveri('а казаното стеснение го НЯМА при него',
+    Boolean(await p.$('[data-samo-tvoite]')), false);
+}

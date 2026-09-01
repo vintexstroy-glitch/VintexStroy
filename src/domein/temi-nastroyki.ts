@@ -345,3 +345,35 @@ export function vizhdaTemata(koy: KoyGleda, klyuch: string): boolean {
   const tema = temaPoKlyuch(klyuch);
   return tema !== undefined && tema.za.includes(koy);
 }
+
+/**
+ * СЕКЦИИТЕ НА ЕКРАН „НАСТРОЙКИ" БЕЗ СВОЯ ТЕМА, КОИТО СА ЛИЧНИ · поименно.
+ *
+ * „Темата на натоварването" и „Подредбата на екраните" пишат в ПАМЕТТА на
+ * това устройство (нула събития) — те са на всекиго, точно както езикът на
+ * интерфейса. Всичко останало без тема е стопанско по подразбиране: секция,
+ * добавена утре без ред тук и без тема, се ражда СКРИТА за служителя, а не
+ * видима — обратното би било втора врата към достъпа (правило 23).
+ */
+const LICHNI_SEKTSII: readonly string[] = Object.freeze(['tema-natovarvane', 'podredbata']);
+
+/**
+ * Вижда ли ТОЗИ човек ТАЗИ секция на екран „Настройки" (И121 т.1).
+ *
+ * Негови думи: „ТРябва за служителите да имат достъп до техните възможности
+ * за настройки без тези определени само за стопанина които създава трие и
+ * променя всичко."
+ *
+ * Присъдата е на ТРИ стъпала и всяко има един дом: секция с ТЕМА пита темата
+ * (`za` — описът горе); секция без тема е или ЛИЧНА (списъкът поименно), или
+ * стопанска. Екранът пита ТУК, вместо да реди `if`-ове по заглавията — първата
+ * нова секция без свой `if` щеше да се появи за всички.
+ */
+export function vizhdaSektsiyata(koy: KoyGleda, sektsiya: string): boolean {
+  const tema = TEMI.find(
+    (t) => t.kade.vid === 'sektsiya' && t.kade.ekran === 'nastroyki' && t.kade.sektsiya === sektsiya,
+  );
+  if (tema) return tema.za.includes(koy);
+  if (LICHNI_SEKTSII.includes(sektsiya)) return true;
+  return koy === 'stopanin';
+}

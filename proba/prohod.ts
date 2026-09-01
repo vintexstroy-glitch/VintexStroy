@@ -164,6 +164,10 @@ async function main(): Promise<void> {
     // състояние под следващия, е по-скъп от липсващ.
     await menyuta.blok4(ctx);
     await udobstvoto.blok5(ctx);
+    // §141 е ПОСЛЕДЕН нарочно: излиза и влиза като ДРУГ човек (служителя),
+    // а презареждането при изхода чисти всяко модулно състояние — блок след
+    // него би тръгнал от нула, без да го казва.
+    await nastroyki.blok11(ctx);
   } catch (greshka) {
     broyach.dobaviNahodka({
       razdel: broyach.posledenRazdel,

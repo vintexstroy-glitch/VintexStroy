@@ -108,6 +108,7 @@ import {
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import { vizhdaSektsiyata, type KoyGleda } from '../src/domein/temi-nastroyki.js';
 import {
   eVgradenKlyuch,
   prazenModelZaVgradena,
@@ -171,8 +172,16 @@ export function narisuvayNastroyki(
   o: Ogledalo,
   sabitiya = 0,
   izbor: Izbor = izborPoPodrazbirane(),
-  /** влезлият · Стопанинът ли е (ADR-043 · ролята се СМЯТА от Журнала) */
-  negoviyat = true,
+  /**
+   * КОЙ ГЛЕДА · стопанин, служител или упълномощен (И121 т.1 · резен 83).
+   *
+   * Дотук тук влизаше `negoviyat: boolean` и екранът беше заключен ЦЯЛ
+   * (`iskaRolya`). Негови думи: „ТРябва за служителите да имат достъп до
+   * техните възможности за настройки без тези определени само за стопанина."
+   * Затова единицата на правото е СЕКЦИЯТА (както темата в падащия ред), а
+   * присъдата живее в домейна — `vizhdaSektsiyata`, един дом за двата четеца.
+   */
+  koy: KoyGleda = 'stopanin',
   /**
    * ПУНКТОВЕТЕ НА МЕНЮТО · за въпроса „на кой таб стои този хедър" (И103).
    *
@@ -195,25 +204,50 @@ export function narisuvayNastroyki(
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
   const modeli = [...o.modeli.values()];
+  // Присъдата на всяка секция е в домейна (`vizhdaSektsiyata`) — тук само се
+  // пита. Секция, скрита оттук с гол `if`, би се разминала с падащия ред.
+  const vizhda = (s: string): boolean => vizhdaSektsiyata(koy, s);
 
   return `
+    ${
+      /* Стеснението се КАЗВА (правило 15), веднъж и отгоре — не по секция:
+         скритите секции не са изключена отметка, а чуждо място (И121 т.1). */
+      koy === 'stopanin'
+        ? ''
+        : `<p class="drebno" data-samo-tvoite>Тук са ТВОИТЕ настройки. Стопанските —
+      хедърите, бутоните, номенклатурите — ги вижда и мени само Стопанинът.</p>`
+    }
     <div class="plochki">
-      <div class="plochka">
+      ${
+        vizhda('butoni')
+          ? `<div class="plochka">
         <span class="etiket">Бутони</span>
         <span class="chislo" translate="no">${butoni.length}</span>
         <span class="pod">${butoni.length ? `в ${papki(butoni).length} папки` : 'още няма нито един'}</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('modeli')
+          ? `<div class="plochka">
         <span class="etiket">Модели на таблици</span>
         <span class="chislo" translate="no">${modeli.length}</span>
         <span class="pod">${modeli.length ? 'карти на хедъри' : 'правят се при първото четене'}</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('sverki')
+          ? `<div class="plochka">
         <span class="etiket">Записани сверки</span>
         <span class="chislo" translate="no">${o.sverki.length}</span>
         <span class="pod">включително нулевите — правило 7</span>
-      </div>
-      <div class="plochka">
+      </div>`
+          : ''
+      }
+      ${
+        vizhda('patishta')
+          ? `<div class="plochka">
         <span class="etiket">Построени действия</span>
         <span class="chislo" translate="no">${
           DEYSTVIYA.filter((d) => d.dokade === 'postroen').length
@@ -221,7 +255,9 @@ export function narisuvayNastroyki(
         <span class="pod">${
           DEYSTVIYA.filter((d) => d.dokade === 'bez-buton').length
         } са построени, но БЕЗ БУТОН · останалите са само обявени</span>
-      </div>
+      </div>`
+          : ''
+      }
     </div>
 
     ${greshka ? `<div class="vest zle">${ekraniraj(greshka)}</div>` : ''}
@@ -238,39 +274,43 @@ export function narisuvayNastroyki(
        * Сега изискването живее на ТЕМАТА (`temi-nastroyki.ts`), а тук отпадат
        * само двете ѝ секции. Правило 15: изключеното се КАЗВА, не се преглъща.
        */
-      mozhe(izbor, 'iztochnitsi')
-        ? blokNaButonite(butoni)
-        : `<section data-sektsiya="butoni">
+      !vizhda('butoni')
+        ? ''
+        : mozhe(izbor, 'iztochnitsi')
+          ? blokNaButonite(butoni)
+          : `<section data-sektsiya="butoni">
       <div class="dyalglava"><h2>Бутоните · пътищата</h2><span>иска Драйв</span></div>
       <p class="drebno">Бутонът е ПЪТ към файл в Драйва, а това издание е МЕСТНО —
       Журналът е само на устройството. Възможността не е изключена, а я НЯМА в този
       план: пътища без облак водят наникъде. Всичко останало в Настройки работи.</p>
     </section>`
     }
-    ${dobavyam ? formaNaButon(modeli) : ''}
+    ${dobavyam && vizhda('butoni') ? formaNaButon(modeli) : ''}
     ${
-      mozhe(izbor, 'iztochnitsi')
-        ? blokNaModelite(modeli)
-        : `<section data-sektsiya="modeli">
+      !vizhda('modeli')
+        ? ''
+        : mozhe(izbor, 'iztochnitsi')
+          ? blokNaModelite(modeli)
+          : `<section data-sektsiya="modeli">
       <div class="dyalglava"><h2>Модели на таблици</h2><span>иска Драйв</span></div>
       <p class="drebno">Моделът описва ВЪНШЕН файл — картата на неговата глава. Без
       Драйв няма откъде да дойде такъв файл, затова темата я няма в този план.
       Хедърите и колоните им се редактират нормално.</p>
     </section>`
     }
-    ${blokNaRedaktora(modeli, o)}
-    ${blokNaParametrite(o)}
-    ${blokNaEtapite(o)}
+    ${vizhda('hedari') ? blokNaRedaktora(modeli, o) : ''}
+    ${vizhda('parametri') ? blokNaParametrite(o) : ''}
+    ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
 
-    ${blokNaKredititeVNastroyki()}
-    ${blokNaKontragentite(o)}
-    ${blokNaSverkite(o)}
-    ${sektsiyaZhurnalat(o, sabitiya, dnes)}
-    ${sektsiyaGodinite(o, dnes, negoviyat)}
-    ${blokNaBranshovete(dnes)}
-    ${blokNaDeystviyata()}
+    ${vizhda('krediti') ? blokNaKredititeVNastroyki() : ''}
+    ${vizhda('kontragenti') ? blokNaKontragentite(o) : ''}
+    ${vizhda('sverki') ? blokNaSverkite(o) : ''}
+    ${vizhda('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
+    ${vizhda('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
+    ${vizhda('branshove') ? blokNaBranshovete(dnes) : ''}
+    ${vizhda('patishta') ? blokNaDeystviyata() : ''}
     ${blokNaPodredbata(o, dostapni)}
-    ${blokNaKartata()}`;
+    ${vizhda('karta') ? blokNaKartata() : ''}`;
 }
 
 // ── НАП · активирането със съгласие (резен 17 · И108 · И112) ────────────────

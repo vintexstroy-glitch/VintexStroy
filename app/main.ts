@@ -989,10 +989,10 @@ function dostapniteEkrani(n: {
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
       if (koy === 'lichno') return n.lichnoVklyucheno || !n.lichnoPipnato;
-      // НАСТРОЙКИ СТОИ ВИНАГИ · съдържанието му е по роля, не самият пункт
-      // (И101 т.2). Скрит пункт би отнел на служителя и темите, които са
-      // НЕГОВИ — езикът на интерфейса и личният таб.
-      if (koy === 'nastroyki') return true;
+      // НАСТРОЙКИ СТОИ ВИНАГИ и това вече не е изключение тук: екранът няма
+      // `iskaRolya` (резен 83) — вижда го всеки, а СЕКЦИИТЕ му се стесняват
+      // по човек (`vizhdaSektsiyata`). Скрит пункт би отнел на служителя и
+      // темите, които са НЕГОВИ — езикът на интерфейса и личният таб.
       const iska = EKRANI[koy].iska;
       if (iska && !mozhe(izbor, iska)) return false;
     return dostapenLiE(koy, n.rolya);
@@ -1043,7 +1043,7 @@ function strana(
        * при натискане на настройки**". Пунктът остава на мястото си в лентата;
        * различава се само с това, което прави при натискане.
        */
-      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, dostapenLiE(koy, rolya), izbor);
+      if (koy === 'nastroyki') return redNaNastroykite(gledashtiyat, izbor);
       const znachka = koy === 'pari' && zakasneli > 0
         ? `<span class="broyach">${zakasneli}</span>`
         : '';

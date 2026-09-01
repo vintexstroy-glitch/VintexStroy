@@ -31,6 +31,7 @@ import { narisuvayTabove, zakachiTabove } from './tabove.js';
 import { narisuvayLichno, pokanaZaLichno, zakachiLichno } from './lichno.js';
 import { mozhe, type Izbor, type Vazmozhnost } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
+import { koyGleda } from '../src/domein/temi-nastroyki.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Deystviya } from '../src/domein/deystviya.js';
 import { godinite } from '../src/domein/godishna-ravnosmetka.js';
@@ -264,15 +265,20 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      * Изискването слезе на ТЕМАТА (`temi-nastroyki.ts` · поле `iska`), където
      * му е мястото: две теми искат Драйва, останалите не. Това връща и
      * обещанието „ВСЯКО издание работи офлайн" на локалните планове.
+     *
+     * И БЕЗ `iskaRolya` (резен 83 · И121 т.1): „ТРябва за служителите да имат
+     * достъп до техните възможности за настройки без тези определени само за
+     * стопанина." Заключеният ЦЯЛ екран отнемаше на служителя и сверките, и
+     * подредбата — неговите. Единицата на правото е СЕКЦИЯТА: кой коя вижда
+     * казва `vizhdaSektsiyata` (домейнът), а екранът само пита.
      */
-    iskaRolya: 'sobstvenik',
     narisuvay: (r) =>
       narisuvayNastroyki(
         r.ogledalo,
         r.broySabitiya,
         r.izbor,
-        // СТОПАНИНЪТ се СМЯТА от Журнала, не от самоличността (ADR-043).
-        r.ogledalo.stopanin !== '' && r.ogledalo.stopanin === r.kojSam.imeyl,
+        // КОЙ ГЛЕДА се СМЯТА от Журнала, не от самоличността (ADR-043).
+        koyGleda(r.kojSam.imeyl, r.ogledalo),
         // Редакторът на хедъри пита „на кой таб стоиш" — с ЖИВИТЕ пунктове.
         punktoveNaMenyuto(r),
         r.dnes,
