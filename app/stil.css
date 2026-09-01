@@ -997,6 +997,9 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
 .glava.kodova, .red.kodova {
   grid-template-columns: 44px minmax(0, 280px) minmax(0, 300px) 110px;
 }
+.sesiya-dobavki { display: flex; flex-wrap: wrap; gap: 6px 18px; padding: 2px 0 6px; }
+.sesiya-dobavka { font-size: 12px; color: var(--pero-tiho); }
+.sesiya-dobavka .kletka { display: inline; }
 .glava.naem, .red.naem {
   grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;
   min-width: 1040px;

@@ -38,6 +38,7 @@
  */
 
 import { koloniNaImotite, koloniNaNaemite } from './imoti.js';
+import { KOLONI_SESII } from './zhurnalat.js';
 import { koloniNaVzemaniyata, koloniNaPlashtaniyata } from './pari.js';
 import { KOLONI_RAZHODI } from './smetki.js';
 import { koloniNaObektite } from './stoynost.js';
@@ -53,7 +54,8 @@ interface SamoIme {
 }
 
 /**
- * ВГРАДЕНИТЕ СЕДЕМ · ключ · име · таб · сметнати колони.
+ * ВГРАДЕНИТЕ · ключ · име · таб · сметнати колони. Броят им го БРОИ тестът
+ * (`tests/tablitsite.test.ts`), не тази шапка — тя вече излъга веднъж.
  *
  * Редът е редът на екраните; вътре в екрана — редът, в който таблиците стоят
  * една под друга. Той е и редът в матрицата, защото човек ги търси там, където
@@ -135,6 +137,15 @@ const VGRADENI: readonly VgradenaTablitsa[] = Object.freeze<VgradenaTablitsa[]>(
     // „Етаж · вид" слепва две полета · трите оценки ги смята Калкулаторът.
     zatvoreni: [1, 6, 7, 8],
     koloni: () => koloniNaObektite(),
+  },
+  {
+    klyuch: 'vgraden:zhurnal',
+    ime: 'Журналът · сесии',
+    ekran: 'nastroyki',
+    // ВСИЧКИ кодови колони са производни от подписаните полета на събитието —
+    // в тях не пише никой (резен 82); добавките на Стопанина идват отзад.
+    zatvoreni: [0, 1, 2, 3, 4],
+    koloni: () => KOLONI_SESII,
   },
 ]);
 

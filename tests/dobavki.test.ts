@@ -19,14 +19,16 @@ import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import {
+  eRedNaSesiya,
   eVgradenKlyuch,
   klyuchNaKletka,
   prazenModelZaVgradena,
   preimenuvayKodova,
   VGRADEN_IMOTI,
+  VGRADEN_ZHURNAL,
   VGRADENI_S_DOBAVKI,
 } from '../src/domein/dobavki.js';
-import { dobaviKolona, smeniVidNaStoynost } from '../src/domein/redaktor.js';
+import { dobaviKolona, semeystvo, smeniVidNaStoynost } from '../src/domein/redaktor.js';
 import { belegNaModel } from '../src/iztochnik/model.js';
 import { kodoviteGlaviNa, tablitsiteNaProgramata } from '../app/tablitsite.js';
 import { SHA } from './pomoshtni.js';
@@ -69,10 +71,12 @@ async function sImotIDveKoloni(d: Deystviya): Promise<void> {
 
 describe('празният модел на вградена', () => {
   it('се ражда само за вградените от поименния списък', () => {
-    // Ключът е ЗАКОВАН с ръка: правата и клетките се записват на него, и
+    // Ключовете са ЗАКОВАНИ с ръка: правата и клетките се записват на тях, и
     // тиха смяна би ги откачила от таблицата им (`app/tablitsite.ts`).
+    // Вторият дойде с резен 82 — САМИЯТ Журнал (И121 т.1).
     expect(VGRADEN_IMOTI).toBe('vgraden:imoti');
-    expect(VGRADENI_S_DOBAVKI).toEqual([VGRADEN_IMOTI]);
+    expect(VGRADEN_ZHURNAL).toBe('vgraden:zhurnal');
+    expect(VGRADENI_S_DOBAVKI).toEqual([VGRADEN_IMOTI, VGRADEN_ZHURNAL]);
     expect(eVgradenKlyuch(VGRADEN_IMOTI)).toBe(true);
     expect(eVgradenKlyuch('Банка ОББ')).toBe(false);
     expect(() => prazenModelZaVgradena('vgraden:naemi')).toThrow(/поименен/);
@@ -344,5 +348,93 @@ describe('преименуването на кодова колона', () => {
     expect(imoti.glavi[0]).toBe('Обект');
     // кръщелното не се пипа — то е домът в кода, не запис
     expect(kodoviteGlaviNa(VGRADEN_IMOTI, o2)[0]).toBe(kodovi[0]);
+  });
+});
+
+// ── 6 · КЛЕТКАТА НА СЕСИЯ · самият Журнал (резен 82 · ADR-140) ─────────────
+
+describe('клетката върху сесия на Журнала', () => {
+  const sesiya = '2026-09-01|vintexstroy@gmail.com';
+
+  it('редът на сесията е „ден | кой" · формата се брои, не се гадае', () => {
+    expect(eRedNaSesiya(sesiya)).toBe(true);
+    expect(eRedNaSesiya('IM-1')).toBe(false);
+    expect(eRedNaSesiya('2026-09-01')).toBe(false);
+    expect(eRedNaSesiya('2026-9-1|x')).toBe(false);
+  });
+
+  it('записва се и се чете · последната дума бие и тук', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiModel(
+      dobaviKolona(prazenModelZaVgradena(VGRADEN_ZHURNAL), {
+        ime: 'Бележка на деня',
+        rolya: 'sobstvenik',
+      }),
+      { opId: 'op-model-zh' },
+    );
+    await deystviya.zapishiKletkaNaDobavka(
+      { tablitsa: VGRADEN_ZHURNAL, redId: sesiya, kolona: 0, stoynost: 'проверена' },
+      { opId: 'op-1' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect(o.dobavkiKletki.get(klyuchNaKletka(VGRADEN_ZHURNAL, sesiya, 0))?.stoynost).toBe(
+      'проверена',
+    );
+  });
+
+  it('счупен адрес на сесия се отказва с думи', async () => {
+    const { deystviya } = stend();
+    await deystviya.zapishiModel(
+      dobaviKolona(prazenModelZaVgradena(VGRADEN_ZHURNAL), {
+        ime: 'Бележка на деня',
+        rolya: 'sobstvenik',
+      }),
+      { opId: 'op-model-zh' },
+    );
+    await expect(
+      deystviya.zapishiKletkaNaDobavka(
+        { tablitsa: VGRADEN_ZHURNAL, redId: 'не-сесия', kolona: 0, stoynost: 'х' },
+        { opId: 'op-1' },
+      ),
+    ).rejects.toThrow(/не е сесия/);
+  });
+
+  it('и Журналът е ДЕВЕТАТА вградена · изцяло производни кодови колони', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiModel(
+      dobaviKolona(prazenModelZaVgradena(VGRADEN_ZHURNAL), {
+        ime: 'Бележка на деня',
+        rolya: 'sobstvenik',
+      }),
+      { opId: 'op-model-zh' },
+    );
+    const o = await ogledaloto(dnevnik);
+    const zhurnal = tablitsiteNaProgramata(o).filter((t) => t.klyuch === VGRADEN_ZHURNAL);
+    expect(zhurnal).toHaveLength(1);
+    expect(zhurnal[0]!.glavi.at(-1)).toBe('Бележка на деня');
+    // добавката е ОТВОРЕНА — с нея инвариантът „не изцяло затворена" оживява
+    expect(zhurnal[0]!.zatvoreni.length).toBeLessThan(zhurnal[0]!.glavi.length);
+  });
+});
+
+// ── 7 · ПРАЗНАТА ГЛАВА НЕ Е СЕМЕЙСТВО (находка на §140) ────────────────────
+
+describe('празният отпечатък не роднее', () => {
+  it('два наслагваеми модела с по една СВОЯ добавка не са роднини', () => {
+    // Първата добавка тръгва от отпечатък '' — влезе ли той в predishni,
+    // всеки празен модел става „роднина" на всеки друг и семейството
+    // разнася колони между ЧУЖДИ таблици (Журналът получи колоната на
+    // Имоти в §140, преди пазачът да се роди).
+    const imoti = dobaviKolona(prazenModelZaVgradena(VGRADEN_IMOTI), {
+      ime: 'Изложение',
+      rolya: 'sobstvenik',
+    });
+    const zhurnal = dobaviKolona(prazenModelZaVgradena(VGRADEN_ZHURNAL), {
+      ime: 'Бележка на деня',
+      rolya: 'sobstvenik',
+    });
+    expect(imoti.predishni).toEqual([]);
+    expect(semeystvo([imoti, zhurnal], zhurnal)).toEqual([]);
+    expect(semeystvo([imoti, zhurnal], imoti)).toEqual([]);
   });
 });

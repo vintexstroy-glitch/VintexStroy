@@ -928,3 +928,62 @@ export async function blok9(ctx: KonteksNaProhoda): Promise<void> {
   proveri('броят стана 2 · на всички редове наведнъж',
     await p.$eval('.red.imot', (r) => [...r.children].at(-2)?.textContent?.trim()), '2');
 }
+
+/** 140 · колоната в САМИЯ Журнал · бележка на сесията (резен 82 · ADR-140) */
+export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '140 · колоната в самия Журнал';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // ── РАЖДАНЕТО · Журналът стои в избора като вградена ─────────────────────
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await p.waitForSelector('#izbor-hedar');
+  proveri('Журналът · сесии стои в избора на хедър',
+    (await p.$$eval('#izbor-hedar option', (o) =>
+      o.map((x) => x.textContent ?? ''))).some((t) => t.includes('Журналът · сесии')), true);
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-hedar', 'vgraden:zhurnal'));
+  await p.waitForSelector('#nova-kolona');
+  await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
+  await p.waitForSelector('#forma-kolona');
+  await p.fill('#kolona-ime', 'Бележка на деня');
+  await sSabitie(p, () => p.click('#forma-kolona button[type=submit]'));
+  await p.waitForSelector('.red.redaktor');
+  proveri('и НЕ отива при „роднини" — празната глава не е семейство',
+    (await tekstNa(p, '.vest')).includes('семейството'), false);
+  proveri('добавката на Журнала се реди в Редактора',
+    (await p.$$eval('.red.redaktor [data-ime-vhod]', (e) =>
+      e.map((x) => (x as HTMLInputElement).value))).includes('Бележка на деня'), true);
+
+  // ── СЕСИИТЕ · клетката е бележка върху „ден | кой" ───────────────────────
+  await p.click('#sesii-otvori');
+  await p.waitForSelector('[data-sektsiya=zhurnal-sesii][data-otvoren=da]');
+  await p.waitForSelector('.sesiya-dobavki [data-redakt^="dobavka·vgraden:zhurnal·"]');
+  proveri('всяка сесия носи клетката на добавката',
+    (await p.$$('.karta.sesiya')).length,
+    (await p.$$('.sesiya-dobavki [data-redakt^="dobavka·vgraden:zhurnal·"]')).length);
+  proveri('празната клетка се казва с „—"',
+    await p.$eval('.sesiya-dobavki [data-redakt]', (e) => e.textContent?.trim()), '—');
+
+  const predi = await broySabitiya(p);
+  await p.dblclick('.sesiya-dobavki [data-redakt^="dobavka·vgraden:zhurnal·"]');
+  await p.waitForSelector('.sesiya-dobavki .kletka-redaktor');
+  await p.fill('.sesiya-dobavki .kletka-redaktor', 'проверена');
+  await sSabitie(p, () => p.keyboard.press('Enter'));
+  proveri('записът на бележката е ТОЧНО едно събитие', (await broySabitiya(p)) - predi, 1);
+  await p.waitForFunction(() =>
+    [...document.querySelectorAll('.sesiya-dobavki [data-redakt]')].some(
+      (e) => e.textContent?.includes('проверена')));
+  proveri('и сесията я показва',
+    (await p.$$eval('.sesiya-dobavki [data-redakt]', (e) =>
+      e.map((x) => x.textContent?.trim() ?? ''))).includes('проверена'), true);
+
+  // затварянето пуска книгата · отварянето я чете наново — бележката е ЗАПИС
+  await deystvieSPrerisuvane(p, () => p.click('#sesii-zatvori'));
+  await p.click('#sesii-otvori');
+  await p.waitForSelector('.sesiya-dobavki [data-redakt^="dobavka·vgraden:zhurnal·"]');
+  proveri('бележката стои и след затваряне и ново отваряне — Журналът я носи',
+    (await p.$$eval('.sesiya-dobavki [data-redakt]', (e) =>
+      e.map((x) => x.textContent?.trim() ?? ''))).includes('проверена'), true);
+  await deystvieSPrerisuvane(p, () => p.click('#sesii-zatvori'));
+}

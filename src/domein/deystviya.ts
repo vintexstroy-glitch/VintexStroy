@@ -98,7 +98,13 @@ import {
 import { proveriNovTab } from './tabove.js';
 import { eStopanin, GreshkaStopanin, mozheDaVzemeZhurnala } from './stopanin.js';
 import { GreshkaVhod, proveriNastroyka, type Sila } from './vhodni-problemi.js';
-import { klyuchNaKletka, proveriKletkaNaDobavka, VGRADEN_IMOTI } from './dobavki.js';
+import {
+  eRedNaSesiya,
+  klyuchNaKletka,
+  proveriKletkaNaDobavka,
+  VGRADEN_IMOTI,
+  VGRADEN_ZHURNAL,
+} from './dobavki.js';
 import {
   GreshkaKontragent,
   klyuchNaKontragent,
@@ -1056,6 +1062,13 @@ export class Deystviya {
     if (danni.tablitsa === VGRADEN_IMOTI && !o.imoti.has(danni.redId)) {
       throw new GreshkaTablitsa(
         `Ред „${danni.redId}" го няма сред имотите — клетка без ред няма къде да се покаже.`,
+      );
+    }
+    // Сесията се СМЯТА от потока и Огледалото не я държи (резен 82) — затова
+    // тук се проверява ФОРМАТА на реда „ден | кой", не съществуването му.
+    if (danni.tablitsa === VGRADEN_ZHURNAL && !eRedNaSesiya(danni.redId)) {
+      throw new GreshkaTablitsa(
+        `Ред „${danni.redId}" не е сесия — Журналът реди „ден | кой" (2026-09-01|imeyl).`,
       );
     }
     return this.#pusni(

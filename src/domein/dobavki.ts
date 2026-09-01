@@ -47,8 +47,32 @@ class GreshkaDobavka extends Error {
 /** Ключът на пилота · вградената таблица „Имоти" (`app/tablitsite.ts`). */
 export const VGRADEN_IMOTI = 'vgraden:imoti';
 
-/** Вградените, които приемат добавки · ДНЕС една, поименно (ADR-137). */
-export const VGRADENI_S_DOBAVKI: readonly string[] = Object.freeze([VGRADEN_IMOTI]);
+/**
+ * САМИЯТ ЖУРНАЛ · сесиите на редактора (резен 82 · И121 т.1: „както на всяка
+ * една от тези с които се работи в програмата, ТАКА И В САМИЯ ЖУРНАЛ").
+ *
+ * Редът на тази таблица е СЕСИЯТА — двойката „ден | кой" (`sesii.ts`), защото
+ * тя е онова, което екранът на Журнала реди. Клетката на добавка ляга върху
+ * сесия: бележка на деня, а не пипане по събитие — събитията са замразени.
+ */
+export const VGRADEN_ZHURNAL = 'vgraden:zhurnal';
+
+/** Вградените, които приемат добавки · ДНЕС две, поименно (ADR-137 · ADR-140). */
+export const VGRADENI_S_DOBAVKI: readonly string[] = Object.freeze([
+  VGRADEN_IMOTI,
+  VGRADEN_ZHURNAL,
+]);
+
+/**
+ * РЕД НА СЕСИЯ ли е адресът · „ден | кой", както Журналът го реди.
+ *
+ * Сесията се СМЯТА от потока (`sesii.ts`) и Огледалото не я държи — затова
+ * действието проверява ФОРМАТА на реда, не съществуването му: клетка върху
+ * бъдещ или чужд ден е позволена бележка, клетка върху счупен адрес — не.
+ */
+export function eRedNaSesiya(redId: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}\|[^|·]+$/.test(redId);
+}
 
 /** Вграден ли е ключът · вградените носят представка (`app/tablitsite.ts`). */
 export function eVgradenKlyuch(klyuch: string): boolean {

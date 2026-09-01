@@ -41,6 +41,9 @@ import {
   type Predlozhenie,
 } from '../src/domein/zhurnal-ot-tablitsa.js';
 import { denyaNa, zhurnalatZaEkrana, type Sesiya } from '../src/domein/sesii.js';
+import { klyuchNaKletka, VGRADEN_ZHURNAL } from '../src/domein/dobavki.js';
+import { vidNaKolona } from '../src/domein/kolonno.js';
+import { pishi } from '../src/yadro/pari.js';
 import {
   filtarAktiven,
   filtriray,
@@ -70,7 +73,7 @@ let kniga: readonly Sabitie[] | null = null;
  * „изключен филтър = днешният ден" остана в домейна (`zhurnalatZaEkrana`).
  * Товарът се търси, но не стои като визуална колона (`samoZaTarsene`).
  */
-const KOLONI_SESII: readonly KolonaSFiltar<Sabitie>[] = [
+export const KOLONI_SESII: readonly KolonaSFiltar<Sabitie>[] = [
   { klyuch: 'den', ime: 'Ден', vid: 'data', vzemi: denyaNa },
   { klyuch: 'koy', ime: 'Кой', vid: 'tekst', vzemi: (s) => s.actor },
   { klyuch: 'vid', ime: 'Вид', vid: 'tekst', vzemi: (s) => s.type },
@@ -128,7 +131,7 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number, dnes: string): 
       ${svrazki.length ? tablitsaNaSvrazkite(svrazki) : ''}
     </section>
 
-    ${blokNaSesiite(dnes)}`;
+    ${blokNaSesiite(o, dnes)}`;
 }
 
 /**
@@ -141,7 +144,7 @@ export function sektsiyaZhurnalat(o: Ogledalo, sabitiya: number, dnes: string): 
  * Книгата се чете С БУТОН, а не при всяко рисуване на Настройки: тя е цялата
  * история, а секцията стои на екрана и когато никой не я гледа.
  */
-function blokNaSesiite(dnes: string): string {
+function blokNaSesiite(o: Ogledalo, dnes: string): string {
   if (kniga === null) {
     return `
     <section data-sektsiya="zhurnal-sesii" data-otvoren="ne">
@@ -200,7 +203,7 @@ function blokNaSesiite(dnes: string): string {
       ${
         izgled.sesii.length === 0
           ? '<p class="prazno">Нито една сесия по този филтър. Празното е отговор, не грешка.</p>'
-          : izgled.sesii.map(redNaSesiya).join('')
+          : izgled.sesii.map((s) => redNaSesiya(o, s)).join('')
       }
       ${f ? redZaSkritoto(f, 'zhurnal-sesii') : ''}
 
@@ -219,8 +222,39 @@ function blokNaSesiite(dnes: string): string {
     </section>`;
 }
 
+/**
+ * ДОБАВКИТЕ НА ЕДНА СЕСИЯ (резен 82 · ADR-140) · „и в самия журнал".
+ *
+ * Редът на журнала е СЕСИЯТА (ден | кой) — клетката на добавка е бележка
+ * върху нея, не пипане по събитие: събитията са замразени (правило 1).
+ * ФОРМУЛНАТА добавка тук се казва с „—": сесиите не са табличен изглед и
+ * сметката им чака своя (казано, не преглътнато).
+ */
+function dobavkiteNaSesiyata(o: Ogledalo, s: Sesiya): string {
+  const m = o.modeli.get(VGRADEN_ZHURNAL);
+  if (!m || m.glavi.length === 0) return '';
+  const redId = `${s.den}|${s.koy}`;
+  return `<div class="sesiya-dobavki" translate="no">${m.glavi
+    .map((ime, k) => {
+      const kl = o.dobavkiKletki.get(klyuchNaKletka(VGRADEN_ZHURNAL, redId, k));
+      const formulna = m.formuli[k] !== undefined;
+      const pishe = !formulna && vidNaKolona(m, k) === 'promenlyva';
+      const tekst = formulna
+        ? '—'
+        : kl?.stoynost_st !== undefined
+          ? pishi(kl.stoynost_st)
+          : (kl?.stoynost ?? '') || '—';
+      return `<span class="sesiya-dobavka"><b>${ekraniraj(ime)}:</b> <span class="kletka"${
+        pishe
+          ? ` data-redakt="dobavka·${ekraniraj(klyuchNaKletka(VGRADEN_ZHURNAL, redId, k))}" title="Двоен клик или F2 — стойност на добавката"`
+          : ''
+      }><span>${ekraniraj(tekst)}</span></span></span>`;
+    })
+    .join('')}</div>`;
+}
+
 /** Една сесия · името, денят, часовете, и редовете под тях. */
-function redNaSesiya(s: Sesiya): string {
+function redNaSesiya(o: Ogledalo, s: Sesiya): string {
   return `
     <div class="karta sesiya" data-sesiya="${ekraniraj(`${s.den}·${s.koy}`)}"
          data-broy="${s.broy}">
@@ -230,6 +264,7 @@ function redNaSesiya(s: Sesiya): string {
           s.broy
         } ${s.broy === 1 ? 'запис' : 'записа'}</span>
       </div>
+      ${dobavkiteNaSesiyata(o, s)}
       ${s.redove
         .map(
           (r) => `<div class="istoriya-sabitie" translate="no" data-seq="${r.seq}">

@@ -1742,10 +1742,11 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.
     // СЕДЕМ от резен 18б насам (Продажби); ОСЕМ от резен 48 — Управление влезе
-    // с колонния си описател и с това падна последната граница в тази матрица.
+    // с колонния си описател и с това падна последната граница в тази матрица;
+    // ДЕВЕТ от резен 82 — самият Журнал (сесиите) влезе като вградена.
     const vgradeniVMatritsata = (await p.$$eval('[data-hedar-red]', (e) =>
       e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:'));
-    proveri('вградените таблици влизат в матрицата', vgradeniVMatritsata.length, 8);
+    proveri('вградените таблици влизат в матрицата', vgradeniVMatritsata.length, 9);
     proveri('и УПРАВЛЕНИЕ е сред тях · границата падна',
       vgradeniVMatritsata.includes('vgraden:dela'), true);
     proveri('и вносният хедър стои до тях',

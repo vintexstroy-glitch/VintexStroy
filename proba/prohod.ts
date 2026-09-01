@@ -124,6 +124,7 @@ async function main(): Promise<void> {
     await nastroyki.blok7(ctx);
     await nastroyki.blok8(ctx);
     await nastroyki.blok9(ctx);
+    await nastroyki.blok10(ctx);
     /**
      * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
      *
