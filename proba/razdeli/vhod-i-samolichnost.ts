@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisniVGrupata, plochka, tekstNa } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 import { ADRES } from '../yadro/server.ts';
 
@@ -103,7 +103,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
     const [svalenSZapasen] = await Promise.all([
       p.waitForEvent('download'),
-      natisniVGrupata(p, '#iznesi'),
+      natisni(p, '#iznesi'),
     ]);
     const tekstNaIznosa = await readFile(await svalenSZapasen.path(), 'utf8');
     proveri('изнесеният файл НЕ носи телефона',

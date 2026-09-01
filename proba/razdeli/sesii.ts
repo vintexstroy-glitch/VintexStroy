@@ -80,6 +80,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await p.waitForSelector('[data-filtar-ot="zhurnal-sesii:den"]');
   await p.fill('[data-filtar-ot="zhurnal-sesii:den"]', '2020-01-01');
   await p.waitForSelector('[data-sektsiya=zhurnal-sesii][data-izklyuchen=ne]');
+  // Менюто остава отворено по избор (75а) и ВИСИ върху редовете под лентата —
+  // затваря се, за да не гълта кликовете на следващите проверки.
+  await p.click('[data-filtar-glava="zhurnal-sesii:den"]');
+  await p.waitForFunction(
+    () => document.querySelector('[data-menyu]') === null,
+    undefined,
+    { timeout: 5_000 },
+  );
   const sVsichki = await p.$$eval('[data-sesiya]', (e) => e.length);
   proveri('с широк обхват сесиите са повече от нула', sVsichki > 0, true);
 

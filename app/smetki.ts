@@ -258,6 +258,29 @@ function znachkaNaSverkata(zatvarya: boolean): string {
   }</span>`;
 }
 
+/**
+ * ПЕРИОДЪТ В ПОСТОЯННАТА ЛЕНТА (И124 т.11 · резен 76 · ADR-133).
+ *
+ * Негово: „В Перид при Сметки липсва възможност за въвеждане на края на
+ * разглеждания периода. **Това е част от постоянното меню с бутоните най
+ * отгоре видимо постоянно.**" Затова формата НЕ живее в тялото (то скролва),
+ * а в шапката — тя стои извън скролиращата кутия и се вижда по всяко време.
+ * Рисува я `main.ts`; законите за края (сборовете гледат обхвата, месечните
+ * механизми — началния месец) са си в `narisuvaySmetki`.
+ */
+export function lentataNaBalansa(dnes: string): string {
+  const mesets = period ?? dnes.slice(0, 7);
+  const krayat = periodDo !== null && periodDo > mesets ? periodDo : null;
+  return `
+      <form id="forma-period" class="lenta-period" translate="no">
+        <label>От <input translate="no" id="smetki-period" name="period" type="month"
+               value="${ekraniraj(mesets)}" required></label>
+        <label>До <input translate="no" id="smetki-period-do" name="periodDo" type="month"
+               value="${ekraniraj(krayat ?? '')}"></label>
+        <button type="submit" class="vtorichen">Покажи</button>
+      </form>`;
+}
+
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const mesets = period ?? dnes.slice(0, 7);
   // КРАЯТ (И124 т.11) · сборовете и разбивките гледат ОБХВАТА; месечните
@@ -300,27 +323,6 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     </div>
 
     ${formaSalda(o)}
-
-    <section data-sektsiya="smetki-period" class="karta">
-      <div class="dyalglava"><h2>Период</h2><span>от началото до края · празен край значи „само единият месец"</span></div>
-      <form id="forma-period">
-        <div class="poleta tesni">
-          <div class="pole">
-            <label for="smetki-period">От</label>
-            <input translate="no" id="smetki-period" name="period" type="month" value="${ekraniraj(mesets)}" required>
-          </div>
-          <div class="pole">
-            <label for="smetki-period-do">До (по избор)</label>
-            <input translate="no" id="smetki-period-do" name="periodDo" type="month" value="${ekraniraj(krayat ?? '')}">
-            <span class="drebno">Сборовете и разбивките гледат обхвата; ДДС и сверките са месечни и работят по „От".</span>
-          </div>
-        </div>
-        <div class="deystviya">
-          <button type="submit" class="vtorichen">Покажи</button>
-          <p class="drebno">Нищо не се записва — изгледът се изчислява от Журнала при всяко показване.</p>
-        </div>
-      </form>
-    </section>
 
     <section data-sektsiya="smetki-smetki">
       <div class="dyalglava">

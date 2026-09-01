@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 57 · Менютата · речникът е от Журнала | 57 · Менютата · четирите състояния | 57 · Менютата · следата СЛЕД записа | 58 · Още огледала · по обект | 58 · Още огледала · по контрагент */
@@ -150,16 +150,16 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.diagrama-lenta title', (e) => e.textContent.includes('→')), true);
 
     // Бутонът СКРИВА, не разменя — таблицата остава и в двете състояния.
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#kam-diagrama'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#kam-diagrama'));
     proveri('скрита диаграма НЕ отнема таблицата',
       await p.$$eval('.gant-lenta', (e) => e.length), 3);
     proveri('и диаграмата наистина я няма', await p.$$eval('svg.diagrama', (e) => e.length), 0);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#kam-diagrama'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#kam-diagrama'));
     proveri('и се връща с бутон', await p.$$eval('svg.diagrama', (e) => e.length), 1);
 
     // БУТОНЪТ СЕГА · подрежда, не решава.
     const predSega = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#sega'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#sega'));
     proveri('СЕГА не пипа нито едно дело', await broySabitiya(p), predSega);
     proveri('СЕГА филтрира по спешно и важно',
       await p.$eval('#f-otsenka', (e) => (e as any).value), 'спешно-важно');

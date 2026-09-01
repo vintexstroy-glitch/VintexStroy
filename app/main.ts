@@ -39,7 +39,6 @@ import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
-import { zakachiZhiviyaHedar } from './zhiviyat-hedar.js';
 import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
 import {
   kopchetoNaLentata,
@@ -59,7 +58,7 @@ import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
-import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { lentataNaBalansa, narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { nachaloNaProbvaneto } from '../src/domein/probvane.js';
@@ -652,16 +651,6 @@ async function trugvay(): Promise<void> {
     });
   }
 
-  /**
-   * ДРЪЖКАТА НА ЖИВИЯ ХЕДЪР · пази се, за да се ОТВЪРЖЕ при следващото рисуване.
-   *
-   * Слушателят стои на `window`, не на корена, защото страницата се скролва
-   * цялата. Всяко прерисуване подменя корена, тъй че без отвързване след десет
-   * прерисувания на `window` висят десет слушателя — и всеки мери целия екран
-   * на всеки кадър. Точно лагът, който той нарочно е поискал да го няма.
-   */
-  let otvarzhiZhiviyaHedar: (() => void) | undefined;
-
   async function prerisuvay(): Promise<void> {
     const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
@@ -708,6 +697,14 @@ async function trugvay(): Promise<void> {
             <h1>${opis.ime}</h1>
             <p>${opis.podnaslov}</p>
           </div>
+          ${
+            /* ПОСТОЯННАТА ЛЕНТА (И124 т.3 · т.11 · ADR-133): шапката НЕ скролва
+               (`.telo` е единствената скролираща кутия), затова каквото стои
+               тук е „видимо по всяко време на скрола". Периодът на Баланса е
+               първото ѝ парче; бутоните вдясно са САМОСТОЯТЕЛНИ — групите
+               със стрелкичка паднаха. */
+            ekran === 'smetki' ? lentataNaBalansa(dnes) : ''
+          }
           <div class="desno-gore">
             ${/* РАЗМЕРЪТ НА ТЕКСТА · ПЪРВИ отляво в групата и затова видим на
                   всеки екран, дори когато петте служебни пътя ги няма (личния).
@@ -889,21 +886,16 @@ async function trugvay(): Promise<void> {
     // ПОДРЕДБАТА НА ЕКРАНА · всеки сам мести секциите си (И101 т.2 · ADR-045).
     // След рисуването, защото пренарежда вече нарисувани възли.
     zakachiPodredbata(koren, ekran);
-    // ГРУПАТА ДЕЙСТВИЯ · няколко действия на едно място стават един бутон със
-    // стрелкичка (ADR-057). СЛЕД подредбата: тя мести цели секции, а групата
-    // пипа бутоните вътре в тях — обратният ред би свивал възли, които после
-    // се местят.
+    // ГРУПИТЕ ОСТАНАХА САМО В РЕДОВЕТЕ (И124 т.3 · ADR-133): секционните и
+    // таб-бутоните са самостоятелни и видими; редовият лост пази височината
+    // на реда (т.4 от същото съобщение). Падна и живият хедър (резен 49):
+    // „хедъра който се лепи отгоре и се сменя за всяка таблица се маха,
+    // защото не работи добре и натоварва."
     zakachiGrupite(koren, ekran);
     // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с повече от три
     // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
     // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
-    // ЖИВИЯТ ХЕДЪР · коя глава стои горе при скрол (M15 · резен 49). НАКРАЯ:
-    // той МЕРИ вече нарисуваното, а всичко над него още мести секции и възли.
-    // Предишната закачка се отвързва, инак при всяко прерисуване се трупа още
-    // един слушател върху `window` и лагът, който той не иска, идва сам.
-    otvarzhiZhiviyaHedar?.();
-    otvarzhiZhiviyaHedar = zakachiZhiviyaHedar(koren);
     /**
      * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
      *

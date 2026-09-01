@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisniVGrupata, plochka, redove, sSabitie, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
+import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -293,7 +293,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       await p.$(`[data-premahni-kolona="${broyKoloni - 1}"]`), null);
 
     // СМЯНАТА · само Стопанинът, и е ново събитие (правило 1)
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, `[data-smeni-formula="${broyKoloni - 1}"]`));
+    await deystvieSPrerisuvane(p, () => natisni(p, `[data-smeni-formula="${broyKoloni - 1}"]`));
     await p.waitForSelector('#forma-formula');
     await p.selectOption('#forma-formula [name=deystvie]', 'razlika');
     await sSabitie(p, () => p.click('#forma-formula button[type=submit]'));
@@ -496,7 +496,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await p.selectOption('[data-parametar="dublikat"] [data-parametar-sila]', 'preduprezhdava');
     await p.fill('[data-parametar="dublikat"] [data-parametar-belezhka]', 'при нас се случва');
     await deystvieSPrerisuvane(p, () =>
-      natisniVGrupata(p, '[data-parametar="dublikat"] [data-parametar-zapishi]'),
+      natisni(p, '[data-parametar="dublikat"] [data-parametar-zapishi]'),
     );
     proveri('записът влиза в ЖУРНАЛА, не в паметта на екрана',
       await broySabitiya(p), predParametara + 1);

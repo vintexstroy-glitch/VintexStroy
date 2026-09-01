@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, natisniVGrupata, sSabitie } from '../yadro/pomoshtni.ts';
+import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -332,7 +332,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // ТРЕТИЯТ бутон СЕ СВИ В ГРУПАТА (ADR-057) — с два лица нищо не се свиваше,
   // с три вече да. Затова се натиска ПРЕЗ групата, точно както го прави човек:
   // отваря стрелкичката, избира по думата, чак тогава натиска.
-  await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#litse-semeystva'));
+  await deystvieSPrerisuvane(p, () => natisni(p, '#litse-semeystva'));
   await p.waitForSelector('[data-sektsiya=semeystva]');
   proveri('третото лице на Редактора се отваря', (await p.$$('#forma-semeystvo')).length, 1);
 

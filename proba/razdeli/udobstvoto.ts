@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, dokatoStane, naEkran, napishiSigurno, napishiVPoleto, natisniVGrupata, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -44,12 +44,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('„покажи всичко" маха и търсенето',
       (await p.$$eval('.red.naem', (r) => r.length)) > 1, true);
 
-    // ЗАМРАЗЕНИЯТ ХЕДЪР · свойство на стила, проверено като стил.
-    proveri('главата е замразена (sticky)',
-      await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'sticky');
+    // ХЕДЪРЪТ ВЕЧЕ НЕ ЛЕПНЕ (И124 т.3 · ADR-133) · надживя резен 9а: „хедъра
+    // който се лепи отгоре… се маха". Постоянното горе е шапката (§121).
+    proveri('главата НЕ лепне · лепящият хедър е паднал',
+      await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'static');
 
     // ИСТОРИЯТА НА РЕДА · кой · какво · кога, от Журнала.
-    await natisniVGrupata(p, '.red.naem:has-text("Домакинство") [data-istoriya]');
+    await natisni(p, '.red.naem:has-text("Домакинство") [data-istoriya]');
     await p.waitForSelector('.istoriya-karta');
     const istoriyata = await tekstNa(p, '.istoriya-karta');
     proveri('историята казва типа събитие', istoriyata.includes('НаемДобавен'), true);
@@ -172,7 +173,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // груповото сторно: една причина (диалогът я дава), запис на ред, вест
     const predaSborove = await broySabitiya(p);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-storno-izbrani]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '[data-storno-izbrani]'));
     proveri('груповото сторно пише ПО ЕДНО събитие на ред',
       await broySabitiya(p), predaSborove + 2);
     proveri('и казва какво стана', (await tekstNa(p, '.vest')).includes('Сторнирани 2 от 2'), true);
@@ -239,7 +240,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.evaluate(() => document.body.textContent.includes('Пробен клипборд ЕООД')), true);
     proveri('и нищо още не е записано — Вратата чака човека',
       await broySabitiya(p), predKlipborda);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#otkazhi-plan'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#otkazhi-plan'));
     proveri('отказът прибира предложението', await p.$('#otkazhi-plan'), null);
 
     // ══ 32 · фините филтри на ВСИЧКИ таблици ════════════════════════════
@@ -671,24 +672,22 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
 
 
 /**
- * 69 · Групата действия · един бутон с дума и стрелкичка (ADR-057)
+ * 69 · Самостоятелните бутони · групите паднаха (И124 т.3 · ADR-133)
  *
- * Негово правило, дословно: „**С падащо меню когато е повече от един**…
- * **Когато е една функция си го пише на бутона.**" И механиката: „Избираш
- * действието — **то променя името на бутона**… и **чак когато избереш и
- * натиснеш бутона стартира действието**."
+ * Негови думи, дословно: „**Тези бутони са самостоятелни и са видими** към
+ * табло горе което е хоризонтално и **видими по всяко време на скрола**.
+ * **Падаши менюта да има само в менюто.**"
  *
- * Затова НАЙ-ВАЖНАТА проверка тук не е че менюто се отваря, а че изборът от
- * него **не добавя нито едно събитие**. Меню, което действа при избора, би
- * изглеждало еднакво на екрана и би записвало в Журнала без човек да е
- * натиснал — точно разликата, която той поиска.
+ * Групата със стрелкичката (ADR-057) е надживяна: нито едно действие не се
+ * крие зад избор. Проверява се ВИДИМОТО (`checkVisibility`), не атрибут —
+ * поуката от ADR-057 §Б важи и за обратното обещание.
  */
 export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
   const { stranitsa: p, broyach } = ctx;
   let razdel = '—';
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
-    razdel = '69 · Групата действия · един бутон и стрелкичка';
+    razdel = '69 · Самостоятелните бутони · групите паднаха';
 
     // Блокът е вмъкнат по средата на прохода и затова НЕ мести състояние под
     // следващия: накрая се връща на екрана, от който е тръгнал (същото правило
@@ -697,70 +696,22 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       () => (document.querySelector('.navred.tuk') as HTMLElement | null)?.dataset['ekran'] ?? '',
     );
 
-    // Таблото носи най-простата група: Драйвът е ДВЕ действия в един контейнер.
+    // Таблото носеше най-простата група: двете действия на Драйва. Сега и
+    // двете стоят видими, една до друга — никой не избира от меню.
     await naEkran(p, 'tablo', '#proveri');
-    const grupata = '[data-sektsiya=prenasyane] .grupa-deystviya';
-    proveri('двете действия на Драйва станаха ЕДНА група',
-      await p.$$eval(grupata, (e) => e.length), 1);
-    // МЕРИ СЕ ВИДИМОТО, не свойството `hidden`. Първата версия четеше атрибута
-    // и казваше „скрит е", докато на екрана стояха четири бутона: авторско
-    // правило за `display` бие `[hidden]` от таблицата на браузъра. Скрийншотът
-    // го хвана, проходът — не. Оттук нататък го хваща и той.
-    proveri('вижда се ЕДНО от тях',
-      await p.$$eval(`${grupata} button:not(.strelkichka)`,
-        (e) => e.filter((x) => (x as HTMLElement).checkVisibility()).length), 1);
-    proveri('и това е първото · редът, в който екранът ги е нарисувал',
-      await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), false);
-    proveri('другото стои в DOM-а, само скрито · слушателят му не е пипан',
-      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), true);
-    proveri('и наистина не се вижда · не само по атрибут',
-      await p.$eval('#butni-drayv', (e) => !(e as HTMLElement).checkVisibility()), true);
-    proveri('стрелкичката КАЗВА, че носи меню',
-      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-haspopup')), 'menu');
-    proveri('и че е прибрана',
-      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-expanded')), 'false');
+    proveri('нито една група действия не остана на екрана',
+      await p.$$eval('.grupa-deystviya, .strelkichka', (e) => e.length), 0);
+    proveri('двете действия на Драйва СЕ ВИЖДАТ, и двете',
+      await p.$$eval('#drapni-drayv, #butni-drayv',
+        (e) => e.filter((x) => (x as HTMLElement).checkVisibility()).length), 2);
 
-    razdel = '69 · Групата действия · менюто ИЗПИСВА думите';
-    await p.click(`${grupata} .strelkichka`);
-    await p.waitForSelector('.kontekstno-menyu');
-    proveri('отвореното се казва на четеца на екран',
-      await p.$eval(`${grupata} .strelkichka`, (e) => e.getAttribute('aria-expanded')), 'true');
-    proveri('менюто изрежда ВСИЧКИ действия, с думите им',
-      (await p.$$eval('.kontekstno-menyu [data-deystvie]', (e) => e.map((x) => x.textContent))).join(' · '),
-      'Дръпни от Драйва · Бутни в Драйва');
-
-    razdel = '69 · Групата действия · изборът СМЕНЯ думата, но НЕ действа';
-    const predIzbora = await broySabitiya(p);
-    await p.click('.kontekstno-menyu [data-deystvie="Бутни в Драйва"]');
-    await p.waitForSelector('#butni-drayv:not([hidden])');
-    proveri('избраното стана видимото',
-      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), false);
-    proveri('а другото се прибра', await p.$eval('#drapni-drayv', (e) => (e as HTMLElement).hidden), true);
-    // ТОВА е разликата между „меню" и „меню, което избира".
-    proveri('и НИТО ЕДНО събитие не е влязло в Журнала', await broySabitiya(p), predIzbora);
-    proveri('менюто се е прибрало след избора',
-      await p.$$eval('.kontekstno-menyu', (e) => e.length), 0);
-
-    razdel = '69 · Групата действия · изборът преживява смяна на екран';
-    await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'tablo', '#proveri');
-    proveri('върнах се и думата е онази, която избрах',
-      await p.$eval('#butni-drayv', (e) => (e as HTMLElement).hidden), false);
-
-    razdel = '69 · Групата действия · едно действие си пише думата';
-    // Негово правило: група се прави от ПОВЕЧЕ от едно. „Излез" е сам в своя
-    // контейнер и няма какво да избира — значи няма и стрелкичка.
-    proveri('самотното действие НЕ е в група',
-      await p.$eval('#izlez', (e) => Boolean(e.closest('.grupa-deystviya'))), false);
-    proveri('и си е с думата', await p.$eval('#izlez', (e) => e.textContent!.trim()), 'Излез');
-
-    razdel = '69 · Групата действия · голият знак остава отвън';
-    // ▲ и ▼ носят `aria-label`, но нямат ДУМА, а той каза „исписване".
-    // Стрелка, натискана пет пъти подред, в меню става неизползваема.
-    await naEkran(p, 'tabove', '#izbor-tab');
-    proveri('местенето с ▲ стои видимо, извън всяка група',
-      await p.$eval('[data-sektsiya-gore]', (e) =>
-        (e as HTMLElement).hidden || Boolean(e.closest('.grupa-deystviya'))), false);
+    razdel = '69 · Самостоятелните бутони · шапката не скролва';
+    // „Видими по всяко време на скрола": бутоните за целия таб живеят в
+    // шапката, а скролиращата кутия е `.telo` — шапката стои ИЗВЪН нея.
+    proveri('бутоните на таба са В ШАПКАТА, извън скролиращата кутия',
+      await p.$eval('#proveri', (e) => Boolean(e.closest('.shapka')) && !e.closest('.telo')), true);
+    proveri('и се виждат',
+      await p.$eval('#proveri', (e) => (e as HTMLElement).checkVisibility()), true);
 
     if (nachalniyat) {
       await deystvieSPrerisuvane(p, () => p.click(`[data-ekran=${nachalniyat}]`));
@@ -970,32 +921,17 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('страницата НЕ скролва · нищо не бута тялото',
       await p.evaluate(() => document.documentElement.scrollHeight <= innerHeight + 1), true);
 
-    const glavataPri = async (kolko: number): Promise<number> => {
+    // ГЛАВАТА ВЕЧЕ НЕ ЛЕПНЕ (И124 т.3 · ADR-133) · „хедъра който се лепи
+    // отгоре… се маха". Постоянното при скрол е ШАПКАТА — тя стои извън
+    // скролиращата кутия и не мърда; главата на таблицата си отива с редовете.
+    const shapkataPri = async (kolko: number): Promise<number> => {
       await p.$eval('.telo', (e, s2) => { (e as HTMLElement).scrollTop = s2 as number; }, kolko);
       await p.waitForTimeout(120);
-      return p.$eval('.tablitsa .glava', (e) => Math.round(e.getBoundingClientRect().top));
+      return p.$eval('.shapka', (e) => Math.round(e.getBoundingClientRect().top));
     };
-    // ДВАТА СКРОЛА СЕ СМЯТАТ ОТ САМАТА ТАБЛИЦА, не се заковават.
-    //
-    // Дотук тук стояха 900 и 1300 — числа, верни за височината на екрана в деня,
-    // в който бяха написани. Резен 37 добави колона и два реда обяснение под
-    // таблицата, тя слезе по-надолу, и 1300 вече падаше ИЗВЪН нея: главата се
-    // отлепваше по естествен път, а проверката го обявяваше за счупена лепкавост.
-    //
-    // Числото трябва да е ВЪТРЕ в обхвата на таблицата — това е онова, което
-    // проверката значи. Мери се стабилност, не абсолютна позиция (и точно това
-    // пише коментарът отгоре, но самите числа не го спазваха).
-    const obhvat = await p.$eval('.tablitsa', (e) => {
-      const telo = document.querySelector('.telo') as HTMLElement;
-      const gore = e.getBoundingClientRect().top - telo.getBoundingClientRect().top + telo.scrollTop;
-      return { gore: Math.round(gore), visochina: Math.round(e.getBoundingClientRect().height) };
-    });
-    const parviyat = obhvat.gore + Math.round(obhvat.visochina * 0.25);
-    const vtoriyat = obhvat.gore + Math.round(obhvat.visochina * 0.6);
-    const glavaA = await glavataPri(parviyat);
-    const glavaB = await glavataPri(vtoriyat);
-    console.log(`\n  ГЛАВАТА при скрол ${parviyat} → ${glavaA}px · при ${vtoriyat} → ${glavaB}px\n`);
-    proveri('главата стои на едно и също място при два различни скрола', glavaA, glavaB);
+    const shapkaA = await shapkataPri(300);
+    const shapkaB = await shapkataPri(900);
+    proveri('шапката стои на едно и също място при два различни скрола', shapkaA, shapkaB);
 
     const parvataPri = async (kolko: number): Promise<number> => {
       await p.$eval('.telo', (e, s2) => { (e as HTMLElement).scrollLeft = s2 as number; }, kolko);
@@ -1293,7 +1229,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '76 · Размерът · и В ПРОЗОРЕЦА, където текстът е най-дребен';
     // Прозорецът ПОКРИВА шапката — лост зад воала е лост, който го няма.
-    await natisniVGrupata(p, '[data-istoriya]');
+    await natisni(p, '[data-istoriya]');
     await p.waitForSelector('.istoriya-karta');
     proveri('лостът е и в прозореца',
       await p.$$eval('.istoriya-karta .goleminata button', (b) => b.length), 3);
@@ -1660,7 +1596,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-priemi]', (e) => e.length)) >= 1, true);
     // ДВАТА бутона са в ГРУПА действия (ADR-057): видим е един, другият е зад
     // стрелкичката. Проходът прави трите стъпки на човека, не заобикаля групата.
-    await sSabitie(p, () => natisniVGrupata(p, '[data-priemi]'));
+    await sSabitie(p, () => natisni(p, '[data-priemi]'));
     proveri('приемането мени състоянието',
       (await tekstNa(p, '[data-zadacha]')).includes('приета'), true);
     proveri('и бутоните за отговор си отиват · веднъж отговорено е отговорено',
@@ -1669,7 +1605,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // ОТКАЗАНАТА СИ СЕДИ · негово. Праща се втора и се отказва.
     const zadachiPredi = await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length);
     await sSabitie(p, () => p.click('#forma-zadacha button[type=submit]'));
-    await sSabitie(p, () => natisniVGrupata(p, '[data-otkazhi]'));
+    await sSabitie(p, () => natisni(p, '[data-otkazhi]'));
     proveri('отказаната НЕ изчезва от листа',
       await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length), zadachiPredi + 1);
     proveri('и носи причината си',
@@ -1884,7 +1820,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '[data-papki-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
 
     razdel = '115 · Папката · ПОПРАВКА без нея не я трие';
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '.red.imot:has-text("Витоша") [data-popravi-imot]'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '.red.imot:has-text("Витоша") [data-popravi-imot]'));
     proveri('формата се напълни с линка', await p.inputValue('#imot-papka'), ADRES_NA_PAPKA);
     await p.fill('#imot-ploshtad', '48,00');
     await p.fill('#imot-prichina', 'измерена площ');
@@ -2476,90 +2412,45 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и полетата НЕ се записват като стойност · само като решение',
       await broySabitiya(p), await broySabitiya(p));
 
-    // ══ 121 · ЖИВИЯТ ХЕДЪР · смяната при скрол (M15 · резен 49) ═══════════
+    // ══ 121 · ПОСТОЯННАТА ЛЕНТА · лепящият хедър ПАДНА (И124 т.3 · ADR-133) ══
     //
-    // „Има стационарни горни редове на таблиците, а когато скролваш и минаваш
-    // по различни таблици, да се сменя нов хедър." Тук се проверява ЖИВИЯТ
-    // резултат в истински браузър; числата на решението са в теста на домейна.
-    //
-    // ═══ СКРОЛЪТ СЕ КАРА ДО ТОЧНО МЯСТО, не до дъното ═══
-    //
-    // Първата версия буташе кутията до дъното и очакваше смяна. Тя не идваше, и
-    // това НЕ беше дефект на кода: на този екран таблиците може да са малко, а
-    // кутията да скролва по-малко от височината на една таблица. Проверка, която
-    // зависи от това колко данни е събрал проходът дотук, мери късмет.
-    //
-    // Сега скролът се кара ТОЧНО дотам, където ВТОРАТА таблица взима горния ръб.
-    // Тогава смяната е задължителна по неговото правило („надолу е нормално
-    // всичко") и проверката мери правилото, а не височината на екрана.
-    razdel = '121 · Живият хедър · залепен и жив';
+    // Негови думи, дословно: „хедъра който се лепи отгоре и се сменя за всяка
+    // таблица се маха, защото не работи добре и натоварва. Заместваме го от
+    // бутоните които обхващат целия таб… видими към табло горе което е
+    // хоризонтално и видими по всяко време на скрола." И т.11: периодът на
+    // Баланса „е част от постоянното меню с бутоните най отгоре видимо
+    // постоянно."
+    razdel = '121 · Постоянната лента · хедърът не лепне';
     await naEkran(p, 'smetki', '#forma-period');
-    // Живият хедър се състезава между ВСИЧКИ таблици на екрана; стеснен до една
-    // секция, броят щеше да мери друго, не онова, което закачката вижда.
-    // Обявено, защото изключение, зашито мълчаливо, е дупка (обход Б):
-    // ОБХВАТ: ЦЯЛАТА СТРАНИЦА
-    const broyTablitsi = await p.$$eval('[data-tablitsa]', (e) => e.length);
-    // ДВЕ Е НАЙ-МАЛКОТО, при което въпросът изобщо съществува · без този ред
-    // проверките отдолу биха минали и на екран с ЕДНА таблица, без да мерят нищо.
-    proveri('екранът носи поне ДВЕ таблици · инак няма какво да се сменя',
-      broyTablitsi >= 2, true);
-    proveri('живата глава е ТОЧНО ЕДНА · не нула и не две',
-      await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 1);
+    proveri('жива глава НЯМА · механизмът е паднал, не само класът',
+      await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 0);
+    proveri('главата на таблицата вече НЕ лепне (не е sticky)',
+      await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'static');
 
-    razdel = '121 · Живият хедър · надолу се сменя ВЕДНАГА';
-    const prvata = await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '');
-    // СКРОЛИРА СЕ КУТИЯТА, не прозорецът: `.telo` е ЕДИНСТВЕНАТА скролираща
-    // кутия (резен 9а). Първата версия движеше `window` и нищо не мърдаше —
-    // находката, заради която и самата закачка смени съда си.
-    // ═══ ТЪРСИ СЕ ТАБЛИЦА С РАЗЛИЧНА ГЛАВА, не просто следващата ═══
-    //
-    // ВТОРА НАХОДКА НА ПРОХОДА, и тя показа, че кодът е ПРАВ: първата версия
-    // скролваше до втората таблица по РЕД, а на Сметки първите две са
-    // коефициентни и носят ЕДНА И СЪЩА глава. Тогава по неговото правило главата
-    // НЕ бива да се сменя („когато двете таблици са от едно семейство по хедър…
-    // то си остава хедърът от първата") — и не се сменяше. Проверката мереше
-    // роднинството, а твърдеше смяна.
-    const dovtorata = await p.evaluate(() => {
-      const telo = document.querySelector('.telo') as HTMLElement | null;
-      const t = [...document.querySelectorAll<HTMLElement>('[data-tablitsa]')];
-      if (!telo || t.length < 2) return -1;
-      const glavata = (x: HTMLElement): string =>
-        [...x.querySelectorAll('thead th, .glava > *')].map((k) => k.textContent?.trim() ?? '').join('·');
-      const zhiva = document.querySelector<HTMLElement>('[data-zhiv-hedar]');
-      if (!zhiva) return -1;
-      const negovata = glavata(zhiva);
-      const chuzhda = t.find((x) => glavata(x) !== negovata);
-      if (!chuzhda) return -1;
-      const gore = telo.getBoundingClientRect().top;
-      // до горния ръб на ЧУЖДАТА таблица, плюс един пиксел навътре в нея
-      return telo.scrollTop + (chuzhda.getBoundingClientRect().top - gore) + 1;
+    razdel = '121 · Постоянната лента · периодът на Баланса е в нея';
+    proveri('формата за периода стои В ШАПКАТА, извън скролиращата кутия',
+      await p.$eval('#forma-period', (e) => Boolean(e.closest('.shapka')) && !e.closest('.telo')),
+      true);
+    proveri('и носи От, До и „Покажи"',
+      await p.$eval('#forma-period', (e) =>
+        Boolean(e.querySelector('#smetki-period')) &&
+        Boolean(e.querySelector('#smetki-period-do')) &&
+        Boolean(e.querySelector('button[type=submit]'))),
+      true);
+
+    razdel = '121 · Постоянната лента · видима по всяко време на скрола';
+    // Скролира се КУТИЯТА (`.telo` — резен 9а); шапката е извън нея и затова
+    // не мърда. Мери се ВИДИМОТО след скрол, не разметката.
+    await p.evaluate(() => {
+      const t = document.querySelector('.telo') as HTMLElement | null;
+      if (t) t.scrollTop = t.scrollHeight;
     });
-    proveri('има таблица с РАЗЛИЧНА глава и тя има измеримо място', dovtorata > 0, true);
-    await dokatoStane(
-      p,
-      () => p.evaluate((kade) => {
-        const t = document.querySelector('.telo') as HTMLElement | null;
-        if (t) t.scrollTop = kade as number;
-      }, dovtorata),
-      async () =>
-        (await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '')) !== prvata,
-      'главата се сменя, щом втората таблица вземе горния ръб',
-    );
-    const vtorata = await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '');
-    proveri('надолу главата е СМЕНЕНА · „надолу е нормално всичко"', vtorata !== prvata, true);
-    proveri('и пак е ТОЧНО ЕДНА', await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 1);
-
-    razdel = '121 · Живият хедър · нагоре се връща';
-    await dokatoStane(
-      p,
-      () => p.evaluate(() => {
-        const t = document.querySelector('.telo') as HTMLElement | null;
-        if (t) t.scrollTop = 0;
-      }),
-      async () =>
-        (await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? '')) === prvata,
-      'горната глава се връща при скрол нагоре',
-    );
-    proveri('нагоре се връща ПЪРВАТА · след като се види повече от половината ѝ',
-      await p.$eval('[data-zhiv-hedar]', (e) => (e as HTMLElement).dataset.tablitsa ?? ''), prvata);
+    proveri('след скрол до дъното периодът ОСТАВА видим',
+      await p.$eval('#forma-period', (e) => (e as HTMLElement).checkVisibility()), true);
+    proveri('и бутоните на таба остават видими',
+      await p.$eval('#iznesi', (e) => (e as HTMLElement).checkVisibility()), true);
+    await p.evaluate(() => {
+      const t = document.querySelector('.telo') as HTMLElement | null;
+      if (t) t.scrollTop = 0;
+    });
 }

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naEkran, natisniVGrupata, tekstNa } from '../yadro/pomoshtni.ts';
+import { naEkran, natisni, tekstNa } from '../yadro/pomoshtni.ts';
 
 /** 39б · границата на книгата | 39в · пренасянето има БУТОНИ, не само обещание */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -83,7 +83,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '67 · многото вериги · моята верига остава цяла';
     await naEkran(p, 'tablo', '#proveri');
-    await natisniVGrupata(p, '#proveri');
+    await natisni(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е цяла'));
     proveri('чуждият хеш НЕ поваля моята проверка',
       (await p.evaluate(() => document.body.innerText)).includes('Веригата е цяла'), true);

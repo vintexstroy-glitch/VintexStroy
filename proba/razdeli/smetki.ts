@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisniVGrupata, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -96,7 +96,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('сверката на разхода', sverkiR[2]?.[1], '2 600,00 €');
 
     // сторно на фактурата — входящият ДДС си отива с нея
-    await sSabitie(p, () => natisniVGrupata(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
+    await sSabitie(p, () => natisni(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
     proveri('деветнайсет събития', await broySabitiya(p), 19 + OTKRIVASHTOTO);
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');
@@ -218,7 +218,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     await p.setInputFiles('#fayl-iztochnik', krivo);
     await p.waitForSelector('.red.propusnat');
     proveri('непозволена ставка не се закръгля — казва се', (await redove(p, '.red.propusnat'))[0]?.[1]?.includes('Ставка 21 не съществува'), true);
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '#otkazhi-plan'));
+    await deystvieSPrerisuvane(p, () => natisni(p, '#otkazhi-plan'));
 
 
     // ══ 19 · бутонът · моделът на ПЪТЯ ═══════════════════════════════════
@@ -286,7 +286,7 @@ export async function blok4(
     // Изтритото меню ЗАКЛЮЧВА името (ред 1994)
     await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
     await p.waitForSelector('.red.redaktor');
-    await sSabitie(p, () => natisniVGrupata(p, '[data-iztriy-menyu]'));
+    await sSabitie(p, () => natisni(p, '[data-iztriy-menyu]'));
     await p.waitForSelector('.red.redaktor input:disabled');
     proveri('изтритото меню заключва името', (await p.$$('.red.redaktor input:disabled')).length, 1);
     proveri(
@@ -307,7 +307,7 @@ export async function blok4(
 
     const parvoto = await p.$eval('[data-vid-stoynost]', (e) => (e as any).value);
     await p.selectOption('[data-vid-stoynost]', parvoto === 'evro' ? 'protsent' : 'evro');
-    await sSabitie(p, () => natisniVGrupata(p, '[data-zapishi-kolona="0"]'));
+    await sSabitie(p, () => natisni(p, '[data-zapishi-kolona="0"]'));
     proveri('смяната на вида ражда ЕДНО събитие и се задържа',
       await p.$eval('[data-vid-stoynost]', (e) => (e as any).value),
       parvoto === 'evro' ? 'protsent' : 'evro');
@@ -330,8 +330,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
 
     // Формата за салдата стои ГОРЕ — негова дума: „Редактируеми отгоре в Сметки".
+    // Периодът вече НЕ е секция в тялото (И124 т.11 · ADR-133): той живее в
+    // постоянната лента най-горе, а Салда остава първата секция след плочките.
     const redNaSekcii = await p.$$eval('section .dyalglava h2', (h) => h.map((x) => x.textContent.trim()));
-    proveri('Салда стои преди Период', redNaSekcii.indexOf('Салда') < redNaSekcii.indexOf('Период'), true);
+    proveri('Период вече НЕ е секция в тялото · той е в постоянната лента',
+      redNaSekcii.includes('Период'), false);
+    proveri('Салда стои преди Баланс', redNaSekcii.indexOf('Салда') < redNaSekcii.indexOf('Баланс'), true);
     // Дялът вече носи НЕГОВИТЕ ТРИ ИМЕНА (резен 50 · „Слей ги в гнезда"), а не
     // само „Отчети": гнездата са три и заглавието на дяла ги казва и трите.
     proveri('дялът носи трите гнезда', redNaSekcii.includes('Отчети · Пари · Регистър'), true);
@@ -1172,7 +1176,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · закачането е ТОЧНО ЕДНО събитие';
   const predi = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('границата се КАЗВА, не се подразбира',
     (await tekstNa(p, '.istoriya-karta')).includes('не качва'), true);
@@ -1189,7 +1193,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · СЪЩИЯТ файл втори път е НУЛА събития';
   const predVtoriya = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('редът на документа стои в списъка',
     await p.$$eval('.dokument-red', (e) => e.length), 1);
@@ -1213,7 +1217,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · вторият РАЗЛИЧЕН файл влиза';
   const predTretiya = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   await p.selectOption('#forma-dokument select[name=vid]', 'platezhno');
   await p.setInputFiles('#dokument-fayl', patPlatezhno);
@@ -1223,7 +1227,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '90 · Документите · махането е ЗАПИС, не триене';
   const predMahaneto = await broySabitiya(p);
-  await natisniVGrupata(p, `${MOYAT} [data-dokumenti]`);
+  await natisni(p, `${MOYAT} [data-dokumenti]`);
   await p.waitForSelector('#forma-dokument');
   proveri('двата реда стоят', await p.$$eval('.dokument-red', (e) => e.length), 2);
   await deystvieSPrerisuvane(p, () => p.click('.dokument-red [data-mahni-dokument]'));
@@ -1236,7 +1240,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'imoti', '#forma-imot');
   proveri('имотът носи същото копче',
     (await p.$$eval('.red.imot [data-dokumenti]', (e) => e.length)) > 0, true);
-  await natisniVGrupata(p, '.red.imot [data-dokumenti]');
+  await natisni(p, '.red.imot [data-dokumenti]');
   await p.waitForSelector('#forma-dokument');
   proveri('и същият прозорец се отваря',
     (await tekstNa(p, '.istoriya-karta h3')).includes('имот'), true);
@@ -1245,7 +1249,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'gant', '.gant-delo');
   proveri('делото носи същото копче',
     (await p.$$eval('.gant-delo [data-dokumenti]', (e) => e.length)) > 0, true);
-  await natisniVGrupata(p, '.gant-delo [data-dokumenti]');
+  await natisni(p, '.gant-delo [data-dokumenti]');
   await p.waitForSelector('#forma-dokument');
   proveri('и пак същият прозорец',
     (await tekstNa(p, '.istoriya-karta h3')).includes('дело'), true);

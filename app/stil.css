@@ -371,8 +371,10 @@ a:hover { color: var(--aktsent-tumen); }
    окото гледа страницата. Две вложени кутии не могат едновременно да залепят
    глава за окото.
 
-   Затова кутията е ЕДНА и това е `.telo`. Оттам и главата (`top:0`), и
-   замразената първа колона (`left:0`) залепват за ОКОТО, а не за таблицата.
+   Затова кутията е ЕДНА и това е `.telo`. Оттам замразената първа колона
+   (`left:0`) залепва за ОКОТО, а не за таблицата. Главата ВЕЧЕ НЕ ЛЕПНЕ
+   (И124 т.3 · ADR-133): „хедъра който се лепи отгоре и се сменя за всяка
+   таблица се маха" — постоянното горе е ШАПКАТА, тя стои извън кутията.
 
    ЗАЩО НЕ „само хоризонтален скрол на таблицата": `overflow-x: auto` с
    `overflow-y: visible` е НЕВЪЗМОЖНО в CSS — `visible` се смята на `auto`, щом
@@ -497,6 +499,11 @@ a:hover { color: var(--aktsent-tumen); }
 .shapka h1 { font-family: Literata, Georgia, serif; font-size: 1.857rem; font-weight: 600; margin: 0 0 3px; letter-spacing: -0.015em; }
 .shapka p { margin: 0; font-size: 0.929rem; color: var(--mastilo2); }
 .desno-gore { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+/* ПЕРИОДЪТ НА БАЛАНСА В ПОСТОЯННАТА ЛЕНТА (И124 т.11 · ADR-133) · шапката не
+   скролва, значи полетата са „видими по всяко време на скрола". */
+.lenta-period { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lenta-period label { display: flex; align-items: center; gap: 5px; font-size: 0.857rem; color: var(--mastilo2); }
+.lenta-period input { padding: 4px 6px; }
 
 /* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
    показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
@@ -624,12 +631,6 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
   width: max-content; min-width: 100%;
 }
-.glava { position: sticky; top: 0; z-index: 3; }
-/* ЖИВАТА ГЛАВА · онази, чиято таблица държи горния ръб (M15 · резен 49).
-   Тя стои НАД останалите, за да не я покрие съседна залепена глава при бърз
-   скрол. Само това — цвят не се мени: смяната трябва да е незабележима, а не
-   да мига. */
-[data-zhiv-hedar] .glava, [data-zhiv-hedar] thead { z-index: 4; }
 .glava > :first-child, .red > :first-child { position: sticky; left: 0; z-index: 1; }
 .glava > :first-child { background: var(--panel); }
 .red > :first-child { background: #FFFFFF; }
@@ -1983,17 +1984,15 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .stalbove-nadpis { fill: var(--mastilo2); font-size: 0.714rem; font-variant-numeric: tabular-nums; }
 
 
-/* ── ГРУПАТА ДЕЙСТВИЯ · един бутон с дума и стрелкичка (ADR-057) ─────────
-   Двата бутона се долепват в един лост: думата отляво, стрелкичката отдясно.
-   Менюто ѝ е СЪЩОТО като контекстното (виж по-долу) — вид, който живее на две
-   места, се разминава при първата смяна на палитрата. */
+/* ── ГРУПАТА ДЕЙСТВИЯ · САМО В РЕДОВЕТЕ (И124 т.3 · ADR-133) ─────────────
+   Секционните и таб-групите паднаха — „Тези бутони са самостоятелни и са
+   видими". Редовият лост остава: той пази ниския ред (т.4 · височините). */
 .grupa-deystviya { display: inline-flex; align-items: stretch; }
 /* СКРИТОТО В ГРУПАТА СЕ СКРИВА НАИСТИНА.
    `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а всяко авторско
    правило за `display` я бие — независимо от тежестта на селектора. Бутонът с
    знак носи `display: inline-flex` (`button.sIkona`), значи скритите оставаха
-   да се виждат: групата изглеждаше като четири бутона и една стрелкичка.
-   Проходът четеше СВОЙСТВОТО `hidden` и казваше „скрит е"; окото каза друго. */
+   да се виждат. Проходът четеше СВОЙСТВОТО `hidden`; окото каза друго. */
 .grupa-deystviya > [hidden] { display: none; }
 .grupa-deystviya > button:not(.strelkichka) {
   border-top-right-radius: 0; border-bottom-right-radius: 0; border-right: none;

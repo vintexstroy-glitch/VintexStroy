@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, natisniVGrupata, sSabitie, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, natisni, sSabitie, zapishiDelo } from '../yadro/pomoshtni.ts';
 
 /** 42 · табовете и секциите | 43 · адресната книга */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -32,7 +32,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // СВЪРЗВАНЕТО · падащо меню, не текст — „по кое" пита само носителите
     await deystvieSPrerisuvane(p, () =>
-      natisniVGrupata(p, '.karta:has-text("Наемите") [data-sektsiya-svarzhi]'));
+      natisni(p, '.karta:has-text("Наемите") [data-sektsiya-svarzhi]'));
     await p.waitForSelector('#forma-svarzhi');
     await p.selectOption('#forma-svarzhi [name=po]', 'imot');
     await p.selectOption('#forma-svarzhi [name=izvor]', { label: 'Обектите' });
@@ -82,7 +82,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-tab', 'smetki'));
     const predMahane = await broySabitiya(p);
     await sSabitie(p, () =>
-      natisniVGrupata(p, '.karta:has-text("Обектите") [data-sektsiya-mahni]'));
+      natisni(p, '.karta:has-text("Обектите") [data-sektsiya-mahni]'));
     proveri('и махането е събитие', await broySabitiya(p), predMahane + 1);
     proveri('другата секция остава', Boolean(await p.$('.karta:has-text("Наемите")')), true);
     proveri('и вече не е стеснена — връзката падна с махнатата',

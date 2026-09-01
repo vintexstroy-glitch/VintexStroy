@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisniVGrupata, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -27,7 +27,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
     razdel = '9 · верига';
-    await natisniVGrupata(p, '#proveri');
+    await natisni(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата е'));
     // Един бутон, ДВА отговора (ADR-055): „цяла ли е моята верига" и
     // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
@@ -39,7 +39,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // ══ 10 · износ ═══════════════════════════════════════════════════════
     razdel = '10 · износ';
-    const [svaleno] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#iznesi')]);
+    const [svaleno] = await Promise.all([p.waitForEvent('download'), natisni(p, '#iznesi')]);
     const patyat = await svaleno.path();
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
     proveri('изнесени 12 събития + откриващото', izneseni.length, 12 + OTKRIVASHTOTO);
@@ -199,7 +199,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     await p.reload();
     await p.waitForSelector('#proveri');
-    await natisniVGrupata(p, '#proveri');
+    await natisni(p, '#proveri');
     await p.waitForFunction(() => document.body.innerText.includes('Веригата се къса'));
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
@@ -336,7 +336,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('внесено докрай', await p.evaluate(() => document.body.innerText.includes('внесено докрай')), true);
 
     // архивът за Ексел се сваля и е истински .xlsx (PK отпред)
-    const [arhiv] = await Promise.all([p.waitForEvent('download'), natisniVGrupata(p, '#arhiv')]);
+    const [arhiv] = await Promise.all([p.waitForEvent('download'), natisni(p, '#arhiv')]);
     const arhivPat = await arhiv.path();
     const parviBajtove = new Uint8Array((await readFile(arhivPat)).buffer).slice(0, 2);
     proveri('архивът е ZIP (PK)', String.fromCharCode(...parviBajtove), 'PK');
@@ -586,21 +586,21 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
           // черупка, не което я добавя. Броен, той щеше да наказва точно
           // лекарството: всеки нов сгъваем дял вдига числото с едно.
           .filter((b) => !(b as HTMLElement).dataset['sgavane']);
-        const vGrupa = upravleniya.filter((b) => b.closest('.grupa-deystviya')).length;
         const shirina = telo.getBoundingClientRect().width;
         let nayShirok = 0;
         for (const v of telo.querySelectorAll('*')) {
           const r = (v as HTMLElement).getBoundingClientRect();
           if (r.height > 0 && r.width > nayShirok && r.width <= shirina + 1) nayShirok = r.width;
         }
+        // „В група" вече няма (И124 т.3 · ADR-133): бутоните са самостоятелни
+        // по негова дума, значи всяко видимо управление се брои голо.
         return {
-          goli: upravleniya.length - vGrupa,
-          vGrupa,
+          goli: upravleniya.length,
           prazno: Math.round(shirina - nayShirok),
         };
       });
       redove.push(
-        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · в група ${String(m.vGrupa).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px`,
+        `  ${ekran.padEnd(10)} голи ${String(m.goli).padStart(3)} · празно отдясно ${String(m.prazno).padStart(4)}px`,
       );
       if (m.goli > nayMnogoGoli) nayMnogoGoli = m.goli;
       if (m.prazno > nayMnogoPrazno) nayMnogoPrazno = m.prazno;
@@ -622,16 +622,16 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '134б · дялът се сгъва';
     await naEkran(p, 'smetki', '#forma-period');
     const vidimiPoleta = async (): Promise<number> =>
-      p.$$eval('[data-sektsiya=smetki-period] input, [data-sektsiya=smetki-period] button:not([data-sgavane])', (e) =>
+      p.$$eval('[data-sektsiya=smetki-salda] input, [data-sektsiya=smetki-salda] button:not([data-sgavane])', (e) =>
         e.filter((x) => {
           const r = x.getBoundingClientRect();
           return r.width > 0 && r.height > 0;
         }).length,
       );
     proveri('всеки дял носи ЕДИН знак за сгъване, не два бутона',
-      await p.$$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.length), 1);
+      await p.$$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.length), 1);
     proveri('и по подразбиране е РАЗТВОРЕН · нищо не се крие само',
-      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      await p.$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
       'true');
     const predSgavane = await vidimiPoleta();
     proveri('дялът показва полетата си', predSgavane > 0, true);
@@ -640,11 +640,11 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // СГЪВАНЕТО НЕ ПРЕРИСУВА екрана — то е местен превключвател. Затова тук не
     // се чака прерисуване, а самото СЪСТОЯНИЕ: четене веднага след клик е
     // точно това, което обход Е брои (`docs/11`).
-    await p.click('[data-sektsiya=smetki-period] [data-sgavane]');
-    await p.waitForSelector('[data-sektsiya=smetki-period] [data-sgavane][aria-expanded=false]');
+    await p.click('[data-sektsiya=smetki-salda] [data-sgavane]');
+    await p.waitForSelector('[data-sektsiya=smetki-salda] [data-sgavane][aria-expanded=false]');
     proveri('сгънатият дял не показва НИЩО освен главата си', await vidimiPoleta(), 0);
     proveri('и знакът го КАЗВА на четеца на екран',
-      await p.$eval('[data-sektsiya=smetki-period] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
+      await p.$eval('[data-sektsiya=smetki-salda] [data-sgavane]', (e) => e.getAttribute('aria-expanded')),
       'false');
     proveri('сгъването е ПОГЛЕД · нула събития', await broySabitiya(p), predSabitiyaSg);
 
@@ -652,14 +652,14 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // ЧАКА СЕ СЕКЦИЯТА, не поле в нея: сгънатият дял НЯМА видимо поле, и
     // чакането щеше да виси трийсет секунди върху собствения си успех.
     await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-period]');
+    await naEkran(p, 'smetki', '[data-sektsiya=smetki-salda]');
     proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
 
     // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
     await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
     // ПРЕЗ ГРУПАТА · трите действия на картата станаха група (ADR-057) и
-    // видимо стои само последно избраното. Точно за това е `natisniVGrupata`.
-    await deystvieSPrerisuvane(p, () => natisniVGrupata(p, '[data-razgani-vsichki="smetki"]'));
+    // видимо стои само последно избраното. Точно за това е `natisni`.
+    await deystvieSPrerisuvane(p, () => natisni(p, '[data-razgani-vsichki="smetki"]'));
     await naEkran(p, 'smetki', '#forma-period');
     proveri('„Разтвори всички" връща дяла разтворен', await vidimiPoleta(), predSgavane);
 
