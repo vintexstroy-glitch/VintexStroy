@@ -1480,6 +1480,9 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── фините филтри в стил Уиндоус ────────────────────────────────────── */
 .glavicha { position: relative; display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+/* Глава-ЛЕНТА без решетка под нея (сесиите на редактора · дървото на делата):
+   дръжките стоят една до друга, а редовете отдолу си имат свой строеж. */
+.glava.sesii-glava, .glava.gant-filtri { display: flex; flex-wrap: wrap; gap: 4px 18px; }
 .glavicha.suma { justify-content: flex-end; text-align: right; }
 .ime-kolona {
   background: none; border: none; padding: 0; cursor: pointer;

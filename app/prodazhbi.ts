@@ -51,6 +51,13 @@ import {
 import { NACHINI_NA_PLASHTANE } from '../src/domein/sabitiya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  filtriray,
+  glaviNaTablitsata,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
@@ -124,17 +131,29 @@ function vTsentove(
   return undefined;
 }
 
-function glavata(zhivi: readonly string[], zatvoreni: readonly number[]): string {
-  return `
-      <div class="red glava prodazhbared" translate="no">
-        ${zhivi
-          .map(
-            (k, i) =>
-              `<span class="kletka${zatvoreni.includes(i) ? ' zatvorena' : ''}"
-                   data-kolona="${ekraniraj(k)}">${ekraniraj(k)}</span>`,
-          )
-          .join('')}
-      </div>`;
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ · смятат се от ЖИВИЯ списък (резен 75в · И124 т.2).
+ *
+ * Продажби е единствената таблица с ДИНАМИЧНИ колони: добавеният етап е
+ * колона като всяка друга, а колонното право решава кои изобщо са живи
+ * (`koloni(o)` ги дава ВЕЧЕ стеснени — правото минава ПРЕЗ филтъра, не
+ * покрай него). Затова описът не се пише на ръка, а се извежда: парична
+ * колона дава центовете си (за групите по прагове и сбора), текстова —
+ * изписаното. Затворените индекси идват от същия дом като досега.
+ */
+function koloniSFiltar(
+  zhivi: readonly string[],
+  zatvoreni: readonly number[],
+  pari: ReadonlySet<string>,
+): readonly KolonaSFiltar<RedNaProdazhbite>[] {
+  return zhivi.map((ime, i) => ({
+    klyuch: ime,
+    ime,
+    vid: pari.has(ime) ? ('evro' as const) : ('tekst' as const),
+    vzemi: (r: RedNaProdazhbite) =>
+      pari.has(ime) ? (vTsentove(r, ime, pari) ?? 0) : kletkata(r, ime),
+    zatvorena: zatvoreni.includes(i),
+  }));
 }
 
 function redNaTablitsata(
@@ -296,13 +315,16 @@ function blokNaDvizheniyata(o: Ogledalo, r: RedNaProdazhbite): string {
     </section>`;
 }
 
-export function narisuvayProdazhbi(o: Ogledalo): string {
+export function narisuvayProdazhbi(o: Ogledalo, dnes: string): string {
   const zhivi = koloni(o);
   const zatvoreni = zatvoreniteKoloni(o);
   const pari = parichni(etapite(o));
+  const koloniF = koloniSFiltar(zhivi, zatvoreni, pari);
   const vsichki = podredeni(redovete(o));
   const tekushti = vsichki.filter((r) => !vArhiva(r.prodazhba.sastoyanie));
   const arhiv = vsichki.filter((r) => vArhiva(r.prodazhba.sastoyanie));
+  const fTekushti = filtriray('prodazhbi', tekushti, koloniF, dnes);
+  const fArhiv = filtriray('prodazhbi-zavarsheni', arhiv, koloniF, dnes);
   const izbrana = vsichki.find((r) => r.prodazhba.id === izbranata());
   const s = sveri(o, vsichki);
   const imoti = [...o.imoti.values()];
@@ -380,14 +402,18 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
       <p class="drebno">Новата сделка се отваря с <b>пълните колони</b> и стои
       <b>червена</b>, докато не ѝ се смени състоянието — негово решение, дословно.</p>
 
+      ${poleZaTarsene('prodazhbi')}
       <div class="tablitsa" data-tablitsa="prodazhbi">
-        ${glavata(zhivi, zatvoreni)}
+        <div class="red glava prodazhbared" translate="no">
+          ${glaviNaTablitsata('prodazhbi', koloniF, tekushti, dnes)}
+        </div>
         ${
           tekushti.length === 0
             ? '<p class="drebno">Няма нито една текуща сделка.</p>'
-            : tekushti.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
+            : fTekushti.redove.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
         }
       </div>
+      ${redZaSkritoto(fTekushti, 'prodazhbi')}
     </section>
 
     ${
@@ -432,14 +458,18 @@ export function narisuvayProdazhbi(o: Ogledalo): string {
         <h2>Продажби Завършени</h2>
         <span>терминалът · оттук няма връщане</span>
       </div>
+      ${arhiv.length ? poleZaTarsene('prodazhbi-zavarsheni') : ''}
       <div class="tablitsa" data-tablitsa="prodazhbi-zavarsheni">
-        ${glavata(zhivi, zatvoreni)}
+        <div class="red glava prodazhbared" translate="no">
+          ${glaviNaTablitsata('prodazhbi-zavarsheni', koloniF, arhiv, dnes)}
+        </div>
         ${
           arhiv.length === 0
             ? '<p class="drebno">Няма завършена сделка · нито една не е стигнала до нотариус.</p>'
-            : arhiv.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
+            : fArhiv.redove.map((r) => redNaTablitsata(r, zhivi, pari)).join('')
         }
       </div>
+      ${redZaSkritoto(fArhiv, 'prodazhbi-zavarsheni')}
     </section>
 
     <section data-sektsiya="prodazhbi-chakat">

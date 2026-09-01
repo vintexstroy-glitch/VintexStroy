@@ -99,10 +99,18 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('седмицата дава 7×5 + 7', koloniSedmitsa, 7 * 5 + 7);
     await deystvieSPrerisuvane(p, () => p.click('[data-takt="mesets"]'));
 
-    // ФИЛТРИТЕ · три колони, независими една от друга.
-    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', 'Хисаря'));
+    // ФИЛТРИТЕ · колоните са на ДВИГАТЕЛЯ (резен 75в) — дубльорът-select падна.
+    proveri('главата-лента носи стрелка на всяка от четирите колони',
+      await p.$$eval('.gant-filtri [data-filtar-glava]', (e) => e.length), 4);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="gant:myasto"]'));
+    await deystvieSPrerisuvane(p, () =>
+      p.check('[data-filtar-grupa="gant:myasto"][value="Хисаря"]'));
     proveri('филтърът по Място оставя едно дело', (await p.$$eval('.gant-delo', (e) => e.length)), 1);
-    await deystvieSPrerisuvane(p, () => p.selectOption('#f-myasto', ''));
+    proveri('и скритото СЕ КАЗВА под лентата',
+      (await tekstNa(p, '[data-sektsiya=gant-izgled] .filtar-skrito')).includes('крие'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti="gant:myasto"]'));
+    // Менюто се затваря, за да не гълта първия клик на следващите проверки.
+    await deystvieSPrerisuvane(p, () => p.click('[data-filtar-glava="gant:myasto"]'));
 
     // СГЪВАНЕТО · само дела и поддела (И88). Мястото няма сгъвач.
     proveri('мястото НЯМА сгъвач',

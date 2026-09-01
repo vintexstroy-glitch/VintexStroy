@@ -446,21 +446,29 @@ function glavaSFiltar<T>(
   k: KolonaSFiltar<T>,
   redove: readonly T[],
   dnes: string,
+  bezPodredba = false,
 ): string {
   if (k.samoZaTarsene) return '';
   const suma = k.vid === 'evro';
   const pald = klyuchNa(tablitsa, k.klyuch);
   const broy = (izbrano.get(pald)?.size ?? 0) + (otdoAktivno(pald) ? 1 : 0);
   const podredba = podredbi.get(tablitsa);
-  const aktivnaPodredba = podredba?.kolona === k.klyuch;
+  const aktivnaPodredba = !bezPodredba && podredba?.kolona === k.klyuch;
   // Името на колоната Е бутонът за подредба — както в Explorer и Excel:
   // клик подрежда нагоре, втори клик надолу, трети връща изходния ред.
+  // Таблица със СВОЙ закон за реда (дървото на делата — детето след родителя;
+  // сесиите — по тайминга на записа) го казва с `bezPodredba`: името е надпис,
+  // не дръжка — дръжка, която нищо не мени, е надпис в маскировка (ADR-041).
   return `<span class="glavicha${suma ? ' suma' : ''}${k.zatvorena ? ' zatvorena' : ''}" data-kolona="${ekraniraj(k.klyuch)}" data-ime="${ekraniraj(k.ime)}">
-    <button type="button" class="ime-kolona${aktivnaPodredba ? ' podredena' : ''}"
+    ${
+      bezPodredba
+        ? `<span class="ime-kolona">${ekraniraj(k.ime)}</span>`
+        : `<button type="button" class="ime-kolona${aktivnaPodredba ? ' podredena' : ''}"
       data-podredi="${ekraniraj(pald)}"
       aria-label="Подреди по ${ekraniraj(k.ime)}">${ekraniraj(k.ime)}${
         aktivnaPodredba ? (podredba!.nadolu ? ' ↓' : ' ↑') : ''
-      }</button>
+      }</button>`
+    }
     <button type="button" class="strelka${broy ? ' aktivna' : ''}" data-filtar-glava="${ekraniraj(pald)}"
       aria-label="Филтър по ${ekraniraj(k.ime)}">${broy ? '▼' : '▾'}</button>
     ${otvoreno === pald ? menyu(tablitsa, k, redove, dnes) : ''}
@@ -473,8 +481,29 @@ export function glaviNaTablitsata<T>(
   koloni: readonly KolonaSFiltar<T>[],
   redove: readonly T[],
   dnes: string,
+  bezPodredba = false,
 ): string {
-  return koloni.map((k) => glavaSFiltar(tablitsa, k, redove, dnes)).join('');
+  return koloni.map((k) => glavaSFiltar(tablitsa, k, redove, dnes, bezPodredba)).join('');
+}
+
+/**
+ * АКТИВЕН ли е някой филтър на тази таблица · отметка, От–До или търсене.
+ *
+ * Журналът на промените пита, защото изключеният му филтър НЕ значи „покажи
+ * всичко", а „покажи ДНЕШНИЯ ден" (негово, р84·[20]) — законът е на домейна,
+ * но кой е изключвачът, знае само двигателят.
+ */
+export function filtarAktiven<T>(
+  tablitsa: string,
+  koloni: readonly KolonaSFiltar<T>[],
+): boolean {
+  return (
+    (tarseno.get(tablitsa) ?? '').trim() !== '' ||
+    koloni.some((k) => {
+      const pald = klyuchNa(tablitsa, k.klyuch);
+      return (izbrano.get(pald)?.size ?? 0) > 0 || otdoAktivno(pald);
+    })
+  );
 }
 
 /**
@@ -558,6 +587,22 @@ export function poleZaTarsene(tablitsa: string): string {
     <input translate="no" type="search" data-tarsi-tablitsa="${ekraniraj(tablitsa)}" value="${ekraniraj(stoynost)}"
       placeholder="Търси в таблицата…" autocomplete="off" aria-label="Търси в таблицата">
   </label>`;
+}
+
+/**
+ * ИЗЧИСТВА всичко, което КРИЕ редове на една таблица · отметки, От–До и
+ * търсене. Подредбата остава — тя нарежда, не крие. Дели се между „покажи
+ * всичко" и бутона СЕГА на Ганта, който събира деня на чисто.
+ */
+export function izchistiFiltrite(tablitsa: string): void {
+  for (const pald of [...izbrano.keys()]) {
+    if (pald.startsWith(`${tablitsa}:`)) izbrano.delete(pald);
+  }
+  for (const pald of [...otdo.keys()]) {
+    if (pald.startsWith(`${tablitsa}:`)) otdo.delete(pald);
+  }
+  tarseno.delete(tablitsa);
+  zapomniFiltrite();
 }
 
 /** Ред с думи под таблицата, когато филтърът крие нещо. */
@@ -692,18 +737,8 @@ export function zakachiFiltri(koren: HTMLElement, prerisuvay: () => Promise<void
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-filtar-izchisti-vsichko]')) {
     b.addEventListener('click', async () => {
-      const tablitsa = b.dataset['filtarIzchistiVsichko']!;
-      for (const pald of [...izbrano.keys()]) {
-        if (pald.startsWith(`${tablitsa}:`)) izbrano.delete(pald);
-      }
-      for (const pald of [...otdo.keys()]) {
-        if (pald.startsWith(`${tablitsa}:`)) otdo.delete(pald);
-      }
-      // „Покажи всичко" маха и търсенето — то също крие редове. Подредбата
-      // остава: тя нарежда, не крие.
-      tarseno.delete(tablitsa);
+      izchistiFiltrite(b.dataset['filtarIzchistiVsichko']!);
       otvoreno = null;
-      zapomniFiltrite();
       await prerisuvay();
     });
   }

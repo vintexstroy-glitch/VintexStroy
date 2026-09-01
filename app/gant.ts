@@ -31,7 +31,9 @@ import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import {
   filtriray,
+  glaviNaTablitsata,
   glaviTh,
+  izchistiFiltrite,
   poleZaTarsene,
   redZaSkritoto,
   type KolonaSFiltar,
@@ -119,8 +121,12 @@ interface PogledNaGanta {
   diagrama: boolean;
   /** негово, 31.08: „Да може да се крие" · таблицата, като диаграмата */
   tablitsa: boolean;
-  filtarMyasto: string;
-  filtarObekt: string;
+  /**
+   * ЕДИНСТВЕНИЯТ останал свой филтър: Оценката НЕ Е колона на таблицата,
+   * затова падащото ѝ меню не дублира колонен филтър и остава (резен 75в).
+   * Мястото и Обектът са колони — техните дубльори паднаха: филтрира ги
+   * двигателят (`filtriray`) през главата-лента.
+   */
   filtarOtsenka: string;
 }
 
@@ -189,8 +195,6 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     sgunati: new Set<string>(chetiEkranno<string[]>(`${klyuch}.sgunati`, [])),
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     tablitsa: chetiEkranno(`${klyuch}.tablitsa`, true),
-    filtarMyasto: chetiEkranno(`${klyuch}.myasto`, ''),
-    filtarObekt: chetiEkranno(`${klyuch}.obekt`, ''),
     filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
   };
   POGLEDI.set(klyuch, nov);
@@ -207,8 +211,6 @@ function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.sgunati`, [...p.sgunati]);
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.tablitsa`, p.tablitsa);
-  zapomniEkranno(`${p.klyuch}.myasto`, p.filtarMyasto);
-  zapomniEkranno(`${p.klyuch}.obekt`, p.filtarObekt);
   zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
 }
 
@@ -285,7 +287,7 @@ export function narisuvayGant(
   predstavka = 'd-',
 ): string {
   const p = pogled(klyuch);
-  const { sgunati, diagrama, tablitsa, filtarMyasto, filtarObekt, filtarOtsenka } = p;
+  const { sgunati, diagrama, tablitsa, filtarOtsenka } = p;
   // СВОЯТ ТАКТ без период е такт без решетка. Вместо празен екран се пада на
   // месец и полетата стоят отворени — правило 15: изключеното се КАЗВА.
   const svoyGotov = p.svoy.ot !== '' && p.svoy.do !== '' && p.svoy.do >= p.svoy.ot;
@@ -302,11 +304,13 @@ export function narisuvayGant(
   // ДНЕВНИЯТ РЕД (И124 т.6): завършеното „не е в дневния ред" — то е в
   // архивната таблица долу, заредена по периода на изгледа.
   const podredeni = podredeniPoDarvo(vDnevniyaRed(vsichki), dnes, rachen);
-  const filtrirani = podredeni.filter(
-    (d) =>
-      (!filtarMyasto || d.myasto === filtarMyasto) &&
-      (!filtarObekt || d.obekt === filtarObekt) &&
-      (!filtarOtsenka || d.otsenka === filtarOtsenka),
+  // Двигателят реже по колоните (Място · Дело · Обект · Отговорник) и по
+  // търсенето; Оценката остава свой филтър, защото не е колона. Дървовидната
+  // наредба се пази: филтърът маха редове, не разбърква останалите.
+  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място');
+  const fDvigatel = filtriray(klyuch, podredeni, koloniDela, dnes);
+  const filtrirani = fDvigatel.redove.filter(
+    (d) => !filtarOtsenka || d.otsenka === filtarOtsenka,
   );
   // СГЪВАЧИТЕ се броят ПРЕДИ сгъването и веднъж за целия екран. Сметнати от
   // видимото, свитото дело оставаше без бутон — сгъването беше еднопосочно.
@@ -326,9 +330,6 @@ export function narisuvayGant(
     r.koloni,
     sumiZaObhvat(o, parvata.ot, poslednata.do, p.razrez),
   );
-
-  const mesta = [...new Set(vsichki.map((d) => d.myasto))].sort();
-  const obekti = [...new Set(vsichki.map((d) => d.obekt).filter(Boolean))].sort();
 
   return `
     <div class="plochki">
@@ -411,15 +412,18 @@ export function narisuvayGant(
               )}</span>`
         }
       </div>
+      ${poleZaTarsene(klyuch)}
+      <div class="red glava gant-filtri" translate="no">
+        ${
+          /*
+           * БЕЗ ПОДРЕДБА: дървото има СВОЙ закон за реда — детето след
+           * родителя, ръчният ред побеждава — и колонна подредба би го
+           * разкъсала. Дръжка, която нищо не мени, е надпис (ADR-041).
+           */
+          glaviNaTablitsata(klyuch, koloniDela, podredeni, dnes, true)
+        }
+      </div>
       <div class="poleta tesni">
-        <div class="pole">
-          <label for="f-myasto">Място</label>
-          <select translate="no" id="f-myasto">${opcii(mesta, filtarMyasto, 'всички')}</select>
-        </div>
-        <div class="pole">
-          <label for="f-obekt">Обект</label>
-          <select translate="no" id="f-obekt">${opcii(obekti, filtarObekt, 'всички')}</select>
-        </div>
         <div class="pole">
           <label for="f-otsenka">Оценка</label>
           <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
@@ -432,9 +436,11 @@ export function narisuvayGant(
           ).join('')}</select>
         </div>
       </div>
-      <p class="drebno">Три колони с филтри, не три нива — филтрира се по която и да е, независимо от другите.
-      „Разбий по" е ЧЕТВЪРТО нещо и не е филтър: то не маха редове, а реже СБОРА на части —
+      <p class="drebno">Колоните се филтрират от главата-лента — всяка поотделно,
+      с отметки и търсене. „Оценка" остава свое падащо меню, защото НЕ Е колона.
+      „Разбий по" не е филтър: то не маха редове, а реже СБОРА на части —
       ${ekraniraj(String(sumi.length))} ${sumi.length === 1 ? 'ред' : 'реда'} под решетката, чийто сбор е същият.</p>
+      ${redZaSkritoto(fDvigatel, klyuch)}
     </section>
 
     ${
@@ -714,18 +720,6 @@ function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
 
 function broyPo(dela: readonly Delo[], dnes: string, kakvo: string): number {
   return dela.filter((d) => svetofar(d, dnes) === kakvo).length;
-}
-
-function opcii(spisak: readonly string[], izbrano: string, prazno: string): string {
-  return (
-    `<option value=""${izbrano ? '' : ' selected'}>— ${prazno} —</option>` +
-    spisak
-      .map(
-        (x) =>
-          `<option value="${ekraniraj(x)}"${x === izbrano ? ' selected' : ''}>${ekraniraj(x)}</option>`,
-      )
-      .join('')
-  );
 }
 
 function opciiOtsenki(izbrano: string): string {
@@ -1192,8 +1186,8 @@ export function zakachiGant(
    * нито едно дело (правило 18).
    */
   koren.querySelector<HTMLButtonElement>('#sega')?.addEventListener('click', async () => {
-    p.filtarMyasto = '';
-    p.filtarObekt = '';
+    // Колонните филтри са на двигателя — чистят се през неговата дръжка.
+    izchistiFiltrite(p.klyuch);
     p.filtarOtsenka = 'спешно-важно';
     p.sgunati.clear();
     zapomniPogleda(p);
@@ -1317,14 +1311,6 @@ export function zakachiGant(
       await prerisuvay();
     });
   };
-  vrazhi('#f-myasto', (v) => {
-    p.filtarMyasto = v;
-    zapomniPogleda(p);
-  });
-  vrazhi('#f-obekt', (v) => {
-    p.filtarObekt = v;
-    zapomniPogleda(p);
-  });
   vrazhi('#f-otsenka', (v) => {
     p.filtarOtsenka = v;
     zapomniPogleda(p);

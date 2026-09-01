@@ -7,10 +7,10 @@
  *   2. Вътре редовете вървят по ТАЙМИНГА НА ЗАПИСА · първото записано е първо.
  *   3. Сесиите вървят от най-новата назад · човек пита „какво стана днес".
  *   4. Изключеният филтър показва ДНЕШНИЯ ден, не всичко.
- *   5. Датата, името и текстът стесняват · и трите поотделно.
- *   6. Търсенето е сведено · „Иван" и „иван" са ЕДИН редактор.
- *   7. Сверката вход↔изход затваря · нито един ред не пада между сесиите.
- *   8. Тук НИЩО не се пише · целият модул е четиво (мери се).
+ *   5. Стесненото се приема ОТВЪН (филтърният двигател, резен 75в) · домейнът
+ *      групира каквото получи и не решава втори път кое минава.
+ *   6. Сверката вход↔изход затваря · нито един ред не пада между сесиите.
+ *   7. Тук НИЩО не се пише · целият модул е четиво (мери се).
  */
 
 import { describe, expect, it } from 'vitest';
@@ -18,10 +18,6 @@ import { DnevnikVPametta, Vrata, VsichkoRazresheno, type Sabitie } from '../src/
 import {
   denyaNa,
   dnevnitteSesii,
-  filtaratEIzklyuchen,
-  PRAZEN_FILTAR,
-  prezFiltara,
-  redaktorite,
   sesiite,
   sveriSesiite,
   zhurnalatZaEkrana,
@@ -122,19 +118,14 @@ describe('наредбата · вътре напред, сесиите наза
 // ── 4 · ИЗКЛЮЧЕНИЯТ ФИЛТЪР ────────────────────────────────────────────────
 
 describe('изключеният филтър показва ДНЕШНИЯ ден, не всичко', () => {
-  it('и това се КАЗВА · празният филтър се разпознава', () => {
-    expect(filtaratEIzklyuchen(PRAZEN_FILTAR)).toBe(true);
-    expect(filtaratEIzklyuchen({ ...PRAZEN_FILTAR, koy: 'ivan' })).toBe(false);
-  });
-
   it('дневните сесии са само за подадения ден', () => {
     const s = dnevnitteSesii(KNIGA, '2026-08-30');
     expect(s).toHaveLength(2);
     expect(s.every((x) => x.den === '2026-08-30')).toBe(true);
   });
 
-  it('изгледът го прави сам · и обявява, че филтърът е изключен', () => {
-    const izgled = zhurnalatZaEkrana(KNIGA, PRAZEN_FILTAR, '2026-08-30', KOGATO);
+  it('изгледът го прави сам · `null` значи „нито един филтър не е пипнат"', () => {
+    const izgled = zhurnalatZaEkrana(KNIGA, null, '2026-08-30', KOGATO);
     expect(izgled.izklyuchen).toBe(true);
     expect(izgled.sesii).toHaveLength(2);
     // Целият Журнал наведнъж е ИЗНОСЪТ, не екранът.
@@ -146,44 +137,31 @@ describe('изключеният филтър показва ДНЕШНИЯ де
   });
 });
 
-// ── 5 и 6 · СТЕСНЯВАНЕТО ──────────────────────────────────────────────────
+// ── 5 · СТЕСНЕНОТО СЕ ПРИЕМА ОТВЪН ────────────────────────────────────────
 
-describe('датата, името и текстът стесняват · и трите поотделно', () => {
-  it('датите режат от двете страни, ВКЛЮЧИТЕЛНО', () => {
-    const s = sesiite(KNIGA, { ...PRAZEN_FILTAR, ot: '2026-08-29', do_: '2026-08-29' });
-    expect(s).toHaveLength(2);
-    expect(s.every((x) => x.den === '2026-08-29')).toBe(true);
+describe('стесненото идва от двигателя · домейнът не решава втори път', () => {
+  it('подаденото стеснение се групира каквото е · и НЕ е „изключено"', () => {
+    const samoMariya = KNIGA.filter((s) => s.actor === 'mariya@vintex.bg');
+    const izgled = zhurnalatZaEkrana(KNIGA, samoMariya, '2026-08-30', KOGATO);
+    expect(izgled.izklyuchen).toBe(false);
+    expect(izgled.sesii.every((x) => x.koy === 'mariya@vintex.bg')).toBe(true);
+    expect(izgled.sesii.reduce((x, y) => x + y.broy, 0)).toBe(3);
   });
 
-  it('името стеснява ЧАСТИЧНО · не иска цял имейл', () => {
-    const s = sesiite(KNIGA, { ...PRAZEN_FILTAR, koy: 'mariya' });
-    expect(s.every((x) => x.koy === 'mariya@vintex.bg')).toBe(true);
-    expect(s.reduce((x, y) => x + y.broy, 0)).toBe(3);
-  });
-
-  it('и е СВЕДЕНО · „ИВАН" намира „ivan" по същия начин', () => {
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, koy: 'IVAN' })).toBe(true);
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, koy: '  Ivan  ' })).toBe(true);
-  });
-
-  it('текстът рови във вида, същността И товара', () => {
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, tarsi: 'имотдобавен' })).toBe(true);
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, tarsi: 'I-1' })).toBe(true);
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, tarsi: 'Адрес 1' })).toBe(true);
-    expect(prezFiltara(KNIGA[0]!, { ...PRAZEN_FILTAR, tarsi: 'няма такова' })).toBe(false);
-  });
-
-  it('и редакторите се броят от Журнала, не се пишат на ръка', () => {
-    expect([...redaktorite(KNIGA)]).toEqual(['ivan@vintex.bg', 'mariya@vintex.bg']);
+  it('ПРАЗЕН резултат от истински филтър е отговор, не днешният ден', () => {
+    const izgled = zhurnalatZaEkrana(KNIGA, [], '2026-08-30', KOGATO);
+    expect(izgled.izklyuchen).toBe(false);
+    expect(izgled.sesii).toEqual([]);
+    expect(izgled.sverka.vhod).toBe(0);
   });
 });
 
-// ── 7 · СВЕРКАТА ──────────────────────────────────────────────────────────
+// ── 6 · СВЕРКАТА ──────────────────────────────────────────────────────────
 
 describe('сверката вход↔изход · нито един ред не пада между сесиите', () => {
   it('затваря на нула · и се записва, дори когато е нула', () => {
     const s = sesiite(KNIGA);
-    const sv = sveriSesiite(KNIGA, s, PRAZEN_FILTAR, KOGATO);
+    const sv = sveriSesiite(KNIGA, s, KOGATO);
     expect(sv.vhod).toBe(6);
     expect(sv.izhod).toBe(6);
     expect(sv.razlika).toBe(0);
@@ -192,19 +170,20 @@ describe('сверката вход↔изход · нито един ред н�
 
   it('и МОЖЕ да падне · изгубена сесия се вижда с ЧИСЛО', () => {
     const okastreni = sesiite(KNIGA).slice(1);
-    const sv = sveriSesiite(KNIGA, okastreni, PRAZEN_FILTAR, KOGATO);
+    const sv = sveriSesiite(KNIGA, okastreni, KOGATO);
     expect(sv.nared).toBe(false);
     expect(sv.razlika).toBe(-1);
   });
 
-  it('и изгледът я носи със себе си', () => {
-    const izgled = zhurnalatZaEkrana(KNIGA, { ...PRAZEN_FILTAR, koy: 'ivan' }, '2026-08-30', KOGATO);
+  it('и изгледът я носи със себе си · входът е СТЕСНЕНОТО, не цялата книга', () => {
+    const samoIvan = KNIGA.filter((s) => s.actor === 'ivan@vintex.bg');
+    const izgled = zhurnalatZaEkrana(KNIGA, samoIvan, '2026-08-30', KOGATO);
     expect(izgled.sverka.nared).toBe(true);
     expect(izgled.sverka.vhod).toBe(3);
   });
 });
 
-// ── 8 · НИЩО НЕ СЕ ПИШЕ ───────────────────────────────────────────────────
+// ── 7 · НИЩО НЕ СЕ ПИШЕ ───────────────────────────────────────────────────
 
 describe('целият модул е ЧЕТИВО', () => {
   it('гледането не ражда НИТО ЕДНО събитие', async () => {
@@ -222,7 +201,7 @@ describe('целият модул е ЧЕТИВО', () => {
     const predi = (await dnevnik.chetiVsichki(NAEMATEL)).length;
 
     const kniga = await dnevnik.chetiVsichki(NAEMATEL);
-    zhurnalatZaEkrana(kniga, PRAZEN_FILTAR, '2026-08-30', KOGATO);
+    zhurnalatZaEkrana(kniga, null, '2026-08-30', KOGATO);
     sesiite(kniga);
     dnevnitteSesii(kniga, '2026-08-30');
 

@@ -399,7 +399,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
      * ролята при доставчика и колонното право (правило 23), а не втора врата
      * на екрана.
      */
-    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo),
+    narisuvay: (r) => narisuvayProdazhbi(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiProdazhbite(z.koren, z.k, z.prerisuvay),
   },
   plashtaniya: {

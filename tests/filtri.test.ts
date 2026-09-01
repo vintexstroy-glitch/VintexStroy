@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { filtriray, podrediGrupi, prezOtdo, slozhiOtdo } from '../app/filtri.js';
+import { filtarAktiven, filtriray, podrediGrupi, prezOtdo, slozhiOtdo } from '../app/filtri.js';
 
 function grupi(...imena: string[]): Map<string, number> {
   return new Map(imena.map((i, k) => [i, k + 1]));
@@ -138,5 +138,18 @@ describe('От–До на датова колона', () => {
     slozhiOtdo('proba2:Дата', 'ot', '');
     slozhiOtdo('proba2:Дата', 'do_', '');
     expect(filtriray('proba2', redove, koloni, '2026-09-01').redove).toHaveLength(3);
+  });
+});
+
+describe('активен ли е филтърът · Журналът пита, за да пази закона за деня', () => {
+  it('чистата таблица е ИЗКЛЮЧЕНА · пипнато От–До я пали, махнато я гаси', () => {
+    const koloni = [
+      { klyuch: 'Дата', ime: 'Дата', vid: 'data' as const, vzemi: (r: { data: string }) => r.data },
+    ];
+    expect(filtarAktiven('proba3', koloni)).toBe(false);
+    slozhiOtdo('proba3:Дата', 'ot', '2026-06-01');
+    expect(filtarAktiven('proba3', koloni)).toBe(true);
+    slozhiOtdo('proba3:Дата', 'ot', '');
+    expect(filtarAktiven('proba3', koloni)).toBe(false);
   });
 });

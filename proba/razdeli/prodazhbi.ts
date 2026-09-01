@@ -44,15 +44,17 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   razdel = '94 · Продажби · петнайсетте колони';
   await naEkran(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
 
+  // Главата е на ФИЛТЪРНИЯ ДВИГАТЕЛ (резен 75в): всяка колона е `.glavicha`
+  // със стрелка — динамичните колони минаха през същия описател като всички.
   proveri(
     'главата носи ТОЧНО петнайсет колони',
-    await p.$$eval('[data-tablitsa=prodazhbi] .glava .kletka', (e) => e.length),
+    await p.$$eval('[data-tablitsa=prodazhbi] .glava .glavicha', (e) => e.length),
     15,
   );
   proveri(
     'и те са НЕГОВИТЕ, в НЕГОВИЯ ред',
     (
-      await p.$$eval('[data-tablitsa=prodazhbi] .glava .kletka', (e) =>
+      await p.$$eval('[data-tablitsa=prodazhbi] .glava .glavicha', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),
@@ -60,8 +62,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       'Капаро · НС · НС кеш · Акт 15 · Акт 16 · проверка · Състояние',
   );
   proveri(
+    'и всяка носи СТРЕЛКА на двигателя',
+    await p.$$eval('[data-tablitsa=prodazhbi] .glava [data-filtar-glava]', (e) => e.length),
+    15,
+  );
+  proveri(
     'три от тях са ЗАТВОРЕНИ · двете от имота и сметката',
-    await p.$$eval('[data-tablitsa=prodazhbi] .glava .kletka.zatvorena', (e) =>
+    await p.$$eval('[data-tablitsa=prodazhbi] .glava .glavicha.zatvorena', (e) =>
       e.map((x) => (x as HTMLElement).dataset['kolona']).join(' · '),
     ),
     'Обект · Място · проверка',
@@ -402,7 +409,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
   razdel = '95 · Етапите растат · новата КОЛОНА стои в таблицата';
   await naEkran(p, 'prodazhbi', '[data-sektsiya=prodazhbi-tekushti]');
-  const glavi = await p.$$eval('[data-tablitsa=prodazhbi] .glava .kletka', (e) =>
+  const glavi = await p.$$eval('[data-tablitsa=prodazhbi] .glava .glavicha', (e) =>
     e.map((x) => (x as HTMLElement).dataset['kolona']),
   );
   proveri('главата стана ШЕСТНАЙСЕТ колони', glavi.length, 16);
