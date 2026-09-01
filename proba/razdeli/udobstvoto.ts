@@ -933,14 +933,24 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const shapkaB = await shapkataPri(900);
     proveri('шапката стои на едно и също място при два различни скрола', shapkaA, shapkaB);
 
-    const parvataPri = async (kolko: number): Promise<number> => {
+    // ЗАМРАЗЯВАНЕТО НАСТРАНИ ПАДА (И127 т.2 · ADR-148): „хедъра който се лепи
+    // от различните таблици… махни го НАВСЯКЪДЕ." Мери се ОБРАТНОТО на дотук:
+    // първата колона тече с реда си. Числото се сверява с истинския скрол —
+    // таблица, която не се е преместила, би минала и двете твърдения.
+    const parvataPri = async (kolko: number): Promise<{ lyavo: number; skrol: number }> => {
       await p.$eval('.telo', (e, s2) => { (e as HTMLElement).scrollLeft = s2 as number; }, kolko);
       await p.waitForTimeout(120);
-      return p.$eval('.red', (r) => Math.round(r.firstElementChild!.getBoundingClientRect().left));
+      return p.$eval('.red', (r) => ({
+        lyavo: Math.round(r.firstElementChild!.getBoundingClientRect().left),
+        skrol: Math.round((r.closest('.telo') as HTMLElement).scrollLeft),
+      }));
     };
     const parvaA = await parvataPri(200);
     const parvaB = await parvataPri(600);
-    proveri('и първата колона остава замразена настрани', parvaA, parvaB);
+    proveri('скролът настрани наистина се мести · инак мярката долу е сляпа',
+      parvaB.skrol > parvaA.skrol, true);
+    proveri('и първата колона ВЕЧЕ НЕ е замразена · тече с реда си',
+      parvaA.lyavo - parvaB.lyavo, parvaB.skrol - parvaA.skrol);
     await p.$eval('.telo', (e) => {
       (e as HTMLElement).scrollLeft = 0;
       (e as HTMLElement).scrollTop = 0;
@@ -1779,9 +1789,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       Number(await tekstNa(p, '[data-bez-tab]')) >= 1, true);
     proveri('и стоят в ПОСЛЕДНАТА група', grupi.at(-1), '');
 
-    // ЗАЛЕПВАНЕТО ПРИ СКРОЛ · „отделени при скрол" е негова дума.
-    proveri('заглавието на групата е ЗАЛЕПЕНО, не тече с текста',
-      await p.$eval('.hedari-zaglavie', (e) => getComputedStyle(e).position), 'sticky');
+    // ЗАЛЕПВАНЕТО ПАДА · „махни го навсякъде" (И127 т.2 · ADR-148). „Отделени
+    // при скрол" се чете РАЗДЕЛЕНИ — своя рамка и свое заглавие, не лепнати.
+    proveri('заглавието на групата НЕ лепне · тече с текста си',
+      await p.$eval('.hedari-zaglavie', (e) => getComputedStyle(e).position), 'static');
     proveri('и е НАДПИС, не бутон · клавиатурата не спира на него',
       await p.$eval('.hedari-zaglavie', (e) => e.getAttribute('role')), 'presentation');
 
@@ -2487,6 +2498,16 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-zhiv-hedar]', (e) => e.length), 0);
     proveri('главата на таблицата вече НЕ лепне (не е sticky)',
       await p.$eval('.tablitsa .glava', (e) => getComputedStyle(e).position), 'static');
+    // И127 т.2 · „махни го НАВСЯКЪДЕ" · мярката е на ЖИВО и с праг НУЛА:
+    // класът може да падне от лист и да остане в друг; лепнатото се БРОИ по
+    // онова, което браузърът наистина смята — включително първата колона,
+    // която ADR-133 беше оставил като „хоризонтална".
+    proveri('нито един елемент на екрана не лепне · нула sticky',
+      await p.$$eval('*', (vsichki) =>
+        vsichki.filter((e) => getComputedStyle(e).position === 'sticky').length), 0);
+    proveri('и първата клетка на главата вече не е замразена',
+      await p.$eval('.tablitsa .glava > :first-child', (e) => getComputedStyle(e).position),
+      'static');
 
     razdel = '121 · Постоянната лента · периодът на Баланса е в нея';
     proveri('формата за периода стои В ШАПКАТА, извън скролиращата кутия',
