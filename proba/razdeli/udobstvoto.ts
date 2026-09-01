@@ -2111,6 +2111,51 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.diagrama-red title', (t) =>
         t.some((x) => (x.textContent ?? '').includes('09:30'))), true);
 
+    // ═══ 117е · НОВИЯТ ИМОТ РАЖДА ГОЛЯМОТО ДЕЛО (резен 69 · И124 т.1) ═══
+    //
+    // „При започване на нов Имот с нов Обекти строителството е голямо дело с
+    // мног дървесни разклонения като в МСПроджект." Машината ПРЕДЛАГА,
+    // записва ЧОВЕКЪТ (правило 18).
+    razdel = '117е · Новият адрес ражда ПРЕДЛОЖЕНИЕ, не записи';
+    await naEkran(p, 'imoti', '#forma-imot');
+    const prediPredlozhenie = await broySabitiya(p);
+    await dobaviImot(p, 'Върба', 'вила 1');
+    await p.waitForSelector('[data-sektsiya=darvo-na-stroezha]');
+    proveri('предложението се появява при НОВ адрес',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 1);
+    proveri('и е само ЕДНО събитие · имотът, не дървото',
+      await broySabitiya(p), prediPredlozhenie + 1);
+    proveri('казва броя · 22 дела, броени от шаблона',
+      (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('22 дела'), true);
+    proveri('и казва, че записва ЧОВЕКЪТ (правило 18)',
+      (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('правило 18'), true);
+
+    razdel = '117е · „Не сега" не оставя следа';
+    await deystvieSPrerisuvane(p, () => p.click('#darvo-ne-sega'));
+    proveri('предложението изчезва',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
+    proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 1);
+
+    razdel = '117е · СЪЩИЯТ адрес не предлага втори строеж';
+    await dobaviImot(p, 'Върба', 'вила 2');
+    proveri('вторият имот на адреса НЕ ражда предложение',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
+
+    razdel = '117е · „Създай дървото" · записва се ЦЯЛОТО, със сверка';
+    const prediDarvo = await broySabitiya(p);
+    await dobaviImot(p, 'Гълъбец', 'парцел А');
+    await p.waitForSelector('#darvo-sazdai');
+    await deystvieSPrerisuvane(p, () => p.click('#darvo-sazdai'));
+    proveri('двайсет и двете дела са в Журнала',
+      await broySabitiya(p), prediDarvo + 1 + 22);
+    proveri('и сверката се КАЗВА · разлика 0',
+      (await p.$eval('.vest', (e) => (e as any).innerText)).includes('22 от 22 дела · разлика 0'), true);
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('дървото стои под мястото си в Управление',
+      await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 22);
+    proveri('и разклоненията са ПОД корена · има поддела',
+      await p.$$eval('.gant-delo.poddelo[data-grupa="Гълъбец"]', (e) => e.length) > 0, true);
+
     // ═══ 118 · КАЛЕНДАРЪТ · цифрите в полето на деня (И90 · резен 40) ═══
     //
     // „Както и всички приходи и разходи са с цифри в полето на календара."

@@ -19,6 +19,12 @@ import type { Imot, Naem, Ogledalo } from '../src/ogledalo/ogledalo.js';
 import { zakachiStornoButoni } from './storno.js';
 import { poImot } from '../src/ogledalo/izgledi.js';
 import {
+  broyatNaShablona,
+  delataOtShablona,
+  KORENAT_NA_STROEZHA,
+  SHABLON_NA_STROEZHA,
+} from '../src/domein/darvo-na-stroezha.js';
+import {
   grupirano,
   IMENA_NA_IZGLEDITE,
   IMENA_NA_STAPKITE,
@@ -184,9 +190,46 @@ export function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
   ];
 }
 
+/**
+ * АДРЕСИТЕ КЪМ МОМЕНТА НА РИСУВАНЕ · за да познае записът НОВИЯ адрес.
+ * Пълни се при рисуване (там е Огледалото), чете се при запис (ADR-040).
+ */
+let adresiteSega = new Set<string>();
+
+/**
+ * ПРЕДЛОЖЕНИЕТО ЗА ДЪРВОТО (резен 69 · И124 т.1): „При започване на нов Имот
+ * с нов Обекти строителството е голямо дело с мног дървесни разклонения като
+ * в МСПроджект." Машината ПРЕДЛАГА, записва човекът (правило 18) — затова
+ * това е памет на екрана, не събитие: отказът не оставя следа в Журнала.
+ */
+let predlozhenoDarvo: { readonly myasto: string; readonly obekt: string } | null = null;
+
+function blokNaDarvoto(): string {
+  if (!predlozhenoDarvo) return '';
+  return `
+    <section class="karta izbrana" data-sektsiya="darvo-na-stroezha">
+      <div class="dyalglava">
+        <h2>Нов адрес · голямото дело на строежа</h2>
+        <span>предложение — записва човекът (правило 18)</span>
+      </div>
+      <p class="drebno">„${ekraniraj(predlozhenoDarvo.myasto)}" е НОВ адрес. Началото на
+      строителство е „${KORENAT_NA_STROEZHA}" с дървесни разклонения като в MS Project —
+      ${broyatNaShablona()} дела, всяко после се мени свободно от Управление:</p>
+      <ul class="drebno" translate="no">${SHABLON_NA_STROEZHA.map(
+        (k) => `<li><b>${ekraniraj(k.ime)}</b> · ${k.stapki.map((x) => ekraniraj(x)).join(' · ')}</li>`,
+      ).join('')}</ul>
+      <div class="deystviya">
+        <button type="button" class="glaven" id="darvo-sazdai">Създай дървото · ${broyatNaShablona()} дела</button>
+        <button type="button" class="vtorichen" id="darvo-ne-sega">Не сега</button>
+        <span class="drebno">Отказът не записва нищо — предложение без следа.</span>
+      </div>
+    </section>`;
+}
+
 export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const { ogledalo } = sastoyanie;
   const imoti = [...ogledalo.imoti.values()];
+  adresiteSega = new Set(imoti.map((i) => i.adres.trim().toLowerCase()));
   const naemi = [...ogledalo.naemi.values()].sort(
     (a, b) => Number(a.prekraten) - Number(b.prekraten) || a.naemetel.localeCompare(b.naemetel),
   );
@@ -244,6 +287,8 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     </div>
 
     ${prekratyavan ? formaPrekratyavane(prekratyavan) : ''}
+
+    ${blokNaDarvoto()}
 
     <section data-sektsiya="imoti-nov" class="karta${popravyanImot ? ' izbrana' : ''}">
       <div class="dyalglava">
@@ -803,10 +848,18 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         rezhim = { kakvo: 'nov' };
         k.vest('dobre', 'Поправката е записана. Старото описание остава в Журнала.');
       } else {
+        // НОВ ли е адресът — гледа се СНИМКАТА отпреди записа: „При започване
+        // на нов Имот с нов Обекти строителството е голямо дело" (И124 т.1).
+        const novAdres = !adresiteSega.has(opis.adres.toLowerCase());
         await k.deystviya.dobaviImot(`I:${crypto.randomUUID()}`, opis, { opId: opIdImot });
         opIdImot = novOpId();
         formaImot.reset();
-        k.vest('dobre', 'Имотът е записан в Журнала.');
+        if (novAdres) {
+          predlozhenoDarvo = { myasto: opis.adres, obekt: opis.edinitsa };
+          k.vest('dobre', 'Имотът е записан. Нов адрес — предложението за голямото дело е долу.');
+        } else {
+          k.vest('dobre', 'Имотът е записан в Журнала.');
+        }
       }
       await prerisuvay();
     } catch (e) {
@@ -817,6 +870,40 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
   });
 
   // ── наем: нов или поправен ───────────────────────────────────────────────
+  // ── дървото на строежа: създава ЧОВЕКЪТ, отказът е без следа ─────────────
+  koren.querySelector<HTMLButtonElement>('#darvo-sazdai')?.addEventListener('click', async () => {
+    if (!predlozhenoDarvo) return;
+    const redove = delataOtShablona(
+      predlozhenoDarvo.myasto,
+      predlozhenoDarvo.obekt,
+      // „отговорник е този който извършва действието" (И124 т.7)
+      k.kojSam.imeyl,
+      dnesKato(),
+      () => `D:${crypto.randomUUID()}`,
+    );
+    let zapisani = 0;
+    try {
+      for (const red of redove) {
+        await k.deystviya.zapishiDelo(red.id, red.danni, { opId: `darvo:${red.id}` });
+        zapisani += 1;
+      }
+    } catch (e) {
+      k.vest('zle', dumiZaGreshka(e));
+      return;
+    }
+    // Сверка вход↔изход · и нулата се казва (правило 7).
+    k.vest(
+      'dobre',
+      `Дървото е записано: ${zapisani} от ${redove.length} дела · разлика ${redove.length - zapisani}.`,
+    );
+    predlozhenoDarvo = null;
+    await prerisuvay();
+  });
+  koren.querySelector<HTMLButtonElement>('#darvo-ne-sega')?.addEventListener('click', async () => {
+    predlozhenoDarvo = null;
+    await prerisuvay();
+  });
+
   const formaNaem = koren.querySelector<HTMLFormElement>('#forma-naem');
   formaNaem?.addEventListener('submit', async (sabitie) => {
     sabitie.preventDefault();
