@@ -35,13 +35,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
   proveri(
     'главата носи ЧЕТИРИНАЙСЕТ колони · тринайсетте му плюс Категория',
-    await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .kletka', (e) => e.length),
+    await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .glavicha', (e) => e.length),
     14,
   );
   proveri(
     'и в НЕГОВИЯ ред · наредба, не подредба при рисуване',
     (
-      await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .kletka', (e) =>
+      await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .glavicha', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),
@@ -51,7 +51,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   proveri(
     'СМЕТНАТИТЕ четири колони са затворени · не се редактират от никого',
     (
-      await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .kletka.zatvorena', (e) =>
+      await p.$$eval('[data-tablitsa=plashtaniya-arhiv] .glava .glavicha.zatvorena', (e) =>
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),

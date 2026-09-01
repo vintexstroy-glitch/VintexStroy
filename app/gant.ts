@@ -29,7 +29,13 @@ import { narisuvayAvtoDelata } from './avtodela.js';
 import { otData } from '../src/yadro/data.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
-import type { KolonaSFiltar } from './filtri.js';
+import {
+  filtriray,
+  glaviTh,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 import { pishi } from '../src/yadro/pari.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import {
@@ -491,10 +497,19 @@ export function narisuvayGant(
  * „още не е записано". Списък само от записаните щеше да КРИЕ точно работата —
  * човек вижда къде има какво да допълни, вместо да се сеща сам.
  */
+/** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
+const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; papka: string; dela: number; zapisano: boolean }>[] = [
+  { klyuch: 'ime', ime: 'Място', vid: 'tekst', vzemi: (r) => r.ime },
+  { klyuch: 'firma', ime: 'Фирма · управлява проекта', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
+  { klyuch: 'papka', ime: 'Папка', vid: 'tekst', vzemi: (r) => (r.papka === '' ? '—' : 'папката') },
+  { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
+];
+
 function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
   const redove = mestata(o, zhivite([...o.dela.values()]));
   const bezZapis = redove.filter((r) => !r.zapisano).length;
   const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
+  const filtriraniMesta = filtriray('mestata', redove, KOLONI_MESTATA, dnes);
 
   return `
     <section data-sektsiya="gant-mesta" data-broy="${redove.length}" data-bez-zapis="${bezZapis}">
@@ -506,12 +521,12 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
       ${
         redove.length === 0
           ? '<p class="drebno">Още няма нито едно място — то се появява с първото дело или се записва оттук.</p>'
-          : `<div class="skrolkutiya">
+          : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="mestata">
           <thead>
-            <tr><th>Място</th><th>Фирма · управлява проекта</th><th>Папка</th><th class="chislo">Дела</th></tr>
+            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}</tr>
           </thead>
-          <tbody>${redove
+          <tbody>${filtriraniMesta.redove
             .map(
               (r) => `
             <tr data-myasto="${ekraniraj(r.ime)}"${r.zapisano ? '' : ' class="bez-zapis"'}>
@@ -529,7 +544,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
             )
             .join('')}</tbody>
         </table>
-      </div>`
+      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}`
       }
 
       <form class="forma" id="${predstavka}forma-myasto">

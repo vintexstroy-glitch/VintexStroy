@@ -477,6 +477,25 @@ export function glaviNaTablitsata<T>(
   return koloni.map((k) => glavaSFiltar(tablitsa, k, redove, dnes)).join('');
 }
 
+/**
+ * Същите глави, но за ИСТИНСКА `<table>` (резен 75б): всяка в свой `<th>`.
+ *
+ * Контактите, авто-делата и другите таблици от резен 66 са `<table>`, не
+ * div-решетка — двигателят е ЕДИН, опаковката е различна (правило 17: редът
+ * на менюто, групите и От–До живеят в `glavaSFiltar`, не тук).
+ */
+export function glaviTh<T>(
+  tablitsa: string,
+  koloni: readonly KolonaSFiltar<T>[],
+  redove: readonly T[],
+  dnes: string,
+): string {
+  return koloni
+    .filter((k) => !k.samoZaTarsene)
+    .map((k) => `<th>${glavaSFiltar(tablitsa, k, redove, dnes)}</th>`)
+    .join('');
+}
+
 function menyu<T>(
   tablitsa: string,
   k: KolonaSFiltar<T>,

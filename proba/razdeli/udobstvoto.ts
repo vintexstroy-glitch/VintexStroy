@@ -1990,6 +1990,30 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('сверката стои на екрана и е нула',
       (await tekstNa(p, '[data-kontakti-sverka]')).replace(/\s+/g, ' ').includes('разлика 0'), true);
 
+    // ══ 116б · ПОКРИТИЕТО РАСТЕ (резен 75б) · таблиците са на двигателя ══
+    //
+    // Контактите ×3, авто-делата, местата, контрагентите и Плащания-архив
+    // минаха на двигателя: глави със стрелки и „Търси в таблицата".
+    razdel = '116б · покритието на двигателя';
+    proveri('двете видими таблици на Контакти носят търсачка',
+      await p.$$eval(
+        '[data-tarsi-tablitsa="prepiski"], [data-tarsi-tablitsa="kontakti"]',
+        (e) => e.length), 2);
+    proveri('и главите на преписките са на двигателя · стрелка на всяка колона',
+      await p.$$eval('[data-tablitsa=prepiski] thead .glavicha [data-filtar-glava]', (e) => e.length), 7);
+    const prepiskiPredi = await p.$$eval('[data-tablitsa=prepiski] [data-prepiska]', (e) => e.length);
+    proveri('търсенето в преписките РЕЖЕ · остава точно една',
+      await (async () => {
+        await p.fill('[data-tarsi-tablitsa="prepiski"]', 'нотариален');
+        await p.waitForFunction(() =>
+          document.querySelectorAll('[data-tablitsa=prepiski] [data-prepiska]').length === 1);
+        const ostana = await p.$$eval('[data-tablitsa=prepiski] [data-prepiska]', (e) => e.length);
+        await deystvieSPrerisuvane(p, () => p.click('[data-filtar-izchisti-vsichko="prepiski"]'));
+        return ostana;
+      })(), 1);
+    proveri('и изчистването връща всичките',
+      await p.$$eval('[data-tablitsa=prepiski] [data-prepiska]', (e) => e.length), prepiskiPredi);
+
     // ═══ 117 · АВТО-ДЕЛАТА · вноска/преписка/среща → дело, червен списък ═══
     //
     // „Да — върни авто-делата (вноска/преписка/среща → дело, червен списък)"

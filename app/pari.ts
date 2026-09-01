@@ -183,7 +183,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     }
 
     ${narisuvayPlashtaniyata(o, dnes)}
-    ${sektsiyaPoKontragent(o)}
+    ${sektsiyaPoKontragent(o, dnes)}
   `;
 }
 
@@ -197,20 +197,32 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
  * казва КОЛКО дължи някой, а КАКЪВ Е. Отрицателното значи „плаща предсрочно",
  * и това е информация, за която иначе се пита счетоводител.
  */
-function sektsiyaPoKontragent(o: Ogledalo): string {
+/** Колоните на контрагентите за двигателя (резен 75б · И124 т.2). */
+const KOLONI_KONTRAGENTI: readonly KolonaSFiltar<ReturnType<typeof poKontragent>[number]>[] = [
+  { klyuch: 'ime', ime: 'Име', vid: 'tekst', vzemi: (r) => r.ime },
+  { klyuch: 'rolya', ime: 'Кой е', vid: 'tekst', vzemi: (r) => r.rolya },
+  { klyuch: 'nachisleno', ime: 'Начислено', vid: 'evro', vzemi: (r) => r.nachisleno_st },
+  { klyuch: 'plateno', ime: 'Платено', vid: 'evro', vzemi: (r) => r.plateno_st },
+  { klyuch: 'duljimo', ime: 'Дължимо', vid: 'evro', vzemi: (r) => r.duljimo_st },
+  { klyuch: 'plashta', ime: 'Плаща', vid: 'chislo', vzemi: (r) => r.srednoZakasnenie ?? '—' },
+];
+
+function sektsiyaPoKontragent(o: Ogledalo, dnes: string): string {
   const redove = poKontragent(o);
   if (redove.length === 0) return '';
+  const filtrirani = filtriray('po-kontragent', redove, KOLONI_KONTRAGENTI, dnes);
   return `
     <section data-sektsiya="po-kontragent">
       <div class="dyalglava">
         <h2>По контрагент</h2>
         <span>кой дължи · кой плаща навреме · на кого плащам</span>
       </div>
+      ${poleZaTarsene('po-kontragent')}
       <div class="tablitsa" data-tablitsa="po-kontragent">
         <div class="glava po-kontragent">
-          <span>Име</span><span>Кой е</span><span>Начислено</span><span>Платено</span><span>Дължимо</span><span>Плаща</span>
+          ${glaviNaTablitsata('po-kontragent', KOLONI_KONTRAGENTI, redove, dnes)}
         </div>
-        ${redove
+        ${filtrirani.redove
           .map(
             (r) => `<div class="red po-kontragent${r.duljimo_st > 0 ? ' trevoga' : ''}" translate="no">
               <span class="kletka"><b>${ekraniraj(r.ime)}</b> <span class="drebno">${r.broySledi}</span></span>
@@ -223,6 +235,7 @@ function sektsiyaPoKontragent(o: Ogledalo): string {
           )
           .join('')}
       </div>
+      ${redZaSkritoto(filtrirani, 'po-kontragent')}
       <p class="drebno">Имената се сравняват без разлика в главните букви и в разстоянията, докато
       <b>Контактите</b> не станат истинска същност — „Стройпласт ЕООД" и „стройпласт еоод " са
       един контрагент. Малкото число до името е колко следи носи той.</p>

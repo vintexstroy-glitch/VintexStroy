@@ -42,6 +42,13 @@ import {
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 import { ekraniraj } from './obshto.js';
+import {
+  filtriray,
+  glaviTh,
+  poleZaTarsene,
+  redZaSkritoto,
+  type KolonaSFiltar,
+} from './filtri.js';
 
 /**
  * СВЕТОФАРЪТ · ВИКА СЕ, не се преписва (резен 39).
@@ -66,6 +73,42 @@ import { ekraniraj } from './obshto.js';
  * Смяната е НОВО СЪБИТИЕ със същия `id` (правило 1): последната дума бие, а
  * предишното състояние си остава в Журнала.
  */
+/**
+ * КОЛОНИТЕ ЗА ДВИГАТЕЛЯ НА ФИЛТРИТЕ (резен 75б · И124 т.2) · трите таблици
+ * на екрана. Суровите стойности идват от реда; празното „За взимане" остава
+ * празно — безсрочната преписка не се преоблича в дата.
+ */
+function koloniNaPrepiskite(o: Ogledalo): readonly KolonaSFiltar<Prepiska>[] {
+  return [
+    { klyuch: 'kontakt', ime: 'С кого', vid: 'tekst', vzemi: (p) => p.kontakt },
+    { klyuch: 'kakvo', ime: 'За какво', vid: 'tekst', vzemi: (p) => p.kakvo },
+    { klyuch: 'zaVzimane', ime: 'За взимане', vid: 'data', vzemi: (p) => p.zaVzimane },
+    { klyuch: 'otgovornik', ime: 'Отговорник', vid: 'tekst', vzemi: (p) => (p.otgovornik === '' ? '—' : p.otgovornik) },
+    { klyuch: 'otsenka', ime: 'Оценка', vid: 'tekst', vzemi: (p) => imeNaOtsenkata(p.otsenka) },
+    { klyuch: 'zakachena', ime: 'Имот · дело', vid: 'tekst', vzemi: (p) => zakachanetoNa(p, o.imoti, o.dela).nadpis },
+    { klyuch: 'sastoyanie', ime: 'Състояние', vid: 'tekst', vzemi: (p) => p.sastoyanie },
+  ];
+}
+
+type RedNaKontakt = { ime: string; telefon: string; imeyl: string; kakav: string; prepiski: number; zapisan: boolean };
+
+const KOLONI_KONTAKTI: readonly KolonaSFiltar<RedNaKontakt>[] = [
+  { klyuch: 'ime', ime: 'Име', vid: 'tekst', vzemi: (r) => r.ime },
+  { klyuch: 'telefon', ime: 'Телефон', vid: 'tekst', vzemi: (r) => (r.telefon === '' ? '—' : r.telefon) },
+  { klyuch: 'imeyl', ime: 'Имейл', vid: 'tekst', vzemi: (r) => (r.imeyl === '' ? '—' : r.imeyl) },
+  { klyuch: 'kakav', ime: 'Какъв е', vid: 'tekst', vzemi: (r) => (r.kakav === '' ? '—' : r.kakav) },
+  { klyuch: 'prepiski', ime: 'Преписки', vid: 'chislo', vzemi: (r) => r.prepiski },
+];
+
+const KOLONI_SRESHTI: readonly KolonaSFiltar<Sreshta>[] = [
+  { klyuch: 'vid', ime: 'Вид', vid: 'tekst', vzemi: (x) => x.vid },
+  { klyuch: 'kontakt', ime: 'С кого', vid: 'tekst', vzemi: (x) => x.kontakt },
+  { klyuch: 'adres', ime: 'Адрес', vid: 'tekst', vzemi: (x) => (x.adres === '' ? '—' : x.adres) },
+  { klyuch: 'data', ime: 'Дата', vid: 'data', vzemi: (x) => x.data },
+  { klyuch: 'chas', ime: 'Час', vid: 'tekst', vzemi: (x) => (x.chas === '' ? '—' : x.chas) },
+  { klyuch: 'sastoyanie', ime: 'Състояние', vid: 'tekst', vzemi: (x) => x.sastoyanie },
+];
+
 function padashtoSastoyanie(
   koe: 'prepiska' | 'sreshta',
   id: string,
@@ -132,6 +175,7 @@ function sektsiyaPrepiski(
   const podredeni = [...prepiski].sort(
     (a, b) => (b.zaVzimane || '0').localeCompare(a.zaVzimane || '0') || a.kakvo.localeCompare(b.kakvo, 'bg'),
   );
+  const filtrirani = filtriray('prepiski', podredeni, koloniNaPrepiskite(o), dnes);
   return `
     <section data-sektsiya="prepiski">
       <div class="dyalglava">
@@ -221,13 +265,12 @@ function sektsiyaPrepiski(
       ${
         prepiski.length === 0
           ? '<p class="prazno">Още няма нито една преписка.</p>'
-          : `<div class="skrolkutiya">
+          : `${poleZaTarsene('prepiski')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="prepiski">
           <thead>
-            <tr><th>С кого</th><th>За какво</th><th>За взимане</th><th>Отговорник</th>
-                <th>Оценка</th><th>Имот · дело</th><th>Състояние</th></tr>
+            <tr>${glaviTh('prepiski', koloniNaPrepiskite(o), podredeni, dnes)}</tr>
           </thead>
-          <tbody>${podredeni
+          <tbody>${filtrirani.redove
             .map(
               (p) => `
             <tr data-prepiska="${ekraniraj(p.id)}" data-svetofar="${svetofarNaSroka(p.zaVzimane, dnes)}"
@@ -247,7 +290,7 @@ function sektsiyaPrepiski(
             )
             .join('')}</tbody>
         </table>
-      </div>`
+      </div>${redZaSkritoto(filtrirani, 'prepiski')}`
       }
       <p class="drebno">Без дата преписката НЕ свети: подразбран срок би оцветил
       в червено работа, за която никой не е бързал. Часът е ПО ИЗБОР — празен час
@@ -270,6 +313,7 @@ function sektsiyaKontakti(
   imena: readonly string[],
   dnes: string,
 ): string {
+  const filtriraniKontakti = filtriray('kontakti', redove, KOLONI_KONTAKTI, dnes);
   return `
     <section data-sektsiya="kontakti">
       <div class="dyalglava">
@@ -308,12 +352,12 @@ function sektsiyaKontakti(
       ${
         redove.length === 0
           ? '<p class="prazno">Още няма нито един контакт.</p>'
-          : `<div class="skrolkutiya">
+          : `${poleZaTarsene('kontakti')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="kontakti">
           <thead>
-            <tr><th>Име</th><th>Телефон</th><th>Имейл</th><th>Какъв е</th><th>Преписки</th></tr>
+            <tr>${glaviTh('kontakti', KOLONI_KONTAKTI, redove, dnes)}</tr>
           </thead>
-          <tbody>${redove
+          <tbody>${filtriraniKontakti.redove
             .map(
               (r) => `
             <tr data-kontakt="${ekraniraj(r.ime)}" data-zapisan="${r.zapisan ? 'da' : 'ne'}">
@@ -328,7 +372,7 @@ function sektsiyaKontakti(
             )
             .join('')}</tbody>
         </table>
-      </div>`
+      </div>${redZaSkritoto(filtriraniKontakti, 'kontakti')}`
       }
       <p class="drebno" data-kontakti-sverka>Сверка вход↔изход: ${sv.vhod} преписки →
       ${sv.izhod} преброени по контакти, разлика ${sv.razlika}.</p>
@@ -356,6 +400,7 @@ function blokSreshti(
   const podredeni = [...sreshti].sort(
     (a, b) => a.data.localeCompare(b.data) || a.kontakt.localeCompare(b.kontakt, 'bg'),
   );
+  const filtriraniSreshti = filtriray('sreshti', podredeni, KOLONI_SRESHTI, dnes);
   return `
     <div class="dyalglava" data-blok="sreshti">
       <h3>Срещи и ангажименти</h3>
@@ -414,12 +459,12 @@ function blokSreshti(
     ${
       podredeni.length === 0
         ? '<p class="prazno">Още няма нито една среща.</p>'
-        : `<div class="skrolkutiya">
+        : `${poleZaTarsene('sreshti')}<div class="skrolkutiya">
       <table class="tablitsa" data-tablitsa="sreshti">
         <thead>
-          <tr><th>Вид</th><th>С кого</th><th>Адрес</th><th>Дата</th><th>Час</th><th>Състояние</th></tr>
+          <tr>${glaviTh('sreshti', KOLONI_SRESHTI, podredeni, dnes)}</tr>
         </thead>
-        <tbody>${podredeni
+        <tbody>${filtriraniSreshti.redove
           .map(
             (x) => `
           <tr data-sreshta="${ekraniraj(x.id)}" data-sastoyanie="${ekraniraj(x.sastoyanie)}"
@@ -434,7 +479,7 @@ function blokSreshti(
           )
           .join('')}</tbody>
       </table>
-    </div>`
+    </div>${redZaSkritoto(filtriraniSreshti, 'sreshti')}`
     }
     <p class="drebno">Проведената и отпадналата НЕ светят и не стават дело:
     ангажимент без изход би светил вечно.</p>`;
