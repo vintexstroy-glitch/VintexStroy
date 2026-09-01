@@ -76,9 +76,7 @@ import { zakachiChernovata } from './chernova.js';
 import { prilozhiSkritite } from './skriti-koloni.js';
 import { zakachiZebrata } from './zebra.js';
 import { zakachiVisochinata } from './visochina.js';
-import { zakachiGoleminata } from './golemina.js';
 import { narisuvayProfila, zakachiProfila } from './profil.js';
-import { zakachiTemata } from './tema.js';
 import { helpatEOtvoren, narisuvayHelpa, zakachiHelpa } from './help.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
@@ -932,10 +930,9 @@ async function trugvay(): Promise<void> {
     // ЗЕБРАТА е ПОСЛЕДНА: тя брои РЕДОВЕТЕ, а скритите колони и подредбата
     // могат да сменят кои редове изобщо стоят. Броене преди тях би дало ивици
     // на редове, които после се местят.
-    zakachiGoleminata(koren);
-    // ПРОФИЛЪТ И ТЕМИТЕ (резен 78 · ADR-135) · панелът, размерът и двете теми.
+    // ПРОФИЛЪТ (резен 78 · ADR-135) · панелът със самоличността. Лостът за
+    // размера и двете теми паднаха с бутоните си (И127 т.3 · ADR-149).
     zakachiProfila(koren);
-    zakachiTemata(koren);
     // ХЕЛПЪТ (резен 78б · ADR-136) · планът на таба се чете от живия екран,
     // затова се закача СЛЕД рисуването — той оглежда каквото стои.
     zakachiHelpa(koren, prerisuvay);

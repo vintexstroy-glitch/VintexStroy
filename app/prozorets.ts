@@ -22,7 +22,6 @@
  */
 
 import { ekraniraj } from './obshto.js';
-import { zakachiGoleminata } from './golemina.js';
 
 interface Prozorets {
   /** заглавието вътре · и достъпното име на прозореца */
@@ -80,7 +79,6 @@ export function otvoriProzorets(p: Prozorets): () => void {
   document.body.append(fon);
 
   // Фокусът влиза В прозореца, за да е следващият Tab вътре в него.
-  zakachiGoleminata(fon);
   fon.querySelector<HTMLButtonElement>('.istoriya-zatvori')!.focus();
   return zatvori;
 }

@@ -1069,10 +1069,12 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   // НЕГОВИТЕ секции стоят · присъдата е на домейна, екранът само пита.
   proveri('Записаните сверки СТОЯТ · те са на работещите',
     Boolean(await p.$('[data-sektsiya=sverki]')), true);
-  proveri('и личните две стоят · подредбата',
+  // ЛИЧНАТА е ЕДНА · „темата на натоварването" падна с бутоните си
+  // (И127 т.3 · резен 92 · ADR-149), и вече не се брои сред личните.
+  proveri('и личната стои · подредбата на екраните',
     Boolean(await p.$('[data-sektsiya=podredbata]')), true);
-  proveri('и темата на натоварването',
-    Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), true);
+  proveri('а темата на натоварването я НЯМА · падна с бутоните си',
+    Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), false);
 
   // СТОПАНСКИТЕ ги НЯМА · изброени поименно, не „всичко останало".
   for (const s of ['hedari', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
