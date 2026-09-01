@@ -150,9 +150,11 @@ export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): Kolon
 function dobavkiteNaImotite(o: Ogledalo): {
   readonly koloni: readonly KolonaSFiltar<Imot>[];
   readonly kletki: (i: Imot) => string;
+  /** новите имена на КОДОВИТЕ колони (резен 80) · номер → името от Стопанина */
+  readonly imenaNaKodovite: Readonly<Record<number, string>>;
 } {
   const m = o.modeli.get(VGRADEN_IMOTI);
-  if (!m) return { koloni: [], kletki: () => '' };
+  if (!m) return { koloni: [], kletki: () => '', imenaNaKodovite: {} };
 
   /** Клетката като ТЕКСТ за човека и за формулите · центовете през `pishiVPole`. */
   const tekstNa = (i: Imot, k: number): string => {
@@ -208,7 +210,7 @@ function dobavkiteNaImotite(o: Ogledalo): {
       })
       .join('');
 
-  return { koloni, kletki };
+  return { koloni, kletki, imenaNaKodovite: m.imenaNaKodovite ?? {} };
 }
 
 /**
@@ -336,8 +338,14 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   }
   // Добавените колони (резен 79) се ДОЛЕПЯТ след кодовите: главите, филтрите
   // и търсенето минават през същия двигател, без да знаят кой е роден къде.
+  // Новото име на кодова колона (резен 80) бие кръщелното при показване.
   const dobavki = dobavkiteNaImotite(ogledalo);
-  const koloniImoti = [...koloniNaImotite(zhiviPoImot), ...dobavki.koloni];
+  const koloniImoti = [
+    ...koloniNaImotite(zhiviPoImot).map((k, i) =>
+      dobavki.imenaNaKodovite[i] === undefined ? k : { ...k, ime: dobavki.imenaNaKodovite[i]! },
+    ),
+    ...dobavki.koloni,
+  ];
   const filtriraniNaemi = filtriray('naemi', naemi, koloniNaemi, dnes);
   const filtriraniImoti = filtriray('imoti', imoti, koloniImoti, dnes);
 

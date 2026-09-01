@@ -111,9 +111,10 @@ import { rolyataNa } from '../src/domein/stopanin.js';
 import {
   eVgradenKlyuch,
   prazenModelZaVgradena,
+  preimenuvayKodova,
   VGRADENI_S_DOBAVKI,
 } from '../src/domein/dobavki.js';
-import { imeNaVgradena } from './tablitsite.js';
+import { imeNaVgradena, kodoviteGlaviNa } from './tablitsite.js';
 
 /** Отворена ли е формата за нов бутон. Живее, докато екранът стои отворен. */
 let dobavyam = false;
@@ -157,6 +158,12 @@ let izbranHedar = '';
 let punktoveNaLentata: readonly PunktNaMenyuto[] = [];
 /** Отворена ли е формата за нова колона. */
 let dobavyamKolona = false;
+/**
+ * КРЪЩЕЛНИТЕ имена на кодовите колони на ИЗБРАНАТА вградена (резен 80).
+ * Пълни се при рисуване (там е Огледалото), чете се при закачане — същото
+ * разделение като при речниците (ADR-040) и пунктовете на лентата горе.
+ */
+let kodoviteNaIzbrania: readonly string[] = [];
 /** Коя формулна колона се мени в момента · `null` значи никоя (И92 т.8). */
 let smenyamFormula: number | null = null;
 
@@ -422,6 +429,8 @@ function blokNaRedaktora(modeli: readonly ModelNaTablitsa[], o: Ogledalo): strin
     ...modeli.filter((m) => !eVgradenKlyuch(m.klyuch)),
   ];
   const izbran = zaRedaktora.find((m) => m.klyuch === izbranHedar);
+  kodoviteNaIzbrania =
+    izbran && eVgradenKlyuch(izbran.klyuch) ? kodoviteGlaviNa(izbran.klyuch, o) : [];
   return `
     <section data-sektsiya="hedari">
       <div class="dyalglava">
@@ -654,8 +663,35 @@ function poleZaTaba(m: ModelNaTablitsa): string {
     <b>Служители</b>). Празното е състояние, не липса — брои се и се показва.</p>`;
 }
 
+/**
+ * КОДОВИТЕ КОЛОНИ НА ВГРАДЕНАТА · името се сменя, кръщелното остава в кода
+ * (резен 80 · И121 т.2: „могат да променят името на колоната дадено при
+ * създаването, което се показва от настройки"). Празно поле ВРЪЩА кръщелното.
+ */
+function blokNaKodovite(m: ModelNaTablitsa): string {
+  if (kodoviteNaIzbrania.length === 0) return '';
+  return `
+    <div class="tablitsa">
+      <div class="glava kodova"><span>Ред</span><span>Кръщелно от кода</span><span>Ново име</span><span></span></div>
+      ${kodoviteNaIzbrania
+        .map(
+          (ime, k) => `<div class="red kodova" translate="no">
+        <span>${k + 1}</span>
+        <span>${ekraniraj(ime)}</span>
+        <span><input translate="no" data-ime-kodova="${k}" value="${ekraniraj(m.imenaNaKodovite?.[k] ?? '')}" placeholder="${ekraniraj(ime)}" autocomplete="off"></span>
+        <span><button type="button" class="vtorichen malak" data-zapishi-kodova="${k}">Запиши</button></span>
+      </div>`,
+        )
+        .join('')}
+    </div>
+    <p class="drebno">Името се показва навсякъде, където колоната се рисува; кръщелното
+    остава в кода и ПРАЗНО поле го връща. Смяната е нов <b>МоделЗаписан</b> — поправка,
+    не презапис (правило 1).</p>`;
+}
+
 function koloniteNa(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): string {
   return `
+    ${eVgradenKlyuch(m.klyuch) ? blokNaKodovite(m) : ''}
     <div class="tablitsa">
       <div class="glava redaktor">
         <span>Ред</span><span>Колона</span><span>Вид</span><span>Стойност</span><span>Номенклатура</span><span>Готово меню</span><span></span>
@@ -2036,6 +2072,35 @@ export function zakachiNastroyki(
       kazhi.textContent = dumiZaGreshka(err);
     }
   });
+
+  // НОВОТО ИМЕ НА КОДОВА КОЛОНА (резен 80) · празното връща кръщелното.
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-kodova]')) {
+    b.addEventListener('click', async () => {
+      const kolona = Number(b.dataset['zapishiKodova']);
+      const ime = koren.querySelector<HTMLInputElement>(`[data-ime-kodova="${kolona}"]`)?.value ?? '';
+      try {
+        const star = await hedarSega();
+        if (!star) throw new Error('Хедърът вече го няма — избери наново.');
+        const nov = preimenuvayKodova(star, {
+          kolona,
+          ime,
+          rolya: await rolyata(),
+          kodovi: kodoviteNaIzbrania,
+        });
+        await zapishiHedar(
+          star,
+          nov,
+          ime.trim() === ''
+            ? `Колона ${kolona + 1} се върна към кръщелното си име „${kodoviteNaIzbrania[kolona] ?? ''}".`
+            : `Кодовата колона „${kodoviteNaIzbrania[kolona] ?? ''}" вече се казва „${ime.trim()}".`,
+        );
+        greshka = '';
+      } catch (err) {
+        greshka = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-zapishi-kolona]')) {
     b.addEventListener('click', async () => {

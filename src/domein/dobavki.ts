@@ -33,6 +33,8 @@
 
 import type { ModelNaTablitsa } from '../iztochnik/model.js';
 import type { PayloadKletkaNaDobavkaZapisana } from './sabitiya.js';
+import type { Rolya as RolyaNaChovek } from '../yadro/samolichnost.js';
+import { svedenaGlava } from '../iztochnik/tablitsa.js';
 import { vidNaKolona } from './kolonno.js';
 
 class GreshkaDobavka extends Error {
@@ -93,6 +95,67 @@ export function prazenModelZaVgradena(klyuch: string): ModelNaTablitsa {
  */
 export function klyuchNaKletka(tablitsa: string, redId: string, kolona: number): string {
   return `${tablitsa}·${redId}·${kolona}`;
+}
+
+/**
+ * ПРЕИМЕНУВА КОДОВА КОЛОНА на вградена (резен 80 · И121 т.2).
+ *
+ * Негова дума: „Имената на колоните се кръщават при създаването и могат да
+ * променят името на колоната дадено при създаването, което се показва от
+ * настройки." Кодовите колони не са в `glavi` на наслагваемия модел (домът
+ * на имената им е екранът — правило 17), затова `preimenuvayKolona` не ги
+ * стига: новото име ляга в картата `imenaNaKodovite`, а липсващ запис значи
+ * името от кода. ПРАЗНОТО МАХА записа — връщане към кръщелното, не грешка
+ * (както номерът на връзка).
+ *
+ * Записът е ново `МоделЗаписан` (правило 1); само за управителите, като
+ * всяка операция на Редактора.
+ */
+export function preimenuvayKodova(
+  m: ModelNaTablitsa,
+  n: {
+    readonly kolona: number;
+    readonly ime: string;
+    readonly rolya: RolyaNaChovek;
+    /** кръщелните имена от кода — за обхвата и за сблъсъка */
+    readonly kodovi: readonly string[];
+  },
+): ModelNaTablitsa {
+  if (n.rolya !== 'sobstvenik') {
+    throw new GreshkaDobavka(
+      `Преименуването на колона е само за управителите (ред 1494) — ролята тук е „${n.rolya}".`,
+    );
+  }
+  if (!VGRADENI_S_DOBAVKI.includes(m.klyuch)) {
+    throw new GreshkaDobavka(
+      `„${m.klyuch}" не е вградена с добавки — кодови имена се преименуват само по поименния списък.`,
+    );
+  }
+  if (!Number.isInteger(n.kolona) || n.kolona < 0 || n.kolona >= n.kodovi.length) {
+    throw new GreshkaDobavka(
+      `Кодова колона ${n.kolona} я няма (${n.kodovi.length} кодови колони).`,
+    );
+  }
+  const chisto = n.ime.trim().replace(/\s+/g, ' ');
+  const karta = { ...(m.imenaNaKodovite ?? {}) };
+  if (chisto === '') {
+    delete karta[n.kolona];
+    return Object.freeze({ ...m, imenaNaKodovite: Object.freeze(karta) });
+  }
+  // Две колони с едно име се разменят при четене — сблъсъкът гледа ЖИВИТЕ
+  // имена: кодовите с преименуването им и добавките.
+  const zhivi = [
+    ...n.kodovi.map((ime, k) => (k === n.kolona ? '' : (karta[k] ?? ime))),
+    ...m.glavi,
+  ];
+  const zaeto = zhivi.findIndex((ime) => ime !== '' && svedenaGlava(ime) === svedenaGlava(chisto));
+  if (zaeto >= 0) {
+    throw new GreshkaDobavka(
+      `Име „${chisto}" вече носи колона в тази таблица. Две колони с едно име се разменят при четене.`,
+    );
+  }
+  karta[n.kolona] = chisto;
+  return Object.freeze({ ...m, imenaNaKodovite: Object.freeze(karta) });
 }
 
 /**

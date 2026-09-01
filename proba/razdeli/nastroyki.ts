@@ -824,3 +824,44 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     (await p.$$eval('.red.imot [data-redakt^="dobavka·"]', (e) =>
       e.map((x) => x.textContent?.trim() ?? ''))).includes('южно'), true);
 }
+
+/** 138 · името на кодовата колона (резен 80 · ADR-138) */
+export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '138 · името на кодовата колона';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
+  await p.waitForSelector('#izbor-hedar');
+  await p.selectOption('#izbor-hedar', 'vgraden:imoti');
+  await p.waitForSelector('.red.kodova');
+
+  const kodovi = await redove(p, '.red.kodova');
+  proveri('кодовите колони се редят с кръщелното си име', kodovi.length >= 5, true);
+  proveri('и първата е „Място и единица"', kodovi[0]?.[1], 'Място и единица');
+
+  // ── НОВОТО ИМЕ · едно събитие МоделЗаписан, показва се навсякъде ─────────
+  await p.fill('[data-ime-kodova="0"]', 'Обект');
+  await sSabitie(p, () => p.click('[data-zapishi-kodova="0"]'));
+  await p.waitForSelector('[data-ime-kodova="0"]');
+  proveri('полето помни новото име след прерисуване',
+    await p.$eval('[data-ime-kodova="0"]', (e) => (e as HTMLInputElement).value), 'Обект');
+  proveri('а кръщелното стои до него — не е изтрито',
+    (await redove(p, '.red.kodova'))[0]?.[1], 'Място и единица');
+
+  await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
+  proveri('Имоти рисува НОВОТО име в главата',
+    await p.$eval('[data-tablitsa=imoti] .glava .glavicha', (e) => e.getAttribute('data-ime')), 'Обект');
+
+  // ── ПРАЗНОТО ВРЪЩА кръщелното · връщане, не грешка ───────────────────────
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await p.waitForSelector('[data-ime-kodova="0"]');
+  await p.fill('[data-ime-kodova="0"]', '');
+  await sSabitie(p, () => p.click('[data-zapishi-kodova="0"]'));
+  await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
+  proveri('празното връща кръщелното',
+    await p.$eval('[data-tablitsa=imoti] .glava .glavicha', (e) => e.getAttribute('data-ime')),
+    'Място и единица');
+}

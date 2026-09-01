@@ -152,7 +152,9 @@ export function tablitsiteNaProgramata(o: Ogledalo): readonly TablitsaSHedar[] {
     // затворени номера се отместват с броя на кодовите. Затова редът му НЕ
     // влиза при вносните долу: същият ключ на две места е двойник в матрицата.
     const dobavki = o.modeli.get(v.klyuch);
-    const kodovi = v.koloni(o).map((k) => k.ime);
+    // Новото име на кодова колона (резен 80) бие кръщелното при показване;
+    // липсващ запис значи името от кода.
+    const kodovi = v.koloni(o).map((k, i) => dobavki?.imenaNaKodovite?.[i] ?? k.ime);
     return {
       klyuch: v.klyuch,
       ime: v.ime,
@@ -191,4 +193,14 @@ export function eVgradena(klyuch: string): boolean {
 /** Името на вградена по ключ · домът на имената е този регистър (правило 17). */
 export function imeNaVgradena(klyuch: string): string {
   return VGRADENI.find((v) => v.klyuch === klyuch)?.ime ?? klyuch;
+}
+
+/**
+ * КРЪЩЕЛНИТЕ имена на кодовите колони на една вградена — както кодът ги е
+ * дал, БЕЗ преименуванията. Редакторът ги показва до новото име и ги подава
+ * на `preimenuvayKodova` за обхвата и сблъсъка (резен 80).
+ */
+export function kodoviteGlaviNa(klyuch: string, o: Ogledalo): readonly string[] {
+  const v = VGRADENI.find((x) => x.klyuch === klyuch);
+  return v ? v.koloni(o).map((k) => k.ime) : [];
 }

@@ -183,6 +183,17 @@ export interface ModelNaTablitsa {
    * ключ (правило 1); Огледалото държи последния.
    */
   readonly ekran?: string;
+  /**
+   * НОВИТЕ ИМЕНА НА КОДОВИТЕ КОЛОНИ · номер на кодова колона → името, което
+   * Стопанинът ѝ е дал (резен 80 · И121 т.2: „могат да променят името на
+   * колоната дадено при създаването, което се показва от настройки").
+   *
+   * Живее САМО в наслагваемия модел на вградена таблица (`vgraden:*`):
+   * нейните кодови колони не са в `glavi` (правило 17 — домът им е екранът),
+   * значи `preimenuvayKolona` не ги стига. Липсващ запис = името от кода.
+   * Празно име не се записва — то МАХА записа, както номерът на връзка.
+   */
+  readonly imenaNaKodovite?: Readonly<Record<number, string>>;
 }
 
 export class GreshkaModel extends Error {
@@ -364,8 +375,19 @@ export function belegNaModel(m: ModelNaTablitsa): string {
     `${formuliPoRed(m)}|` +
     // Номерът на връзката решава С КОГО говори колоната — смяната му е
     // промяна, не украса (И94 т.2 · ADR-028).
-    `${nomeraPoRed(m)}`
+    `${nomeraPoRed(m)}|` +
+    // Новото име на кодова колона (резен 80) е промяна — без него в белега
+    // преименуването минаваше за „нищо ново" и не влизаше в Журнала.
+    `${imenaNaKodovitePoRed(m)}`
   );
+}
+
+/** Новите имена на кодовите колони, подредени по номер — за белега. */
+function imenaNaKodovitePoRed(m: ModelNaTablitsa): string {
+  return Object.entries(m.imenaNaKodovite ?? {})
+    .sort(([a], [b]) => Number(a) - Number(b))
+    .map(([k, ime]) => `${k}:${ime}`)
+    .join(';');
 }
 
 /** Номерата на връзките, подредени по колона — за белега. */

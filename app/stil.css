@@ -994,6 +994,9 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   width: max-content;
   min-width: 100%;
 }
+.glava.kodova, .red.kodova {
+  grid-template-columns: 44px minmax(0, 280px) minmax(0, 300px) 110px;
+}
 .glava.naem, .red.naem {
   grid-template-columns: minmax(0, 340px) minmax(0, 300px) minmax(0, 240px) 120px 136px 292px;
   min-width: 1040px;
