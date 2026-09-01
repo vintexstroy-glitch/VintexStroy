@@ -504,53 +504,54 @@ export function narisuvayGant(
  * човек вижда къде има какво да допълни, вместо да се сеща сам.
  */
 /** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
-const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; papka: string; dela: number; zapisano: boolean }>[] = [
+const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; dela: number; koy: string }>[] = [
   { klyuch: 'ime', ime: 'Място', vid: 'tekst', vzemi: (r) => r.ime },
   { klyuch: 'firma', ime: 'Фирма · управлява проекта', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
-  { klyuch: 'papka', ime: 'Папка', vid: 'tekst', vzemi: (r) => (r.papka === '' ? '—' : 'папката') },
+  { klyuch: 'koy', ime: 'Записал', vid: 'tekst', vzemi: (r) => r.koy },
   { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
 ];
 
 function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
+  // САМО ЗАРЕДЕНИТЕ (И124 т.7 · ADR-134): „Тук се появяват само заредените
+  // обекти и отговорник е този който извършва действието." Само-срещаните по
+  // делата вече не се редят тук; „Записал" е извършващият (правило 14).
   const redove = mestata(o, zhivite([...o.dela.values()]));
-  const bezZapis = redove.filter((r) => !r.zapisano).length;
   const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
   const filtriraniMesta = filtriray('mestata', redove, KOLONI_MESTATA, dnes);
 
   return `
-    <section data-sektsiya="gant-mesta" data-broy="${redove.length}" data-bez-zapis="${bezZapis}">
+    <section data-sektsiya="gant-mesta" data-broy="${redove.length}">
       <div class="dyalglava">
         <h2>Местата · проектите</h2>
-        <span>отговорникът на МЯСТОТО е ФИРМА · на ДЕЛОТО е ЧОВЕК</span>
+        <span>само заредените · отговорникът на ДЕЙСТВИЕТО е записалият</span>
       </div>
 
       ${
         redove.length === 0
-          ? '<p class="drebno">Още няма нито едно място — то се появява с първото дело или се записва оттук.</p>'
+          ? '<p class="drebno">Още няма нито едно записано място — записва се от формата тук. Място, което само се среща по делата, не се реди само (И124 т.7).</p>'
           : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="mestata">
           <thead>
-            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}</tr>
+            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}<th></th></tr>
           </thead>
           <tbody>${filtriraniMesta.redove
             .map(
               (r) => `
-            <tr data-myasto="${ekraniraj(r.ime)}"${r.zapisano ? '' : ' class="bez-zapis"'}>
-              <td translate="no">${ekraniraj(r.ime)}${
-                r.zapisano ? '' : ' <span class="drebno">още не е записано</span>'
-              }</td>
+            <tr data-myasto="${ekraniraj(r.ime)}" data-papka-adres="${ekraniraj(r.papka)}">
+              <td translate="no">${ekraniraj(r.ime)}</td>
               <td translate="no">${ekraniraj(r.firma) || '<span class="drebno">—</span>'}</td>
-              <td translate="no">${
-                r.papka === ''
-                  ? '<span class="drebno">—</span>'
-                  : `<a href="${ekraniraj(r.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
-              }</td>
+              <td translate="no">${ekraniraj(r.koy)}</td>
               <td class="chislo" translate="no">${r.dela}</td>
+              <td><button type="button" class="vtorichen malak" data-mnogotochie
+                aria-label="Менюто на реда" title="Менюто на реда">⋯</button></td>
             </tr>`,
             )
             .join('')}</tbody>
         </table>
-      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}`
+      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}
+      <p class="drebno">Папката на мястото се отваря с ДЕСЕН БУТОН върху реда
+      (или „⋯") — „да има пътища за неща само от там" (И124 т.3). Видим линк в
+      колона вече няма.</p>`
       }
 
       <form class="forma" id="${predstavka}forma-myasto">
@@ -586,11 +587,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
       </form>
 
       <p class="drebno" data-mesta-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
-      разлика ${sv.razlika}.${
-        bezZapis === 0
-          ? ' Всяко място си има запис.'
-          : ` ${bezZapis} ${bezZapis === 1 ? 'място чака' : 'места чакат'} фирма и папка.`
-      }</p>
+      разлика ${sv.razlika}. Показват се само заредените.</p>
     </section>`;
 }
 

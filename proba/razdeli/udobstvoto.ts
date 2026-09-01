@@ -1807,13 +1807,19 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '#greshka-imot')).includes('не се приема'), true);
     proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediLoshiya);
 
-    razdel = '115 · Папката · записва се и се вижда като ЛИНК';
+    razdel = '115 · Папката · записва се · пътят е ДЕСНИЯТ БУТОН (И124 т.3)';
     await p.fill('#imot-papka', ADRES_NA_PAPKA);
     await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
     proveri('новият обект носи папка',
       await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
-    proveri('и тя е ЛИНК, който се отваря в нов таб',
-      await p.$eval('.red.imot [data-ima=da] a', (e) => (e as any).target), '_blank');
+    // „Да има пътища за неща само от там": видимият линк в колоната ПАДНА
+    // (резен 77 · ADR-134); колоната остава честен белег има/няма, а пътят
+    // е контекстното меню на реда — проверява се в §117ж.
+    proveri('но линк в колоната ВЕЧЕ НЯМА · пътят е менюто на реда',
+      await p.$$eval('.red.imot [data-papka] a', (e) => e.length), 0);
+    proveri('и редът носи адреса за менюто',
+      await p.$eval('.red.imot:has-text("Витоша")', (e) =>
+        ((e as HTMLElement).dataset['papkaAdres'] ?? '').length > 0), true);
     proveri('броят се вдигна', await p.$eval('[data-papki-broy]',
       (e) => (e as any).dataset.papkiBroy), '1');
     proveri('сверката раздяля всички обекти на две кофи',

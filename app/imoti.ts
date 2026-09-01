@@ -727,7 +727,7 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
           : `и още ${zhivi.length - 1} · ${zhivi.slice(1).map((n) => ekraniraj(n.naemetel)).join(', ')}`
       }</span>`;
   return `
-    <div class="red imot" translate="no">
+    <div class="red imot" translate="no" data-papka-adres="${ekraniraj(imot.papka)}">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
       <span class="kletka" data-redakt="imot-ploshtad·${ekraniraj(imot.id)}" data-surovo="${imot.ploshtad_kvsm}" title="Двоен клик или F2 — поправка на място"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>
@@ -740,9 +740,15 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo): string {
             : '<span class="znachka tiha">свободен</span>'
       }</span>
       <span class="kletka" data-papka="${ekraniraj(imot.id)}" data-ima="${imot.papka === '' ? 'ne' : 'da'}">${
+        /* ВИДИМИЯТ ЛИНК ПАДНА (И124 т.3 · резен 77 · ADR-134): „зареждането
+           на фолдъра става с дясно копче само за обектите и имотите… да има
+           пътища за неща само от там". Клетката остава ЧЕСТЕН белег има/няма
+           и Е втората дръжка на менюто („⋯" за iOS) — тя не вдига реда,
+           както отделен бутон в лоста би го вдигнал (§73 го мери). */
         imot.papka === ''
           ? '<span class="drebno">без папка</span>'
-          : `<a href="${ekraniraj(imot.papka)}" target="_blank" rel="noopener noreferrer">папката</a>`
+          : `<button type="button" class="vrazka" data-mnogotochie
+               title="Менюто на реда · папката се отваря оттам">има папка ⋯</button>`
       }</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'popravka', tekst: 'Поправи', danni: { 'popravi-imot': imot.id } })}

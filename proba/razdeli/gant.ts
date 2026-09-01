@@ -51,25 +51,31 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // към папката с проекта" и „в таблицата за отговорник напиши фирмата която
     // управлява проекта" *(р48·[42])*. И границата: отговорникът на ДЕЛОТО е
     // ЧОВЕК *(р48·[44])*.
-    razdel = '109 · Местата · незаписаните се ПОКАЗВАТ';
-    proveri('двете места от делата са в списъка',
-      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 2);
-    proveri('и двете КАЗВАТ, че още не са записани',
-      await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).dataset.bezZapis), '2');
+    razdel = '109 · Местата · само ЗАРЕДЕНИТЕ (И124 т.7)';
+    // „Тук се появяват само заредените обекти" надживя показването на
+    // само-срещаните по делата (резен 31) — редове от делата НЕ се редят сами.
+    proveri('местата от делата НЕ се редят, докато не се запишат',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 0);
+    proveri('и празното го КАЗВА с думи',
+      (await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).innerText))
+        .includes('не се реди само'), true);
     proveri('сверката се КАЗВА, дори когато е нула',
       (await p.$eval('[data-mesta-sverka]', (e) => (e as any).innerText)).includes('разлика 0'), true);
 
-    razdel = '109 · Местата · фирмата и папката';
+    razdel = '109 · Местата · фирмата и записалият';
     const prediMyasto = await broySabitiya(p);
     await napishiVPoleto(p, '#d-m-ime', 'Малинова');
     await napishiVPoleto(p, '#d-m-firma', 'Винтекс Строй ЕООД');
     await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
     proveri('записването е ЕДНО събитие', await broySabitiya(p), prediMyasto + 1);
+    proveri('и записаното вече СЕ РЕДИ · само то',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 1);
     proveri('фирмата стои на реда на мястото',
       (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText))
         .includes('Винтекс Строй ЕООД'), true);
-    proveri('и редът вече НЕ е „още не е записано"',
-      await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).dataset.bezZapis), '1');
+    proveri('„отговорник е този който извършва действието" · записалият е на реда',
+      (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText))
+        .includes('vintexstroy@gmail.com'), true);
     proveri('броят на делата на мястото се КАЗВА',
       (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText)).includes('2'), true);
 
@@ -77,9 +83,34 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('делото си пази ЧОВЕКА',
       (await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).innerText).join(' ')))
         .includes('Николай Петков'), true);
-    proveri('а мястото носи ФИРМАТА · заглавието го КАЗВА',
-      (await p.$eval('[data-sektsiya=gant-mesta] .dyalglava', (e) => (e as any).innerText))
-        .includes('ФИРМА'), true);
+
+    razdel = '109б · Обектът и десният бутон (И124 т.3 · т.7 · ADR-134)';
+    // Мястото е без папка → менюто го КАЗВА, вместо редът да мълчи.
+    await p.click('[data-myasto="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('„⋯" вдига менюто на реда · втората дръжка за iOS',
+      (await p.$eval('.kontekstno-menyu', (e) => (e as any).innerText))
+        .includes('Папката в Драйва'), true);
+    proveri('и без линк отказът се КАЗВА, не се крие',
+      (await p.$eval('.kontekstno-menyu', (e) => (e as any).innerText))
+        .includes('още няма линк'), true);
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => document.querySelector('.kontekstno-menyu') === null);
+
+    // С папка → менюто носи ПЪТЯ (бутон, не линк в колоната).
+    await napishiVPoleto(p, '#d-m-ime', 'Малинова');
+    await napishiVPoleto(p, '#d-m-papka',
+      ['https:', '//', 'primer.example', '/malinova'].join(''));
+    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
+    proveri('линк в колоните НЯМА · пътят е само през менюто',
+      await p.$$eval('[data-tablitsa=mestata] a', (e) => e.length), 0);
+    await p.click('[data-myasto="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('менюто носи „Папката в Драйва" като ДЕЙСТВИЕ',
+      await p.$$eval('.kontekstno-menyu button', (e) =>
+        e.filter((x) => (x.textContent ?? '').trim() === 'Папката в Драйва').length), 1);
+    await p.keyboard.press('Escape');
+    await p.waitForFunction(() => document.querySelector('.kontekstno-menyu') === null);
 
     razdel = '109 · Местата · второто записване ПОПРАВЯ';
     const prediPopravka = await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length);
