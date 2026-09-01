@@ -41,6 +41,7 @@ import {
   STAVKI,
 } from '../src/domein/dds.js';
 import {
+  mesetsiteVObhvata,
   potok,
   potototsiNaRazhod,
   razhodiZaPerioda,
@@ -157,6 +158,8 @@ let greshkaSaldo = '';
 
 /** Кой месец се гледа · помни се (ADR-022): счетоводителят живее в един месец. */
 let period: string | null = chetiEkranno<string | null>('smetki.period', null);
+/** КРАЯТ на разглеждания период (И124 т.11) · null значи „само единият месец". */
+let periodDo: string | null = chetiEkranno<string | null>('smetki.periodDo', null);
 /**
  * Виждат ли се Приходите и Разходите в решетката на делата (И95): „показано
  * всички те цифри там с опция да ги изключваш пускаш". Скриването пипа
@@ -250,26 +253,36 @@ function znachkaNaSverkata(zatvarya: boolean): string {
 
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const mesets = period ?? dnes.slice(0, 7);
-  const s = smetki(o, mesets, new Date().toISOString());
+  // КРАЯТ (И124 т.11) · сборовете и разбивките гледат ОБХВАТА; месечните
+  // механизми (ДДС · сверката с извлечението · салдата) са месечни по закон
+  // и работят по НАЧАЛНИЯ месец — и го КАЗВАТ (правило 15).
+  const krayat = periodDo !== null && periodDo > mesets ? periodDo : null;
+  const obhvatat = krayat === null ? [mesets] : mesetsiteVObhvata(mesets, krayat);
+  const sega = new Date().toISOString();
+  const s = smetki(o, mesets, sega);
+  const poMesetsi = obhvatat.map((m) => (m === mesets ? s : smetki(o, m, sega)));
+  const prihodObhvat = poMesetsi.reduce((sbor, x) => sbor + x.prihod_st, 0);
+  const razhodObhvat = poMesetsi.reduce((sbor, x) => sbor + x.razhod_st, 0);
+  const nadpisObhvat = krayat === null ? mesets : `${mesets} → ${krayat}`;
   const razlika = s.sverki.reduce((sbor, x) => sbor + x.razlika, 0);
-  const razhodi = razhodiZaPerioda(o, mesets);
+  const razhodi = obhvatat.flatMap((m) => razhodiZaPerioda(o, m));
   const filtriraniRazhodi = filtriray('razhodi', razhodi, KOLONI_RAZHODI, dnes);
 
   return `
     <div class="plochki">
       <div class="plochka">
-        <span class="etiket">Приход за ${ekraniraj(mesets)}</span>
-        <span class="chislo" translate="no">${pishi(s.prihod_st)}</span>
+        <span class="etiket">Приход за ${ekraniraj(nadpisObhvat)}</span>
+        <span class="chislo" translate="no">${pishi(prihodObhvat)}</span>
         <span class="pod">начислено · обща цена с ДДС</span>
       </div>
       <div class="plochka">
         <span class="etiket">ДДС ${s.zaVnasyane_st < 0 ? 'за възстановяване' : 'за внасяне'}</span>
         <span class="chislo" translate="no">${pishi(s.zaVnasyane_st)}</span>
-        <span class="pod">изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span>
+        <span class="pod">${krayat === null ? '' : `месечно · ${ekraniraj(mesets)} · `}изход ${pishi(s.dds_izhod_st)} − вход ${pishi(s.dds_vhod_st)}</span>
       </div>
       <div class="plochka">
-        <span class="etiket">Разход за ${ekraniraj(mesets)}</span>
-        <span class="chislo" translate="no">${pishi(s.razhod_st)}</span>
+        <span class="etiket">Разход за ${ekraniraj(nadpisObhvat)}</span>
+        <span class="chislo" translate="no">${pishi(razhodObhvat)}</span>
         <span class="pod">заплати + кредити + фактури</span>
       </div>
       <div class="plochka${s.nared ? '' : ' trevoga'}">
@@ -282,12 +295,17 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     ${formaSalda(o)}
 
     <section data-sektsiya="smetki-period" class="karta">
-      <div class="dyalglava"><h2>Период</h2><span>сметките се смятат наново за всеки месец</span></div>
+      <div class="dyalglava"><h2>Период</h2><span>от началото до края · празен край значи „само единият месец"</span></div>
       <form id="forma-period">
         <div class="poleta tesni">
           <div class="pole">
-            <label for="smetki-period">Месец</label>
+            <label for="smetki-period">От</label>
             <input translate="no" id="smetki-period" name="period" type="month" value="${ekraniraj(mesets)}" required>
+          </div>
+          <div class="pole">
+            <label for="smetki-period-do">До (по избор)</label>
+            <input translate="no" id="smetki-period-do" name="periodDo" type="month" value="${ekraniraj(krayat ?? '')}">
+            <span class="drebno">Сборовете и разбивките гледат обхвата; ДДС и сверките са месечни и работят по „От".</span>
           </div>
         </div>
         <div class="deystviya">
@@ -299,7 +317,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
 
     <section data-sektsiya="smetki-smetki">
       <div class="dyalglava">
-        <h2>Сметки</h2><span>${ekraniraj(mesets)}</span>
+        <h2>Баланс</h2><span>${krayat === null ? ekraniraj(mesets) : `месечно · ${ekraniraj(mesets)}`}</span>
       </div>
       <div class="tablitsa">
         <div class="glava smetka">
@@ -393,7 +411,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       razhodi.length === 0
         ? ''
         : `<section data-sektsiya="smetki-razhodi">
-      <div class="dyalglava"><h2>Разходи за ${ekraniraj(mesets)}</h2><span>${razhodi.length}</span></div>
+      <div class="dyalglava"><h2>Разходи за ${ekraniraj(nadpisObhvat)}</h2><span>${razhodi.length}</span></div>
       ${poleZaTarsene('razhodi')}
       <div class="tablitsa" data-tablitsa="razhodi">
         <div class="glava razhod">
@@ -983,7 +1001,7 @@ function blokNaSpravkata(o: Ogledalo, mesets: string, izchisleno_st: number): st
 
       <div class="plochki">
         <div class="plochka">
-          <span class="etiket">Изчислено в Сметки</span>
+          <span class="etiket">Изчислено в Баланс</span>
           <span class="chislo" translate="no">${pishi(izchisleno_st)}</span>
           <span class="pod">изход − вход, от Журнала</span>
         </div>
@@ -1393,8 +1411,20 @@ export function zakachiSmetki(
   const formaPeriod = koren.querySelector<HTMLFormElement>('#forma-period');
   formaPeriod?.addEventListener('submit', async (e) => {
     e.preventDefault();
-    period = String(new FormData(formaPeriod).get('period'));
+    const d = new FormData(formaPeriod);
+    const noviyat = String(d.get('period'));
+    const noviyatKray = String(d.get('periodDo') ?? '');
+    if (noviyatKray !== '' && noviyatKray < noviyat) {
+      // Вестта се вижда при СЛЕДВАЩОТО рисуване — затова отказът рисува,
+      // без да сменя периода: екранът остава на стария обхват и КАЗВА защо.
+      k.vest('zle', `Краят „${noviyatKray}" е преди началото „${noviyat}" — обхватът върви напред.`);
+      await prerisuvay();
+      return;
+    }
+    period = noviyat;
+    periodDo = noviyatKray === '' || noviyatKray === noviyat ? null : noviyatKray;
     zapomniEkranno('smetki.period', period);
+    zapomniEkranno('smetki.periodDo', periodDo);
     await prerisuvay();
   });
 

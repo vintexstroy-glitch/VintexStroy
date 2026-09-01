@@ -2156,6 +2156,61 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и разклоненията са ПОД корена · има поддела',
       await p.$$eval('.gant-delo.poddelo[data-grupa="Гълъбец"]', (e) => e.length) > 0, true);
 
+    // ═══ 117ж · БАЛАНСЪТ · периодът с КРАЙ (резен 70 · И124 т.11) ═══
+    //
+    // „В Перид при Сметки липсва възможност за въвеждане на края на раз
+    // глеждания периода. … Името е не Сметки а Баланс който включва Приход и
+    // Разход и всички разпивки."
+    razdel = '117ж · Балансът · името и краят на периода';
+    await naEkran(p, 'smetki', '#forma-period');
+    proveri('екранът се казва БАЛАНС, не Сметки',
+      await p.$eval('.shapka h1', (e) => e.textContent!.trim()), 'Баланс');
+    proveri('и в лентата пунктът е Баланс',
+      (await p.$eval('.nav', (e) => (e as any).innerText)).includes('Баланс'), true);
+    proveri('периодът има ОТ и ДО · краят е по избор',
+      await p.$$eval('#forma-period input[type=month]', (e) => e.length), 2);
+
+    // ЧИСЛОТО за единия месец · за да се мери, че обхватът наистина СБОРУВА.
+    await p.fill('#smetki-period', '2026-02');
+    await p.fill('#smetki-period-do', '');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    const prihodEdinMesets = await p.$eval('.plochka .etiket', () => {
+      const et = [...document.querySelectorAll('.plochka .etiket')]
+        .find((x) => x.textContent!.startsWith('Приход за'));
+      return Number((et!.nextElementSibling!.textContent ?? '').replace(/[^\d]/g, ''));
+    });
+    await p.fill('#smetki-period', '2026-02');
+    await p.fill('#smetki-period-do', '2026-03');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    const prihodObhvat = await p.$eval('.plochka .etiket', () => {
+      const et = [...document.querySelectorAll('.plochka .etiket')]
+        .find((x) => x.textContent!.startsWith('Приход за'));
+      return Number((et!.nextElementSibling!.textContent ?? '').replace(/[^\d]/g, ''));
+    });
+    proveri('обхватът СБОРУВА двата месеца · мартенският наем влиза',
+      prihodObhvat > prihodEdinMesets, true);
+    proveri('приходът казва ОБХВАТА, не един месец',
+      await p.$$eval('.plochka .etiket', (e) =>
+        e.some((x) => x.textContent!.includes('Приход за 2026-02 → 2026-03'))), true);
+    proveri('а ДДС-то КАЗВА, че е месечно (правило 15)',
+      await p.$$eval('.plochka .pod', (e) =>
+        e.some((x) => x.textContent!.includes('месечно · 2026-02'))), true);
+
+    razdel = '117ж · Краят преди началото се отказва с думи';
+    await p.fill('#smetki-period', '2026-05');
+    await p.fill('#smetki-period-do', '2026-01');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    proveri('отказът се КАЗВА',
+      (await p.$eval('.vest', (e) => (e as any).innerText)).includes('обхватът върви напред'), true);
+    proveri('и обхватът не се сменя',
+      await p.$$eval('.plochka .etiket', (e) =>
+        e.some((x) => x.textContent!.includes('Приход за 2026-02 → 2026-03'))), true);
+
+    // Връща се ЕДИН месец, за да не подпира следващите раздели на обхват.
+    await p.fill('#smetki-period', '2026-02');
+    await p.fill('#smetki-period-do', '');
+    await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+
     // ═══ 118 · КАЛЕНДАРЪТ · цифрите в полето на деня (И90 · резен 40) ═══
     //
     // „Както и всички приходи и разходи са с цифри в полето на календара."

@@ -303,7 +303,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-03');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
-    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Сметки'), '200,00 €');
+    proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Баланс'), '200,00 €');
 
     await p.fill('#spravka-data', '2026-04-10');
     await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));

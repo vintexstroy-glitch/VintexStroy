@@ -236,8 +236,11 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     zakachi: (z) => zakachiPari(z.koren, z.k, z.prerisuvay),
   },
   smetki: {
-    ime: 'Сметки',
-    podnaslov: 'цените са с ДДС · ДДС-то е отделен ред, изведен по акумулатори',
+    // „Името е не Сметки а Баланс който включва Приход и Разход и всички
+    // разпивки" (И124 т.11 · ADR-120 §6). Ключът `smetki` остава — той е
+    // кодов адрес (памети, права, пътища), не име на екрана.
+    ime: 'Баланс',
+    podnaslov: 'Приход и Разход и всички разбивки · цените са с ДДС',
     ikona: 'ekran-smetki',
     iska: 'smetki-dds',
     iskaRolya: 'redaktor',
