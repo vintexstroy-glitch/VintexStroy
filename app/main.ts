@@ -144,7 +144,7 @@ function zapishiPokazatelya(imeyl: string, naematel: string): void {
 }
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { zabraviIzbora } from './lichno.js';
-import { dostapenLiE, EKRANI, type Konteks, type KoyEkran } from './ekranite.js';
+import { dostapenLiE, EKRANI, REDAT_NA_LENTATA, type Konteks, type KoyEkran } from './ekranite.js';
 
 /**
  * Белегът на СЛУЖЕБНИЯ износ. Домът на четенето и писането е `obshto.ts` —
@@ -980,7 +980,9 @@ function dostapniteEkrani(n: {
   readonly lichnoPipnato: boolean;
   /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
 }): readonly KoyEkran[] {
-  return (Object.keys(EKRANI) as KoyEkran[]).filter((koy) => {
+  // РЕДЪТ Е РЕШЕНИЕ, не подредба на файл (И125 · резен 85): списъкът с
+  // изворите на всяко място живее до регистъра, в `ekranite.ts`.
+  return REDAT_NA_LENTATA.filter((koy) => {
       // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
       // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
       // драйв, а полето за него живее на самия екран).
