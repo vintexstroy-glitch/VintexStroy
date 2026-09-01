@@ -29,6 +29,7 @@ import {
   type RedNaSverkata,
   type RezultatNaSverkata,
 } from '../src/domein/sverka-izvlechenie.js';
+import { proverkiOtSverki } from '../src/domein/proverki-ot-sverki.js';
 import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
@@ -1655,6 +1656,74 @@ export function zakachiSmetki(
  * „Ако не ги намира в сверката в Извлечение СВЕТВА" — негови думи, 11.08.
  * Затова находката не е ред в списък, а ЧИСЛО горе, и редът носи цвят.
  */
+/**
+ * ПРОВЕРКИ ОТ СВЕРКИ (резен 72 · И124 т.10) · остатъкът по теми, двете посоки.
+ *
+ * „Да има таблица Проверки от Сверки където се показва грешки и оставащотото
+ * в извлеченията което не е участвалов сверки и справки събрано по теми."
+ *
+ * Таблицата гледа ВСИЧКИ месеци на прочетеното извлечение, не само показания:
+ * остатъкът от март не е по-малко остатък, защото екранът гледа април. Живее
+ * колкото самото извлечение — то се чете и се забравя, нищо не влиза в
+ * Журнала. Темата е предложение на машината (правило 18), не запис.
+ */
+function blokNaProverkite(): string {
+  const pr = proverkiOtSverki(sverkiteNaIzvlechenieto, new Date().toISOString());
+  const glava = `
+      <div class="dyalglava">
+        <h2>Проверки от Сверки</h2>
+        <span>остатъкът, който не е участвал в сверка · по теми · в двете посоки</span>
+      </div>
+      <p class="drebno" data-proverki-po-temi>${pr.poTemi
+        .map((t) => `${ekraniraj(t.tema)} · <b>${t.redove.length}</b>`)
+        .join(' &nbsp;·&nbsp; ')}</p>`;
+
+  if (pr.redove.length === 0) {
+    return `${glava}
+      <p class="drebno" data-proverki-prazno>Остатък няма — всеки ред от извлечението
+      се е срещнал с книгата, и нулата е проверена, не подразбрана.</p>`;
+  }
+
+  return `${glava}
+      <div class="tablitsa" data-tablitsa="proverki-ot-sverki">
+        <div class="glava izvlechenie">
+          <span data-kolona="koy" data-ime="Кой">Кой</span>
+          <span data-kolona="data" data-ime="Дата">Дата</span>
+          <span data-kolona="nachin" data-ime="Посока">Посока</span>
+          <span data-kolona="suma" data-ime="Сума">Сума</span>
+          <span data-kolona="sadba" data-ime="Откъде">Откъде</span>
+        </div>
+        ${pr.poTemi
+          .filter((t) => t.redove.length > 0)
+          .map(
+            (t) => `
+        <div class="grupa-glava" data-tema="${ekraniraj(t.tema)}" translate="no">
+          <b>${ekraniraj(t.tema)}</b> · ${t.redove.length} ${t.redove.length === 1 ? 'ред' : 'реда'}
+          <span class="suma" data-st="${t.sbor_st}">${pishi(t.sbor_st)}</span>
+        </div>
+        ${t.redove
+          .map(
+            (x) => `
+        <div class="red izvlechenie duljimo" data-proverka-tema="${ekraniraj(t.tema)}" translate="no">
+          <span class="kletka"><b>${ekraniraj(x.koy)}</b></span>
+          <span class="kletka"><span>${ekraniraj(x.data)}</span></span>
+          <span class="kletka"><span>${x.posoka === 'prihod' ? 'навътре' : 'навън'}</span></span>
+          <span class="suma" data-st="${x.suma_st}">${pishi(x.suma_st)}</span>
+          <span class="kletka"><span>${
+            x.otkade === 'извлечението' ? 'в извлечението · книгата мълчи' : 'в книгата · банката мълчи'
+          }</span></span>
+        </div>`,
+          )
+          .join('')}`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno" data-proverki-sverka="${pr.sverka.razlika}">Сверка вход↔изход:
+      ${pr.sverka.vhod} находки от сверките ↔ ${pr.sverka.izhod}
+      ${pr.sverka.izhod === 1 ? 'ред' : 'реда'} тук · разлика ${pr.sverka.razlika} —
+      казва се и нулата.</p>`;
+}
+
 function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
   const zapisi = zapisiteNaKnigata(o, mesets);
   const r = sverkiteNaIzvlechenieto.find((x) => x.period === mesets) ?? null;
@@ -1788,29 +1857,11 @@ function blokNaSverkataSIzvlechenie(o: Ogledalo, mesets: string): string {
           : `<p class="drebno"><b data-samo-v-bankata>${r.samoVBankata.length}</b>
              ${r.samoVBankata.length === 1 ? 'ред е' : 'реда са'} в извлечението, но
              ${r.samoVBankata.length === 1 ? 'няма' : 'нямат'} насреща си запис в книгата.
-             Това е ДРУГА находка: пари са минали, а книгата мълчи.</p>
-             <div class="tablitsa" data-tablitsa="samo-v-bankata">
-               <div class="glava izvlechenie">
-                 <span data-kolona="koy" data-ime="Кой">Кой</span>
-                 <span data-kolona="data" data-ime="Дата">Дата</span>
-                 <span data-kolona="nachin" data-ime="Посока">Посока</span>
-                 <span data-kolona="suma" data-ime="Сума">Сума</span>
-                 <span data-kolona="sadba" data-ime="Какво казва книгата">Какво казва книгата</span>
-               </div>
-               ${r.samoVBankata
-                 .map(
-                   (x) => `
-                 <div class="red izvlechenie duljimo" translate="no">
-                   <span class="kletka"><b>${ekraniraj(x.koy)}</b></span>
-                   <span class="kletka"><span>${ekraniraj(x.data)}</span></span>
-                   <span class="kletka"><span>${x.posoka === 'prihod' ? 'навътре' : 'навън'}</span></span>
-                   <span class="suma" data-st="${x.suma_st}">${pishi(x.suma_st)}</span>
-                   <span class="kletka"><span>няма такъв запис</span></span>
-                 </div>`,
-                 )
-                 .join('')}
-             </div>`
+             Това е ДРУГА находка: пари са минали, а книгата мълчи — редовете са долу,
+             в Проверки от Сверки, по теми.</p>`
       }
+
+      ${blokNaProverkite()}
 
       <div class="dyalglava">
         <h2>Списъците за счетоводството</h2>

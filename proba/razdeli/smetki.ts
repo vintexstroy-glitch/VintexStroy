@@ -1349,6 +1349,57 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('таблицата си отива', await p.$$eval('[data-tablitsa=izvlechenie]', (e) => e.length), 0);
   proveri('и затварянето НЕ пише нищо', await broySabitiya(p), predZapisa + 1);
 
+  // ══ 91в · ПРОВЕРКИ ОТ СВЕРКИ (резен 72 · И124 т.10) ══════════════════════
+  //
+  // „Да има таблица Проверки от Сверки където се показва грешки и
+  //  оставащотото в извлеченията което не е участвалов сверки и справки
+  //  събрано по теми. Банкови такси, Грешни преводи, Гршни плащания с
+  //  карта… и в двете посоки ако има, ако е вкарано с карта, а липсва в
+  //  извлечението."
+  razdel = '91в · Проверки от Сверки · остатъкът по теми, в двете посоки';
+  // Запис С КАРТА, който банката НЯМА — неговият пример, дословно.
+  await zapishiRazhod(p, {
+    potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Липсваща Карта ООД',
+    opis: 'с карта, без ред в банката', suma: '400,00', nachin: 'карта',
+    data: denVMesetsa('13'), dokument: 'K-2',
+  });
+  // Извлечение с ЦЕЛИЯ остатък: такса, грешен превод навътре, непознат навън.
+  const IZVLECHENIE_S_OSTATAK =
+    'Дата;Описание;Сума;Референция;Салдо\n' +
+    `${bgDen('10')};БАНКА ООД;-100,00;R-1;900,00\n` +
+    `${bgDen('12')};КАРТА ООД;-200,00;R-2;700,00\n` +
+    `${bgDen('20')};НЕПОЗНАТ ЕООД;-777,00;R-3;-77,00\n` +
+    `${bgDen('25')};ТАКСА УПРАВЛЕНИЕ СМЕТКА;-5,00;R-4;-82,00\n` +
+    `${bgDen('26')};ВРЪЩАНЕ ОТ ДОСТАВЧИК;50,00;R-5;-32,00`;
+  await p.setInputFiles('#fayl-izvlechenie', {
+    name: 'izvlechenie-s-ostatak.csv',
+    mimeType: 'text/csv',
+    buffer: Buffer.from(IZVLECHENIE_S_OSTATAK, 'utf8'),
+  });
+  await p.waitForSelector('[data-tablitsa=proverki-ot-sverki]');
+
+  proveri('остатъкът е ЧЕТИРИ реда · 3 от извлечението + 1 от книгата',
+    await p.$$eval('[data-proverka-tema]', (e) => e.length), 4);
+  proveri('темите с редове са четири, в заковния ред',
+    await p.$$eval('[data-tablitsa=proverki-ot-sverki] [data-tema]',
+      (e) => e.map((x) => (x as HTMLElement).dataset['tema']).join(' · ')),
+    'Банкови такси · Грешни преводи · Грешни плащания с карта · Вкарано, а липсва в извлечението');
+  proveri('и празната тема се КАЗВА с нулата си (правило 15)',
+    (await tekstNa(p, '[data-proverki-po-temi]')).includes('Пасват няколко реда · 0'), true);
+  proveri('вкараното с карта, а липсващо, идва от КНИГАТА',
+    (await tekstNa(p, '[data-proverka-tema="Вкарано, а липсва в извлечението"]'))
+      .includes('банката мълчи'), true);
+  proveri('кешът НЕ е остатък · ненамереният кеш е нормално състояние',
+    (await tekstNa(p, '[data-tablitsa=proverki-ot-sverki]')).includes('Кеш ООД'), false);
+  proveri('сверката редове ↔ находки затваря · и нулата се казва',
+    await p.$eval('[data-proverki-sverka]', (e) => (e as HTMLElement).dataset['proverkiSverka']), '0');
+  proveri('и четенето пак НЕ пише нищо в Журнала',
+    await broySabitiya(p), predZapisa + 2);
+
+  await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
+  proveri('със затварянето си отиват и Проверките · те живеят колкото извлечението',
+    await p.$$eval('[data-tablitsa=proverki-ot-sverki]', (e) => e.length), 0);
+
   // ══ 114 · ФИЛТЪРЪТ ПО КОНКРЕТЕН ДОГОВОР (резен 36 · ADR-096) ══════════════
   //
   // „в извлечения да се сверява с филтър за конкретен избор на договори по
