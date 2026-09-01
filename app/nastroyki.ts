@@ -74,9 +74,9 @@ import {
 } from '../src/domein/redaktor.js';
 import {
   DEYSTVIYA_NA_FORMULA,
-  IMENA_NA_DEYSTVIYATA,
+  DEYSTVIYA_PO_REDOVE,
+  imeNaDeystvie,
   sDumiFormula,
-  type DeystvieNaFormula,
   type Formula,
 } from '../src/domein/formuli.js';
 import { dokade, IMENA_NA_FUNKTSIITE, obyaveni, VRAZKI } from '../src/domein/vrazki.js';
@@ -848,14 +848,14 @@ function formaNaFormulata(m: ModelNaTablitsa, kolona: number, sega?: Formula): s
         <div class="pole">
           <label>Действие</label>
           <select translate="no" name="deystvie">
-            ${DEYSTVIYA_NA_FORMULA.map(
+            ${[...DEYSTVIYA_NA_FORMULA, ...DEYSTVIYA_PO_REDOVE].map(
               (d) =>
-                `<option value="${d}"${d === sega?.deystvie ? ' selected' : ''}>${IMENA_NA_DEYSTVIYATA[d]}</option>`,
+                `<option value="${d}"${d === sega?.deystvie ? ' selected' : ''}>${imeNaDeystvie(d)}</option>`,
             ).join('')}
           </select>
         </div>
         <div class="pole"><label>Първа колона</label>${izbor(1, sega?.ot[0], false)}</div>
-        <div class="pole"><label>Втора колона</label>${izbor(2, sega?.ot[1], false)}</div>
+        <div class="pole"><label>Втора · празна при „по редове"</label>${izbor(2, sega?.ot[1], true)}</div>
         <div class="pole"><label>Трета · само при сбор</label>${izbor(3, sega?.ot[2], true)}</div>
       </div>
       <p class="greshka" id="greshka-formula"></p>
@@ -919,14 +919,14 @@ function formaNaKolona(m: ModelNaTablitsa, modeli: readonly ModelNaTablitsa[]): 
           <div class="poleta tesni">
             <div class="pole">
               <label for="nova-deystvie">Действие</label>
-              ${menyuNaDeystviyata('nova-deystvie')}
+              ${menyuNaDeystviyata('nova-deystvie', 'deystvie', true)}
             </div>
             ${[1, 2, 3]
               .map(
                 (nomer) => `<div class="pole">
-              <label for="nova-operand${nomer}">${nomer === 3 ? 'Трета · само при сбор' : `${nomer === 1 ? 'Първа' : 'Втора'} колона`}</label>
+              <label for="nova-operand${nomer}">${nomer === 3 ? 'Трета · само при сбор' : nomer === 2 ? 'Втора · празна при „по редове"' : 'Първа колона'}</label>
               <select translate="no" id="nova-operand${nomer}" name="operand${nomer}">
-                ${nomer === 3 ? '<option value="">— няма —</option>' : ''}
+                ${nomer >= 2 ? '<option value="">— няма —</option>' : ''}
                 ${m.glavi
                   .map((ime, k) =>
                     m.formuli[k] === undefined
@@ -1971,7 +1971,7 @@ export function zakachiNastroyki(
       .map((x) => String(x ?? '').trim())
       .filter((x) => x !== '')
       .map(Number);
-    return { deystvie: String(danni.get('deystvie')) as DeystvieNaFormula, ot };
+    return { deystvie: String(danni.get('deystvie')) as Formula['deystvie'], ot };
   };
 
   // Полетата на формулата се показват само когато видът е „формулна" —

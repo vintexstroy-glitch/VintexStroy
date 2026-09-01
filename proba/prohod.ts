@@ -123,6 +123,7 @@ async function main(): Promise<void> {
     // остава на екрана — по-ранните броячи на глави не бива да я виждат.
     await nastroyki.blok7(ctx);
     await nastroyki.blok8(ctx);
+    await nastroyki.blok9(ctx);
     /**
      * §94 и §95 стоят ТУК · и мястото е ИЗМЕРЕНО, не избрано.
      *

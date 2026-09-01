@@ -37,7 +37,7 @@ import {
 } from '../src/domein/registar-naemi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { klyuchNaKletka, VGRADEN_IMOTI } from '../src/domein/dobavki.js';
-import { smetniFormula } from '../src/domein/formuli.js';
+import { eAgregat, smetniAgregat, smetniFormula } from '../src/domein/formuli.js';
 import { vidNaKolona } from '../src/domein/kolonno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { butonIstoriya } from './istoriya.js';
@@ -168,6 +168,15 @@ function dobavkiteNaImotite(o: Ogledalo): {
     const formula = m.formuli[k];
     if (formula) {
       try {
+        // АГРЕГАТЪТ ПО РЕДОВЕ (резен 81) наблюдава ЦЯЛАТА колона-източник —
+        // всеки ред показва същото число (правило 20: смята се, не се пише).
+        if (eAgregat(formula.deystvie)) {
+          return smetniAgregat(
+            formula.deystvie,
+            [...o.imoti.values()].map((red) => tekstNa(red, formula.ot[0] ?? 0)),
+            m.vidove[formula.ot[0] ?? 0] ?? 'tekst',
+          );
+        }
         return smetniFormula(
           formula,
           formula.ot.map((op) => tekstNa(i, op)),
@@ -205,12 +214,23 @@ function dobavkiteNaImotite(o: Ogledalo): {
           const st = typeof surovo === 'number' ? surovo : null;
           return `<span class="suma"${st === null ? '' : ` data-st="${st}"`}${belezi}>${st === null ? '—' : pishi(st)}</span>`;
         }
-        const tekst = surovo === null ? '' : String(surovo);
+        // Смятаното (число от формула или агрегат) идва в СТОТНИ (правило 3
+        // по духа на `otStotni`) — изписва се за човек, не като суров запис.
+        const tekst =
+          surovo === null ? '' : typeof surovo === 'number' ? sStotni(surovo) : surovo;
         return `<span class="kletka"${belezi}><span>${tekst === '' ? '—' : ekraniraj(tekst)}</span></span>`;
       })
       .join('');
 
   return { koloni, kletki, imenaNaKodovite: m.imenaNaKodovite ?? {} };
+}
+
+/** Стотните като текст за човека · „350" → „3,5" · „300" → „3". */
+function sStotni(st: number): string {
+  const tsyalo = Math.trunc(st / 100);
+  const drobna = Math.abs(st % 100);
+  if (drobna === 0) return String(tsyalo);
+  return `${tsyalo},${String(drobna).padStart(2, '0').replace(/0$/, '')}`;
 }
 
 /**

@@ -865,3 +865,66 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     await p.$eval('[data-tablitsa=imoti] .glava .glavicha', (e) => e.getAttribute('data-ime')),
     'Място и единица');
 }
+
+/** 139 · агрегатът по редове · наблюдателят (резен 81 · ADR-139) */
+export async function blok9(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '139 · агрегатът по редове';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  // ── РАЖДАНЕТО · формулна колона „брой по редове" върху добавка ───────────
+  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await p.waitForSelector('#izbor-hedar');
+  // Изборът прерисува и при ВЕЧЕ избрания хедър — без изчакване кликът долу
+  // се брои срещу ГРЕШНОТО прерисуване и формата „закъснява" (гонка, платена
+  // с два пуска на прохода).
+  await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-hedar', 'vgraden:imoti'));
+  await p.waitForSelector('.red.redaktor');
+
+  await deystvieSPrerisuvane(p, () => p.click('#nova-kolona'));
+  await p.waitForSelector('#forma-kolona');
+  const deystviya = await p.$$eval('#nova-deystvie option', (o) => o.map((x) => x.textContent ?? ''));
+  proveri('конструкторът предлага и действията „по редове"',
+    deystviya.some((d) => d.includes('брой по редове')), true);
+  // операндът е добавката „Изложение" (§137) · чете се ПРЕДИ действията,
+  // защото опциите стоят от отварянето на формата — не ги ражда изборът
+  const iztochnik = await p.$$eval('#nova-operand1 option', (o) =>
+    o.filter((x) => (x.textContent ?? '').includes('Изложение')).map((x) => (x as HTMLOptionElement).value));
+  proveri('източникът се избира от добавките', iztochnik.length, 1);
+
+  await p.fill('#kolona-ime', 'Брой изложения');
+  await p.selectOption('#kolona-vid', 'formula');
+  await p.waitForFunction(() => document.getElementById('mvsto-za-formula')?.hidden === false);
+  await p.selectOption('#nova-deystvie', 'broy-redove');
+  // втората колона остава празна — агрегатът иска само източника
+  await p.selectOption('#nova-operand1', iztochnik[0]!);
+  await sSabitie(p, () => p.click('#forma-kolona button[type=submit]'));
+  await p.waitForFunction(() =>
+    [...document.querySelectorAll('.red.redaktor')].some((r) => r.textContent?.includes('брой по редове(')));
+  const nablyudatel = (await redove(p, '.red.redaktor')).find((r) =>
+    r.some((k) => k.includes('брой по редове(')));
+  proveri('редакторът казва сметката ѝ', Boolean(nablyudatel), true);
+  proveri('и тя е ЗАТВОРЕНА — наблюдава, не се пише', nablyudatel?.[2], 'затворена');
+
+  // ── ИМОТИ · всеки ред показва СЪЩОТО число ───────────────────────────────
+  await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
+  await p.waitForSelector('[data-tablitsa=imoti] .glavicha[data-ime="Брой изложения"]');
+  const kletki = await p.$$eval('.red.imot', (redoveNaEkrana) =>
+    redoveNaEkrana.map((r) => [...r.children].at(-2)?.textContent?.trim() ?? ''));
+  proveri('всеки ред показва СЪЩОТО число', new Set(kletki).size, 1);
+  proveri('и то е броят на непразните изложения · 1 от §137', kletki[0], '1');
+
+  // ── НАБЛЮДАТЕЛЯТ Е ЖИВ · нова стойност мени броя на ВСИЧКИ редове ────────
+  const vtoraKletka = (await p.$$('.red.imot [data-redakt^="dobavka·"]'))[1];
+  proveri('има втори ред с клетка за писане', Boolean(vtoraKletka), true);
+  await vtoraKletka!.dblclick();
+  await p.waitForSelector('.red.imot .kletka-redaktor');
+  await p.fill('.red.imot .kletka-redaktor', 'северно');
+  await sSabitie(p, () => p.keyboard.press('Enter'));
+  await p.waitForFunction(() =>
+    [...document.querySelectorAll('.red.imot')].every(
+      (r) => [...r.children].at(-2)?.textContent?.trim() === '2'));
+  proveri('броят стана 2 · на всички редове наведнъж',
+    await p.$eval('.red.imot', (r) => [...r.children].at(-2)?.textContent?.trim()), '2');
+}
