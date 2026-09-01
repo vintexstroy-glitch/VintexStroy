@@ -502,6 +502,36 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('поименно, не като празно място',
       (await p.$eval('[data-chakat-period]', (e) => e.textContent)).includes('Марж'), true);
 
+    // ══ 123б · ДЯЛЪТ „ОТЧЕТ" (резен 74 · И124 т.12) ══════════════════════
+    //
+    // „Тук събери секцията Сметки наречена Сметки Прогноза с Отчет, Отчет са
+    //  цялата работа с коефициентите и диаграмите, таблиците за тях."
+    razdel = '123б · дялът Отчет · Прогнозата + коефициентите под едно име';
+
+    proveri('банерът на дяла стои и БРОИ състава',
+      await p.$eval('[data-otchet-sastav]', (e) => e.getAttribute('data-otchet-sastav')), '6');
+    proveri('и шестте секции носят белега на дяла',
+      await p.$$eval('section[data-dyal="otchet"]', (e) =>
+        e.map((x) => (x as HTMLElement).dataset['sektsiya']).join(' · ')),
+      'smetki-otcheti · koef-sastoyanie · koef-svoy · koef-izbor · koef-izbraniyat · koef-vsichki');
+    proveri('чакащото по отчета се КАЗВА поименно · екселът и симулацията',
+      await p.$eval('[data-otchet-chaka]', (e) => e.getAttribute('data-otchet-chaka')), '2');
+
+    // ГОТОВИЯТ ПЕРИОД (р75·[64]) · един натиск слага От и До.
+    proveri('готовите периоди са ТРИ бутона',
+      await p.$$eval('[data-gotov-period]', (e) => e.length), 3);
+    const granitsi = await p.$eval('[data-gotov-period="minalata"]', (e) => ({
+      ot: (e as HTMLElement).dataset['ot'],
+      do: (e as HTMLElement).dataset['do'],
+    }));
+    await deystvieSPrerisuvane(p, () => p.click('[data-gotov-period="minalata"]'));
+    proveri('От застава на 1 януари на миналата година',
+      await p.$eval('#koef-ot', (e) => (e as HTMLInputElement).value), granitsi.ot);
+    proveri('а До — на 31 декември',
+      await p.$eval('#koef-do', (e) => (e as HTMLInputElement).value), granitsi.do);
+    // Връщаме дванайсетте месеца · следващите проверки очакват подразбираното.
+    await deystvieSPrerisuvane(p, () => p.click('[data-gotov-period="dvanayset"]'));
+
     // ══ 125 · СВОЙ КОЕФИЦИЕНТ · от формата до Журнала (резен 54) ═════════
     //
     // Негово, 30.08: „Можеш да вкарваш сам коефициенти."

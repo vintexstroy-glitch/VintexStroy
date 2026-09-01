@@ -30,6 +30,7 @@ import {
   type RedNaSverkata,
   type RezultatNaSverkata,
 } from '../src/domein/sverka-izvlechenie.js';
+import { CHAKA_PO_OTCHETA, SEKTSIITE_NA_OTCHETA } from '../src/domein/dyal-otchet.js';
 import { proverkiOtSverki } from '../src/domein/proverki-ot-sverki.js';
 import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
@@ -371,7 +372,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>
 
+    ${blokNaDyalaOtchet()}
     ${blokNaOtchetite(o, mesets, dnes)}
+    ${narisuvayKoefitsientite(o, dnes)}
 
     ${blokDelata(o, dnes)}
 
@@ -403,7 +406,6 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     </section>
 
     ${narisuvaySpravkite(o, dnes)}
-    ${narisuvayKoefitsientite(o, dnes)}
 
     ${narisuvayKalendara(o, mesets, dnes)}
 
@@ -530,6 +532,33 @@ function formaSalda(o: Ogledalo): string {
  * правиш полета в Секция Отчети където ще се сложар полета които да покзват
  * тези стойности с формули между всички таблици." Затова тук няма голо число.
  */
+/**
+ * ДЯЛЪТ „ОТЧЕТ" (резен 74 · И124 т.12) · „Тук събери секцията Сметки наречена
+ * Сметки Прогноза с Отчет, Отчет са цялата работа с коефициентите и
+ * диаграмите, таблиците за тях."
+ *
+ * Банерът КАЗВА какво стои в дяла (съставът се брои от `dyal-otchet.ts`, не се
+ * преглежда на око) и какво още ЧАКА по отчета — поименно, за да го брои
+ * машина, не изречение. Секциите отдолу носят `data-dyal="otchet"`.
+ */
+function blokNaDyalaOtchet(): string {
+  return `
+    <section data-sektsiya="otchet-dyal" class="karta">
+      <div class="dyalglava">
+        <h2>Отчет</h2>
+        <span>Прогнозата (Сметки на Дела и Състояние) · коефициентите · диаграмите · таблиците им</span>
+      </div>
+      <p class="drebno" data-otchet-sastav="${SEKTSIITE_NA_OTCHETA.length}">Дялът
+      събира ${SEKTSIITE_NA_OTCHETA.length} секции — гнездата с Прогнозата и
+      петте на коефициентите. Съставът се БРОИ, не се оценява.</p>
+      <p class="drebno" data-otchet-chaka="${CHAKA_PO_OTCHETA.length}">Проверено
+      по изворите („има пропуски") — още чака, поименно:</p>
+      <ul class="drebno">
+        ${CHAKA_PO_OTCHETA.map((x) => `<li>${ekraniraj(x)}</li>`).join('')}
+      </ul>
+    </section>`;
+}
+
 function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
   // Липсващият сбор се ПРОПУСКА, не се подава като undefined: полето трябва да
   // може да различи „нула" от „още не е смятано" (правило 15).
@@ -543,7 +572,7 @@ function blokNaOtchetite(o: Ogledalo, mesets: string, dnes: string): string {
   const g = sveriGnezdata(r.poleta);
   const sborNaNaemite = sboroveNaRegistara(registarZaMeseca(o, mesets, dnes));
   return `
-    <section data-sektsiya="smetki-otcheti">
+    <section data-sektsiya="smetki-otcheti" data-dyal="otchet">
       <div class="dyalglava">
         <h2>${REDAT_NA_GNEZDATA.map((k) => ekraniraj(IMENA_NA_GNEZDATA[k])).join(' · ')}</h2>
         <span>${ekraniraj(mesets)} · три гнезда, всяко число с формулата си</span>
