@@ -52,7 +52,8 @@ import {
   vidaNaKolonata,
   zatvorenaE,
 } from '../src/domein/redove-na-tablitsa.js';
-import { razrezPoKolona, sveriRazreza } from '../src/domein/razrez.js';
+import { parichniteKoloni, razrezPoKolona, sveriRazreza } from '../src/domein/razrez.js';
+import { rollupPoZakachki, sveriRollup } from '../src/domein/rollup.js';
 
 /** Каквото е прочетено, докато човекът не потвърди · нула събития дотогава. */
 let predlozhenie: PredlozhenieZaTablitsa | undefined;
@@ -91,6 +92,12 @@ let izbranaTablitsa = '';
 
 /** ПО КОЯ колона е разрезът · празно значи „без разрез" (резен 59). */
 let razrezPo = '';
+
+/** ОТ КОЯ таблица събира rollup-ът · празно значи „без" (резен 88). */
+let rollupOt = '';
+
+/** КОЯ парична колона на извора събира rollup-ът. */
+let rollupKolona = '';
 
 export function blokNaTablitsaOtFayl(o: Ogledalo): string {
   return `
@@ -218,11 +225,30 @@ function ednoSemeystvoKatoTablitsa(
  * (правило 23). Показва се, но с думата „смята се" вместо вход — изключеното
  * се КАЗВА, не се премълчава (правило 15).
  */
-function blokNaSazdadenite(o: Ogledalo): string {
+/**
+ * КОЯ таблица гледам · ЕДИНСТВЕНИЯТ дом на въпроса (правило 17).
+ *
+ * Екранът и записът я решаваха ПО РАЗЛИЧЕН път: екранът — избраната, после
+ * току-що създадената, после първата ПО АЗБУКА; записът — избраната, после
+ * първата ПО РЕД НА СЪЗДАВАНЕ. При празен изричен избор двете се разминават
+ * тихо: екранът показва една таблица, а редът влиза в друга. Проход §145 го
+ * хвана на живо — В-1, писан пред „Втори обект", осъмна във „Фактури от файл".
+ */
+function gledanataTablitsa(o: Ogledalo): PayloadTablitsaOtFaylSazdadena | undefined {
   const vsichki = [...o.tablitsiOtFayl.values()].sort((a, b) =>
     a.klyuch < b.klyuch ? -1 : a.klyuch > b.klyuch ? 1 : 0,
   );
-  if (vsichki.length === 0) {
+  // ТОКУ-ЩО СЪЗДАДЕНАТА се показва сама: човек, който е натиснал „Създай",
+  // гледа нея, а не първата по азбука. Изричният избор пак бие.
+  return (
+    vsichki.find((x) => x.klyuch === izbranaTablitsa) ??
+    vsichki.find((x) => x.klyuch === zaVnos) ??
+    vsichki[0]
+  );
+}
+
+function blokNaSazdadenite(o: Ogledalo): string {
+  if (o.tablitsiOtFayl.size === 0) {
     return `
     <section data-sektsiya="sazdadenite-tablitsi">
       <div class="dyalglava">
@@ -233,12 +259,10 @@ function blokNaSazdadenite(o: Ogledalo): string {
     </section>`;
   }
 
-  // ТОКУ-ЩО СЪЗДАДЕНАТА се показва сама: човек, който е натиснал „Създай",
-  // гледа нея, а не първата по азбука. Изричният избор пак бие.
-  const t =
-    vsichki.find((x) => x.klyuch === izbranaTablitsa) ??
-    vsichki.find((x) => x.klyuch === zaVnos) ??
-    vsichki[0]!;
+  const vsichki = [...o.tablitsiOtFayl.values()].sort((a, b) =>
+    a.klyuch < b.klyuch ? -1 : a.klyuch > b.klyuch ? 1 : 0,
+  );
+  const t = gledanataTablitsa(o)!;
   const redove = redovete(o.redoveNaTablitsi, t.klyuch);
   const sverka = sveriRedovete(o.vhodNaRedovete, o.redoveNaTablitsi, t.klyuch);
   const nomera = t.glavi.map((_, i) => String(i));
@@ -331,6 +355,7 @@ function blokNaSazdadenite(o: Ogledalo): string {
 
       ${blokNaVnosa(t)}
       ${blokNaRazreza(t, redove, nomera)}
+      ${blokNaRollup(o, t, redove)}
 
       <p class="drebno" id="sverka-redove">Записани: <b>${sverka.zapisani}</b> · махнати:
       <b>${sverka.mahnati}</b> · живи: <b>${sverka.zhivi}</b> · разлика: <b>${sverka.razlika}</b>
@@ -506,6 +531,102 @@ function blokNaRazreza(
     разликата значи нещо. Празната клетка е СВОЯ група, не изхвърлен ред.</p>`;
 }
 
+/**
+ * ROLLUP-ЪТ · сбор от ДРУГА таблица по закачената връзка (резен 88).
+ *
+ * Последното от трите, които чакаха редовете (`docs/10`): за всеки ред на
+ * гледаната таблица — колко реда на ИЗВОРНАТА са закачени за него и сборът на
+ * една нейна парична колона. Сметка, не запис — както разрезът (ADR-113).
+ * Без избор няма rollup: сметка, която се появява сама, кара човека да ѝ
+ * вярва, без да я е поискал.
+ */
+function blokNaRollup(
+  o: Ogledalo,
+  t: PayloadTablitsaOtFaylSazdadena,
+  redove: readonly RedNaTablitsa[],
+): string {
+  // Rollup събира от ДРУГА таблица — при една-единствена той няма предмет
+  // (прецедентът на празните групи), а не е изключена отметка.
+  const drugi = [...o.tablitsiOtFayl.keys()].filter((x) => x !== t.klyuch).sort();
+  if (drugi.length === 0) return '';
+
+  const izvorKlyuch = drugi.includes(rollupOt) ? rollupOt : '';
+  const menyuTablitsa = `
+    <div class="pole">
+      <label for="izbor-rollup">Сбор от таблица</label>
+      <select translate="no" id="izbor-rollup">
+        <option value=""${izvorKlyuch === '' ? ' selected' : ''}>— без —</option>
+        ${drugi
+          .map(
+            (x) =>
+              `<option value="${ekraniraj(x)}"${x === izvorKlyuch ? ' selected' : ''}>${ekraniraj(x)}</option>`,
+          )
+          .join('')}
+      </select>
+    </div>`;
+
+  if (izvorKlyuch === '') return `<div class="poleta tesni">${menyuTablitsa}</div>`;
+
+  const izvor = o.tablitsiOtFayl.get(izvorKlyuch)!;
+  const pari = parichniteKoloni(izvor);
+  if (pari.length === 0) {
+    // Правило 15: невъзможното се КАЗВА, не се преглъща с празно меню.
+    return `<div class="poleta tesni">${menyuTablitsa}</div>
+    <p class="drebno" id="rollup-bez-pari">„${ekraniraj(izvorKlyuch)}" няма парична колона —
+    rollup няма какво да събере.</p>`;
+  }
+
+  const kolona = pari.includes(rollupKolona) ? rollupKolona : '';
+  const menyuKolona = `
+    <div class="pole">
+      <label for="izbor-rollup-kolona">коя колона</label>
+      <select translate="no" id="izbor-rollup-kolona">
+        <option value=""${kolona === '' ? ' selected' : ''}>— избери —</option>
+        ${pari
+          .map(
+            (k) =>
+              `<option value="${k}"${k === kolona ? ' selected' : ''}>${ekraniraj(izvor.glavi[Number(k)]!)}</option>`,
+          )
+          .join('')}
+      </select>
+    </div>`;
+
+  if (kolona === '') return `<div class="poleta tesni">${menyuTablitsa}${menyuKolona}</div>`;
+
+  const izvorniRedove = redovete(o.redoveNaTablitsi, izvorKlyuch);
+  const rollup = rollupPoZakachki(o.zakachki, t.klyuch, redove, izvor, izvorniRedove, kolona);
+  const sverka = sveriRollup(o.zakachki, t.klyuch, redove, izvor, izvorniRedove, kolona, rollup);
+
+  return `
+    <div class="poleta tesni">${menyuTablitsa}${menyuKolona}</div>
+    <div class="tablitsa" data-tablitsa="rollup">
+      <div class="glava opis"><span>Ред</span><span>Закачени</span>
+      <span>${ekraniraj(izvor.glavi[Number(kolona)]!)} от „${ekraniraj(izvorKlyuch)}"</span></div>
+      ${
+        rollup.length
+          ? rollup
+              .map(
+                (r) => `
+      <div class="red opis" translate="no" data-rollup-red="${ekraniraj(r.red)}">
+        <span><b>${ekraniraj(r.red)}</b></span>
+        <span>${r.izvorni.length}</span>
+        <span data-rollup-sbor="${r.sbor_st}">${ekraniraj(kakvoPishe(stotinki(r.sbor_st)))}</span>
+      </div>`,
+              )
+              .join('')
+          : '<div class="red opis"><span>Няма нито един ред.</span><span></span><span></span></div>'
+      }
+    </div>
+    <p class="drebno" id="sverka-rollup">Живи в извора: <b>${sverka.zhiviVIzvora}</b> · влезли:
+    <b>${sverka.vlezli}</b> · незакачени: <b>${sverka.nezakacheni}</b> · по парите изворът е
+    <b>${ekraniraj(kakvoPishe(stotinki(sverka.sborIzvora_st)))}</b>, влезлите —
+    <b>${ekraniraj(kakvoPishe(stotinki(sverka.sborVlezli_st)))}</b>, разлика
+    <b data-rollup-razlika="${sverka.razlika_st}">${ekraniraj(kakvoPishe(stotinki(sverka.razlika_st)))}</b>
+    · закачки към махнати: <b>${sverka.kamMahnati}</b>. Двете страни се смятат по РАЗЛИЧЕН
+    път; изворен ред, закачен за два реда, влиза в сбора на ВСЕКИ, а в сверката се брои
+    ВЕДНЪЖ — затова тя гледа различните.</p>`;
+}
+
 export function zakachiTablitsaOtFayl(
   koren: HTMLElement,
   k: Konteks,
@@ -586,6 +707,20 @@ export function zakachiTablitsaOtFayl(
     await prerisuvay();
   });
 
+  koren.querySelector<HTMLSelectElement>('#izbor-rollup')?.addEventListener('change', async (e) => {
+    rollupOt = (e.target as HTMLSelectElement).value;
+    // Колоната е колона НА ИЗВОРА: сменен извор прави стария избор чужд номер.
+    rollupKolona = '';
+    await prerisuvay();
+  });
+
+  koren
+    .querySelector<HTMLSelectElement>('#izbor-rollup-kolona')
+    ?.addEventListener('change', async (e) => {
+      rollupKolona = (e.target as HTMLSelectElement).value;
+      await prerisuvay();
+    });
+
   for (const izbor of koren.querySelectorAll<HTMLSelectElement>('[data-vid-na]')) {
     izbor.addEventListener('change', async () => {
       const nomer = Number(izbor.dataset['vidNa']);
@@ -611,7 +746,8 @@ export function zakachiTablitsaOtFayl(
   formaRed?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const o = await k.deystviya.ogledalo();
-    const t = o.tablitsiOtFayl.get(izbranaTablitsa) ?? [...o.tablitsiOtFayl.values()][0];
+    // СЪЩАТА таблица, която екранът показва — не първата по ред на създаване.
+    const t = gledanataTablitsa(o);
     if (t === undefined) return;
 
     const danni = new FormData(formaRed);
@@ -659,7 +795,8 @@ export function zakachiTablitsaOtFayl(
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-mahni-red]')) {
     b.addEventListener('click', async () => {
       const o = await k.deystviya.ogledalo();
-      const t = o.tablitsiOtFayl.get(izbranaTablitsa) ?? [...o.tablitsiOtFayl.values()][0];
+      // СЪЩАТА таблица, която екранът показва — не първата по ред на създаване.
+      const t = gledanataTablitsa(o);
       const star = t === undefined ? undefined : o.redoveNaTablitsi.get(t.klyuch)?.get(b.dataset['mahniRed']!);
       if (star === undefined) return;
       try {
