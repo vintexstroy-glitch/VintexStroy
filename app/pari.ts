@@ -27,7 +27,7 @@ import { butonIstoriya } from './istoriya.js';
 import { butonSIkona } from './ikoni.js';
 import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
-import { optsiiNaNachina, poleSIzbor } from './menyu.js';
+import { optsiiNaNachina, poleSIzbor, poleZaPrepiska } from './menyu.js';
 import type { Konteks } from './ekranite.js';
 import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
@@ -359,7 +359,13 @@ function redPlashtane(o: Ogledalo, p: Plashtane): string {
     <div class="red plashtane" translate="no">
       <span class="kletka"><b>${ekraniraj(p.data)}</b><span>seq ${p.seq}</span></span>
       <span class="kletka"><b>${ekraniraj(opis.koy)}</b><span>${v ? `${v.period} · ` : ''}${ekraniraj(opis.kade)}</span></span>
-      <span class="kletka"><span>${ekraniraj(p.nachin)}</span></span>
+      <span class="kletka"><span>${ekraniraj(p.nachin)}${
+        // Изгубеното закачане се КАЗВА, не се преглъща (ADR-101): преписка,
+        // която Огледалото вече не намира, стои като „преп. ?".
+        p.prepId === undefined
+          ? ''
+          : ` · преп. ${ekraniraj(o.prepiski.get(p.prepId)?.kontakt ?? '?')}`
+      }</span></span>
       <span class="suma plateno" data-st="${p.suma_st}">${pishi(p.suma_st)}</span>
       <span class="butoni">
         ${butonSIkona({ ikona: 'storno', tekst: 'Сторно', title: 'Сторно · добавя ред, не трие', danni: { storno: String(p.seq) } })}
@@ -396,6 +402,7 @@ function formaPlashtane(o: Ogledalo, vzemaneId: string): string {
             <label for="pl-data">Дата</label>
             <input translate="no" id="pl-data" name="data" type="date" value="${dnesKato()}" required>
           </div>
+          ${poleZaPrepiska('pl-prepiska', o.prepiski)}
         </div>
         <p class="greshka" id="greshka-plashtane"></p>
         <div class="deystviya">
@@ -491,6 +498,9 @@ export function zakachiPari(
           suma_st,
           nachin: String(danni.get('nachin')) as NachinNaPlashtane,
           data,
+          ...(String(danni.get('prepiska') ?? '') === ''
+            ? {}
+            : { prepId: String(danni.get('prepiska')) }),
         },
         { opId: opIdPlashtane },
       );

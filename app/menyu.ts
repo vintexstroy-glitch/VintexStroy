@@ -284,6 +284,31 @@ export function poleSIzbor(p: PoleSIzbor): string {
 }
 
 /**
+ * ВРЪЗКАТА КЪМ ПРЕПИСКА (М12 · р69·[48] · резен 89): „нова колона prepId
+ * (връзка към преписка в Регистъра), prep остава разчетът-число."
+ *
+ * ЕДНО поле за ДВЕТЕ страни на парите — разходът в Сметки и плащането в
+ * Пари. По избор; без нито една преписка полето не се РАЖДА — няма какво
+ * да се избере (прецедентът на празните групи). Само `id`-то се различава,
+ * за да не се сблъскат двете форми на един екран.
+ */
+export function poleZaPrepiska(
+  id: string,
+  prepiski: ReadonlyMap<string, { readonly id: string; readonly kontakt: string; readonly kakvo: string }>,
+): string {
+  if (prepiski.size === 0) return '';
+  return `<div class="pole">
+            <label for="${ekraniraj(id)}">Преписка (по избор)</label>
+            <select translate="no" id="${ekraniraj(id)}" name="prepiska">
+              <option value="">— без преписка —</option>
+              ${[...prepiski.values()]
+                .map((pr) => `<option value="${ekraniraj(pr.id)}">${ekraniraj(pr.kontakt)} · ${ekraniraj(pr.kakvo)}</option>`)
+                .join('')}
+            </select>
+          </div>`;
+}
+
+/**
  * Закача закона за всички полета с меню в даден корен.
  *
  * НЕ ПРЕРИСУВА екрана. Оцветяването става при всяко натискане на клавиш; пълно

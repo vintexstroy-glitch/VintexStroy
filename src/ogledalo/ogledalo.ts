@@ -197,6 +197,8 @@ export interface Plashtane {
   readonly suma_st: number;
   readonly nachin: string;
   readonly data: string;
+  /** закачената преписка — разчетът-число (М12); липсва при запис без нея */
+  readonly prepId?: string;
 }
 
 /** Един разход — другата страна на ДДС-то. */
@@ -221,6 +223,8 @@ export interface Razhod {
   readonly klyuch: string;
   /** кой файл и коя негова версия го донесе */
   readonly izvor: string;
+  /** закачената преписка — разчетът-число (М12); липсва при запис без нея */
+  readonly prepId?: string;
 }
 
 /** Подадената ДДС-справка — ключалката на периода. */
@@ -969,6 +973,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           ...(p.stavka === undefined ? {} : { stavka: p.stavka }),
           klyuch: p.klyuch ?? '',
           izvor: p.izvor ?? '',
+          ...(p.prepId === undefined ? {} : { prepId: p.prepId }),
         });
         break;
       }
@@ -1835,6 +1840,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           suma_st: p.suma_st,
           nachin: p.nachin,
           data: p.data,
+          ...(p.prepId === undefined ? {} : { prepId: p.prepId }),
         });
         const vzemane = vzemaniya.get(p.vzemaneId);
         if (vzemane) {

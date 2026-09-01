@@ -485,6 +485,14 @@ export interface PayloadPlashtanePrieto {
   readonly suma_st: number;
   readonly nachin: NachinNaPlashtane;
   readonly data: string;
+  /**
+   * ВРЪЗКАТА КЪМ ПРЕПИСКА в Регистъра (М12 · р69·[48] · резен 89): „нова
+   * колона prepId (връзка към преписка в Регистъра), prep остава
+   * разчетът-число". `prep` е НЕГОВОТО число в неговите листове и НЕ се
+   * строи тук; строи се само връзката. По избор — старите записи без нея
+   * са си верни.
+   */
+  readonly prepId?: string;
 }
 
 /**
@@ -522,6 +530,9 @@ export interface PayloadRazhodZapisan {
    */
   readonly klyuch?: string;
   readonly izvor?: string;
+  /** връзката към преписка в Регистъра (М12 · резен 89) · виж бележката при
+   *  `PayloadPlashtanePrieto.prepId` — един дом на решението, две страни */
+  readonly prepId?: string;
 }
 
 /**

@@ -279,11 +279,13 @@ export interface RazhodVhod {
   readonly data: string;
   readonly dokument: string;
   readonly stavka?: string | number;
+  /** връзката към преписка (М12 · резен 89) · по избор, като при човек */
+  readonly prepiska?: string;
 }
 
 export async function zapishiRazhod(
   p: Page,
-  { potok, sektor, dostavchik, opis, suma, nachin, data, dokument, stavka }: RazhodVhod,
+  { potok, sektor, dostavchik, opis, suma, nachin, data, dokument, stavka, prepiska }: RazhodVhod,
 ): Promise<void> {
   await p.selectOption('#razhod-potok', potok);
   // Сектор се избира САМО при „Фактури". Заплатите и кредитите взимат
@@ -300,6 +302,9 @@ export async function zapishiRazhod(
   // Ставката е избор НА РЕДА (ADR-009). Не се подава ли — остава каквото
   // формата предлага, точно както при човек, който не я пипа.
   if (stavka !== undefined) await p.selectOption('#razhod-stavka', String(stavka));
+  // Преписката е ПО ИЗБОР — полето изобщо липсва при празен регистър, затова
+  // помощникът го пипа само когато викащият наистина закача.
+  if (prepiska !== undefined) await p.selectOption('#razhod-prepiska', prepiska);
   await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
 }
 

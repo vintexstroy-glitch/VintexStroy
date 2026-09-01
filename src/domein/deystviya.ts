@@ -304,8 +304,24 @@ export class Deystviya {
     z: Zayavka,
   ): Promise<Rezultat> {
     proveriDvizhi(danni.suma_st, 'Плащането');
-    proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
+    const o = await this.ogledalo();
+    proveriZamrazen(o, danni.data.slice(0, 7), z.svereno);
+    this.#proveriPrepiskata(o, danni.prepId);
     return this.#pusni('ПлащанеПрието', VID.plashtane, id, danni, z);
+  }
+
+  /**
+   * ВРЪЗКАТА КЪМ ПРЕПИСКА (М12 · резен 89) · проверява се при ВХОДА: записан
+   * веднъж, счупен `prepId` виси завинаги (правило 1). Липсващият е позволен —
+   * връзката е по избор; сочещият в нищото се отказва С ДУМИ.
+   */
+  #proveriPrepiskata(o: Ogledalo, prepId: string | undefined): void {
+    if (prepId === undefined || prepId === '') return;
+    if (!o.prepiski.has(prepId)) {
+      throw new GreshkaPrepiska(
+        `Преписка „${prepId}" няма в Регистъра — връзката би сочила в нищото.`,
+      );
+    }
   }
 
   /**
@@ -726,7 +742,9 @@ export class Deystviya {
     z: Zayavka,
   ): Promise<Rezultat> {
     proveriDvizhi(danni.suma_st, 'Разходът');
-    proveriZamrazen(await this.ogledalo(), danni.data.slice(0, 7), z.svereno);
+    const o = await this.ogledalo();
+    proveriZamrazen(o, danni.data.slice(0, 7), z.svereno);
+    this.#proveriPrepiskata(o, danni.prepId);
     return this.#pusni('РазходЗаписан', VID.razhod, id, danni, z);
   }
 
@@ -2213,6 +2231,14 @@ class GreshkaNaem extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'GreshkaNaem';
+  }
+}
+
+/** Връзката към преписка сочи в нищото (М12 · резен 89). */
+class GreshkaPrepiska extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'GreshkaPrepiska';
   }
 }
 
