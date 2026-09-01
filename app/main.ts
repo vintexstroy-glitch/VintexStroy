@@ -79,6 +79,7 @@ import { zakachiVisochinata } from './visochina.js';
 import { zakachiGoleminata } from './golemina.js';
 import { narisuvayProfila, zakachiProfila } from './profil.js';
 import { zakachiTemata } from './tema.js';
+import { helpatEOtvoren, narisuvayHelpa, zakachiHelpa } from './help.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
 import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
@@ -709,6 +710,10 @@ async function trugvay(): Promise<void> {
             ekran === 'smetki' ? lentataNaBalansa(dnes) : ''
           }
           <div class="desno-gore">
+            ${/* ХЕЛПЪТ (И124 т.5 · ADR-136) · планът на таба, вдясно. Бутонът
+                  е в черупката — на всеки екран, като профила. */
+              `<button type="button" class="vtorichen" id="help-vhod"
+                 aria-pressed="${helpatEOtvoren() ? 'true' : 'false'}">Хелп</button>`}
             ${/* ПРОФИЛЪТ (И124 т.5 · ADR-135) · аватарът е на ВСЕКИ екран, а
                   размерът на текста и темите живеят В НЕГО: „да се създаде
                   профил и да се измести там с всичката информация за
@@ -789,7 +794,9 @@ async function trugvay(): Promise<void> {
             }),
           })}
         </div>
-      </main>`;
+      </main>
+      ${/* ХЕЛПЪТ (И124 т.5 · ADR-136) · вдясно, скрит по подразбиране. */
+        narisuvayHelpa()}`;
 
     poslednaVest = null;
     opis.zakachi({
@@ -928,6 +935,9 @@ async function trugvay(): Promise<void> {
     // ПРОФИЛЪТ И ТЕМИТЕ (резен 78 · ADR-135) · панелът, размерът и двете теми.
     zakachiProfila(koren);
     zakachiTemata(koren);
+    // ХЕЛПЪТ (резен 78б · ADR-136) · планът на таба се чете от живия екран,
+    // затова се закача СЛЕД рисуването — той оглежда каквото стои.
+    zakachiHelpa(koren, prerisuvay);
     zakachiIzgledaNaGanta(koren);
     zakachiVisochinata(koren);
     zakachiZebrata(koren);

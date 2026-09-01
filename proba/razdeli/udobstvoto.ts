@@ -1259,6 +1259,42 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
         Math.round(parseFloat(getComputedStyle(e).fontSize) * 100) / 100), tekstPredi);
     await p.keyboard.press('Escape');
 
+    razdel = '76б · Хелпът · планът на таба, вдясно (И124 т.5 · ADR-136)';
+    // „Цялата обяснителна информация се подрежда като план за таба."
+    proveri('бутонът „Хелп" е в шапката · на всеки екран',
+      await p.$$eval('.shapka #help-vhod', (b) => b.length), 1);
+    proveri('и панелът е ПРИБРАН по подразбиране · не бута таблиците',
+      await p.$$eval('#help-panel', (e) => e.length), 0);
+    await deystvieSPrerisuvane(p, () => p.click('#help-vhod'));
+    await p.waitForSelector('#help-panel');
+    proveri('отвореният хелп реди СЕКЦИИТЕ на екрана · планът на таба',
+      await p.evaluate(() =>
+        document.querySelectorAll('#help-tyalo .help-sektsiya').length ===
+        document.querySelectorAll('.telo section[data-sektsiya]').length &&
+        document.querySelectorAll('#help-tyalo .help-sektsiya').length > 0),
+      true);
+    proveri('и ПРЕДУПРЕЖДЕНИЯТА си остават в тялото, не само в панела',
+      (await p.$$eval('.telo .drebno', (e) => e.length)) > 0, true);
+    proveri('ръбът за мерене стои на панела · „и по височина и по ширина"',
+      await p.$$eval('#help-rab', (e) => e.length), 1);
+    proveri('и ширината идва от премерената променлива',
+      await p.$eval('#help-panel', (e) => getComputedStyle(e).width), '300px');
+
+    // „Ако нещо се добави в таба се включва в хелпа там" — планът се чете от
+    // ЖИВИЯ екран: на друг екран хелпът показва НЕГОВИТЕ секции.
+    const sektsiiImoti = await p.$eval('#help-tyalo', (e) => e.textContent ?? '');
+    await naEkran(p, 'pari', '#forma-nachisli');
+    proveri('хелпът остава отворен през смяната · помни се',
+      await p.$$eval('#help-panel', (e) => e.length), 1);
+    proveri('и показва секциите на НОВИЯ екран, не на стария',
+      await p.$eval('#help-tyalo', (e) => (e.textContent ?? '') !== '') &&
+        (await p.$eval('#help-tyalo', (e) => e.textContent ?? '')) !== sektsiiImoti,
+      true);
+    await naEkran(p, 'imoti', '#forma-imot');
+    await deystvieSPrerisuvane(p, () => p.click('#help-zatvori'));
+    proveri('„Скрий" прибира панела · както в Клод',
+      await p.$$eval('#help-panel', (e) => e.length), 0);
+
     razdel = '75 · Височината на реда · ЕДНА за цялата таблица';
     // Негово: „Когато местиш една височина на един ред ЗАЕДНО МЕСТИШ НА ВСИЧКИ
     // РЕДОВЕ височината, ЗА КОЛОНИТЕ НЕ ВАЖИ." Двете половини се мерят поотделно.

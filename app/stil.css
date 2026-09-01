@@ -530,6 +530,38 @@ a:hover { color: var(--aktsent-tumen); }
 .tema-red input { grid-row: 1 / span 2; margin: 0; }
 .tema-red .drebno { grid-column: 2; margin: 0; }
 
+/* ── ХЕЛПЪТ · планът на таба, вдясно, като в Клод (резен 78б · ADR-136) ───
+   На широк екран е КОЛОНА с влачим ляв ръб (ширина); на тесен ЛЯГА отдолу
+   и същият ръб мени височината. `--help-legnal` казва на кода коя посока
+   важи — кодът пита стила, не преписва media-условието (правило 17). */
+.help {
+  --help-legnal: ne;
+  width: var(--help-shirina, 300px); flex-shrink: 0; position: relative;
+  border-left: 1px solid var(--liniya); background: var(--panel);
+  display: flex; flex-direction: column; min-width: 0;
+}
+.help-rab {
+  position: absolute; left: -3px; top: 0; bottom: 0; width: 6px;
+  cursor: col-resize; z-index: 5;
+}
+.help-rab:hover { background: var(--aktsent); opacity: 0.4; }
+.help-glava {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 12px; border-bottom: 1px solid var(--liniya);
+}
+.help-tyalo { overflow-y: auto; padding: 10px 12px; }
+.help-sektsiya { display: flex; flex-direction: column; gap: 2px; margin-bottom: 14px; }
+@media (max-width: 900px) {
+  .help {
+    --help-legnal: da;
+    position: fixed; left: 0; right: 0; bottom: 0; width: auto;
+    height: var(--help-visochina, 40dvh); z-index: 25;
+    border-left: none; border-top: 1px solid var(--liniya);
+    box-shadow: 0 -8px 24px rgba(23, 20, 15, 0.13);
+  }
+  .help-rab { left: 0; right: 0; top: -3px; bottom: auto; width: auto; height: 6px; cursor: row-resize; }
+}
+
 /* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
    показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
    шапката, а лост зад воала е лост, който го няма. */
