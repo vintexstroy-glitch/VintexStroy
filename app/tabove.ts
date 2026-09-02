@@ -34,7 +34,6 @@ import { ekraniraj } from './obshto.js';
 import {
   dobaviSektsiya,
   eStatsionaren,
-  GreshkaTab,
   IMENA_NA_DIAGRAMITE,
   IMENA_NA_IZTOCHNITSITE,
   IMENA_NA_VIDOVETE_SEKTSII,
@@ -48,7 +47,6 @@ import {
   razvarzhiSektsiya,
   STATSIONARNI,
   svarzhiSektsii,
-  vazmozhniIzvori,
   type IztochnikDiagrama,
   type IztochnikTablitsa,
   type PoKakvo,
@@ -67,7 +65,6 @@ import {
 import { rolyataNa } from '../src/domein/stopanin.js';
 import { dayNomer } from '../src/domein/redaktor.js';
 import { reshetka } from '../src/domein/gant.js';
-import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
 import { pishi } from '../src/yadro/pari.js';
 import { narisuvayDiagrama } from './gant-diagrama.js';

@@ -21,7 +21,6 @@ import {
   OPISI,
   type NastroykaNaProblem,
   type OpisNaProblem,
-  type VidProblem,
 } from '../src/domein/vhodni-problemi.js';
 import { butonSIkona } from './ikoni.js';
 import {
@@ -86,7 +85,6 @@ import {
   ZNAK_NA_VIDA,
   type VidStoynost,
 } from '../src/domein/vid-stoynost.js';
-import { kartataNaSaglasieto } from './saglasie.js';
 import { IMENA_NA_VIDOVETE, vidNaKolona } from '../src/domein/kolonno.js';
 import type { PunktNaMenyuto } from '../src/domein/hedari-po-tabove.js';
 import { IME_BEZ_TAB } from '../src/domein/hedari-po-tabove.js';

@@ -15,9 +15,8 @@ import { pishi } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { sha256Web } from '../src/nositel/hash-web.js';
-import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
+import { otCSV } from '../src/iztochnik/csv.js';
 import { tablitsiteNa, vidaNaFayla } from '../src/iztochnik/chetetsat.js';
-import { otXLSX } from '../src/iztochnik/xlsx.js';
 import {
   belegNaPartida,
   sboroveNaPartida,
@@ -32,7 +31,6 @@ import { sDumiFormula, smetniKolonite } from '../src/domein/formuli.js';
 import { IMENA_NA_VIDOVETE_STOYNOST } from '../src/domein/vid-stoynost.js';
 import {
   belegNaModel,
-  GreshkaModel,
   IMENA_NA_ROLITE,
   nameriModel,
   napraviModel,

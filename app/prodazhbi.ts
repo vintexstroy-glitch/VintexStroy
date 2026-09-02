@@ -36,7 +36,6 @@ import {
   etapite,
   imeNaSastoyanieto,
   koloni,
-  KOLONI,
   OTGOVORENITE,
   podredeni,
   posokata,

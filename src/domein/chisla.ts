@@ -42,7 +42,7 @@
  */
 
 import { otSuma, GreshkaPari } from '../yadro/pari.js';
-import { poRolya, redoveSDanni, type ModelNaTablitsa, type Rolya } from '../iztochnik/model.js';
+import { redoveSDanni, type ModelNaTablitsa, type Rolya } from '../iztochnik/model.js';
 import { ePari } from './vid-stoynost.js';
 import { kletka, type Tablitsa } from '../iztochnik/tablitsa.js';
 

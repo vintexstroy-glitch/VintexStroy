@@ -17,11 +17,7 @@ import {
   type Plashtane,
   type Vzemane,
 } from '../src/ogledalo/ogledalo.js';
-import {
-  GreshkaNachislyavane,
-  nachisliZaPeriod,
-  zaNachislyavane,
-} from '../src/domein/nachislyavane.js';
+import { nachisliZaPeriod, zaNachislyavane } from '../src/domein/nachislyavane.js';
 import { adresZaPoshta, napishiPismo } from '../src/domein/pismo.js';
 import { butonIstoriya } from './istoriya.js';
 import { butonSIkona } from './ikoni.js';
@@ -29,7 +25,9 @@ import { zakachiStornoButoni } from './storno.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import { optsiiNaNachina, poleSIzbor, poleZaPrepiska } from './menyu.js';
 import type { Konteks } from './ekranite.js';
-import { NACHINI_NA_PLASHTANE, type NachinNaPlashtane } from '../src/domein/sabitiya.js';
+import type { Izbor } from '../src/domein/planove.js';
+import { sVazmozhnostta } from './vazmozhnostta.js';
+import { type NachinNaPlashtane } from '../src/domein/sabitiya.js';
 
 /** Кое вземане чака плащане в момента. Живее, докато формата е отворена. */
 let izbrano: string | null = null;
@@ -77,7 +75,7 @@ export function koloniNaPlashtaniyata(o: Ogledalo): KolonaSFiltar<Plashtane>[] {
   ];
 }
 
-export function narisuvayPari(o: Ogledalo, dnes: string): string {
+export function narisuvayPari(o: Ogledalo, dnes: string, izbor: Izbor): string {
   const zakasneli = prosrocheni(o, dnes);
   const otvoreni = [...o.vzemaniya.values()]
     .filter((v) => v.ostatak_st > 0 && !zakasneli.some((z) => z.id === v.id))
@@ -183,7 +181,7 @@ export function narisuvayPari(o: Ogledalo, dnes: string): string {
     }
 
     ${narisuvayPlashtaniyata(o, dnes)}
-    ${sektsiyaPoKontragent(o, dnes)}
+    ${sektsiyaPoKontragent(o, dnes, izbor)}
   `;
 }
 
@@ -207,7 +205,21 @@ const KOLONI_KONTRAGENTI: readonly KolonaSFiltar<ReturnType<typeof poKontragent>
   { klyuch: 'plashta', ime: 'Плаща', vid: 'chislo', vzemi: (r) => r.srednoZakasnenie ?? '—' },
 ];
 
-function sektsiyaPoKontragent(o: Ogledalo, dnes: string): string {
+function sektsiyaPoKontragent(o: Ogledalo, dnes: string, izbor: Izbor): string {
+  return sVazmozhnostta(
+    izbor,
+    'ogledala',
+    {
+      sektsiya: 'po-kontragent',
+      zaglavie: 'По контрагент',
+      zashto: 'Изгледът „По контрагент" показва кой дължи, кой плаща навреме и на кого плащам.',
+    },
+    () => blokatPoKontragent(o, dnes),
+  );
+}
+
+/** Самата таблица · вика се САМО когато възможността я има (иначе не се смята). */
+function blokatPoKontragent(o: Ogledalo, dnes: string): string {
   const redove = poKontragent(o);
   if (redove.length === 0) return '';
   const filtrirani = filtriray('po-kontragent', redove, KOLONI_KONTRAGENTI, dnes);

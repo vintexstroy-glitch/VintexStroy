@@ -266,14 +266,15 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ime: 'Имоти',
     podnaslov: 'записва вместо да помни · всичко минава през Вратата',
     ikona: 'ekran-imoti',
-    narisuvay: (r) => narisuvayImoti({ ogledalo: r.ogledalo, sabitiya: r.broySabitiya }),
+    narisuvay: (r) =>
+      narisuvayImoti({ ogledalo: r.ogledalo, sabitiya: r.broySabitiya, izbor: r.izbor }),
     zakachi: (z) => zakachiFormite(z.koren, z.k, z.prerisuvay),
   },
   pari: {
     ime: 'Пари',
     podnaslov: 'какво ти дължат, кой закъснява, какво е влязло',
     ikona: 'ekran-pari',
-    narisuvay: (r) => narisuvayPari(r.ogledalo, r.dnes),
+    narisuvay: (r) => narisuvayPari(r.ogledalo, r.dnes, r.izbor),
     zakachi: (z) => zakachiPari(z.koren, z.k, z.prerisuvay),
   },
   smetki: {

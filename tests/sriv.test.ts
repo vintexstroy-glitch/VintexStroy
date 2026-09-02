@@ -9,7 +9,6 @@ import { describe, expect, it } from 'vitest';
 import 'fake-indexeddb/auto';
 import {
   DnevnikVPametta,
-  GreshkaDnevnik,
   KotvaVPametta,
   proveriKotvata,
   proveriVerigata,

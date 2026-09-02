@@ -43,7 +43,7 @@
 
 import { obshtOstatak, obshtoObezpechenie } from './krediti.js';
 import { deliZakragleno } from '../yadro/pari.js';
-import { razhodiZaPerioda, smetki } from './smetki.js';
+import { smetki } from './smetki.js';
 import { aktiviIZadalzheniya, saldoNa, sumiZaObhvat, type VanshniZaKapitala } from './otcheti.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';

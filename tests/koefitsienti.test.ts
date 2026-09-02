@@ -12,9 +12,6 @@
 
 import { IMENA_NA_TAKTOVETE } from '../src/domein/vreme.js';
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
-import { Deystviya } from '../src/domein/deystviya.js';
-import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import {
   GreshkaKoefitsient,
   KOEFITSIENTI,
@@ -31,7 +28,7 @@ import {
   razbiyNaStapki,
   type DanniZaPerioda,
 } from '../src/domein/koefitsienti.js';
-import { mesetsSChisla, SHA, stend } from './pomoshtni.js';
+import { mesetsSChisla, stend } from './pomoshtni.js';
 
 const OT = '2026-08-01';
 const DO = '2026-08-31';

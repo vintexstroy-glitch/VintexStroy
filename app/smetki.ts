@@ -33,16 +33,8 @@ import {
 import { CHAKA_PO_OTCHETA, SEKTSIITE_NA_OTCHETA } from '../src/domein/dyal-otchet.js';
 import { proverkiOtSverki } from '../src/domein/proverki-ot-sverki.js';
 import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
-import { otpechatak } from '../src/iztochnik/snimka.js';
-import { sha256Web } from '../src/nositel/hash-web.js';
 import { platenoDDSZaPerioda } from '../src/ogledalo/ogledalo.js';
-import {
-  akumulator,
-  ddsOtObshta,
-  sektoriNaRazhod,
-  stavkaNaReda,
-  STAVKI,
-} from '../src/domein/dds.js';
+import { akumulator, ddsOtObshta, sektoriNaRazhod, stavkaNaReda } from '../src/domein/dds.js';
 import {
   mesetsiteVObhvata,
   potok,
@@ -58,7 +50,6 @@ import {
   trezornotoSaldo,
   IMENA_NA_DZHOBOVETE,
   otcheti,
-  saldoNa,
   type Otcheti,
   type Pole,
 } from '../src/domein/otcheti.js';
@@ -108,8 +99,6 @@ import { blokNaKreditite, redPodRazhodite, zakachiKreditite } from './krediti.js
 import { blokNaZaplatite, zakachiZaplatite } from './zaplati.js';
 import { blokNaTablitsaOtFayl, zakachiTablitsaOtFayl } from './tablitsa-ot-fayl.js';
 import { butonSIkona } from './ikoni.js';
-import { oboroti } from '../src/domein/glavna-kniga.js';
-import { svaliFayl } from './obshto.js';
 import { CHAKA_DUMA_ZA_DDS } from '../src/domein/prodazhbi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {

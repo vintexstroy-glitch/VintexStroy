@@ -56,6 +56,8 @@ import {
 } from './menyu.js';
 import type { Menyu } from '../src/domein/padashti-menyuta.js';
 import type { Konteks } from './ekranite.js';
+import type { Izbor } from '../src/domein/planove.js';
+import { sVazmozhnostta } from './vazmozhnostta.js';
 
 /** Ключът на речниците на този екран · формата на наема е една. */
 const RECHNIK_NAEM = 'naem';
@@ -78,6 +80,8 @@ function menyutoNaNaemite(o: Ogledalo): Menyu {
 interface SastoyanieNaEkrana {
   readonly ogledalo: Ogledalo;
   readonly sabitiya: number;
+  /** Планът и отметките — „По обект" е възможност (`ogledala`), не даденост. */
+  readonly izbor: Izbor;
 }
 
 /** Какво прави екранът в момента. Едно състояние, не три флага. */
@@ -600,7 +604,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     </section>`
     }
     ${sektsiyaNaRegistara(ogledalo, dnes)}
-    ${sektsiyaPoImot(ogledalo)}
+    ${sektsiyaPoImot(ogledalo, sastoyanie.izbor)}
   `;
 }
 
@@ -742,7 +746,21 @@ function sektsiyaNaRegistara(o: Ogledalo, dnes: string): string {
  * Изгледът е ЧИСТА ФУНКЦИЯ върху Огледалото — нула ново състояние, нула нови
  * събития. Истината е една (Журналът); ъглите към нея са колкото трябват.
  */
-function sektsiyaPoImot(o: Ogledalo): string {
+function sektsiyaPoImot(o: Ogledalo, izbor: Izbor): string {
+  return sVazmozhnostta(
+    izbor,
+    'ogledala',
+    {
+      sektsiya: 'po-imot',
+      zaglavie: 'По обект',
+      zashto: 'Изгледът „По обект" показва кой обект колко носи и колко дължи.',
+    },
+    () => blokatPoImot(o),
+  );
+}
+
+/** Самата таблица · вика се САМО когато възможността я има (иначе не се смята). */
+function blokatPoImot(o: Ogledalo): string {
   const redove = poImot(o);
   if (redove.length === 0) return '';
   const sbor = redove.reduce(

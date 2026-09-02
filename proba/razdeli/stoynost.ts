@@ -2,7 +2,7 @@ import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, dokatoStane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import type { Page } from 'playwright-core';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 /**
