@@ -66,8 +66,10 @@
 
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, basename } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const KOREN = new URL('..', import.meta.url).pathname;
+// `fileURLToPath`, а НЕ `.pathname` (резен 94 · ADR-152) · виж `chestnost.mjs`.
+const KOREN = fileURLToPath(new URL('..', import.meta.url));
 
 /** `--vsichki` показва ЦЕЛИТЕ списъци · без него се съкращават до 40 реда. */
 const VSICHKI = process.argv.includes('--vsichki');

@@ -18,8 +18,10 @@ import { join, relative } from 'node:path';
 // пада на този ред, — затова е вписано МАШИННО ЧЕТИМО в `package.json`
 // (`engines.node`), а не само с думи тук. И двата потока карат Node 22.
 import { PAKETI } from '../src/domein/azbuki.ts';
+import { fileURLToPath } from 'node:url';
 
-const DIST = new URL('../dist/', import.meta.url).pathname;
+// `fileURLToPath`, а НЕ `.pathname` (резен 94 · ADR-152).
+const DIST = fileURLToPath(new URL('../dist/', import.meta.url));
 
 /** Всички файлове в dist, освен самия работник. */
 function vsichkiFaylove(papka = DIST) {

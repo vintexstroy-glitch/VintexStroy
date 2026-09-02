@@ -1,5 +1,7 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+// `fileURLToPath`, а НЕ `.pathname` · на Windows второто дава „/C:/…" (ADR-152).
+import { fileURLToPath } from 'node:url';
 
 /**
  * 101 · ТАБЛИЦА ОТ ФАЙЛ · неговият експеримент с Фактури (резен 21 · ADR-081).
@@ -30,7 +32,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const predi = await broySabitiya(p);
   await p.setInputFiles(
     '#fayl-tablitsa',
-    new URL('../../primeri/fakturi-s-formuli.xlsx', import.meta.url).pathname,
+    fileURLToPath(new URL('../../primeri/fakturi-s-formuli.xlsx', import.meta.url)),
   );
   await p.waitForSelector('[data-predlozhenie]', { timeout: 5_000 });
 
@@ -289,7 +291,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'smetki', '[data-sektsiya=tablitsa-ot-fayl]');
   await p.setInputFiles(
     '#fayl-tablitsa',
-    new URL('../../primeri/fakturi-vtori-obekt.xlsx', import.meta.url).pathname,
+    fileURLToPath(new URL('../../primeri/fakturi-vtori-obekt.xlsx', import.meta.url)),
   );
   await p.waitForSelector('[data-predlozhenie]', { timeout: 5_000 });
   proveri(

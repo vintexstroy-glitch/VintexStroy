@@ -48,7 +48,12 @@ const BEZ_EKRANEN_KONSUMATOR: Readonly<Record<string, string>> = Object.freeze({
 
 /** Обявеното · съюзът `Vazmozhnost` в `planove.ts`, прочетен от самия файл. */
 function obyavenite(): readonly string[] {
-  const sayuzat = /export type Vazmozhnost =([\s\S]*?);\n/.exec(PLANOVE)?.[1];
+  // `;` БЕЗ край на ред след него (резен 94 · ADR-152). Дотук изразът искаше
+  // `;\n` и на Windows не намираше НИЩО: чекаутът беше CRLF, значи `;\r\n`.
+  // И най-лошото — мълчеше вярно: „съюзът го няма" изглежда точно като
+  // „съюзът е празен". `.gitattributes` заковава LF и класът пада, но изразът
+  // тук вече не разчита на това: две защити са по-евтини от една находка.
+  const sayuzat = /export type Vazmozhnost =([\s\S]*?);/.exec(PLANOVE)?.[1];
   if (sayuzat === undefined) throw new Error('съюзът Vazmozhnost не се намери в planove.ts');
   return [...sayuzat.matchAll(/\|\s*'([a-z-]+)'/g)]
     .map((m) => m[1])
