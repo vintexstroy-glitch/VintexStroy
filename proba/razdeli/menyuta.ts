@@ -347,6 +347,65 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     proveri('нито един таб с ≥2 секции не е БЕЗ падащ ред',
       bezRed.filter((k) => (pametta[k] ?? 0) >= 2).join(' · ') || 'няма такъв', 'няма такъв');
 
+    // ══ 146 · МЕНЮТАТА СА АКТИВНИ ОТ ПЪРВИЯ МИГ (И127 т.1 · резен 90) ══════
+    //
+    // Дотук горната мярка беше вярна ПО ЗАСЛУГА НА ПРОХОДА: той е отварял
+    // всеки екран, значи паметта им е пълна. Човек, който тъкмо е влязъл,
+    // виждаше голи пунктове — цената, обявена в ADR-057в. Тя пада: паметта се
+    // пълни от рисуване НАУМ. Мери се точно това — паметта се ТРИЕ, страницата
+    // се презарежда, и редовете трябва да са там още преди да е отворен екран.
+    razdel = '146 · падащите менюта са АКТИВНИ от първия миг';
+    const predi = await p.$$eval('.padasht-menyu > [data-ekran]', (e) => e.length);
+    proveri('преди чистенето редовете ги има · инак мярката долу мери нищо',
+      predi >= 2, true);
+    await p.evaluate(() => {
+      for (const k of Object.keys(localStorage)) {
+        if (k.includes('sektsii.')) localStorage.removeItem(k);
+      }
+    });
+    await p.reload({ waitUntil: 'load' });
+    await p.waitForSelector('#forma-imot');
+    const sledChistene = await p.$$eval('.padasht-menyu > [data-ekran]', (e) =>
+      e.map((x) => x.getAttribute('data-ekran') ?? '').sort());
+    proveri('след ТРИТА памет редовете пак са тук · рисуването наум ги връща',
+      sledChistene.length >= predi, true);
+    proveri('и Баланс носи ред, без да е отварян в тази сесия',
+      sledChistene.includes('smetki'), true);
+    proveri('и Управление · чужд екран, нула отваряния',
+      sledChistene.includes('gant'), true);
+
+    // ══ 146б · ТАБЛИЦИТЕ СА РАЗДЕЛЕНИ · подпункт за всяка именувана ════════
+    // „и да са разделени таблиците" — секция с ЕДНА таблица си остава един
+    // пункт; секция с ТРИ (Кредити) дава три подпункта с имената им.
+    // Кредитите са СЕКЦИЯ на Баланс, не свой екран (ADR-143 · редът на
+    // лентата) — редът, който ги изрежда, е неговият.
+    await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+    // КЛИКЪТ Е УСЛОВЕН: `naEkran` натиска СЪЩИЯ пункт, за да смени екрана — а
+    // пунктът е един бутон с две задачи (ADR-057в), тоест редът вече е
+    // отворен. Втори клик щеше да го ЗАТВОРИ, и чакането да виси върху
+    // собственото си действие.
+    if (await p.$eval('#ekran-red-smetki', (e) => (e as HTMLElement).hidden)) {
+      await p.click('.padasht-menyu > [data-ekran=smetki]');
+    }
+    await p.waitForSelector('#ekran-red-smetki:not([hidden])');
+    const podtablitsi = await p.$$eval('#ekran-red-smetki [data-kam-tablitsa]', (e) =>
+      e.map((x) => x.getAttribute('data-kam-tablitsa') ?? '').sort());
+    proveri('трите таблици на Кредити са РАЗДЕЛЕНИ в менюто',
+      podtablitsi.join(' · '), 'krediti · krediti-plan · krediti-predstoyashti');
+    proveri('и всеки подпункт носи ИМЕТО на таблицата си, не ключа ѝ',
+      (await tekstNa(p, '#ekran-red-smetki')).includes('Предстоящи вноски'), true);
+    // Подпунктът ЗАВЕЖДА до своята таблица · подчертаването го казва.
+    await p.click('#ekran-red-smetki [data-kam-tablitsa="krediti-plan"]');
+    // ЧАКА СЕ ПОДЧЕРТАВАНЕТО, не таблицата: тя вече стои на екрана, а
+    // завеждането е асинхронно (отваря екран, прерисува, чак тогава сочи).
+    // Белегът живее 1,6 секунди — чакането го хваща, броенето след него не.
+    const zavelo = await p
+      .waitForSelector('.tablitsa[data-tablitsa=krediti-plan].podchertana', { timeout: 5_000 })
+      .then(() => true)
+      .catch(() => false);
+    proveri('натиснатият подпункт завежда до СВОЯТА таблица', zavelo, true);
+    await naEkran(p, 'imoti', '#forma-imot');
+
     razdel = '71 · Падащият ред на екрана · какво изрежда';
     const vhodSmetki = '.padasht-menyu > [data-ekran=smetki]';
     proveri('пунктът КАЗВА, че носи ред', await p.$eval(vhodSmetki, (e) => e.getAttribute('aria-expanded')), 'false');

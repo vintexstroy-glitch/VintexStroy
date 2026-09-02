@@ -39,7 +39,7 @@ import { smeniNastroykiteNaVhoda } from './vhodni-problemi.js';
 import { redNaNastroykite, zakachiMenyutoNaNastroykite } from './menyu-nastroyki.js';
 import { zakachiPodredbata } from './podredba.js';
 import { zakachiGrupite } from './grupa-deystviya.js';
-import { zakachiMenyutataNaEkranite } from './menyu-ekran.js';
+import { zakachiMenyutataNaEkranite, zapomniSektsiiteOtHTML } from './menyu-ekran.js';
 import {
   kopchetoNaLentata,
   lentataESvita,
@@ -142,7 +142,7 @@ function zapishiPokazatelya(imeyl: string, naematel: string): void {
 }
 import { dopusnatiImeyli, pishatImeyli } from '../src/domein/lichen-dostap.js';
 import { zabraviIzbora } from './lichno.js';
-import { dostapenLiE, EKRANI, REDAT_NA_LENTATA, type Konteks, type KoyEkran } from './ekranite.js';
+import { dostapenLiE, EKRANI, REDAT_NA_LENTATA, type Konteks, type KoyEkran, type ZaRisuvane } from './ekranite.js';
 
 /**
  * Белегът на СЛУЖЕБНИЯ износ. Домът на четенето и писането е `obshto.ts` —
@@ -682,6 +682,39 @@ async function trugvay(): Promise<void> {
     // беше отказан, а тялото рисува другия.
     const opis = EKRANI[ekran];
 
+    /**
+     * КОНТЕКСТЪТ НА РИСУВАНЕТО · един обект, ДВАМА викащи (правило 17).
+     *
+     * Дотук той се сглобяваше вътре в шаблона и служеше само на текущия екран.
+     * И127 т.1 („падащите менюта да са АКТИВНИ") иска секциите на ВСИЧКИ екрани
+     * още преди да са отваряни — а те се четат от същото рисуване. Два еднакви
+     * къса щяха да се разминат при първото ново поле.
+     */
+    const kontekstat = {
+      ogledalo,
+      broySabitiya: sabitiya.length,
+      // ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · книгата е ТУК, значи и сметката е тук
+      // (резен 32). Таблото получава готов низ и не научава за Журнала.
+      parviyatZapis: nachaloNaProbvaneto(sabitiya),
+      dnes,
+      izbor,
+      kojSam,
+      akaunt,
+      kranatEOtvoren: !vrata.zatvorena,
+      lichnoOgledalo,
+      lichenAkaunt: lichen.akaunt,
+      broyLichni: lichniteSabitiya.length,
+      // МЕРЕНО, не питано (правило от `CLAUDE.md`: „Размерът се МЕРИ").
+      // `-1` значи „браузърът не казва" и екранът го чете като нула нужно
+      // място — по-честно от измислено число.
+      zaetoNaUstroystvoto: Math.max(0, hranilishte.zaeto),
+      dostapniEkrani: dostapniteEkrani({
+        rolya: rolyataNa(kojSam.imeyl, ogledalo),
+        lichnoVklyucheno,
+        lichnoPipnato: lichnoOgledalo !== null,
+      }),
+    };
+
     koren.innerHTML = `
       ${strana(
         ogledalo,
@@ -767,30 +800,7 @@ async function trugvay(): Promise<void> {
         <div class="telo">
           ${vestHTML()}
           ${ekran !== 'lichno' && mozhe(izbor, 'iztochnitsi') ? narisuvayPlana() : ''}
-          ${opis.narisuvay({
-            ogledalo,
-            broySabitiya: sabitiya.length,
-            // ДЕНЯТ НА ПЪРВОТО СЪБИТИЕ · книгата е ТУК, значи и сметката е тук
-            // (резен 32). Таблото получава готов низ и не научава за Журнала.
-            parviyatZapis: nachaloNaProbvaneto(sabitiya),
-            dnes,
-            izbor,
-            kojSam,
-            akaunt,
-            kranatEOtvoren: !vrata.zatvorena,
-            lichnoOgledalo,
-            lichenAkaunt: lichen.akaunt,
-            broyLichni: lichniteSabitiya.length,
-            // МЕРЕНО, не питано (правило от `CLAUDE.md`: „Размерът се МЕРИ").
-            // `-1` значи „браузърът не казва" и екранът го чете като нула
-            // нужно място — по-честно от измислено число.
-            zaetoNaUstroystvoto: Math.max(0, hranilishte.zaeto),
-            dostapniEkrani: dostapniteEkrani({
-              rolya: rolyataNa(kojSam.imeyl, ogledalo),
-              lichnoVklyucheno,
-              lichnoPipnato: lichnoOgledalo !== null,
-            }),
-          })}
+          ${opis.narisuvay(kontekstat)}
         </div>
       </main>
       ${/* ХЕЛПЪТ (И124 т.5 · ADR-136) · вдясно, скрит по подразбиране. */
@@ -902,9 +912,14 @@ async function trugvay(): Promise<void> {
     // „хедъра който се лепи отгоре и се сменя за всяка таблица се маха,
     // защото не работи добре и натоварва."
     zakachiGrupite(koren, ekran);
-    // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с повече от три
-    // (ADR-057в). СЛЕД подредбата: редът изрежда секциите в реда, в който
-    // човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
+    // МЕНЮТАТА СА АКТИВНИ ОТ ПЪРВИЯ МИГ (И127 т.1 · резен 90): секциите на
+    // ВСЕКИ достъпен екран се четат от рисуване НАУМ, преди човек да е влизал
+    // където и да е. Рисува се със СЪЩИЯ контекст — един извор, нула
+    // предсказване. Само за екраните БЕЗ памет: втори път е излишна работа.
+    napalniPamettaNaMenyutata(kontekstat);
+    // ПАДАЩИЯТ РЕД НА ЛЕНТАТА · секциите на всеки екран с две и повече
+    // (ADR-057в · ADR-143). СЛЕД подредбата: редът изрежда секциите в реда, в
+    // който човекът ги е наредил, а не в реда, в който екранът ги е нарисувал.
     zakachiMenyutataNaEkranite(koren, ekran, otvoriEkran, prerisuvay);
     /**
      * КОИ ЕКРАНА СА ДОСТЪПНИ · един израз за ДВАТА викащи (правило 17).
@@ -972,6 +987,34 @@ async function trugvay(): Promise<void> {
  * пунктове, а то не е ред). Преписан на две места, филтърът щеше да се разминава
  * при първата нова възможност.
  */
+/**
+ * ПЪЛНИ ПАМЕТТА НА МЕНЮТАТА · екраните се рисуват НАУМ (И127 т.1 · резен 90).
+ *
+ * Негова дума: „Направи падащите менюта да са АКТИВНИ." Дотук редът на екран,
+ * който никога не е отварян, го НЯМАШЕ — цената, обявена в ADR-057в. Тя пада
+ * тук, и то БЕЗ втори регистър: `narisuvay` връща НИЗ, значи всеки екран може
+ * да се нарисува наум — нищо не се показва, нищо не се закача, нула събития —
+ * и секциите му се четат от този низ със СЪЩОТО сито, което чете живия DOM.
+ * Разминаване е невъзможно по построение (правило 17), не по дисциплина.
+ *
+ * ЦЕНАТА, КАЗАНА: това е по едно рисуване на екран, ЕДИН път — само за онези
+ * без памет. Отваряният екран презаписва своята при всяко рисуване, тъй че
+ * второто минаване тук не прави нищо. Екран, който гръмне при рисуване наум
+ * (липсващ контур, чужда книга), се ПРОПУСКА мълчаливо: менюто му остава
+ * каквото е било, вместо цялото приложение да падне заради един ред в меню.
+ */
+function napalniPamettaNaMenyutata(kontekstat: ZaRisuvane): void {
+  for (const klyuch of kontekstat.dostapniEkrani) {
+    if (klyuch === 'nastroyki') continue; // свой ред по ТЕМИ, не по секции
+    if (chetiEkranno<unknown[]>(`sektsii.${klyuch}`, []).length > 0) continue;
+    try {
+      zapomniSektsiiteOtHTML(klyuch, EKRANI[klyuch as KoyEkran].narisuvay(kontekstat));
+    } catch {
+      // Мълчи нарочно · вж. шапката.
+    }
+  }
+}
+
 function dostapniteEkrani(n: {
   readonly rolya: Rolya;
   readonly lichnoVklyucheno: boolean;

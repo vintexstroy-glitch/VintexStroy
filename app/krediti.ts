@@ -300,7 +300,7 @@ function blokNaPlana(o: Ogledalo, r: RedNaKredita, dnes: string): string {
       Договорът и погасителният план остават в Драйва — влиза отпечатъкът им,
       не байтовете (ADR-073).</p>
 
-      <div class="tablitsa" data-tablitsa="krediti-plan">
+      <div class="tablitsa" data-tablitsa="krediti-plan" data-ime="Планът по дати">
         <div class="red glava planred" translate="no">
           <span class="kletka">Дата</span>
           <span class="kletka">Вноска</span>
@@ -401,7 +401,7 @@ function blokNaPredstoyashtite(o: Ogledalo, dnes: string): string {
       ${
         redove.length === 0
           ? '<p class="drebno" data-predstoyashti="0">Нито една вноска в следващите 45 дни.</p>'
-          : `<div class="tablitsa" data-tablitsa="krediti-predstoyashti">
+          : `<div class="tablitsa" data-tablitsa="krediti-predstoyashti" data-ime="Предстоящи вноски">
         <div class="red glava vnoskared" translate="no">
           <span class="kletka">Кредит</span>
           <span class="kletka">Дата</span>
@@ -519,7 +519,7 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
       идват от плана, а платеното се записва отделно.</p>
 
       ${poleZaTarsene('krediti')}
-      <div class="tablitsa" data-tablitsa="krediti">
+      <div class="tablitsa" data-tablitsa="krediti" data-ime="Кредити · вноски за месеца">
         <div class="red glava krediteured" translate="no">
           ${glaviNaTablitsata('krediti', KOLONI_S_FILTAR, redove, dnes)}
         </div>
