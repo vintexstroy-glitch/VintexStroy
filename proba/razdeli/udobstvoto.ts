@@ -214,10 +214,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.keyboard.press('Control+c');
     await p.waitForFunction(() =>
       document.querySelector('.status-lenta')?.textContent?.includes('Копирано'));
+    // КРАЯТ НА РЕДА В КЛИПБОРДА · на Windows Chrome връща `\r\n` (ADR-152 §6):
+    // цепене по `\n` оставяше `\r` на първия ред и „чисти числа" падаше без
+    // приложението да е сгрешило — Excel приема и двете.
     const vKlipborda = await p.evaluate(() => navigator.clipboard.readText());
-    proveri('копирани са два реда', vKlipborda.split('\n').length, 2);
+    const redoveVKlipborda = vKlipborda.split(/\r?\n/);
+    proveri('копирани са два реда', redoveVKlipborda.length, 2);
     proveri('парите тръгват като ЧИСТИ числа — Excel смята по тях',
-      vKlipborda.split('\n').every((r) => /^\d+,\d\d$/.test(r)), true);
+      redoveVKlipborda.every((r) => /^\d+,\d\d$/.test(r)), true);
     proveri('и лентата казва „Копирано"',
       ((await statusnaLenta()) ?? '').includes('Копирано · 2 реда'), true);
     await p.keyboard.press('Escape');
@@ -1793,9 +1797,13 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval(`${IMOTI_RED} .pravo [data-ne-deystva]`, (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('СМЕТКА'), true);
 
-    // ГРАНИЦАТА · Управление още не влиза, и това се КАЗВА, не се премълчава.
-    proveri('границата стои с думи на екрана',
-      (await tekstNa(p, '[data-granitsa-upravlenie]')).includes('Управление'), true);
+    // УПРАВЛЕНИЕ ВЛИЗА (резен 48 · `vgraden:dela`). Екранът обявяваше граница,
+    // която отдавна беше паднала — застоял текст, намерен от сверката на 02.09
+    // (ADR-153). Проверката е обърната: групата на Управление Е в матрицата,
+    // а надпис за граница НЯМА (правило 15: екран, който казва „не може", докато може).
+    proveri('Управление е в матрицата · и паднала граница не се обявява',
+      (await p.$$eval('[data-grupa-hedari=gant] [data-hedar-red]', (e) => e.length)) > 0 &&
+        (await p.$$('[data-granitsa-upravlenie]')).length === 0, true);
 
     await naEkran(p, 'imoti', '#forma-imot');
 

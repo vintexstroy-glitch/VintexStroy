@@ -16,7 +16,7 @@ import { chromium, nameriHroma } from '../stroezh/hrom.mjs';
 import { Broyach } from './yadro/proverka.ts';
 import type { KonteksNaProhoda } from './yadro/kontekst.ts';
 import { postaviGoogle } from './yadro/mok-google.ts';
-import { pusniServer, pochakaySurvara } from './yadro/server.ts';
+import { pusniServer, pochakaySurvara, spriServer } from './yadro/server.ts';
 import { tishina } from './yadro/tishina.ts';
 
 import * as vhodISamolichnost from './razdeli/vhod-i-samolichnost.ts';
@@ -227,7 +227,7 @@ async function main(): Promise<void> {
 
   await brauzar.close();
   try {
-    if (server.pid) process.kill(-server.pid);
+    spriServer(server);
   } catch {
     /* вече е спрян */
   }

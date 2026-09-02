@@ -40,6 +40,13 @@ export function nameriHroma() {
     })(),
     '/opt/pw-browsers/chromium',
     '/opt/pw-browsers/chromium-1194/chrome-linux/chrome',
+    // WINDOWS · машината на собственика (ADR-152 §6). Chrome и Edge са Chromium
+    // и Playwright ги кара; търсят се на стандартните места, без да се заковава
+    // нито едно. `PROGRAMFILES` и `LOCALAPPDATA` са на средата, не наши.
+    `${process.env['PROGRAMFILES'] ?? 'C:/Program Files'}/Google/Chrome/Application/chrome.exe`,
+    `${process.env['PROGRAMFILES(X86)'] ?? 'C:/Program Files (x86)'}/Google/Chrome/Application/chrome.exe`,
+    `${process.env['LOCALAPPDATA'] ?? ''}/Google/Chrome/Application/chrome.exe`,
+    `${process.env['PROGRAMFILES(X86)'] ?? 'C:/Program Files (x86)'}/Microsoft/Edge/Application/msedge.exe`,
   ];
   for (const k of kandidati) {
     if (k && existsSync(k)) return k;
