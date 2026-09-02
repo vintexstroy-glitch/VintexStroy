@@ -17,14 +17,28 @@
  * предскаже — и щеше да се разминава при всяка смяна на агент (правило 17).
  *
  * Затова списъкът се ЧЕТЕ ОТ ЕКРАНА. За екрана, на който стоиш — от живия DOM,
- * значи винаги точен. За останалите — от ПАМЕТТА на екрана, попълнена при
- * последното им отваряне. Резен 4 направи това възможно: дотогава секцията
- * нямаше стабилен ключ и запомнен списък щеше да сочи в нищото при първото
- * преименувано заглавие.
+ * значи винаги точен. За останалите — от ПАМЕТТА на екрана. Резен 4 направи
+ * това възможно: дотогава секцията нямаше стабилен ключ и запомнен списък щеше
+ * да сочи в нищото при първото преименувано заглавие.
  *
- * Цената, казана: екран, който НИКОГА не е отварян, няма падащ ред. Не се
- * лъже с предположен списък — просто пунктът е обикновен, докато не го отвориш
- * веднъж.
+ * ═══ И ЦЕНАТА ПАДНА · МЕНЮТАТА СА АКТИВНИ ОТ ПЪРВИЯ МИГ (И127 т.1) ═══
+ *
+ * Дотук цената беше казана и приета: „екран, който НИКОГА не е отварян, няма
+ * падащ ред". Негова дума, 01.09: „Направи падащите менюта да са АКТИВНИ и да
+ * са РАЗДЕЛЕНИ ТАБЛИЦИТЕ." Тоест цената пада — но НЕ с втори регистър, който
+ * пак би се разминавал.
+ *
+ * Паметта се пълни ПРЕДВАРИТЕЛНО, от СЪЩИЯ извор: екранът се рисува НАУМ
+ * (`narisuvay` връща низ — нищо не се показва и нищо не се закача), секциите
+ * му се четат от този низ със същото сито, и се записват. Един извор, нула
+ * предсказване: разминаване е невъзможно по построение, а не по дисциплина.
+ *
+ * ═══ И ТАБЛИЦИТЕ СА РАЗДЕЛЕНИ ═══
+ *
+ * Секция с ЕДНА таблица е един пункт. Секция с ПОВЕЧЕ таблици се разтваря:
+ * под нея стои по един подпункт за всяка таблица, с ИМЕТО ѝ (`data-ime`).
+ * Таблица без име не получава подпункт — измислено име е по-лошо от липсващо,
+ * а проходът брои безименните с праг НУЛА.
  *
  * ═══ ЗАЩО СЕ СТРОИ ПРИ ЗАКАЧАНЕ, А НЕ ПРИ РИСУВАНЕ ═══
  *
@@ -43,12 +57,20 @@ import {
   podrediPoSemeystvo,
 } from './semeystva.js';
 
+/** Една таблица в секция · само когато носи свое ИМЕ (И127 т.1). */
+interface TablitsaVSektsiya {
+  readonly klyuch: string;
+  readonly ime: string;
+}
+
 /** Една секция, както се показва в реда. */
 interface Sektsiya {
   readonly klyuch: string;
   readonly ime: string;
   /** отпечатъкът на главата ѝ · празен, когато секцията няма таблица (резен 11) */
   readonly otpechatak?: string;
+  /** таблиците ѝ · пълни се САМО при две и повече, за да се разделят */
+  readonly tablitsi?: readonly TablitsaVSektsiya[];
 }
 
 /**
@@ -67,8 +89,25 @@ function klyuchat(ekran: string): string {
   return `sektsii.${ekran}`;
 }
 
+/**
+ * ТАБЛИЦИТЕ НА ЕДНА СЕКЦИЯ · само когато са ДВЕ и повече, и само именуваните.
+ *
+ * Една таблица не се дели от себе си — там секцията вече е пунктът. При две и
+ * повече всяка именувана става подпункт: „да са разделени таблиците".
+ */
+function tablitsiteNa(sektsiya: Element): readonly TablitsaVSektsiya[] {
+  const vsichki = [...sektsiya.querySelectorAll('.tablitsa[data-tablitsa]')];
+  if (vsichki.length < 2) return [];
+  return vsichki
+    .map((t) => ({
+      klyuch: (t as HTMLElement).dataset['tablitsa'] ?? '',
+      ime: (t as HTMLElement).dataset['ime'] ?? '',
+    }))
+    .filter((t) => t.klyuch !== '' && t.ime !== '');
+}
+
 /** Секциите на НАРИСУВАНИЯ екран · същото сито като при подредбата. */
-function sektsiiteNa(koren: ParentNode): Sektsiya[] {
+export function sektsiiteNa(koren: ParentNode): Sektsiya[] {
   const telo = koren.querySelector('.telo');
   if (!telo) return [];
   return [...telo.children]
@@ -83,8 +122,26 @@ function sektsiiteNa(koren: ParentNode): Sektsiya[] {
           (k) => k.textContent?.trim() ?? '',
         ),
       ),
+      tablitsi: tablitsiteNa(e),
     }))
     .filter((s) => s.klyuch !== '' && s.ime !== '');
+}
+
+/**
+ * ЗАПОМНЯ СЕКЦИИТЕ НА ЕКРАН, НАРИСУВАН НАУМ (И127 т.1 · резен 90).
+ *
+ * Викащият подава готовия HTML низ на екрана — същия, който би сложил в
+ * тялото. Тук той се чете със СЪЩОТО сито, което чете живия DOM: един извор,
+ * нула предсказване. Пише се само когато има какво: празен резултат не гаси
+ * стара, вярна памет.
+ */
+export function zapomniSektsiiteOtHTML(ekran: string, html: string): number {
+  const list = document.implementation.createHTMLDocument('');
+  // Ситото търси `.telo` — низът на екрана е СЪДЪРЖАНИЕТО ѝ, не тя самата.
+  list.body.innerHTML = `<div class="telo">${html}</div>`;
+  const sektsii = sektsiiteNa(list.body);
+  if (sektsii.length > 0) zapomniEkranno(klyuchat(ekran), sektsii);
+  return sektsii.length;
 }
 
 /**
@@ -100,12 +157,21 @@ export async function zavediDoSektsiyata(
   sektsiya: string,
   otvoriEkran: (ekran: string) => Promise<void>,
   prerisuvay: () => Promise<void>,
+  tablitsa = '',
 ): Promise<void> {
   await otvoriEkran(ekran);
   await prerisuvay();
   // СЛЕД прерисуването: старият възел вече го няма, а новият още не е намерен.
   // Търси се в живия документ, не в стария корен.
-  const tsel = document.querySelector<HTMLElement>(`[data-sektsiya="${CSS.escape(sektsiya)}"]`);
+  //
+  // ТАБЛИЦАТА БИЕ СЕКЦИЯТА (И127 т.1): подпунктът сочи КОНКРЕТНА таблица —
+  // тя е по-тясната цел. Няма ли я (изчезнала между двете рисувания), пада се
+  // до секцията ѝ, вместо да не стане нищо.
+  const tsel =
+    (tablitsa === ''
+      ? null
+      : document.querySelector<HTMLElement>(`.tablitsa[data-tablitsa="${CSS.escape(tablitsa)}"]`)) ??
+    document.querySelector<HTMLElement>(`[data-sektsiya="${CSS.escape(sektsiya)}"]`);
   if (!tsel) return;
   tsel.scrollIntoView({ block: 'start' });
   tsel.classList.add('podchertana');
@@ -190,7 +256,17 @@ export function zakachiMenyutataNaEkranite(
           (s) =>
             `<button type="button" class="tema" role="menuitem" data-kam-sektsiya="${ekraniraj(
               s.klyuch,
-            )}"><span class="dvete"><b>${ekraniraj(s.ime)}</b></span></button>`,
+            )}"><span class="dvete"><b>${ekraniraj(s.ime)}</b></span></button>` +
+            // ТАБЛИЦИТЕ РАЗДЕЛЕНИ · подпункт за всяка именувана, когато са 2+.
+            (s.tablitsi ?? [])
+              .map(
+                (t) =>
+                  `<button type="button" class="tema podtablitsa" role="menuitem"
+                     data-kam-sektsiya="${ekraniraj(s.klyuch)}"
+                     data-kam-tablitsa="${ekraniraj(t.klyuch)}"><span class="dvete"><span
+                     class="drebno">${ekraniraj(t.ime)}</span></span></button>`,
+              )
+              .join(''),
         )
         .join('') +
       (semeystva > 0
@@ -216,7 +292,13 @@ export function zakachiMenyutataNaEkranite(
     for (const b of red.querySelectorAll<HTMLButtonElement>('[data-kam-sektsiya]')) {
       b.addEventListener('click', async () => {
         zatvoriVsichki();
-        await zavediDoSektsiyata(koy, b.dataset['kamSektsiya'] ?? '', otvoriEkran, prerisuvay);
+        await zavediDoSektsiyata(
+          koy,
+          b.dataset['kamSektsiya'] ?? '',
+          otvoriEkran,
+          prerisuvay,
+          b.dataset['kamTablitsa'] ?? '',
+        );
       });
     }
 

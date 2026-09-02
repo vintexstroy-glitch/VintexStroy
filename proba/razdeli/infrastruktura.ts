@@ -551,6 +551,15 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     let nayMnogoGoli = 0;
     let nayMnogoPrazno = 0;
     let nayMnogoKuli = 0;
+    /**
+     * БЕЗИМЕННИТЕ ТАБЛИЦИ · И127 т.1 („да са разделени таблиците") · праг НУЛА.
+     *
+     * Секция с ЕДНА таблица е сама по себе си разделена — заглавието ѝ е
+     * заглавието на таблицата. Секция с ДВЕ и повече иска име на всяка, иначе
+     * менюто няма как да ги раздели, а окото — как да ги различи. Броят се
+     * ПОИМЕННО, за да се знае коя точно чака име.
+     */
+    const bezIme: string[] = [];
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
@@ -563,6 +572,24 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['tablo', '#tablo-lichno'],
     ] as const) {
       await naEkran(p, ekran, znak);
+      // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на
+      // един обход по деветте екрана.
+      bezIme.push(
+        ...(await p.evaluate(() =>
+          [...document.querySelectorAll('.telo > [data-sektsiya]')].flatMap((sek) => {
+            const tablitsi = [...sek.querySelectorAll('.tablitsa[data-tablitsa]')];
+            if (tablitsi.length < 2) return [];
+            return tablitsi
+              .filter((t) => ((t as HTMLElement).dataset['ime'] ?? '') === '')
+              .map(
+                (t) =>
+                  `${(sek as HTMLElement).dataset['sektsiya']}/${
+                    (t as HTMLElement).dataset['tablitsa']
+                  }`,
+              );
+          }),
+        )),
+      );
       const m = await p.evaluate(() => {
         const vidim = (e: Element): boolean => {
           const r = e.getBoundingClientRect();
@@ -637,6 +664,12 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       nayMnogoKuli === 0 ? 'да' : `не · ${nayMnogoKuli}`,
       'да',
     );
+    // И127 т.1 · „да са разделени таблиците" · праг НУЛА, с ИМЕНАТА в думите.
+    proveri(
+      'всяка таблица в многотаблична секция носи ИМЕ · инак не се дели',
+      bezIme.length === 0 ? 'да' : `не · ${[...new Set(bezIme)].join(' · ')}`,
+      'да',
+    );
 
     // ── СГЪВАНЕТО НА ДЯЛА · „да е СКРИТО с дребни бутончета" (И101) ────────
     razdel = '134б · дялът се сгъва';
@@ -704,6 +737,24 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['tablo', '#tablo-lichno'],
     ] as const) {
       await naEkran(p, ekran, znak);
+      // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на
+      // един обход по деветте екрана.
+      bezIme.push(
+        ...(await p.evaluate(() =>
+          [...document.querySelectorAll('.telo > [data-sektsiya]')].flatMap((sek) => {
+            const tablitsi = [...sek.querySelectorAll('.tablitsa[data-tablitsa]')];
+            if (tablitsi.length < 2) return [];
+            return tablitsi
+              .filter((t) => ((t as HTMLElement).dataset['ime'] ?? '') === '')
+              .map(
+                (t) =>
+                  `${(sek as HTMLElement).dataset['sektsiya']}/${
+                    (t as HTMLElement).dataset['tablitsa']
+                  }`,
+              );
+          }),
+        )),
+      );
       const m = await p.evaluate(() => {
         const vidim = (e: Element): boolean => {
           const r = e.getBoundingClientRect();

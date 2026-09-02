@@ -131,7 +131,7 @@ export interface Konteks {
  * беше, че тернарната верига долу знаеше КОЙ какво иска. Тук въпросът се
  * обръща: рисуването получава ВСИЧКО и всеки взима каквото му трябва.
  */
-interface ZaRisuvane {
+export interface ZaRisuvane {
   readonly ogledalo: Ogledalo;
   readonly broySabitiya: number;
   readonly dnes: string;

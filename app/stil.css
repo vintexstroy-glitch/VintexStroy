@@ -323,15 +323,11 @@
      27.08: „Бутоните за размера на текста да е видим по всяко време горе в
      дясно, на всеки прозорец").
 
-     Числото е МНОЖИТЕЛ, не нова скала: `clamp(…rem…)` следва настройката на
-     устройството (резен 1) и остава. Човек със слабо зрение, който си е вдигнал
-     шрифта в браузъра, инак би загубил своето при първото натискане.
-
-     Стои на КОРЕНА нарочно: изскачащият прозорец виси на `body`, значи
-     наследява същото число. Сложено на `.telo`, то щеше да спре точно на
-     границата на прозореца. */
-  --golemina: 1;
-  --text-base: calc(clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem) * var(--golemina));
+     МНОЖИТЕЛЯТ ПАДНА с лоста си (И127 т.3 · ADR-149): „бутоните за размер на
+     текста ги махни". Скалата остава онова, което множител 1 винаги е давал —
+     `clamp(…rem…)`, тоест НАСТРОЙКАТА НА УСТРОЙСТВОТО (резен 1). Който иска
+     по-едро, го вдига в браузъра си, и приложението го следва. */
+  --text-base: clamp(0.95rem, 0.9rem + 0.3vw, 1.05rem);
   --text-xs: calc(var(--text-base) * 0.79);
   --text-sm: calc(var(--text-base) * 0.89);
   --text-md: var(--text-base);
@@ -522,7 +518,6 @@ a:hover { color: var(--aktsent-tumen); }
 .profil-panel hr { border: none; border-top: 1px solid var(--liniya); margin: 10px 0; }
 .profil-koy { display: flex; flex-direction: column; gap: 2px; }
 .profil-red { display: flex; flex-direction: column; gap: 6px; font-size: 0.857rem; color: var(--mastilo2); }
-.temite { display: flex; flex-direction: column; gap: 6px; }
 .tema-red {
   display: grid; grid-template-columns: auto auto; grid-template-rows: auto auto;
   column-gap: 8px; align-items: center; cursor: pointer;
@@ -562,29 +557,10 @@ a:hover { color: var(--aktsent-tumen); }
   .help-rab { left: 0; right: 0; top: -3px; bottom: auto; width: auto; height: 6px; cursor: row-resize; }
 }
 
-/* ЛОСТЪТ ЗА РАЗМЕРА · трите „A" се различават по РАЗМЕР, не по знак — лостът
-   показва каквото прави. Стои и в шапката, и в прозореца: прозорецът ПОКРИВА
-   шапката, а лост зад воала е лост, който го няма. */
-.goleminata { display: inline-flex; align-items: baseline; gap: 2px; }
-.goleminata button {
-  border: 1px solid var(--liniya); background: #FFFFFF; color: var(--mastilo2);
-  border-radius: 4px; padding: 2px 8px; line-height: 1.2; cursor: pointer;
-  font-family: inherit;
-}
-.goleminata button:hover { background: var(--panel); color: var(--mastilo); }
-.goleminata button[aria-pressed='true'] {
-  background: var(--aktsent); border-color: var(--aktsent); color: #FBF8F3;
-}
-/* Размерите са ЗАКОВАНИ в px, а не в rem: това е ЛЕГЕНДАТА на лоста, а не текст
-   от приложението. Расте ли и тя с избора, трите „A" остават еднакви помежду
-   си и лостът престава да казва кое какво е. */
-.goleminata .golemina-drebno { font-size: 11px; }
-.goleminata .golemina-normalno { font-size: 14px; }
-.goleminata .golemina-edro { font-size: 18px; }
-
-/* В ПРОЗОРЕЦА · горе вдясно, до заглавието. */
+/* ЛОСТЪТ ЗА РАЗМЕРА И ИЗБОРЪТ НА ТЕМА ПАДНАХА (И127 т.3 · ADR-149) — с тях
+   паднаха и стиловете им (`.goleminata`, `.temite`): стил без разметка е
+   мъртва буква, а `chistota` не чете листове. */
 .istoriya-karta { position: relative; }
-.istoriya-karta > .goleminata { position: absolute; top: 14px; right: 14px; }
 
 .telo {
   flex-grow: 1; min-width: 0; padding: var(--space-lg);
@@ -681,14 +657,17 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 .dyalglava span { font-size: 0.857rem; color: var(--mastilo2); }
 
 /* Таблицата НЯМА свой скрол (резен 9а — виж `.ekran` по-горе): скролира
-   `.telo`, и затова главата се лепи за ОКОТО. `width: max-content` държи
-   рамката около редовете ѝ, когато те са по-широки от екрана; `min-width: 100%`
-   я държи цяла, когато не са. */
+   `.telo`. `width: max-content` държи рамката около редовете ѝ, когато те са
+   по-широки от екрана; `min-width: 100%` я държи цяла, когато не са. */
 .tablitsa {
   border: 1px solid var(--liniya); border-radius: 5px; background: #FFFFFF;
   width: max-content; min-width: 100%;
 }
-.glava > :first-child, .red > :first-child { position: sticky; left: 0; z-index: 1; }
+/* ЗАМРАЗЕНАТА ПЪРВА КОЛОНА ПАДА (И127 т.2 · ADR-148). ADR-133 я остави с
+   довода „тя е хоризонтална и той не я е назовал" — сега е назована:
+   „хедъра който се лепи от различните таблици… махни го НАВСЯКЪДЕ", а тя е
+   точно глава, лепната при страничен скрол. Фонът остава: първата клетка се
+   различава по цвят, не по залепване. */
 .glava > :first-child { background: var(--panel); }
 .red > :first-child { background: #FFFFFF; }
 .glava, .red {
@@ -722,7 +701,11 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 /* ПОДРАЗБРАНАТА ВИСОЧИНА идва от ТЕМАТА на корена (резен 78 · ADR-135):
    „Начални" = 48px (премереното), „Основни" = 32px. Ръчното влачене по ръба
    пише направо на таблицата и бие темата. Гантът пази своята сбита шарка. */
-.tablitsa { --red-visochina: var(--tema-red-visochina, 48px); }
+/* ПОДРАЗБРАНАТА ВИСОЧИНА · 48px, премереният ред от резен 8 (49px). Дотук
+   идваше от темата на натоварването; тя падна с бутоните си (И127 т.3 ·
+   ADR-149), а числото ОСТАВА — то е онова, което екранът е показвал.
+   Ръчното влачене по ръба (Ексел-жестът) го бие за своята таблица. */
+.tablitsa { --red-visochina: 48px; }
 .tablitsa .red { min-height: var(--red-visochina); }
 /* Истинските <table> таблици · редовете им са <tr>, не .red. Дотук
    променливата не ги стигаше и трите гъстоти там бяха ДЕКОРАЦИЯ — лостът
@@ -1703,23 +1686,21 @@ table.razbivka .drebno { font-size: 0.75rem; }
 
 /* ── ГРУПАТА ХЕДЪРИ · подредени по табовете на менюто (И103) ────────────────
    Негови думи: „подредени както са по табовете в менюто И ОТДЕЛЕНИ ПРИ СКРОЛ."
-   „Отделени" е залепването: заглавието на таба остава горе, докато под него
-   текат неговите хедъри, и се сменя на границата между два таба.
+   „Отделени" е РАЗДЕЛЕНИ — своя рамка и свое заглавие на всяка група; ДОТУК
+   го четях като „залепени" и заглавието стоеше `sticky top: 0`.
 
-   ЗАЩО `top: 0` ЛЕПИ ЗА ОКОТО: единствената скролираща кутия е `.telo`
-   (резен 9а), значи `sticky` брои спрямо нея, а не спрямо някаква вътрешна.
-   Втора скролираща кутия тук щеше да залепи заглавието за нещо, което човек
-   не гледа.
+   ЗАЛЕПВАНЕТО ПАДА (И127 т.2 · ADR-148): „хедъра който се лепи от различните
+   таблици го има на места. Махни го навсякъде." Навсякъде значи и тук, и при
+   първата колона на всяка таблица — нула лепнати глави в целия лист, и
+   мярката го БРОИ, за да не се върне тихо.
 
    ЗАГЛАВИЕТО Е НАДПИС, НЕ БУТОН (`role="presentation"`) — клавиатурата не бива
    да спира на нещо, което не прави нищо. Лостът ДО него е бутонът. */
 .grupa-hedari { margin: 18px 0; }
 /* СВОЕ ИМЕ, не назаем: `.grupa-zaglavie` вече е заето от заглавията в падащия
-   ред на Настройки (резен 6). Взето назаем, залепването щеше да се приложи и
-   ТАМ — стил, който пътува до чужд екран, без някой да го е искал. Проходът го
-   намери: първият `.grupa-zaglavie` на страницата беше НЕ моят. */
+   ред на Настройки (резен 6). Името си остава свое и без залепването: два
+   стила под едно име се разминават при първата смяна на единия. */
 .hedari-zaglavie {
-  position: sticky; top: 0; z-index: 2;
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
   gap: 8px;
   padding: 7px 10px; margin-bottom: 8px;

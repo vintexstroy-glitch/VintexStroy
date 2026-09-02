@@ -298,10 +298,18 @@ describe('секциите на Настройки по човек (резен 8
     }
   });
 
-  it('служителят вижда СВОИТЕ · сверките и личните две', () => {
-    for (const s of ['sverki', 'tema-natovarvane', 'podredbata']) {
+  it('служителят вижда СВОИТЕ · сверките и личната подредба', () => {
+    for (const s of ['sverki', 'podredbata']) {
       expect(vizhdaSektsiyata('sluzhitel', s), s).toBe(true);
     }
+  });
+
+  it('а „темата на натоварването" е ПАДНАЛА · име без секция не се пази', () => {
+    // И127 т.3 (резен 92 · ADR-149): бутоните за гъстотата паднаха, а с тях и
+    // секцията им. Останало в списъка на личните, името щеше да отваря врата
+    // към несъществуващо — и да лъже описа, който точно това пази.
+    expect(vizhdaSektsiyata('sluzhitel', 'tema-natovarvane')).toBe(false);
+    expect(vizhdaSektsiyata('upalnomoshten', 'tema-natovarvane')).toBe(false);
   });
 
   it('а стопанските ги НЯМА за него · изброени поименно', () => {
@@ -310,10 +318,9 @@ describe('секциите на Настройки по човек (резен 8
     }
   });
 
-  it('упълномощеният е най-тесен · само личните две', () => {
+  it('упълномощеният е най-тесен · само личната подредба', () => {
     expect(vizhdaSektsiyata('upalnomoshten', 'sverki')).toBe(false);
     expect(vizhdaSektsiyata('upalnomoshten', 'podredbata')).toBe(true);
-    expect(vizhdaSektsiyata('upalnomoshten', 'tema-natovarvane')).toBe(true);
   });
 
   it('НЕПОЗНАТА секция пада към стопанска, не към видима', () => {
