@@ -20,9 +20,11 @@
 
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const KOREN = new URL('..', import.meta.url).pathname;
+// `fileURLToPath`, а НЕ `.pathname` (резен 94 · ADR-152): на Windows
+// `.pathname` връща „/C:/…" и `join` го превръща в „C:\\C:\\…".
+const KOREN = fileURLToPath(new URL('..', import.meta.url));
 
 function faylove(papka, kray = '.ts') {
   const spisak = [];

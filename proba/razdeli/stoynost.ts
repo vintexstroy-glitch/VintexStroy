@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import type { Page } from 'playwright-core';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+// `fileURLToPath`, а НЕ `.pathname` · на Windows второто дава „/C:/…" (ADR-152).
+import { fileURLToPath } from 'node:url';
 
 /**
  * СМЕНЯ ЕДНО ПОЛЕ НА КАЛКУЛАТОРА И ЧАКА ИЗХОДЪТ ДА МРЪДНЕ · §84 и §89.
@@ -178,7 +180,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '38 · Малинова Долина';
     await naEkran(p, 'stoynost', '#cheti-ploshti');
-    await p.setInputFiles('#fayl-ploshti', new URL('../../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.setInputFiles('#fayl-ploshti', fileURLToPath(new URL('../../primeri/tseni-md.csv', import.meta.url)));
     await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
     const vestMD = (await tekstNa(p, '.vest')).replace(/[\s\u00A0\u202F]/g, '');
     proveri('45-те обекта влизат · разликата е нула',
@@ -283,7 +285,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       razlikata.includes('Подразбираща се доходност'), true);
 
     // ВРЪЗКАТА МЕЖДУ ДВЕТЕ СЕКЦИИ · смяна горе мени числата долу
-    await p.setInputFiles('#fayl-ploshti', new URL('../../primeri/tseni-md.csv', import.meta.url).pathname);
+    await p.setInputFiles('#fayl-ploshti', fileURLToPath(new URL('../../primeri/tseni-md.csv', import.meta.url)));
     await p.waitForFunction(() => document.body.textContent.includes('Прочетени 45'));
     const predSmyana = await chisloNaPoleto(p, 'stoynost-a');
     // ЧАКА СЕ ЧИСЛОТО, не прерисуването. Обработчикът е асинхронен и прави ДВЕ
