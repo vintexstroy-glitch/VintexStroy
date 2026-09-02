@@ -346,17 +346,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
     ikona: 'ekran-sluzhiteli',
     narisuvay: (r) =>
-      narisuvaySluzhiteli(
-        r.ogledalo,
-        r.kojSam,
-        r.dnes,
-        r.izbor,
-        // Матрицата на правата подрежда хедърите по реда на менюто (И103).
-        punktoveNaMenyuto(r),
-        // ПРАВАТА ГИ РАЗДАВА САМО СТОПАНИНЪТ (И57) · ролята се СМЯТА от
-        // Журнала, не се твърди от самоличността (ADR-043).
-        rolyataNa(r.kojSam.imeyl, r.ogledalo) === 'sobstvenik',
-      ),
+      narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes, r.izbor),
     zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {

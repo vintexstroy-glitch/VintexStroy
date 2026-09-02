@@ -104,27 +104,40 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
 
     // ══ 20 · колонното право · Бамстера и скритата колона ════════════════
     //
-    // ДОМЪТ Ѝ Е ТАБЪТ СЛУЖИТЕЛИ (И103 · резен 14): „ОТ ТАМ се дават и хедърите
-    // на всички таблици." Дотук секцията стоеше в Настройки; темата смени адреса
-    // си с ЕДИН ред и §58 по-долу пази, че водù насам.
+    // ДОМЪТ Ѝ Е НАСТРОЙКИ (И129 т.2 · резен 97 · ADR-156): „в Главни настойки…
+    // с 2 падащи менюта" — служител и хедър, и чак тогава клетките. Вписването
+    // на човек остава в Служители — там се РАБОТИ с хора. Дотук (И103 · резен
+    // 14) матрицата стоеше при тях; темата смени адреса си с ЕДИН ред и §63
+    // по-долу пази, че водù насам.
     razdel = '20 · колонното право';
-    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
+    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
     // СТОПАНИНЪТ СТОИ В СПИСЪКА и без нито един вписан служител — той е първото
     // събитие в Журнала (ADR-043). Значи „още няма никого" се брои по ДРУГИТЕ.
     proveri('още няма вписан служител · само Стопанинът',
       await p.$$eval('#izbor-pravo-chovek option', (o) => o.length), 1);
+    proveri('и без избран хедър матрицата КАЗВА какво чака, вместо да е празна',
+      Boolean(await p.$('[data-pravata-izberi]')), true);
 
+    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
     await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
-
-    await p.waitForSelector('.pravo');
-    await p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com');
-    await p.waitForSelector('.pravo');
     const optsii = await p.$$eval('[data-chovek]', (o) => o.map((x) => x.textContent.replace(/\s+/g, ' ').trim()));
     proveri('служителят е записан с ролята си',
       optsii.some((r) => r.includes('Бамстера') && r.includes('редактира')), true);
+
+    // ДВЕТЕ ПАДАЩИ · служителят, после хедърът; чак тогава има клетки.
+    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
+    proveri('вторият човек е в падащото',
+      await p.$$eval('#izbor-pravo-chovek option', (o) => o.length), 2);
+    proveri('и хедърите са ГРУПИРАНИ по табове в падащото',
+      (await p.$$eval('#izbor-pravo-hedar optgroup', (o) => o.length)) >= 3, true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'Банка ОББ'));
+    await p.waitForSelector('.pravo');
+    proveri('след избора матрицата показва ЕДИН хедър · един наведнъж',
+      await p.$$eval('[data-hedar-red]', (e) => e.length), 1);
 
     // ВНОСНИЯТ хедър „Банка ОББ" · неговите шест колони, не всички на програмата.
     const OBB_RED = '[data-hedar-red="Банка ОББ"]';
@@ -134,7 +147,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
 
     // ══ ТРИТЕ СТОЙНОСТИ · И105 · „падащо меню с дума на избора, 3 варианта" ══
     const dumite = await p.$$eval(`${OBB_RED} .pravo select option`, (o) =>
-      o.slice(0, 3).map((x) => ((x.textContent ?? '').split('\u00b7')[0] ?? '').trim()));
+      o.slice(0, 3).map((x) => ((x.textContent ?? '').split('·')[0] ?? '').trim()));
     proveri('всяка колона има ПАДАЩО МЕНЮ с ТРИ думи', dumite, ['редактира', 'вижда', 'скрито']);
     proveri('нищо не е стеснено в началото', (await p.$$('.pravo.pravo-skrito')).length, 0);
     proveri('и по подразбиране стои НАЙ-ШИРОКАТА',
@@ -145,7 +158,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     const razhodPredi = await plochka(p, 'Разход');
 
     // ── СРЕДНАТА дума · новата · „гледа я, но не я пипа" ──────────────────
-    await naEkran(p, 'sluzhiteli', OBB_RED);
+    await naEkran(p, 'nastroyki', OBB_RED);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'vizhda'));
     await p.waitForSelector('.pravo.pravo-vizhda');
     proveri('свалената до „вижда" СЕ ВИЖДА · не пада от списъка',
@@ -163,7 +176,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     proveri('СКРИТОТО ПАК СЕ СМЯТА · числото не е мръднало', await plochka(p, 'Разход'), razhodPredi);
 
     // Върни я — скрий → върни → скрий не се губи (правило 20)
-    await naEkran(p, 'sluzhiteli', OBB_RED);
+    await naEkran(p, 'nastroyki', OBB_RED);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'redaktira'));
     proveri('връща се с най-широката', (await p.$$('.pravo.pravo-skrito')).length, 0);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'skrito'));
@@ -179,11 +192,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'nablyudatel');
     await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
+    await naEkran(p, 'nastroyki', OBB_RED);
     await p.waitForSelector('.pravo [data-ne-deystva]');
     proveri('на наблюдателя „редактира" НЕ действа · и се казва защо',
       (await p.$$eval('.pravo [data-ne-deystva]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('наблюдава'), true);
     // Обратно на „редактира" — останалата част от прохода го иска такъв.
+    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
@@ -329,8 +344,9 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // ИЗБОРЪТ НА СЛУЖИТЕЛ Е ПОГЛЕД, не факт: живее в паметта на екрана и
     // презареждането го изчиства (`udobstvoto.blok1` презарежда преди този
     // блок). Затова тук се избира наново — точно каквото прави и човек.
-    await naEkran(p, 'sluzhiteli', '#izbor-pravo-chovek');
-    await p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com');
+    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'Банка ОББ'));
     await p.waitForSelector('.pravo');
     proveri('и до затворената пише ЗАЩО „редактира" не действа',
       (await p.$$eval('.pravo [data-ne-deystva]', (e) =>
@@ -1035,7 +1051,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), false);
 
   // СТОПАНСКИТЕ ги НЯМА · изброени поименно, не „всичко останало".
-  for (const s of ['hedari', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
+  for (const s of ['hedari', 'pravata', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
     proveri(`стопанската секция „${s}" я НЯМА за служителя`,
       Boolean(await p.$(`[data-sektsiya=${s}]`)), false);
   }

@@ -293,7 +293,7 @@ describe('пиновете · броевете се твърдят с ръка (
  */
 describe('секциите на Настройки по човек (резен 83)', () => {
   it('стопанинът вижда ВСЯКА секция · и с тема, и без', () => {
-    for (const s of ['hedari', 'butoni', 'modeli', 'kontragenti', 'sverki', 'godinite', 'branshove', 'patishta', 'karta', 'podredbata']) {
+    for (const s of ['hedari', 'pravata', 'butoni', 'modeli', 'kontragenti', 'sverki', 'godinite', 'branshove', 'patishta', 'karta', 'podredbata']) {
       expect(vizhdaSektsiyata('stopanin', s), s).toBe(true);
     }
   });
@@ -313,7 +313,7 @@ describe('секциите на Настройки по човек (резен 8
   });
 
   it('а стопанските ги НЯМА за него · изброени поименно', () => {
-    for (const s of ['hedari', 'butoni', 'modeli', 'parametri', 'etapi-prodazhbi', 'krediti', 'kontragenti', 'zhurnalat', 'godinite', 'branshove', 'patishta', 'karta']) {
+    for (const s of ['hedari', 'pravata', 'butoni', 'modeli', 'parametri', 'etapi-prodazhbi', 'krediti', 'kontragenti', 'zhurnalat', 'godinite', 'branshove', 'patishta', 'karta']) {
       expect(vizhdaSektsiyata('sluzhitel', s), s).toBe(false);
     }
   });

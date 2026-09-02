@@ -1717,23 +1717,25 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // и подредени КАКТО СА ПО ТАБОВЕТЕ В МЕНЮТО и ОТДЕЛЕНИ ПРИ СКРОЛ… можеш по
     // ЦЯЛО МЕНЮ или по отделна ТАБЛИЦА и КОЛОНА от хедъра да дадеш достъп."
     razdel = '88 · хедърите по табовете · трите обхвата';
-    await naEkran(p, 'sluzhiteli', '[data-sektsiya="pravata"]');
+    await naEkran(p, 'nastroyki', '[data-sektsiya="pravata"]');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
 
     // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.
     // СЕДЕМ от резен 18б насам (Продажби); ОСЕМ от резен 48 — Управление влезе
     // с колонния си описател и с това падна последната граница в тази матрица;
-    // ДЕВЕТ от резен 82 — самият Журнал (сесиите) влезе като вградена.
-    const vgradeniVMatritsata = (await p.$$eval('[data-hedar-red]', (e) =>
-      e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:'));
+    // ДЕВЕТ от резен 82 — самият Журнал (сесиите) влезе като вградена. От резен
+    // 97 (ADR-156) екранът показва ЕДИН хедър наведнъж — списъкът е в падащото.
+    const vgradeniVMatritsata = (await p.$$eval('#izbor-pravo-hedar option', (e) =>
+      e.map((x) => (x as HTMLOptionElement).value))).filter((k) => k.startsWith('vgraden:'));
     proveri('вградените таблици влизат в матрицата', vgradeniVMatritsata.length, 9);
     proveri('и УПРАВЛЕНИЕ е сред тях · границата падна',
       vgradeniVMatritsata.includes('vgraden:dela'), true);
     proveri('и вносният хедър стои до тях',
-      (await p.$$('[data-hedar-red="Банка ОББ"]')).length, 1);
+      (await p.$$('#izbor-pravo-hedar option[value="Банка ОББ"]')).length, 1);
 
     // ГРУПИТЕ СА ПО ТАБОВЕ и редът им е РЕДЪТ НА ЛЕНТАТА, не азбучен.
-    const grupi = await p.$$eval('[data-grupa-hedari]', (e) =>
-      e.map((x) => x.getAttribute('data-grupa-hedari') ?? ''));
+    const grupi = await p.$$eval('#izbor-pravo-hedar optgroup', (e) =>
+      e.map((x) => x.getAttribute('data-ekran') ?? ''));
     proveri('хедърите са ГРУПИРАНИ по табове', grupi.length >= 3, true);
     const vLentata = await p.$$eval('.nav > [data-ekran]', (e) =>
       e.map((x) => x.getAttribute('data-ekran') ?? ''));
@@ -1758,14 +1760,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       Number(await tekstNa(p, '[data-bez-tab]')) >= 1, true);
     proveri('и стоят в ПОСЛЕДНАТА група', grupi.at(-1), '');
 
-    // ЗАЛЕПВАНЕТО ПАДА · „махни го навсякъде" (И127 т.2 · ADR-148). „Отделени
-    // при скрол" се чете РАЗДЕЛЕНИ — своя рамка и свое заглавие, не лепнати.
-    proveri('заглавието на групата НЕ лепне · тече с текста си',
-      await p.$eval('.hedari-zaglavie', (e) => getComputedStyle(e).position), 'static');
-    proveri('и е НАДПИС, не бутон · клавиатурата не спира на него',
-      await p.$eval('.hedari-zaglavie', (e) => e.getAttribute('role')), 'presentation');
-
     // ══ ЦЯЛАТА ТАБЛИЦА С ЕДНА ДУМА · вторият обхват ═══════════════════════
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'vgraden:imoti'));
     const IMOTI_RED = '[data-hedar-red="vgraden:imoti"]';
     const koloniNaImoti = await p.$$eval(`${IMOTI_RED} .pravo`, (e) => e.length);
     proveri('вградената таблица показва колоните си', koloniNaImoti > 1, true);
@@ -1777,28 +1773,28 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и казва колко записа е направила',
       (await tekstNa(p, '.vest')).includes('1 таблица'), true);
 
-    // ══ ЦЯЛО МЕНЮ · третият обхват · N таблици, N записа ══════════════════
-    // Табът „Имоти" носи ДВЕ вградени таблици — Имоти и Наеми. Едно действие,
-    // два записа, защото правото е на двойката (служител, хедър).
-    const tablitsiVImoti = await p.$$eval('[data-grupa-hedari=imoti] [data-hedar-red]', (e) => e.length);
+    // ══ ЦЯЛ ТАБ · третият обхват · N таблици, N записа ════════════════════
+    // Табът „Имоти" носи ДВЕ вградени таблици — Имоти и Наеми. Лостът стои под
+    // избрания хедър и казва колко таблици пипа. Едно действие, два записа,
+    // защото правото е на двойката (служител, хедър).
+    const tablitsiVImoti = await p.$$eval('#izbor-pravo-hedar optgroup[data-ekran=imoti] option', (e) => e.length);
     proveri('табът „Имоти" носи повече от една таблица', tablitsiVImoti >= 2, true);
-    const kolonivImoti = await p.$$eval('[data-grupa-hedari=imoti] .pravo', (e) => e.length);
+    proveri('и лостът „цял таб" стои под хедъра · само защото табът има повече от една',
+      await p.$$eval('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', (e) => e.length), 1);
     // ЧАКА СЕ ЕКРАНЪТ, не броят събития. `sSabitiya(N)` би паднало с TIMEOUT —
     // изход, който казва „нещо не стана", вместо „чакани 8 скрити, видени 5".
-    // Диагноза с число е по-евтина от диагноза с таймаут: счупих обхвата
-    // нарочно да пипа само първата таблица и точно това ме научи.
     await deystvieSPrerisuvane(p, () =>
-      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'skrito'));
-    proveri('„цяло меню" скрива всички колони на ВСИЧКИТЕ му таблици',
-      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), kolonivImoti);
+      p.selectOption('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', 'skrito'));
+    proveri('„цял таб" скрива всички колони на показания хедър',
+      await p.$$eval('.pravo.pravo-skrito', (e) => e.length), koloniNaImoti);
     proveri('и записите са по ЕДИН на таблица · право на таб няма',
       (await tekstNa(p, '.vest')).includes(`${tablitsiVImoti} таблици`), true);
 
     // ВРЪЩАНЕТО · „редактира" изпразва стеснението, не го пълни.
     await deystvieSPrerisuvane(p, () =>
-      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'redaktira'));
+      p.selectOption('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', 'redaktira'));
     proveri('и се връща наведнъж · записват се само отклоненията',
-      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), 0);
+      await p.$$eval('.pravo.pravo-skrito', (e) => e.length), 0);
 
     // ЗАТВОРЕНАТА КОЛОНА НА ВГРАДЕНАТА · сметка не се редактира от никого.
     proveri('и вградената има затворени колони, и се казва защо',
@@ -1807,10 +1803,11 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     // УПРАВЛЕНИЕ ВЛИЗА (резен 48 · `vgraden:dela`). Екранът обявяваше граница,
     // която отдавна беше паднала — застоял текст, намерен от сверката на 02.09
-    // (ADR-153). Проверката е обърната: групата на Управление Е в матрицата,
-    // а надпис за граница НЯМА (правило 15: екран, който казва „не може", докато може).
+    // (ADR-153). Проверката е обърната: Управление Е в матрицата — избира се и
+    // се рисува, — а надпис за граница НЯМА (правило 15).
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'vgraden:dela'));
     proveri('Управление е в матрицата · и паднала граница не се обявява',
-      (await p.$$eval('[data-grupa-hedari=gant] [data-hedar-red]', (e) => e.length)) > 0 &&
+      (await p.$$eval('[data-hedar-red="vgraden:dela"]', (e) => e.length)) === 1 &&
         (await p.$$('[data-granitsa-upravlenie]')).length === 0, true);
 
     await naEkran(p, 'imoti', '#forma-imot');

@@ -16,6 +16,7 @@
  */
 
 import { blokNaKredititeVNastroyki, zakachiKreditite } from './krediti.js';
+import { sektsiyaNaPravata, zakachiPravata } from './pravata.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   OPISI,
@@ -297,6 +298,11 @@ export function narisuvayNastroyki(
     </section>`
     }
     ${vizhda('hedari') ? blokNaRedaktora(modeli, o) : ''}
+    ${
+      /* КОЙ КАКВО ВИЖДА · върна се тук от Служители (И129 т.2 · резен 97 ·
+         ADR-156): служител · хедър · трите думи над всяка колона. */
+      vizhda('pravata') ? sektsiyaNaPravata(o, izbor, koy === 'stopanin', punktove) : ''
+    }
     ${vizhda('parametri') ? blokNaParametrite(o) : ''}
     ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
 
@@ -1532,6 +1538,8 @@ export function zakachiNastroyki(
 ): void {
   // ОТМЕТКАТА ЗА ТАБЛИЦАТА КРЕДИТИ · същата дръжка, втори екран (резен 19).
   zakachiKreditite(koren, k, prerisuvay);
+  // Колонното право · двете падащи и клетките (резен 97 · ADR-156).
+  zakachiPravata(koren, k, prerisuvay);
 
   /**
    * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.
