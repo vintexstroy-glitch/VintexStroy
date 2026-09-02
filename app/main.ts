@@ -90,6 +90,7 @@ import {
   koyZhurnal,
   pisachatNa,
   svediImeyl,
+  eVerigaNaPisach,
 } from '../src/domein/akaunt.js';
 import {
   eStopanin,
@@ -360,6 +361,10 @@ async function trugvay(): Promise<void> {
     // знае имената на домейна — затова името се ПОДАВА оттук, от единствения
     // си дом (`stopanin.ts`), вместо да се преписва като низ.
     parvoto: OTKRIVASHTO_SABITIE,
+    // ВЕРИГАТА НА ПИСАЧ тръгва празна и БЕЗ откриващо (ADR-055 · резен 98):
+    // книгата е открита във веригата-нула. Наставката е дума на домейна
+    // (`akaunt.ts`) и се подава, не се преписва.
+    bezOtkrivane: eVerigaNaPisach,
     ...(klyuchalka ? { klyuchalka } : {}),
   });
 
@@ -394,10 +399,29 @@ async function trugvay(): Promise<void> {
    * Аз ли съм — пиша във веригата-нула, точно както досега, и нищо не се
    * мигрира. Друг е — получавам своя верига в СЪЩАТА книга.
    *
+   * НА КНИГАТА, не на голия ключ (резен 98 · ADR-154 §6). На устройството на
+   * служителя веригата-нула е ПРАЗНА — стопанинът не е той, — а книгата е
+   * открита в чуждата верига, дошла по Драйва (`#pero:`). Четен от голия
+   * ключ, стопанинът излизаше „неизвестен", служителят получаваше веригата-
+   * нула на собствената си книга и там първото събитие трябва да е
+   * Стопанинът: не можеше да запише нищо.
+   *
+   * И НЕ „първото по такт" през веригите: чужда верига, дошла по Драйва с
+   * по-ранен час (§67 играе точно такава), би станала стопанин на книгата и
+   * след първото презареждане самият Стопанин би получил верига на писач в
+   * собствената си книга (§79 падна така). Стопанинът е онзи от ОГЛЕДАЛОТО на
+   * книгата — записаният (`СтопанинЗаписан`) или смененият; книга отпреди
+   * правилото, без откриващо, пада на автора на първото събитие в голия
+   * ключ, както досега (`kakvoSStopanina` · „чака дописване").
+   *
    * Празна книга дава `undefined` и значи „аз съм първият": веригата-нула, а
    * трите правила при Вратата решават дали това е законно.
    */
-  stopaninatNaKnigata = (await dnevnik.parvo(akaunt))?.actor;
+  const stopaninOtOgledaloto = fold(
+    (await prochetiKnigata(dnevnik, akaunt, new Date().toISOString())).potok,
+  ).stopanin;
+  stopaninatNaKnigata =
+    stopaninOtOgledaloto !== '' ? stopaninOtOgledaloto : (await dnevnik.parvo(akaunt))?.actor;
   veriga = klyuchNaVerigata(akaunt, kojSam.imeyl, stopaninatNaKnigata);
 
   // Котвата срещу скъсяване отзад: по-къс Журнал от помненото = дръпнат кран.
@@ -611,7 +635,14 @@ async function trugvay(): Promise<void> {
    * активацията, огледано на И97 („стопанинът е първото събитие"). Затова
    * няма отделно „създай Журнал": Вратата тръгва от seq 1 сама.
    */
-  function zakachiPrevklyuchvaneto(koren: HTMLElement, znak: string, vklyucheno: boolean): void {
+  function zakachiPrevklyuchvaneto(
+    koren: HTMLElement,
+    znak: string,
+    vklyucheno: boolean,
+    // ПОЛЕТО ЗА МЯСТОТО · екранът Лично и Профилът носят по едно, със свои
+    // имена — два еднакви `id` в един документ е дупката от ADR-036 §8.
+    poleZnak = '#lichno-myasto',
+  ): void {
     koren.querySelector<HTMLButtonElement>(znak)?.addEventListener('click', async (e) => {
       const buton = e.target as HTMLButtonElement;
       buton.disabled = true;
@@ -621,7 +652,7 @@ async function trugvay(): Promise<void> {
         // престава да е „не е пипано" — а трите състояния са различни (И99).
         if (vklyucheno) await osiguriStopanina(lichen.deystviya, lichen.akaunt);
         // МЯСТОТО · при пускане се чете от полето; при прибиране не трябва.
-        const poleto = koren.querySelector<HTMLInputElement>('#lichno-myasto');
+        const poleto = koren.querySelector<HTMLInputElement>(poleZnak);
         await lichen.deystviya.prevklyuchiLichno(
           {
             vklyucheno,
@@ -653,6 +684,10 @@ async function trugvay(): Promise<void> {
     const lichniteSabitiya = await dnevnik.chetiVsichki(lichen.akaunt);
     const lichnoOgledalo = lichniteSabitiya.length > 0 ? await lichen.deystviya.ogledalo() : null;
     const lichnoVklyucheno = lichnoOgledalo?.lichnoVklyucheno ?? false;
+    // ПИПНАТО ли е · смята се ВЕДНЪЖ и се подава на лентата, Профила и менютата:
+    // позиционен аргумент със СВОЯ сметка (`!== null`) скри пункта, докато Профилът
+    // казваше „не е пускано" (резен 98 · ADR-154 §6).
+    const lichnoPipnato = lichnoOgledalo?.lichnoPipnato ?? false;
     const lichniDostapi = lichnoOgledalo ? [...lichnoOgledalo.lichniDostapi.values()] : [];
     vizhdatLichnoto = dopusnatiImeyli(lichniDostapi);
     pishatVLichnoto = pishatImeyli(lichniDostapi);
@@ -702,7 +737,8 @@ async function trugvay(): Promise<void> {
       dostapniEkrani: dostapniteEkrani({
         rolya: rolyataNa(kojSam.imeyl, ogledalo),
         lichnoVklyucheno,
-        lichnoPipnato: lichnoOgledalo !== null,
+        lichnoPipnato,
+        negov: eStopanin(kojSam.imeyl, ogledalo),
       }),
     };
 
@@ -712,7 +748,7 @@ async function trugvay(): Promise<void> {
         dnes,
         lichnoVklyucheno,
         rolyataNa(kojSam.imeyl, ogledalo),
-        lichnoOgledalo !== null,
+        lichnoPipnato,
         koyGleda(kojSam.imeyl, ogledalo),
       )}
       ${/* РАЗДЕЛИТЕЛНАТА ЛИНИЯ · едно докосване прибира, задържане мери (резен 63). */
@@ -741,7 +777,14 @@ async function trugvay(): Promise<void> {
                   профил и да се измести там с всичката информация за
                   потребителя". Рисува се в ЧЕРУПКАТА, не в екраните: инак
                   единайсетият екран ще се роди без него. */
-              narisuvayProfila(kojSam.imeyl, IMENA_NA_ROLITE[rolyataNa(kojSam.imeyl, ogledalo)])}
+              narisuvayProfila(kojSam.imeyl, IMENA_NA_ROLITE[rolyataNa(kojSam.imeyl, ogledalo)], {
+                // ЛИЧНОТО СЕ ПУСКА ОТ ПРОФИЛА (ADR-154): „Служителя има опция да
+                // активира личен таб от таб Профил." Стопанинът няма блок.
+                negov: eStopanin(kojSam.imeyl, ogledalo),
+                vklyucheno: lichnoVklyucheno,
+                pipnato: lichnoPipnato,
+                myasto: lichnoOgledalo?.lichnoMyasto ?? '',
+              })}
             ${
               /**
                * ПЕТТЕ СЛУЖЕБНИ ПЪТЯ НЕ СЕ РИСУВАТ НА ЛИЧНИЯ ЕКРАН.
@@ -824,8 +867,9 @@ async function trugvay(): Promise<void> {
           prerisuvay,
         );
         // Таблото ВРЪЩА прибраното (мястото вече е записано) и ПРИБИРА
-        // включеното. Първото пускане е на самия екран „Лично" — там е полето
-        // за мястото, без което личното не тръгва (И99).
+        // включеното. Първото пускане е от Профила (ADR-154) или на самия
+        // екран „Лично" — там е полето за мястото, без което личното не
+        // тръгва (И99).
         zakachiPrevklyuchvaneto(koren, '#tablo-lichno', !lichnoVklyucheno);
         zakachiZapasniya(koren);
         zakachiVrashtaneto(koren);
@@ -923,7 +967,8 @@ async function trugvay(): Promise<void> {
       dostapniteEkrani({
         rolya: rolyataNa(kojSam.imeyl, og),
         lichnoVklyucheno,
-        lichnoPipnato: lichnoOgledalo !== null,
+        lichnoPipnato,
+        negov: eStopanin(kojSam.imeyl, og),
       });
 
     // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
@@ -939,6 +984,14 @@ async function trugvay(): Promise<void> {
     // ПРОФИЛЪТ (резен 78 · ADR-135) · панелът със самоличността. Лостът за
     // размера и двете теми паднаха с бутоните си (И127 т.3 · ADR-149).
     zakachiProfila(koren);
+    // ЛИЧНОТО ОТ ПРОФИЛА (ADR-154 · ADR-134 §3) · закача се В ЧЕРУПКАТА, като
+    // самия панел: закачено в блока на Таблото, работеше само там, а на всеки
+    // друг екран бутонът мълчеше — третият проход го намери, щом служителят
+    // пусна личното от екрана „Лично" (ADR-154 §6). Пускане с място,
+    // прибиране, връщане — едно действие, свои имена.
+    zakachiPrevklyuchvaneto(koren, '#profil-lichno-pusni', true, '#profil-lichno-myasto');
+    zakachiPrevklyuchvaneto(koren, '#profil-lichno-priberi', false);
+    zakachiPrevklyuchvaneto(koren, '#profil-lichno-varni', true);
     // ХЕЛПЪТ (резен 78б · ADR-136) · планът на таба се чете от живия екран,
     // затова се закача СЛЕД рисуването — той оглежда каквото стои.
     zakachiHelpa(koren, prerisuvay);
@@ -1010,6 +1063,8 @@ function dostapniteEkrani(n: {
   readonly rolya: Rolya;
   readonly lichnoVklyucheno: boolean;
   readonly lichnoPipnato: boolean;
+  /** Стопанинът ли гледа · той няма личен таб (ADR-154) */
+  readonly negov: boolean;
   /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
 }): readonly KoyEkran[] {
   // РЕДЪТ Е РЕШЕНИЕ, не подредба на файл (И125 · резен 85): списъкът с
@@ -1017,12 +1072,20 @@ function dostapniteEkrani(n: {
   return REDAT_NA_LENTATA.filter((koy) => {
       // ЛИЧНОТО се вижда, докато е ВКЛЮЧЕНО — и докато НИКОГА не е пипано,
       // за да може изобщо да се пусне (И99: активацията иска МЯСТО в личния
-      // драйв, а полето за него живее на самия екран).
+      // драйв, а полето за него живее в Профила и на самия екран — ADR-154).
+      // „Пипано" е ПРЕВКЛЮЧВАНЕ, не съществуване на Журнала: откриващото
+      // събитие ляга там преди проверката на мястото (резен 98).
       //
       // ПРИБРАНОТО пада от лентата и се връща от Таблото, където изключеното
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
-      if (koy === 'lichno') return n.lichnoVklyucheno || !n.lichnoPipnato;
+      if (koy === 'lichno') {
+        // СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ (ADR-154 · И131 т.1: „Стопанина ням,а опция
+        // за личен."). Главният имейл не е служител (ADR-043); границата е на
+        // екрана, Вратата не се пипа — както при всеки скрит пункт (ADR-066).
+        if (EKRANI[koy].samoZaSluzhitel && n.negov) return false;
+        return n.lichnoVklyucheno || !n.lichnoPipnato;
+      }
       // НАСТРОЙКИ СТОИ ВИНАГИ и това вече не е изключение тук: екранът няма
       // `iskaRolya` (резен 83) — вижда го всеки, а СЕКЦИИТЕ му се стесняват
       // по човек (`vizhdaSektsiyata`). Скрит пункт би отнел на служителя и
@@ -1054,7 +1117,12 @@ function strana(
   // СВИТА ЛИ Е · поглед, не факт: чете се от паметта на екрана (ADR-058).
   const svita = lentataESvita();
 
-  const dostapni = dostapniteEkrani({ rolya, lichnoVklyucheno, lichnoPipnato });
+  const dostapni = dostapniteEkrani({
+    rolya,
+    lichnoVklyucheno,
+    lichnoPipnato,
+    negov: gledashtiyat === 'stopanin',
+  });
   /**
    * ТРИТЕ СЛОЯ НА РЕДА · и ЧЕТВЪРТИЯТ въпрос, кое се вижда (резен 15 · И111).
    *

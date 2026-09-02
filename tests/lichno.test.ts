@@ -134,6 +134,30 @@ describe('активирането · Журналът СЪЩЕСТВУВА ⟺ 
     expect((await dnevnik.chetiVsichki(LICHEN)).length).toBe(3);
   });
 
+  it('неуспешен първи опит БЕЗ МЯСТО не прави „не е пускано" на „прибрано" (резен 98)', async () => {
+    // НАМЕРЕНО ОТ ПРОХОДА (ADR-154 §6): екранът пише откриващото събитие
+    // (Стопанинът е първото, ADR-043) ПРЕДИ Вратата да провери мястото, а
+    // „пипнато" се смяташе от самото съществуване на Журнала. Неуспешният
+    // опит правеше състоянието „прибрано" — а прибраното се връща без поле за
+    // място: задънена улица. „Пипнато" пита за ПРЕВКЛЮЧВАНЕ, не за Журнал.
+    const { dnevnik, zaKlyuch } = stend();
+    const lichni = zaKlyuch(LICHEN);
+    await lichni.zapishiStopanina({ imeyl: IMEYL, ime: 'Иво', dostavchik: 'google' }, { opId: 'st' });
+    await expect(
+      lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: '' }, { opId: 'l0' }),
+    ).rejects.toThrow('иска МЯСТО');
+    expect(await dnevnik.chetiVsichki(LICHEN)).toHaveLength(1); // Журналът СЪЩЕСТВУВА…
+    const predi = await lichni.ogledalo();
+    expect(predi.lichnoPipnato).toBe(false); // …но НЕ е пипано
+    expect(predi.lichnoVklyucheno).toBe(false);
+
+    await lichni.prevklyuchiLichno({ vklyucheno: true, sluzhebniyat: SLUZHEBEN, myasto: MYASTO }, { opId: 'l1' });
+    await lichni.prevklyuchiLichno({ vklyucheno: false, sluzhebniyat: SLUZHEBEN }, { opId: 'l2' });
+    const sled = await lichni.ogledalo();
+    expect(sled.lichnoPipnato).toBe(true); // прибраното Е пипано — и се връща
+    expect(sled.lichnoVklyucheno).toBe(false);
+  });
+
   it('включването НЕ оставя нито един ред в служебния Журнал', async () => {
     const { dnevnik, zaKlyuch } = stend();
     await zaKlyuch(LICHEN).prevklyuchiLichno(

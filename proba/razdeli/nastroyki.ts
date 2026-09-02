@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
+import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1001,12 +1001,10 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
  * състоянието отпреди. Накрая се връща стопанинът — проходът оставя книгата
  * на онзи, който я е почнал.
  *
- * КНИГАТА НА СЛУЖИТЕЛЯ иска стопанската верига ВЪТРЕ: на своето устройство
- * той отваря книга под СВОЯ ключ, а чуждите вериги пристигат по Драйва
- * (ADR-055). Проходът играе Драйва по похвата на §67 — пише веригата на
- * Стопанина (откриващото + вписването на служителя) направо в носителя,
- * ПРЕДИ входа. Без нея служителят е стопанин на празна книга и вижда всичко —
- * вярно по устройство, но не е сценарият на резена.
+ * КНИГАТА НА СЛУЖИТЕЛЯ иска стопанската верига ВЪТРЕ (ADR-055). Влизането е
+ * ЕДНО за целия проход (`vlezKatoSluzhitelya`), споделено с §53–§56, където
+ * и Личното го играе служителят (ADR-154). Дотук веригата тук беше две
+ * събития, написани на ръка; сега е ЦЯЛАТА на Стопанина, досипана с новото.
  */
 export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   const { stranitsa: p, broyach } = ctx;
@@ -1015,47 +1013,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   // ── излизане и влизане като СЛУЖИТЕЛЯ от §20 (редактор „Бамстера") ────────
-  await naEkran(p, 'tablo', '#izlez');
-  await p.click('#izlez');
-  await p.waitForSelector('#podstaven-google');
-  // Подложката се слага СЛЕД презареждането — то чисти всичко от `evaluate`.
-  await p.evaluate(() => {
-    (globalThis as unknown as { __kojVliza: unknown }).__kojVliza = {
-      email: 'Ivaylo85Petkov@gmail.com', name: 'Бамстера', sub: '5556667778',
-    };
-  });
-  // Стопанската верига в КНИГАТА НА СЛУЖИТЕЛЯ · проходът играе Драйва (§67).
-  await p.evaluate(async () => {
-    const db = await new Promise((da, ne) => {
-      const z = indexedDB.open('masterbook');
-      z.onsuccess = () => da(z.result);
-      z.onerror = () => ne(z.error);
-    });
-    const veriga = 'ivaylo85petkov@gmail.com#pero:vintexstroy@gmail.com';
-    const dvete = [
-      {
-        opId: 'prohod-chuzhd-stopanin', ts: '2026-08-01T08:00:00.000Z', naematel: veriga,
-        actor: 'vintexstroy@gmail.com', seq: 1, prevHash: '', hash: 'prohod-chuzhd-1',
-        type: 'СтопанинЗаписан', sashtnost: { vid: 'stopanin', id: 'vintexstroy@gmail.com' },
-        payload: { imeyl: 'vintexstroy@gmail.com' },
-      },
-      {
-        opId: 'prohod-chuzhd-sluzhitel', ts: '2026-08-01T08:01:00.000Z', naematel: veriga,
-        actor: 'vintexstroy@gmail.com', seq: 2, prevHash: 'prohod-chuzhd-1', hash: 'prohod-chuzhd-2',
-        type: 'СлужителЗаписан', sashtnost: { vid: 'sluzhitel', id: 'SLUZHITEL:ivaylo85petkov@gmail.com' },
-        payload: { imeyl: 'ivaylo85petkov@gmail.com', ime: 'Бамстера', rolya: 'redaktor' },
-      },
-    ];
-    for (const sabitie of dvete) {
-      await new Promise<void>((da, ne) => {
-        const z = (db as IDBDatabase).transaction('sabitiya', 'readwrite').objectStore('sabitiya').add(sabitie);
-        z.onsuccess = () => da();
-        z.onerror = () => ne(z.error);
-      });
-    }
-  });
-  await p.click('#podstaven-google');
-  await p.waitForSelector('#nastroyki-vhod');
+  await vlezKatoSluzhitelya(p);
 
   proveri('пунктът Настройки ВОДИ и служителя · не само отваря реда',
     await p.$eval('#nastroyki-vhod', (e) => e.hasAttribute('data-ekran')), true);
@@ -1083,11 +1041,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   }
 
   // ── обратно стопанинът · екранът се връща ЦЯЛ ─────────────────────────────
-  await naEkran(p, 'tablo', '#izlez');
-  await p.click('#izlez');
-  await p.waitForSelector('#podstaven-google');
-  await p.click('#podstaven-google');
-  await p.waitForSelector('#nastroyki-vhod');
+  await varniSeKatoStopanina(p);
   await naEkran(p, 'nastroyki', '[data-sektsiya=hedari]');
   await p.keyboard.press('Escape');
   proveri('за стопанина хедърите пак стоят · нищо не е отнето',

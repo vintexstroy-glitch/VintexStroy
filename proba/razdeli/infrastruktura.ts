@@ -502,7 +502,7 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       ['tabove', '#izbor-tab'],
       ['nastroyki', '#nov-buton'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       proveri(`екран „${ekran}" · полетата са защитени`,
@@ -569,7 +569,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['tabove', '#izbor-tab'],
       ['nastroyki', '#nov-buton'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на
@@ -734,7 +734,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['tabove', '#izbor-tab'],
       ['nastroyki', '#nov-buton'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на

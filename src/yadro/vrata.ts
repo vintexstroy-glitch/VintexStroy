@@ -87,6 +87,21 @@ interface NastroykiVrata {
    * Приложението го подава винаги, а тест го пази (ADR-043).
    */
   readonly parvoto?: string;
+  /**
+   * ВЕРИГИ БЕЗ ОТКРИВАЩО СЪБИТИЕ · веригите на ПИСАЧИТЕ (ADR-055 · резен 98).
+   *
+   * Книгата се открива ВЕДНЪЖ, във веригата-нула на стопанина. Втори писач
+   * получава своя верига и тя тръгва ПРАЗНА — а правилото „празен Журнал
+   * приема само откриващото" я заключваше: служителят не можеше да запише
+   * нищо на своето устройство, защото първото му събитие не е и не може да е
+   * Стопанинът. Тестовете на веригите строяха Вратата без `parvoto` и
+   * дупката беше невидима; проходът я намери, щом служителят пренесе дело.
+   *
+   * Ядрото не знае наставката на писача — предикатът се ПОДАВА, както името
+   * на откриващото. За такава верига откриващото е ОТКАЗАНО: втори стопанин
+   * в чужд подпис е точно онова, което ADR-043 забранява.
+   */
+  readonly bezOtkrivane?: (naematel: string) => boolean;
 }
 
 export class Vrata {
@@ -96,6 +111,7 @@ export class Vrata {
   readonly #kotva: DrajkaNaKotva | undefined;
   readonly #klyuchalka: (<T>(naematel: string, rabota: () => Promise<T>) => Promise<T>) | undefined;
   readonly #parvoto: string | undefined;
+  readonly #bezOtkrivane: ((naematel: string) => boolean) | undefined;
 
   /** Спирателен кран (П1.4): спира записа, без да събаря приложението. */
   #zatvorena = false;
@@ -111,6 +127,7 @@ export class Vrata {
     this.#kotva = n.kotva;
     this.#klyuchalka = n.klyuchalka;
     this.#parvoto = n.parvoto;
+    this.#bezOtkrivane = n.bezOtkrivane;
   }
 
   get zatvorena(): boolean {
@@ -346,6 +363,18 @@ export class Vrata {
   async #proveriOtkrivashtoto(op: Operatsiya): Promise<void> {
     if (this.#parvoto === undefined) return;
     const otkrivashto = op.type === this.#parvoto;
+    // ВЕРИГАТА НА ПИСАЧ · открита е книгата, не веригата (ADR-055): нищо не
+    // се чака отпред, а откриващото е отказано — то стои във веригата-нула.
+    if (this.#bezOtkrivane?.(op.naematel)) {
+      if (otkrivashto) {
+        throw new GreshkaVrata(
+          'NEVALIDNO',
+          `„${this.#parvoto}" не влиза във верига на писач (${op.naematel}) — книгата е ` +
+            'открита във веригата на стопанина и втори стопанин в чужд подпис не се записва.',
+        );
+      }
+      return;
+    }
     const parvo = await this.#dnevnik.parvo(op.naematel);
 
     if (!parvo) {

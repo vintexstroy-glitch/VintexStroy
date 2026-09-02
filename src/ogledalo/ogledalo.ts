@@ -538,6 +538,16 @@ export interface Ogledalo {
   readonly rachniyatRedNaDelata: readonly string[];
   readonly lichnoVklyucheno: boolean;
   /**
+   * ПИПАНО ли е някога · има ли поне едно `ЛичноПревключено` (резен 98).
+   *
+   * НЕ е „Журналът съществува": откриващото събитие (Стопанинът е първото,
+   * ADR-043) ляга в личния Журнал ПРЕДИ Вратата да провери мястото, и
+   * неуспешен първи опит без място иначе правеше „не е пускано" на
+   * „прибрано" — а прибраното се връща без поле за място: задънена улица,
+   * която проходът намери, щом служителят мина през Профила (ADR-154).
+   */
+  readonly lichnoPipnato: boolean;
+  /**
    * МЯСТОТО в личния драйв, с което личното е активирано (И99).
    * Празно значи „активирано преди това поле" — старият запис си е валиден.
    */
@@ -866,6 +876,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const nachalniIzgledi = new Map<string, NachalenIzgled>();
   let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
+  let lichnoPipnato = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
   const lichniTemi = new Map<string, LichnaTema>();
@@ -1205,6 +1216,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ЛичноПревключено': {
         const p = s.payload as unknown as PayloadLichnoPrevklyucheno;
         lichnoVklyucheno = p.vklyucheno; // последната дума бие
+        lichnoPipnato = true;
         // Мястото се пази и след прибиране: прибраното не е изтрито, а при
         // повторно пускане човекът не бива да го посочва наново.
         if (p.myasto) lichnoMyasto = p.myasto;
@@ -1931,6 +1943,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     nachalniIzgledi,
     rachniyatRedNaDelata,
     lichnoVklyucheno,
+    lichnoPipnato,
     lichnoMyasto,
     lichniDostapi,
     lichniTemi,

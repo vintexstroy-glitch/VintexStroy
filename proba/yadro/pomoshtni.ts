@@ -537,3 +537,79 @@ export async function napishiSigurno(p: Page, znak: string, stoynost: string): P
     { timeout: 5_000 },
   );
 }
+
+/**
+ * СЛУЖИТЕЛЯТ, който проходът играе · Бамстера от §20 (редактор).
+ *
+ * ЕДИН дом за влизането: §53–§56 (Личното е на служителя · ADR-154) и §141
+ * (Настройките на служителя) влизат по един и същ път. Дотук рецептата
+ * живееше в §141 с двусъбитийна стопанска верига, написана на ръка; на второ
+ * място същата рецепта щеше да се размине — и книгата на служителя с книгата
+ * на Стопанина.
+ */
+export const SLUZHITELYAT = { email: 'Ivaylo85Petkov@gmail.com', name: 'Бамстера', sub: '5556667778' } as const;
+const STOPANINAT = 'vintexstroy@gmail.com';
+
+/**
+ * ИЗЛИЗА и ВЛИЗА като служителя. Презарежда страницата: никой блок след това
+ * не бива да разчита на състоянието отпреди.
+ *
+ * КНИГАТА НА СЛУЖИТЕЛЯ иска стопанската верига ВЪТРЕ (ADR-055): на своето
+ * устройство той отваря книга под СВОЯ ключ, а чуждите вериги пристигат по
+ * Драйва. Проходът играе Драйва по похвата на §67 — пренася ЦЯЛАТА верига на
+ * Стопанина, каквато е в този миг, в книгата на служителя под ключа на писача,
+ * ПРЕДИ входа; при второ влизане досипва само новото (ключът на носителя е
+ * наемател + seq, повторен запис би гръмнал). Без нея служителят е стопанин
+ * на празна книга и вижда всичко — вярно по устройство, но не е сценарият на
+ * нито един резен.
+ */
+export async function vlezKatoSluzhitelya(p: Page): Promise<void> {
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  // Подложката се слага СЛЕД презареждането — то чисти всичко от `evaluate`.
+  await p.evaluate((koy) => {
+    (globalThis as unknown as { __kojVliza: unknown }).__kojVliza = koy;
+  }, SLUZHITELYAT);
+  await p.evaluate(async ([kniga, stopanin]) => {
+    const db = await new Promise<IDBDatabase>((da, ne) => {
+      const z = indexedDB.open('masterbook');
+      z.onsuccess = () => da(z.result);
+      z.onerror = () => ne(z.error);
+    });
+    const vsichki = await new Promise<{ naematel: string; seq: number }[]>((da, ne) => {
+      const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+      z.onsuccess = () => da(z.result);
+      z.onerror = () => ne(z.error);
+    });
+    const veriga = `${kniga}#pero:${stopanin}`;
+    const doseq = Math.max(0, ...vsichki.filter((s) => s.naematel === veriga).map((s) => s.seq));
+    const novi = vsichki
+      .filter((s) => s.naematel === stopanin && s.seq > doseq)
+      .map((s) => ({ ...s, naematel: veriga }));
+    for (const s of novi) {
+      await new Promise<void>((da, ne) => {
+        const z = db.transaction('sabitiya', 'readwrite').objectStore('sabitiya').add(s);
+        z.onsuccess = () => da();
+        z.onerror = () => ne(z.error);
+      });
+    }
+  }, [SLUZHITELYAT.email.toLowerCase(), STOPANINAT]);
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+}
+
+/** ОБРАТНО Стопанинът · проходът оставя книгата на онзи, който я е почнал. */
+export async function varniSeKatoStopanina(p: Page): Promise<void> {
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+}
+
+/** ОТВАРЯ панела на Профила, ако е затворен · прерисуването го затваря само. */
+export async function otvoriProfila(p: Page): Promise<void> {
+  if (await p.$eval('#profil-panel', (e) => (e as HTMLElement).hidden)) await p.click('#profil-avatar');
+  await p.waitForSelector('#profil-panel:not([hidden])');
+}

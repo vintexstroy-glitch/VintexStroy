@@ -5,19 +5,28 @@
  * и да се измести там с всичката информация за потребителя.** Там е и трите
  * бутона… да са 2 броя и да са теми… **и да са изнесени в дясно**."
  *
- * ═══ ПАНЕЛЪТ ОСТАНА С ЕДНО НЕЩО · САМОЛИЧНОСТТА ═══
+ * ═══ ПАНЕЛЪТ НОСИ ДВЕ НЕЩА · САМОЛИЧНОСТТА И ЛИЧНОТО ═══
  *
  * Дотук в него живееха и лостът за размера на текста, и двете теми на
  * натоварването. И127 т.3 (01.09) ги СВАЛИ: „Бутоните за размер на текста ги
  * махни и бутоните за гъстотата също ги махни." Последната дума бие (правило
- * 28); надживяното е записано в ADR-149, заедно с онова, което ОСТАВА —
- * подразбраните числа и ръчното влачене по ръба.
+ * 28); надживяното е записано в ADR-149.
  *
- * ═══ НИЩО НЕ СЕ ЗАПИСВА ═══
+ * На 02.09 (И131 т.1 · ADR-154) панелът получи ЛИЧНОТО: „Служителя има опция
+ * да активира личен таб от таб Профил." Блокът носи състоянието, полето за
+ * мястото в личния драйв (И99: активацията иска МЯСТО) и бутона. Идентификаторите
+ * са свои (`profil-lichno-*`): панелът стои на ВСЕКИ екран, а екранът Лично носи
+ * същата форма — два еднакви `id` в един документ е дупката от ADR-036 §8.
+ * Едно действие, две дръжки (ADR-134 §3).
  *
- * Панелът ЧЕТЕ (имейл, роля) — нула събития. Имейлът е самоличността от
- * доставчика (правило 14) и стои тук, за да се вижда КОЙ е влязъл — не за да
- * се редактира: няма какво да му се редактира.
+ * СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ — „Стопанина ням,а опция за личен." За него блокът
+ * не се рисува; самоличността остава.
+ *
+ * ═══ КАКВО СЕ ЗАПИСВА ═══
+ *
+ * Самоличността се ЧЕТЕ (имейл, роля) — нула събития. Пускането и прибирането
+ * на личното са ЕДНО събитие в ЛИЧНИЯ Журнал, същото като от екрана Лично и от
+ * Таблото; закачането е в `main.ts`, там, където живее и за другите две дръжки.
  */
 
 import { ekraniraj } from './obshto.js';
@@ -27,7 +36,37 @@ function initsialat(imeyl: string): string {
   return (imeyl.trim()[0] ?? '?').toLocaleUpperCase('bg-BG');
 }
 
-export function narisuvayProfila(imeyl: string, rolya: string): string {
+/** Личното, както го вижда панелът · трите състояния (И99), плюс кой гледа. */
+export interface LichnotoVProfila {
+  /** Стопанинът ли е · той няма личен таб (ADR-154) */
+  readonly negov: boolean;
+  readonly vklyucheno: boolean;
+  /** пипано ли е някога · „не е пускано" ≠ „прибрано" ≠ „включено" */
+  readonly pipnato: boolean;
+  readonly myasto: string;
+}
+
+function blokLichno(l: LichnotoVProfila): string {
+  const sastoyanie = l.vklyucheno ? 'включено' : l.pipnato ? 'прибрано' : 'не е пускано';
+  const deystvie = !l.pipnato
+    ? `<label class="pole">
+            <span>Място в твоя драйв</span>
+            <input translate="no" type="text" id="profil-lichno-myasto" value="${ekraniraj(l.myasto)}" placeholder="MasterBook/Лично">
+          </label>
+          <button type="button" class="glaven" id="profil-lichno-pusni">Пусни личното</button>
+          <p class="drebno">Активира се с място. Приложението не създава и не споделя папката — това
+          става в самия драйв (правило 14).</p>`
+    : l.vklyucheno
+      ? '<button type="button" class="vtorichen" id="profil-lichno-priberi">Прибери личното</button>'
+      : '<button type="button" class="vtorichen" id="profil-lichno-varni">Върни личното</button>';
+  return `
+        <div class="profil-lichno" data-profil-lichno="${ekraniraj(sastoyanie)}">
+          <div class="dyalglava"><h3>Лично</h3><span class="znachka ${l.vklyucheno ? 'dobre' : 'tiha'}">${sastoyanie}</span></div>
+          ${deystvie}
+        </div>`;
+}
+
+export function narisuvayProfila(imeyl: string, rolya: string, lichno?: LichnotoVProfila): string {
   return `
     <span class="profilat">
       <button type="button" id="profil-avatar" class="avatar" aria-haspopup="dialog"
@@ -38,6 +77,7 @@ export function narisuvayProfila(imeyl: string, rolya: string): string {
           <b>${ekraniraj(imeyl)}</b>
           <span class="drebno">${ekraniraj(rolya)}</span>
         </div>
+        ${lichno && !lichno.negov ? blokLichno(lichno) : ''}
       </div>
     </span>`;
 }

@@ -602,11 +602,13 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
  *
  * ═══ ЗАЩО ТОЧНО ТУК В РЕДА ═══
  *
- * Пунктът „Лично" го има в лентата само докато Личното е ПУСНАТО — §53 го
- * прибира и екранът изчезва. Затова блокът стои веднага след пускането му:
- * това е единственият миг, в който лентата предлага и десетте. И понеже е
- * вмъкнат по средата на прохода, накрая се ВРЪЩА на екрана, от който е
- * тръгнал — блок, който мести състояние под следващия, е по-скъп от липсващ.
+ * Дотук блокът стоеше веднага след пускането на Личното — единственият миг,
+ * в който лентата предлагаше и него. От резен 98 (ADR-154) Личното е на
+ * СЛУЖИТЕЛЯ, играе се в КРАЯ на прохода (смяната на човека презарежда
+ * страницата) и §53 му брои секциите сам; тук се броят десетте на Стопанина.
+ * И понеже блокът е вмъкнат по средата на прохода, накрая се ВРЪЩА на
+ * екрана, от който е тръгнал — блок, който мести състояние под следващия, е
+ * по-скъп от липсващ.
  *
  * ═══ ЗАЩО НЕ СЕ ЧАКА ПОЛЕ ═══
  *
@@ -641,10 +643,12 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       await p.keyboard.press('Escape');
     };
 
-    // ЕДИНАЙСЕТ, не десет · `sluzhiteli` (резен 14а) липсваше тук и §68
-    // минаваше зелен, без да го е отварял нито веднъж.
+    // ДЕСЕТ · `sluzhiteli` (резен 14а) липсваше тук и §68 минаваше зелен, без
+    // да го е отварял нито веднъж. „Лично" излезе от списъка с резен 98
+    // (ADR-154): екранът е на СЛУЖИТЕЛЯ, Стопанинът няма пункт — секциите му се
+    // броят в §53, докато служителят го е пуснал.
     const ekranite = ['imoti', 'pari', 'stoynost', 'gant', 'smetki',
-      'nastroyki', 'ii', 'tabove', 'lichno', 'sluzhiteli', 'tablo'] as const;
+      'nastroyki', 'ii', 'tabove', 'sluzhiteli', 'tablo'] as const;
     const nachalniyat = await koyEkranE();
 
     let bezMarker = 0;
@@ -664,7 +668,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       udvoeni += klyuchove.length - new Set(klyuchove).size;
     }
 
-    proveri('и единайсетте екрана се отварят от лентата в този миг', obhodeni, ekranite.length);
+    proveri('и десетте екрана се отварят от лентата', obhodeni, ekranite.length);
     proveri('и заедно носят секции за местене', vsichki > 40, true);
     proveri('НИТО ЕДНА не се ключува по заглавието си', bezMarker, 0);
     // Два еднакви ключа на един екран значат възел, прибавен два пъти при
@@ -983,8 +987,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     };
     await napraviDelo('Сграда А', '', '2026-08-01', '2026-08-31');
     await napraviDelo('Груб строеж', 'Сграда А', '2026-08-05', '2026-09-30');
-    await napraviDelo('Кофраж', 'Груб строеж', '2026-08-10', '2026-08-20');
-    await napraviDelo('Кофраж етаж 1', 'Кофраж', '2026-08-12', '2026-08-15');
+    // ИМЕТО Е УНИКАЛНО нарочно: §24 вече има „Кофраж" (Малинова · бл. 1), а
+    // родителят се избира ПО ИМЕ и първото съвпадение печели. Дотук старият
+    // §53 пренасяше точно него в личното на Стопанина и двусмислието беше
+    // скрито; от резен 98 Личното е на служителя и се играе в края (ADR-154).
+    await napraviDelo('Кофраж на сградата', 'Груб строеж', '2026-08-10', '2026-08-20');
+    await napraviDelo('Кофраж етаж 1', 'Кофраж на сградата', '2026-08-12', '2026-08-15');
 
     interface RedNaDarvo {
       readonly stepen: number;
@@ -1041,7 +1049,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const stepenNaReda = async (ime: string): Promise<number> =>
       p.$eval(`.gant-delo:has(b:text-is("${ime}"))`,
         (e) => Number((e as HTMLElement).dataset['stepen']));
-    const stepenPredi = await stepenNaReda('Кофраж');
+    const stepenPredi = await stepenNaReda('Кофраж на сградата');
     const chakayStepen = async (ime: string, n: number): Promise<void> => {
       await p.waitForFunction(
         ([i, k]) => Number(([...document.querySelectorAll('.gant-delo')]
@@ -1050,10 +1058,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
         [ime, n] as [string, number],
       );
     };
-    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Кофраж")) [data-navan]'));
-    await chakayStepen('Кофраж', stepenPredi - 1);
+    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Кофраж на сградата")) [data-navan]'));
+    await chakayStepen('Кофраж на сградата', stepenPredi - 1);
     proveri('НАВЪН вдига делото с ЕДНА степен',
-      await stepenNaReda('Кофраж'), stepenPredi - 1);
+      await stepenNaReda('Кофраж на сградата'), stepenPredi - 1);
     proveri('и детето му го следва · дървото не се къса',
       await stepenNaReda('Кофраж етаж 1'), stepenPredi);
 

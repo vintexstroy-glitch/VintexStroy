@@ -1,39 +1,87 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broyLichni, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, ostatak, tekstNa } from '../yadro/pomoshtni.ts';
+import { SLUZHITELYAT, broyLichni, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, ostatak, otvoriProfila, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
 import { readFile, writeFile } from 'node:fs/promises';
 
-/** 53 · Личното · преди активиране | 53 · Личното · активирането иска МЯСТО | 53 · Личното · същата таблица | 53 · Личното · преносът | 53 · Личното · двата Журнала не се смесват | 54 · Личното · кой вижда личното | 55 · Личните пари · деликатно | 55 · Личните пари · темата | 55 · Личните пари · ръчният ред | 55 · Личните пари · изключеният ред | 55 · Личните пари · кредитът | 55 · Личните пари · извлечението | 55 · Личните пари · вторият внос | 55 · Личните пари · служебният пункт е скрит */
+/** 53 · Личното · Стопанинът е без личен таб | 53 · Личното · преди активиране | 53 · Личното · активирането от Профила иска МЯСТО | 53 · Личното · същата таблица | 53 · Личното · преносът | 53 · Личното · двата Журнала не се смесват | 54 · Личното · кой вижда личното | 55 · Личните пари · деликатно | 55 · Личните пари · темата | 55 · Личните пари · ръчният ред | 55 · Личните пари · изключеният ред | 55 · Личните пари · кредитът | 55 · Личните пари · извлечението | 55 · Личните пари · вторият внос | 55 · Личните пари · служебният пункт е скрит */
 export async function blok1(ctx: KonteksNaProhoda): Promise<{ broy: number } | undefined> {
   const { stranitsa: p, broyach } = ctx;
   let razdel = '—';
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+    // ══ 53 · СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ (И131 т.1 · ADR-154) ══════════════════
+    razdel = '53 · Личното · Стопанинът е без личен таб';
+    await naEkran(p, 'tablo', '#izlez');
+    proveri('лентата на Стопанина НЕ носи пункта „Лично"',
+      Boolean(await p.$('[data-ekran=lichno]')), false);
+    proveri('и Таблото му НЕ рисува картата на личното',
+      Boolean(await p.$('[data-sektsiya=tablo-lichno]')), false);
+    await otvoriProfila(p);
+    proveri('и Профилът му няма нито поле, нито бутон за личното',
+      Boolean(await p.$('[data-profil-lichno]')), false);
+    await p.keyboard.press('Escape');
+
+    // ══ 53 · СЛУЖИТЕЛЯТ · личното е НЕГОВО · оттук до §56 играе той ══════════
     razdel = '53 · Личното · преди активиране';
+    await vlezKatoSluzhitelya(p);
     await naEkran(p, 'tablo', '[data-sektsiya=tablo-lichno]');
-    proveri('Таблото казва, че личното НЕ Е ПУСКАНО · три състояния, не две',
+    proveri('Таблото на служителя казва, че личното НЕ Е ПУСКАНО · три състояния, не две',
       (await p.$eval('[data-sektsiya=tablo-lichno]', (e) => e.textContent)).includes('не е пускано'), true);
     proveri('и НЕ предлага бутон — първото пускане иска мястото',
       Boolean(await p.$('#tablo-lichno')), false);
     proveri('но пунктът „Лично" се вижда, за да може изобщо да се пусне',
       Boolean(await p.$('[data-ekran=lichno]')), true);
 
-    // И99 · АКТИВАЦИЯТА ИСКА МЯСТО В ЛИЧНИЯ ДРАЙВ, не гол бутон
-    razdel = '53 · Личното · активирането иска МЯСТО';
+    // И99 · АКТИВАЦИЯТА ИСКА МЯСТО В ЛИЧНИЯ ДРАЙВ, не гол бутон · и е ОТ ПРОФИЛА
+    razdel = '53 · Личното · активирането от Профила иска МЯСТО';
     const predLichno = await broySabitiya(p);
-    await naEkran(p, 'lichno', '#lichno-pusni');
+    await otvoriProfila(p);
+    proveri('Профилът носи блока „Лично" и казва „не е пускано"',
+      await p.$eval('[data-profil-lichno]', (e) => (e as HTMLElement).dataset['profilLichno']), 'не е пускано');
     proveri('поканата иска МЯСТО в личния драйв',
-      Boolean(await p.$('#lichno-myasto')), true);
+      Boolean(await p.$('#profil-lichno-myasto')), true);
     proveri('и КАЗВА, че приложението не споделя папката вместо теб',
-      (await p.$eval('[data-sektsiya=lichno-pokana]', (e) => e.textContent)).includes('не я споделя'), true);
+      (await p.$eval('[data-profil-lichno]', (e) => e.textContent)).includes('не споделя'), true);
 
     // без място не тръгва
-    await p.click('#lichno-pusni');
-    await p.waitForFunction(() => document.body.textContent.includes('иска МЯСТО'));
-    proveri('без място личното НЕ тръгва', Boolean(await p.$('#l-forma-delo')), false);
+    await deystvieSPrerisuvane(p, () => p.click('#profil-lichno-pusni'));
+    proveri('без място личното НЕ тръгва · отказът е с думи',
+      (await tekstNa(p, '.vest')).includes('иска МЯСТО'), true);
+    // НАМЕРЕНО ОТ ПРОХОДА (резен 98 · ADR-154 §6): откриващото събитие ляга в
+    // личния Журнал ПРЕДИ Вратата да провери мястото, а „пипнато" се смяташе
+    // от самото съществуване на Журнала — неуспешният първи опит правеше „не е
+    // пускано" на „прибрано", пунктът падаше от лентата, а „Върни личното"
+    // няма поле за място: задънена улица. Сега „пипнато" е превключване.
+    await otvoriProfila(p);
+    proveri('и неуспешният опит НЕ прави личното „прибрано" · пипнато е превключване, не Журнал',
+      await p.$eval('[data-profil-lichno]', (e) => (e as HTMLElement).dataset['profilLichno']), 'не е пускано');
+    await p.keyboard.press('Escape');
+    // ВТОРАТА ПОЛОВИНА НА СЪЩАТА НАХОДКА: лентата смяташе „пипнато" САМА, като
+    // позиционен аргумент (`!== null`), и криеше пункта, докато Профилът до нея
+    // казваше „не е пускано". Едно число, един дом (правило 17).
+    proveri('и пунктът „Лично" още стои в лентата · лентата и Профилът четат ЕДНО и също',
+      Boolean(await p.$('[data-ekran=lichno]')), true);
+    await naEkran(p, 'lichno', '[data-sektsiya=lichno-pokana]');
+    proveri('и екранът „Лично" още КАНИ, не показва таблица', Boolean(await p.$('#l-forma-delo')), false);
 
-    await p.fill('#lichno-myasto', 'MasterBook/Лично');
-    await deystvieSPrerisuvane(p, () => p.click('#lichno-pusni'));
+    // с място · от ПРОФИЛА, който стои и на този екран (втора дръжка · ADR-134 §3)
+    await otvoriProfila(p);
+    await p.fill('#profil-lichno-myasto', 'MasterBook/Лично');
+    await deystvieSPrerisuvane(p, () => p.click('#profil-lichno-pusni'));
+    await p.waitForSelector('#l-forma-delo');
     proveri('служебният Журнал НЕ е помръднал', await broySabitiya(p), predLichno);
+    await otvoriProfila(p);
+    proveri('Профилът вече казва „включено" и предлага прибиране',
+      (await p.$eval('[data-profil-lichno]', (e) => (e as HTMLElement).dataset['profilLichno'])) === 'включено'
+        && Boolean(await p.$('#profil-lichno-priberi')), true);
+    await p.keyboard.press('Escape');
+
+    // СЕКЦИИТЕ НА ЛИЧНИЯ ЕКРАН носят ключ · §68 брои останалите десет като
+    // Стопанина; този екран го има само служителят, и само докато е пуснат.
+    const klyuchoveLichno = await p.$$eval('.telo > *', (e) =>
+      e.filter((x) => x.querySelector('.dyalglava')).map((x) => (x as HTMLElement).dataset['sektsiya'] ?? ''));
+    proveri('личният екран носи секции за местене', klyuchoveLichno.length > 0, true);
+    proveri('и НИТО ЕДНА не се ключува по заглавието си', klyuchoveLichno.filter((k) => k === '').length, 0);
+    proveri('и нито два ключа не съвпадат', klyuchoveLichno.length - new Set(klyuchoveLichno).size, 0);
 
     // СЪЩАТА ТАБЛИЦА · свои надписи, СВОЙ Журнал
     razdel = '53 · Личното · същата таблица';
@@ -57,10 +105,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ broy: number } | u
     await p.fill('#prenos-prichina', 'това е мое, не на фирмата');
     await deystvieSPrerisuvane(p, () => p.click('#prenos-pusni'));
     const vestPrenos = await tekstNa(p, '.vest');
+    // При отказ проверката ПОКАЗВА думите на отказа, не „false": иначе
+    // находката казва само „не мина" и се търси на сляпо (резен 98).
     proveri('преносът казва сверката си · разликата дори когато е нула',
-      vestPrenos.includes('разлика 0'), true);
+      vestPrenos.includes('разлика 0') ? 'разлика 0' : vestPrenos, 'разлика 0');
     proveri('и че старото стои непокътнато',
-      vestPrenos.includes('непокътнати'), true);
+      vestPrenos.includes('непокътнати') ? 'непокътнати' : vestPrenos, 'непокътнати');
     proveri('делото се появи в ЛИЧНАТА таблица',
       await p.$$eval('.gant-delo', (r) => r.length), 1);
 
@@ -130,7 +180,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ broy: number } | u
 
     // НА СЕБЕ СИ НЕ СЕ ДАВА · иначе отнемането изглежда като заключване
     // извън собствения Журнал.
-    await p.fill('#dostap-imeyl', 'vintexstroy@gmail.com');
+    await p.fill('#dostap-imeyl', SLUZHITELYAT.email.toLowerCase());
     await deystvieSPrerisuvane(p, () => p.click('#dostap-day'));
     proveri('на СЕБЕ СИ не се дава достъп',
       (await p.evaluate(() => document.body.textContent)).includes('На себе си не се дава достъп'), true);
@@ -352,17 +402,25 @@ export async function blok2(ctx: KonteksNaProhoda, lichniyat: { broy: number } |
     await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
     proveri('своят файл съвпада едно към едно', await broyLichni(p), predChuzhdiya);
 
-    // ПРИБИРАНЕТО · пунктът пада, Журналът остава
+    // ПРИБИРАНЕТО · от ПРОФИЛА · пунктът пада, Журналът остава
     razdel = '53 · Личното · прибирането';
     const predPribirane = lichniyat!.broy;
     await naEkran(p, 'tablo', '#tablo-lichno');
     proveri('Таблото вече предлага ПРИБИРАНЕ',
       (await p.$eval('#tablo-lichno', (e) => e.textContent)).includes('Прибери'), true);
-    await deystvieSPrerisuvane(p, () => p.click('#tablo-lichno'));
+    await otvoriProfila(p);
+    proveri('и Профилът също · едно действие, две дръжки',
+      Boolean(await p.$('#profil-lichno-priberi')), true);
+    await deystvieSPrerisuvane(p, () => p.click('#profil-lichno-priberi'));
     proveri('пунктът падна от лентата',
       Boolean(await p.$('[data-ekran=lichno]')), false);
     proveri('и Таблото предлага да го ВЪРНЕ — мястото вече е записано',
       (await p.$eval('#tablo-lichno', (e) => e.textContent)).includes('Върни'), true);
+    await otvoriProfila(p);
+    proveri('и Профилът казва „прибрано" и предлага същото',
+      (await p.$eval('[data-profil-lichno]', (e) => (e as HTMLElement).dataset['profilLichno'])) === 'прибрано'
+        && Boolean(await p.$('#profil-lichno-varni')), true);
+    await p.keyboard.press('Escape');
     const sledPribirane = await p.evaluate(async () => {
       const db = await new Promise((da) => {
         const z = indexedDB.open('masterbook');
@@ -376,6 +434,11 @@ export async function blok2(ctx: KonteksNaProhoda, lichniyat: { broy: number } |
     });
     proveri('но Журналът ОСТАНА — прибраното не е изтрито',
       sledPribirane > predPribirane, true);
+
+    // ОБРАТНО СТОПАНИНЪТ · проходът оставя книгата на онзи, който я е почнал.
+    await varniSeKatoStopanina(p);
+    proveri('и за Стопанина пак няма пункт „Лично" · личното е на служителя',
+      Boolean(await p.$('[data-ekran=lichno]')), false);
 
     // ══ 59 · МЕНЮТАТА ИЗВЪН УПРАВЛЕНИЕ · живото и заключеното (ADR-042) ═════
     //

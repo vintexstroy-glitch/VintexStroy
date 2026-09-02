@@ -692,7 +692,8 @@ export function narisuvayTablo(
     kartaProbvane(probvane) +
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
-    kartaLichno(lichnoVklyucheno, lichnoPipnato) +
+    // СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ (ADR-154) — и карта за него няма.
+    (negov ? '' : kartaLichno(lichnoVklyucheno, lichnoPipnato)) +
     kartaLenta(lenta.punktove, negov, lenta.moyatRedEPipnat) +
     kartaOtmetki(izbor) +
     kartaSpiratchka(izbor, koj, nuzhnoZaZhurnala) +
@@ -715,8 +716,9 @@ export function narisuvayTablo(
  */
 function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
   // ТРИ състояния, не две: „не е пипано" ≠ „прибрано" ≠ „включено".
-  // Първото пускане иска МЯСТО в личния драйв и става на самия екран „Лично"
-  // (И99); тук се връща само вече записаното.
+  // Първото пускане иска МЯСТО в личния драйв и става от Профила (ADR-154)
+  // или на самия екран „Лично" (И99); тук се връща само вече записаното.
+  // „Пипано" е превключване, не съществуване на Журнала (резен 98).
   const sastoyanie = vklyucheno ? 'включено' : pipnato ? 'прибрано' : 'не е пускано';
   return `
     <section class="karta" data-sektsiya="tablo-lichno">
@@ -731,7 +733,7 @@ function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
             ? `<button type="button" class="vtorichen" id="tablo-lichno">${
                 vklyucheno ? 'Прибери личното' : 'Върни личното'
               }</button>`
-            : '<span class="drebno">пуска се от пункта <b>Лично</b> — там се посочва мястото в твоя драйв</span>'
+            : '<span class="drebno">пуска се от <b>Профила</b> (аватарът горе вдясно) — там се посочва мястото в твоя драйв</span>'
         }
       </div>
       <p class="drebno">Личният таб е <b>същата таблица</b> от Управление за собствени нужди, с
