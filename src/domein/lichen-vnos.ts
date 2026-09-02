@@ -27,7 +27,7 @@
  * ли реда, паметта се е поправила.
  */
 
-import { klyuchNaLichnoDvizhenie, type RedOtKarta, type SlyataKarta } from '../iztochnik/karta.js';
+import { type RedOtKarta, type SlyataKarta } from '../iztochnik/karta.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
 import type { LichnoDvizhenie } from './lichni-pari.js';
 

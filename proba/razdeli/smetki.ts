@@ -1,7 +1,7 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 /** 6 · сметки | 7 · калкулатор */

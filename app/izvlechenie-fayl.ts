@@ -14,9 +14,7 @@
  * в книгата. Оттук излизат само разчетените редове и отпечатъкът на файла.
  */
 
-import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
-import { bezPrazni } from '../src/iztochnik/tablitsa.js';
 import { prochetiKarta, sleiIzvlecheniya, type SlyataKarta } from '../src/iztochnik/karta.js';
 import { otpechatak } from '../src/iztochnik/snimka.js';
 import { sha256Web } from '../src/nositel/hash-web.js';

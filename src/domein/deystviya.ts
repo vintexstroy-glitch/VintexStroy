@@ -162,7 +162,6 @@ import type {
   PayloadPrepiskaZapisana,
   PayloadSreshtaZapisana,
   PayloadPoleZapisano,
-  PayloadNAPVrazkaPrevklyuchena,
   PayloadStopaninZapisan,
   PayloadZapasenKontaktZapisan,
   PayloadStorno,

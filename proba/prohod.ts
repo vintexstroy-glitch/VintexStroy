@@ -154,6 +154,10 @@ async function main(): Promise<void> {
     await sesii.blok1(ctx);
     await tablo.blok2(ctx);
     await tablo.blok3(ctx);
+    // §147 иска ДАННИ и на двата екрана — наеми на Имоти, вземания на Пари.
+    // Затова стои тук, а не при §15: там отметките се мерят на празно, а
+    // изглед без редове изчезва и с гейт, и без него — тоест не мери нищо.
+    await tablo.blok4(ctx);
     await vhodISamolichnost.blok2(ctx);
     await infrastruktura.blok4(ctx);
     await mnogotoVerigi.blok2(ctx);

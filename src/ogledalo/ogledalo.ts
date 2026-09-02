@@ -122,7 +122,6 @@ import type {
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
-  PayloadNAPVrazkaPrevklyuchena,
   PayloadLichnoPrevklyucheno,
   PayloadLichenDostapZapisan,
   PayloadLichnaTemaZapisana,
@@ -1163,8 +1162,14 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         // 1): изтрит случай би направил събитието неразличимо от печатна грешка
         // и би пратил истински запис в `default`.
         //
-        // Формата му остава в `sabitiya.ts` по същата причина: за да е записано
-        // КАКВО стои в един стар Журнал, макар нищо от него вече да не ни трябва.
+        // ФОРМАТА МУ ОБАЧЕ НЕ ОСТАВА, и това е поправка (резен 93 · ADR-151).
+        // Дотук тук пишеше, че `PayloadNAPVrazkaPrevklyuchena` стои в
+        // `sabitiya.ts`, „за да е записано какво стои в стар Журнал". Но
+        // „ВалутаИзбрана" — същият случай, същата причина — НЯМА такъв тип, и
+        // прецедентът е нейният: типът, който никой не чете, не документира
+        // нищо. Стоеше жив само защото ДВА файла го ВНАСЯХА, без да го ползват
+        // (`tests/mrtvi-vnasyaniya.test.ts` ги намери). Пази ги
+        // `tests/sabitiyata.test.ts`: пренебрегнатите са БЕЗ товар, и двата.
         break;
 
       case 'ДелаПодредени': {

@@ -1,6 +1,6 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
-import { readFile, writeFile } from 'node:fs/promises';
+import { readFile } from 'node:fs/promises';
 import { ADRES } from '../yadro/server.ts';
 
 /** 0 · входът с Google | 1 · празно | 60 · Стопанинът */

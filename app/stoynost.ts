@@ -34,8 +34,7 @@ import {
 } from '../src/kalkulator/sazdavane.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
-import { otCSV } from '../src/iztochnik/csv.js';
-import { bezPrazni, type Tablitsa } from '../src/iztochnik/tablitsa.js';
+import { type Tablitsa } from '../src/iztochnik/tablitsa.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
 import {
   eListSPloshti,

@@ -25,7 +25,6 @@ import {
   IMENATA_NA_VIDOVETE,
   kletkata,
   KOLONI_PLASHTANIYA_ARHIV,
-  koloniteNaVida,
   PARICHNI_PLASHTANIYA,
   BEZ_KATEGORIYA,
   sedmitsataZaEkrana,

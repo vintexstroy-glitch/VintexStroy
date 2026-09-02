@@ -26,7 +26,6 @@ import {
   IMETO_NA_DZHOBA,
   keshaNaZaplatite,
   KOLONI_ZAPLATI,
-  sedmichnaZaplata,
   sedmitsataNa,
   sedmitsataZaEkrana,
   sedmitsiteSZapisi,

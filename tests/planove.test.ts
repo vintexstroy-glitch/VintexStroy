@@ -30,7 +30,6 @@ import {
   type Nositel,
   prevklyuchi,
   smeniPlan,
-  stigaLiHranilishteto,
   ZADALZHITELNI,
   type Vazmozhnost,
 } from '../src/domein/planove.js';

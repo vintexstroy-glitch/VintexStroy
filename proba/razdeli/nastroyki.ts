@@ -1,7 +1,7 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
-import { readFile, writeFile } from 'node:fs/promises';
+import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 
 /**

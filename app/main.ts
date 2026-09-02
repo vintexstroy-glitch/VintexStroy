@@ -7,7 +7,6 @@
 
 import {
   KotvaVLocalStorage,
-  type Pravata,
   proveriKotvata,
   proveriVerigata,
   Vrata,
@@ -20,7 +19,7 @@ import {
   osiguriHranilishte,
   type SastoyanieNaHranilishteto,
 } from '../src/nositel/hranilishte.js';
-import { otvoriDnevnik, type DnevnikVIndexedDB } from '../src/nositel/dnevnik-indexeddb.js';
+import { otvoriDnevnik } from '../src/nositel/dnevnik-indexeddb.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import {
   chetiBelegZaIznos,
@@ -54,11 +53,7 @@ import {
   zakachiSvivachaNaLentata,
 } from './lenta.js';
 import { koyGleda, type KoyGleda } from '../src/domein/temi-nastroyki.js';
-import { narisuvayImoti, zakachiFormite } from './imoti.js';
-import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
-import { narisuvayGant, zakachiGant } from './gant.js';
-import { narisuvayPari, zakachiPari } from './pari.js';
-import { lentataNaBalansa, narisuvaySmetki, zakachiSmetki } from './smetki.js';
+import { lentataNaBalansa } from './smetki.js';
 import { narisuvayButona, narisuvayPlana, zakachiIztochnitsi } from './iztochnitsi.js';
 import { arhivZaEksel } from './arhiv.js';
 import { nachaloNaProbvaneto } from '../src/domein/probvane.js';
@@ -80,13 +75,10 @@ import { narisuvayProfila, zakachiProfila } from './profil.js';
 import { helpatEOtvoren, narisuvayHelpa, zakachiHelpa } from './help.js';
 import { zakachiIzgledaNaGanta } from './gant-izgled.js';
 import { zakachiRedaktsiya } from './redaktsiya.js';
-import { chetiIzbor, narisuvayTablo, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
-import { narisuvayNastroyki, zakachiNastroyki } from './nastroyki.js';
-import { narisuvayII, zakachiII } from './ii.js';
-import { narisuvayTabove, zakachiTabove } from './tabove.js';
+import { chetiIzbor, svarzhiPitanetoNaDrayva, zakachiTablo } from './tablo.js';
 import { type Rolya, type Samolichnost } from '../src/yadro/samolichnost.js';
 import { VhodSGoogle, zapomneniyat } from './vhod-google.js';
-import { type Izbor, mozhe, type Vazmozhnost } from '../src/domein/planove.js';
+import { type Izbor, mozhe } from '../src/domein/planove.js';
 import { paket, PAKET_PO_PODRAZBIRANE } from '../src/domein/azbuki.js';
 import { SEGA } from '../src/izdanie.js';
 import {
@@ -97,7 +89,6 @@ import {
   knigataNa,
   koyZhurnal,
   pisachatNa,
-  sDumiZaAkaunta,
   svediImeyl,
 } from '../src/domein/akaunt.js';
 import {

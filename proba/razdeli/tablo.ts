@@ -239,3 +239,56 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     'не е питано');
   await naEkran(p, 'imoti', '#forma-imot');
 }
+
+/**
+ * 147 · ГЕЙТЪТ НА ОГЛЕДАЛАТА · отметката ДЕЙСТВА, и отказът се КАЗВА.
+ *
+ * Негова дума, 02.09: „оправи ог;еда;ата и гейта".
+ *
+ * Възможността `ogledala` беше единствената обявена БЕЗ гейт: двата изгледа
+ * се рисуваха винаги, тоест отметката ѝ в Таблото беше НАДПИС (правило 15,
+ * резен 93 · ADR-151). Тук се мери и трите неща наведнъж: изгледът пада,
+ * казва се ЗАЩО е паднал, и се връща цял с обратното натискане.
+ */
+export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  let razdel = '—';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+  const broy = (znak: string): Promise<number> => p.$$eval(znak, (e) => e.length);
+
+  razdel = '147 · Огледалата · двата изгледа СТОЯТ, докато отметката е вдигната';
+  await naEkran(p, 'imoti', '#forma-imot');
+  proveri('„По обект" е тук', await broy('[data-tablitsa="po-imot"]'), 1);
+  await naEkran(p, 'pari', '#forma-nachisli');
+  proveri('„По контрагент" е тук', await broy('[data-tablitsa="po-kontragent"]'), 1);
+
+  razdel = '147 · Огледалата · отметката ги гаси И НА ДВАТА екрана';
+  await naEkran(p, 'tablo', '.vazmozhnosti');
+  await deystvieSPrerisuvane(p, () => p.click('.vazm input[data-vazmozhnost="ogledala"]'));
+  await naEkran(p, 'imoti', '#forma-imot');
+  proveri('„По обект" падна', await broy('[data-tablitsa="po-imot"]'), 0);
+  proveri('и на мястото му стои отказ', await broy('[data-bez="ogledala"]'), 1);
+  proveri(
+    'който КАЗВА, че е ИЗКЛЮЧЕНА, а не липсваща',
+    (await tekstNa(p, '[data-bez="ogledala"]')).includes('изключена от Таблото'),
+    true,
+  );
+  proveri(
+    'и сочи КЪДЕ се връща',
+    (await tekstNa(p, '[data-bez="ogledala"]')).includes('Таблото'),
+    true,
+  );
+  await naEkran(p, 'pari', '#forma-nachisli');
+  proveri('„По контрагент" също падна', await broy('[data-tablitsa="po-kontragent"]'), 0);
+  proveri('и той казва защо', await broy('[data-bez="ogledala"]'), 1);
+
+  razdel = '147 · Огледалата · отметката ги ВРЪЩА цели';
+  await naEkran(p, 'tablo', '.vazmozhnosti');
+  await deystvieSPrerisuvane(p, () => p.click('.vazm input[data-vazmozhnost="ogledala"]'));
+  await naEkran(p, 'imoti', '#forma-imot');
+  proveri('„По обект" се върна', await broy('[data-tablitsa="po-imot"]'), 1);
+  proveri('и отказът си отиде', await broy('[data-bez="ogledala"]'), 0);
+  await naEkran(p, 'pari', '#forma-nachisli');
+  proveri('„По контрагент" се върна', await broy('[data-tablitsa="po-kontragent"]'), 1);
+}

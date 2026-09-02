@@ -26,7 +26,6 @@ import {
   sveriZakachaniyata,
   zakachanetoNa,
   zaVzimane,
-  type Kontakt,
   type Prepiska,
   type Sreshta,
 } from '../src/domein/kontakti.js';

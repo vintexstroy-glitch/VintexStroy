@@ -28,8 +28,6 @@
  */
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { ikona } from './ikoni.js';
-
 /** Ключът на подредбата за един екран. */
 function klyuchat(ekran: string): string {
   return `podredba.${ekran}`;

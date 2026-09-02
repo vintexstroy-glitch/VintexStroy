@@ -47,10 +47,7 @@ import {
   VIDOVE_KREDIT,
   type VidKredit,
 } from '../src/domein/kredit-matematika.js';
-import { otCSV, tekstOtBaytove } from '../src/iztochnik/csv.js';
-import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
-import { bezPrazni } from '../src/iztochnik/tablitsa.js';
-import { prochetiKarta, sleiIzvlecheniya, saldoNaFayla, type SnimkaNaKarta } from '../src/iztochnik/karta.js';
+import { saldoNaFayla } from '../src/iztochnik/karta.js';
 import { prochetiIzvlecheniyata } from './izvlechenie-fayl.js';
 import {
   sravniLichno,
@@ -58,8 +55,6 @@ import {
   zaPisane,
   type PlanZaVnos,
 } from '../src/domein/lichen-vnos.js';
-import { otpechatak } from '../src/iztochnik/snimka.js';
-import { sha256Web } from '../src/nositel/hash-web.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import {
   menyuOtZhivi,
