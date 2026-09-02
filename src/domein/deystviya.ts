@@ -1121,7 +1121,7 @@ export class Deystviya {
     proveriKletkaNaDobavka(o.modeli.get(danni.tablitsa), danni);
     if (danni.tablitsa === VGRADEN_IMOTI && !o.imoti.has(danni.redId)) {
       throw new GreshkaTablitsa(
-        `Ред „${danni.redId}" го няма сред имотите — клетка без ред няма къде да се покаже.`,
+        `Ред „${danni.redId}" го няма сред обектите — клетка без ред няма къде да се покаже.`,
       );
     }
     // Сесията се СМЯТА от потока и Огледалото не я държи (резен 82) — затова
@@ -1277,7 +1277,7 @@ export class Deystviya {
     const o = await this.ogledalo();
     if (!o.imoti.has(danni.imotId)) {
       throw new GreshkaProdazhba(
-        'Няма такъв имот. Сделката чете „Обект" и „Място" от имота — без него ' +
+        'Няма такъв обект. Сделката чете „Обект" и „Имот" от обекта — без него ' +
           'двете колони остават празни и никой не разбира защо.',
       );
     }

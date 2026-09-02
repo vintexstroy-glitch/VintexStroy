@@ -96,7 +96,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       (await p.evaluate(() => document.body.textContent)).includes('Адресната книга'), true);
     proveri('вградените носят закованите номера',
       await p.$$eval('[data-tablitsa="adresna-kniga"] .red', (r) =>
-        r.some((x) => x.textContent.includes('Дела') && x.textContent.includes('Мястото'))), true);
+        r.some((x) => x.textContent.includes('Дела') && x.textContent.includes('Имотът'))), true);
 
     // на моделна колона се дава номер · записът е събитие
     const imaModelniKoloni = await p.$$eval('[data-nomer-vhod]', (r) => r.length);
@@ -161,7 +161,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('двойката се вижда в таблицата',
       await p.$$eval('[data-tablitsa="zakachki"] [data-zakachka]', (r) => r.length), 1);
     proveri('и се КАЗВА за какво е закачен избраният ред',
-      (await p.$eval('#zakacheno-za', (e) => e.textContent)).includes('Имот'), true);
+      (await p.$eval('#zakacheno-za', (e) => e.textContent)).includes('Обект'), true);
     proveri('сверката брои живата и не намира висяща',
       (await p.$eval('#sverka-zakachki', (e) => e.textContent)).includes('висящи: 0'), true);
 

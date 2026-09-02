@@ -840,7 +840,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
 
   const kodovi = await redove(p, '.red.kodova');
   proveri('кодовите колони се редят с кръщелното си име', kodovi.length >= 5, true);
-  proveri('и първата е „Място и единица"', kodovi[0]?.[1], 'Място и единица');
+  proveri('и първата е „Място и единица"', kodovi[0]?.[1], 'Имот · Обект');
 
   // ── НОВОТО ИМЕ · едно събитие МоделЗаписан, показва се навсякъде ─────────
   await p.fill('[data-ime-kodova="0"]', 'Обект');
@@ -849,7 +849,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
   proveri('полето помни новото име след прерисуване',
     await p.$eval('[data-ime-kodova="0"]', (e) => (e as HTMLInputElement).value), 'Обект');
   proveri('а кръщелното стои до него — не е изтрито',
-    (await redove(p, '.red.kodova'))[0]?.[1], 'Място и единица');
+    (await redove(p, '.red.kodova'))[0]?.[1], 'Имот · Обект');
 
   await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
   proveri('Имоти рисува НОВОТО име в главата',
@@ -863,7 +863,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
   await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
   proveri('празното връща кръщелното',
     await p.$eval('[data-tablitsa=imoti] .glava .glavicha', (e) => e.getAttribute('data-ime')),
-    'Място и единица');
+    'Имот · Обект');
 }
 
 /** 139 · агрегатът по редове · наблюдателят (резен 81 · ADR-139) */

@@ -119,7 +119,7 @@ describe('връзването · „изборът в едната стесня
     t = dobaviSektsiya(t, { ime: 'Имотите', vid: 'tablitsa', iztochnik: 'imoti' });
     t = dobaviSektsiya(t, { ime: 'Разходите', vid: 'tablitsa', iztochnik: 'razhodi' });
     expect(() => svarzhiSektsii(t, 'имотите', 'разходите', 'imot')).toThrow(
-      /не носи по имот/,
+      /не носи по обект/,
     );
   });
 

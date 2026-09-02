@@ -11,6 +11,7 @@
 
 import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { broySPapka, povtoreniPapki, sveriPapkite } from '../src/domein/papki.js';
+import { IMOT_I_OBEKT } from '../src/domein/dumite.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { dnesKato, ekraniraj } from './obshto.js';
 import { otData } from '../src/yadro/data.js';
@@ -108,7 +109,7 @@ function novOpId(): string {
 export function koloniNaImotite(zhiviPoImot: ReadonlyMap<string, Naem[]>): KolonaSFiltar<Imot>[] {
   const zhiviNa = (i: Imot) => zhiviPoImot.get(i.id) ?? [];
   return [
-    { klyuch: 'myasto', ime: 'Място и единица', vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
+    { klyuch: 'myasto', ime: IMOT_I_OBEKT, vid: 'tekst', vzemi: (i) => `${i.adres} · ${i.edinitsa}` },
     {
       klyuch: 'naematel',
       ime: 'Наемател',
@@ -275,7 +276,7 @@ export function koloniNaNaemite(o: Ogledalo): KolonaSFiltar<Naem>[] {
     { klyuch: 'koy', ime: 'Наемател', vid: 'tekst', vzemi: (n) => n.naemetel },
     {
       klyuch: 'imot',
-      ime: 'Имот',
+      ime: 'Обект',
       vid: 'tekst',
       vzemi: (n) => {
         const i = o.imoti.get(n.imotId);
@@ -407,7 +408,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
 
     <section data-sektsiya="imoti-nov" class="karta${popravyanImot ? ' izbrana' : ''}">
       <div class="dyalglava">
-        <h2>${popravyanImot ? 'Поправи имота' : 'Нов имот'}</h2>
+        <h2>${popravyanImot ? 'Поправи обекта' : 'Нов обект'}</h2>
         <span>${
           popravyanImot
             ? 'поправката е ново събитие — старото описание остава в Журнала'
@@ -417,12 +418,12 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       <form id="forma-imot">
         <div class="poleta">
           <div class="pole">
-            <label for="imot-adres">Място или адрес</label>
+            <label for="imot-adres">Имот (адрес)</label>
             <input translate="no" id="imot-adres" name="adres" required placeholder="напр. Малинова" autocomplete="off"
                    value="${popravyanImot ? ekraniraj(popravyanImot.adres) : ''}">
           </div>
           <div class="pole">
-            <label for="imot-edinitsa">Единица</label>
+            <label for="imot-edinitsa">Обект (единица)</label>
             <input translate="no" id="imot-edinitsa" name="edinitsa" required placeholder="напр. АП. № 1" autocomplete="off"
                    value="${popravyanImot ? ekraniraj(popravyanImot.edinitsa) : ''}">
           </div>
@@ -443,7 +444,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         </div>
         <p class="greshka" id="greshka-imot"></p>
         <div class="deystviya">
-          <button type="submit" class="glaven">${popravyanImot ? 'Запиши поправката' : 'Запиши имота'}</button>
+          <button type="submit" class="glaven">${popravyanImot ? 'Запиши поправката' : 'Запиши обекта'}</button>
           ${popravyanImot ? '<button type="button" class="vtorichen" data-otkazhi-rezhim>Откажи</button>' : ''}
           <p class="drebno">${
             popravyanImot
@@ -465,11 +466,11 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
       </div>
       ${
         imoti.length === 0
-          ? '<p class="drebno">Първо въведи имот — наемът виси на него.</p>'
+          ? '<p class="drebno">Първо въведи обект — наемът виси на него.</p>'
           : `<form id="forma-naem">
         <div class="poleta">
           <div class="pole">
-            <label for="naem-imot">Имот</label>
+            <label for="naem-imot">Обект</label>
             <select translate="no" id="naem-imot" name="imotId" required ${popravyanNaem ? 'disabled' : ''}>
               ${imoti
                 .map(
@@ -561,7 +562,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
     </section>
 
     <section data-sektsiya="imoti-spisak">
-      <div class="dyalglava"><h2>Имоти</h2><span>${imoti.length} ${imoti.length === 1 ? 'единица' : 'единици'}</span></div>
+      <div class="dyalglava"><h2>Имоти и обекти</h2><span>${imoti.length} ${imoti.length === 1 ? 'обект' : 'обекта'}</span></div>
       ${imoti.length ? poleZaTarsene('imoti') : ''}
       <div class="tablitsa" data-tablitsa="imoti"${dobavki.koloni.length ? ' data-s-dobavki' : ''}>
         <div class="glava imot">
@@ -569,7 +570,7 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
         </div>
         ${
           imoti.length === 0
-            ? `<p class="prazno">Още няма нито един имот.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
+            ? `<p class="prazno">Още няма нито един обект.<br>Въведи първия горе — той влиза в Журнала като събитие и остава там завинаги.</p>`
             : filtriraniImoti.redove.length === 0
               ? PRAZEN_FILTAR
               : grupiranaTablitsa('imoti', filtriraniImoti.redove, koloniImoti, dnes, (i) => redImot(i, naemiPoImot.get(i.id) ?? [], ogledalo, dobavki.kletki(i)))
@@ -698,7 +699,7 @@ function sektsiyaNaRegistara(o: Ogledalo, dnes: string): string {
         <div class="tablitsa" data-tablitsa="registar-${ekraniraj(g.klyuch)}">
           <div class="glava registar">
             <span data-kolona="koy" data-ime="Наемател">Наемател</span>
-            <span data-kolona="imot" data-ime="Имот">Имот</span>
+            <span data-kolona="imot" data-ime="Обект">Обект</span>
             <span data-kolona="mesets" data-ime="Месец">Месец</span>
             <span class="suma" data-kolona="nachisleno" data-ime="Начислено">Начислено</span>
             <span class="suma" data-kolona="plateno" data-ime="Платено">Платено</span>
@@ -992,9 +993,9 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
         formaImot.reset();
         if (novAdres) {
           predlozhenoDarvo = { myasto: opis.adres, obekt: opis.edinitsa };
-          k.vest('dobre', 'Имотът е записан. Нов адрес — предложението за голямото дело е долу.');
+          k.vest('dobre', 'Обектът е записан. Нов адрес — предложението за голямото дело е долу.');
         } else {
-          k.vest('dobre', 'Имотът е записан в Журнала.');
+          k.vest('dobre', 'Обектът е записан в Журнала.');
         }
       }
       await prerisuvay();
@@ -1171,7 +1172,7 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
     koren,
     k,
     [
-      ['data-storno-imot', 'имотът'],
+      ['data-storno-imot', 'обектът'],
       ['data-storno-naem', 'наемът'],
     ],
     async () => {

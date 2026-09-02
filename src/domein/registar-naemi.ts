@@ -164,7 +164,7 @@ export type IzgledNaRegistara = 'naemateli' | 'imoti' | 'mesetsi';
 
 export const IMENA_NA_IZGLEDITE: Readonly<Record<IzgledNaRegistara, string>> = Object.freeze({
   naemateli: 'По наемател',
-  imoti: 'По имот',
+  imoti: 'По обект',
   mesetsi: 'По месец',
 });
 

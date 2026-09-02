@@ -68,8 +68,8 @@ export function proveriMyastoto(ime: string): string {
   const t = ime.trim();
   if (t === '') {
     throw new GreshkaMyasto(
-      'Мястото няма име. Името е и адресът му — делата сочат мястото по име, ' +
-        'значи безименно място не може да се свърже с нищо.',
+      'Имотът няма име. Името е и адресът му — делата сочат имота по име, ' +
+        'значи безименен имот не може да се свърже с нищо.',
     );
   }
   return t;
@@ -155,7 +155,7 @@ export function sveriMestata(
   kogato: string,
 ): Sverka {
   return sverka(
-    'местата · записаните',
+    'имотите · записаните',
     o.mesta.size,
     mestata(o, zhiviDela).length,
     kogato,

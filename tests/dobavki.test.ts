@@ -168,7 +168,7 @@ describe('записът на клетка отказва с думи', () => {
         { tablitsa: VGRADEN_IMOTI, redId: 'IM-NYAMA', kolona: 0, stoynost: 'х' },
         { opId: 'op-1' },
       ),
-    ).rejects.toThrow(/няма сред имотите/);
+    ).rejects.toThrow(/няма сред обектите/);
   });
 });
 
@@ -264,7 +264,7 @@ describe('регистърът на таблиците слива, не удво
 // създаването, което се показва от настройки."
 
 describe('преименуването на кодова колона', () => {
-  const KODOVI = ['Място и единица', 'Наемател', 'Площ'] as const;
+  const KODOVI = ['Имот · Обект', 'Наемател', 'Площ'] as const;
   const prazen = () => prazenModelZaVgradena(VGRADEN_IMOTI);
 
   it('е само за управителите · и само по поименния списък', () => {

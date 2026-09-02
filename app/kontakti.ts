@@ -84,7 +84,7 @@ function koloniNaPrepiskite(o: Ogledalo): readonly KolonaSFiltar<Prepiska>[] {
     { klyuch: 'zaVzimane', ime: 'За взимане', vid: 'data', vzemi: (p) => p.zaVzimane },
     { klyuch: 'otgovornik', ime: 'Отговорник', vid: 'tekst', vzemi: (p) => (p.otgovornik === '' ? '—' : p.otgovornik) },
     { klyuch: 'otsenka', ime: 'Оценка', vid: 'tekst', vzemi: (p) => imeNaOtsenkata(p.otsenka) },
-    { klyuch: 'zakachena', ime: 'Имот · дело', vid: 'tekst', vzemi: (p) => zakachanetoNa(p, o.imoti, o.dela).nadpis },
+    { klyuch: 'zakachena', ime: 'Обект · дело', vid: 'tekst', vzemi: (p) => zakachanetoNa(p, o.imoti, o.dela).nadpis },
     { klyuch: 'sastoyanie', ime: 'Състояние', vid: 'tekst', vzemi: (p) => p.sastoyanie },
   ];
 }
@@ -218,10 +218,10 @@ function sektsiyaPrepiski(
             </select>
           </div>
           <div class="pole">
-            <label for="prep-zakachena">Имот, дело или поддело (по избор)</label>
+            <label for="prep-zakachena">Обект, дело или поддело (по избор)</label>
             <select translate="no" id="prep-zakachena" name="zakachena">
               <option value="">— към нищо —</option>
-              <optgroup label="Имоти">
+              <optgroup label="Обекти">
                 ${[...o.imoti.values()]
                   .map(
                     (i) =>
@@ -295,7 +295,7 @@ function sektsiyaPrepiski(
       в червено работа, за която никой не е бързал. Часът е ПО ИЗБОР — празен час
       значи „само дата", и дните до срока се броят по КАЛЕНДАР, не по часовник.</p>
 
-      <p class="drebno">Мястото и обектът НЕ се преписват в преписката: те идват от
+      <p class="drebno">Имотът и обектът НЕ се преписват в преписката: те идват от
       онова, за което е закачена. Преписан адрес остарява в мига, в който делото се
       премести, и после два реда казват различно за едно място.</p>
 

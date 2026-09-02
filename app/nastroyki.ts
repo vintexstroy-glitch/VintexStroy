@@ -1505,7 +1505,7 @@ function blokNaKartata(): string {
       </div>
       <div class="tablitsa">
         <div class="glava deystvie">
-          <span>Откъде</span><span>Накъде</span><span>Място</span><span>Състояние</span>
+          <span>Откъде</span><span>Накъде</span><span>Къде</span><span>Състояние</span>
         </div>
         ${VRAZKI.map(
           (v) => `<div class="red deystvie" translate="no">

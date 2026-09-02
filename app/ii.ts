@@ -841,7 +841,7 @@ function dannitezaAgenta(o: Ogledalo, a: Agent, dnes: string): string {
   for (const obhvat of a.obhvat) {
     switch (obhvat) {
       case 'imoti':
-        redove.push(`Имоти: ${o.imoti.size} · договори за наем: ${o.naemi.size}`);
+        redove.push(`Обекти: ${o.imoti.size} · договори за наем: ${o.naemi.size}`);
         break;
       case 'stoynost':
         redove.push(`Таблици с модел: ${o.modeli.size} · записани сверки: ${o.sverki.length}`);

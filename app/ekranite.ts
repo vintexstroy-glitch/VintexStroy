@@ -361,7 +361,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
   },
   gant: {
     ime: 'Управление',
-    podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
+    podnaslov: 'Управление на Времевия Ред в Делата · Имот · Обект · Дело — три колони с филтри',
     ikona: 'ekran-gant',
     narisuvay: (r) => narisuvayGant(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiGant(z.koren, z.k, z.prerisuvay),

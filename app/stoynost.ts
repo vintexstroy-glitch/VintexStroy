@@ -237,7 +237,7 @@ export function narisuvayStoynost(): string {
                  placeholder="ул. Иван Вазов 12, Пловдив">
         </label>
         <button type="button" class="glaven" id="sazday-sgrada">Създай сграда · ${obekti.length} обекта</button>
-        <span class="drebno">Обектите стават <b>Имоти</b> под това име. Второто
+        <span class="drebno">Обектите се записват като <b>Обекти</b> на Имота с това име. Второто
         натискане не удвоява нищо: адресът на действието е сградата и обектът,
         не случайно число. <b>Дела не се раждат</b> — те са негов сценарий за
         конкретна сграда, а измислени дела за чужда са по-лоши от липсващи.</span>
@@ -434,8 +434,8 @@ export function zakachiStoynost(
       if (imotId === undefined) {
         if (kazhi) {
           kazhi.textContent =
-            `„${obekt}" не се връзва с имот по вид и номер. Сделката иска имот — ` +
-            'от него се четат „Обект" и „Място".';
+            `„${obekt}" не се връзва с обект по вид и номер. Сделката иска обект — ` +
+            'от него се четат „Обект" и „Имот".';
         }
         return;
       }
@@ -561,7 +561,7 @@ export function zakachiStoynost(
       const sv = sveriSazdavaneto(obekti.length, 0, novi.length, veche, new Date().toISOString());
       k.vest(
         sv.nared ? 'dobre' : 'zle',
-        `„${adres}": ${novi.length} нови имота${veche > 0 ? ` · ${veche} вече ги имаше` : ''}. ` +
+        `„${adres}": ${novi.length} нови обекта${veche > 0 ? ` · ${veche} вече ги имаше` : ''}. ` +
           `Сверка вход↔изход: ${sv.vhod} → ${sv.izhod}, разлика ${sv.razlika}. ` +
           'Дела не се раждат — те са сценарий за конкретна сграда.',
       );
@@ -688,7 +688,7 @@ export function zakachiStoynost(
       const izhod = await vpishiMD(k, otMD);
       k.vest(
         'dobre',
-        `Вписано: ${izhod.imoti} ${izhod.imoti === 1 ? 'имот' : 'имота'} и ${izhod.dela} дела` +
+        `Вписано: ${izhod.imoti} ${izhod.imoti === 1 ? 'обект' : 'обекта'} и ${izhod.dela} дела` +
           (izhod.veche ? ` · ${izhod.veche} вече бяха вписани и не се удвояват` : '') +
           ' · всичко е в Журнала, със следа.',
       );

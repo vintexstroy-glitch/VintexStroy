@@ -413,7 +413,7 @@ describe('преписката носи Управление', () => {
     const o = await deystviya.ogledalo();
     const z = zakachanetoNa(o.prepiski.get('pr-1')!, o.imoti, o.dela);
     expect(z.nameren).toBe(false);
-    expect(z.nadpis).toBe('имотът вече го няма');
+    expect(z.nadpis).toBe('обектът вече го няма');
   });
 
   it('изгубеното закачане се КАЗВА · и сверката го брои', async () => {

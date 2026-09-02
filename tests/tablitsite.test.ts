@@ -90,12 +90,12 @@ describe('регистърът на таблиците', () => {
     expect(dela, 'Управление липсва от матрицата').toBeDefined();
     expect(dela!.klyuch).toBe('vgraden:dela');
     // ЧЕТИРИ, не три: редът показва и отговорника, а старата глава го премълчаваше.
-    expect(dela!.glavi).toEqual(['Място', 'Дело', 'Обект', 'Отговорник']);
+    expect(dela!.glavi).toEqual(['Имот', 'Дело', 'Обект', 'Отговорник']);
   });
 
   it('главата на Ганта е СЪЩАТА като в матрицата · един дом, два четеца', () => {
     const dela = vsichki.find((t) => t.ekran === 'gant')!;
-    expect(glavataNaDelata('Място')).toBe(dela.glavi.join(' · '));
+    expect(glavataNaDelata('Имот')).toBe(dela.glavi.join(' · '));
     // и при личните дела първата дума се СМЕНЯ, а останалите не (И98)
     expect(glavataNaDelata('Тема')).toBe('Тема · Дело · Обект · Отговорник');
   });
@@ -105,10 +105,10 @@ describe('регистърът на таблиците', () => {
     // („Място · Обект · Дело") и НИТО ЕДИН тест не падна. Тоест описателят си
     // стоеше на мястото, а екранът пак говореше свои думи — точно разминаването,
     // заради което този ред беше дълг. Домът е един само ако ВСИЧКИ четат от него.
-    expect(NADPISI_SLUZHEBNI.glavaNaImenata).toBe(glavataNaDelata('Място'));
+    expect(NADPISI_SLUZHEBNI.glavaNaImenata).toBe(glavataNaDelata('Имот'));
     expect(NADPISI_LICHNI.glavaNaImenata).toBe(glavataNaDelata('Тема'));
     // и подзаглавието на формата · то също изброяваше колоните на ръка
-    expect(NADPISI_SLUZHEBNI.podnaslovNaFormata).toContain(glavataNaDelata('Място'));
+    expect(NADPISI_SLUZHEBNI.podnaslovNaFormata).toContain(glavataNaDelata('Имот'));
     expect(NADPISI_LICHNI.podnaslovNaFormata).toContain(glavataNaDelata('Тема'));
   });
 });

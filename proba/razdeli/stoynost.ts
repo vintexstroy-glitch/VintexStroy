@@ -140,7 +140,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('казва СВЕРКАТА вход↔изход',
       (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
     proveri('и колко нови имота са родени',
-      (await tekstNa(p, '.vest.dobre')).includes('5 нови имота'), true);
+      (await tekstNa(p, '.vest.dobre')).includes('5 нови обекта'), true);
     proveri('обявява, че дела НЕ се раждат',
       (await tekstNa(p, '.vest.dobre')).includes('Дела не се раждат'), true);
 
@@ -195,7 +195,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await p.click('#vpishi-obekti');
     await p.waitForFunction(() => document.body.textContent.includes('Вписано:'));
     const vestVpis = await tekstNa(p, '.vest');
-    proveri('вписани са 45 имота', vestVpis.includes('45 имота'), true);
+    proveri('вписани са 45 обекта', vestVpis.includes('45 обекта'), true);
     proveri('и 79 дела (4 на сградата + 3 на всеки непродаден)',
       vestVpis.includes('79 дела'), true);
     proveri('всяко е събитие в Журнала', await broySabitiya(p), predMD + 45 + 79);

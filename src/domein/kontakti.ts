@@ -540,7 +540,7 @@ export function zakachanetoNa(
           nadpis: i.edinitsa === '' ? i.adres : `${i.adres} · ${i.edinitsa}`,
           nameren: true,
         })
-      : Object.freeze({ kam: 'имот' as const, nadpis: 'имотът вече го няма', nameren: false });
+      : Object.freeze({ kam: 'имот' as const, nadpis: 'обектът вече го няма', nameren: false });
   }
   const d = dela.get(p.zakachenaId);
   if (!d) return Object.freeze({ kam: 'дело' as const, nadpis: 'делото вече го няма', nameren: false });

@@ -1657,7 +1657,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('казва се какво НАПУСКА устройството',
       granitsata.includes('името на делото'), true);
     proveri('и какво НЕ напуска · поименно',
-      granitsata.includes('Мястото и Обектът') && granitsata.includes('наематели'), true);
+      granitsata.includes('Имотът и Обектът') && granitsata.includes('наематели'), true);
 
     // БЕЗ ОТМЕТКА · НУЛА МРЕЖА. Брои се самата ЗАЯВКА, не намерението: обещание
     // „по избор", проверено по надписа на екрана, е обещание, проверено по себе си.
@@ -2347,8 +2347,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '119 · Преписката · закача се за ИМОТ, ДЕЛО или ПОДДЕЛО';
     const gnezda = await p.$$eval('#prep-zakachena optgroup', (e) =>
       e.map((x) => x.getAttribute('label')));
-    proveri('менюто има ДВЕ гнезда · имоти и дела',
-      JSON.stringify(gnezda), JSON.stringify(['Имоти', 'Дела и поддела']));
+    proveri('менюто има ДВЕ гнезда · обекти и дела',
+      JSON.stringify(gnezda), JSON.stringify(['Обекти', 'Дела и поддела']));
     proveri('подделата се четат по НОМЕР · 1.1 казва степента',
       (await p.$$eval('#prep-zakachena optgroup:nth-of-type(2) option',
         (e) => e.map((x) => x.textContent))).some((t) => /^\d+\.\d+/.test(t ?? '')), true);

@@ -9,7 +9,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '57 · Менютата · речникът е от Журнала';
-    proveri('полето „Място" носи СПИСЪК, а не само текст',
+    proveri('полето „Имот" носи СПИСЪК, а не само текст',
       await p.$eval('#d-myasto', (e) => e.getAttribute('list')), 'd-myasto-spisak');
     const mestaVSpisaka = await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => (x as any).value));
     proveri('и в списъка стоят ЖИВИТЕ места, най-писаното горе',

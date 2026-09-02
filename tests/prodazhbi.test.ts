@@ -108,12 +108,12 @@ describe('петнайсетте колони са НЕГОВИ', () => {
       'Състояние',
     ]);
     // Обект и Място са първите две · те идват от имота.
-    expect(KOLONI.slice(0, 2)).toEqual(['Обект', 'Място']);
+    expect(KOLONI.slice(0, 2)).toEqual(['Обект', 'Имот']);
   });
 
   it('затворени са ТРИ · двете от имота и сметката', () => {
     expect(ZATVORENI).toEqual([0, 1, 13]);
-    expect(ZATVORENI.map((i) => KOLONI[i])).toEqual(['Обект', 'Място', 'проверка']);
+    expect(ZATVORENI.map((i) => KOLONI[i])).toEqual(['Обект', 'Имот', 'проверка']);
   });
 
   it('състоянията са ЧЕТИРИ · и точно едно е архив', () => {
@@ -296,7 +296,7 @@ describe('терминалът · Продажби Архив', () => {
     );
     expect(dumi).toHaveLength(3);
     expect(new Set(dumi).size).toBe(3);
-    expect(dumi[0]).toContain('имот');
+    expect(dumi[0]).toContain('обект');
     expect(dumi[1]).toContain('състояние');
     expect(dumi[2]).toContain('вид движение');
   });

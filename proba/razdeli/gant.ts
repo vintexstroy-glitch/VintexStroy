@@ -27,7 +27,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       // мести заедно с кода. Отговорникът е новият: редът винаги го е показвал,
       // а старата глава го премълчаваше (резен 48).
       (await p.$eval('[data-prazno=dela]', (e) => e.textContent))
-        .includes('Място · Дело · Обект · Отговорник'), true);
+        .includes('Имот · Дело · Обект · Отговорник'), true);
     proveri('и се представя, вместо да мълчи',
       (await p.$eval('[data-prazno=dela]', (e) => (e.closest('section') as any).textContent)).includes('Времевия Ред'), true);
 
@@ -58,7 +58,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 0);
     proveri('и празното го КАЗВА с думи',
       (await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).innerText))
-        .includes('не се реди само'), true);
+        .includes('не се реди сам'), true);
     proveri('сверката се КАЗВА, дори когато е нула',
       (await p.$eval('[data-mesta-sverka]', (e) => (e as any).innerText)).includes('разлика 0'), true);
 

@@ -107,7 +107,7 @@ export function mozheLiDaSeStornira(
       const naemi = [...o.naemi.values()].filter((n) => n.imotId === id);
       if (naemi.length > 0) {
         return ne(
-          `На този имот ${naemi.length === 1 ? 'виси' : 'висят'} ${broy(naemi.length, 'наем', 'наема')}. ` +
+          `На този обект ${naemi.length === 1 ? 'виси' : 'висят'} ${broy(naemi.length, 'наем', 'наема')}. ` +
             'Махни първо тях. За смяна на адрес ползвай „Поправи“ — не сторно.',
         );
       }

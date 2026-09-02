@@ -1243,7 +1243,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
   await natisni(p, '.red.imot [data-dokumenti]');
   await p.waitForSelector('#forma-dokument');
   proveri('и същият прозорец се отваря',
-    (await tekstNa(p, '.istoriya-karta h3')).includes('имот'), true);
+    (await tekstNa(p, '.istoriya-karta h3')).includes('обект'), true);
   await zatvoriProzoretsa(p);
 
   await naEkran(p, 'gant', '.gant-delo');

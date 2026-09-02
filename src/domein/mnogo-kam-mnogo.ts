@@ -82,7 +82,7 @@ export type SashtnostZaZakachane = (typeof SASHTNOSTI_ZA_ZAKACHANE)[number];
 
 /** Името на екрана · един дом (правило 17): екранът чете оттук. */
 export const IMENA_NA_SASHTNOSTITE: Readonly<Record<SashtnostZaZakachane, string>> = Object.freeze({
-  imot: 'Имот',
+  imot: 'Обект',
   naem: 'Наем',
   vzemane: 'Вземане',
   plashtane: 'Плащане',

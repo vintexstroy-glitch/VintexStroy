@@ -69,6 +69,7 @@ import {
   zhivite,
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
+import { DUMITE } from '../src/domein/dumite.js';
 import {
   dumataNaButona,
   mozheDaSeSkrie,
@@ -151,7 +152,7 @@ function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu
 
 /** Четирите менюта наведнъж · за закачането след рисуване. */
 function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
-  const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място';
+  const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot;
   return new Map<string, Menyu>([
     ['myasto', menyutoNaDelata(o, 'myasto', parvata)],
     ['obekt', menyutoNaDelata(o, 'obekt', 'Обект')],
@@ -232,8 +233,8 @@ interface NadpisiNaGanta {
 // той е ЕДИНСТВЕНИЯТ ѝ дом и матрицата чете същото (правило 17 · резен 48).
 export const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
   zaglavie: 'Управление на Времевия Ред в Делата',
-  glavaNaImenata: glavataNaDelata('Място'),
-  podnaslovNaFormata: `${glavataNaDelata('Място')} — колоните на делото`,
+  glavaNaImenata: glavataNaDelata(DUMITE.imot),
+  podnaslovNaFormata: `${glavataNaDelata(DUMITE.imot)} — колоните на делото`,
   imeNaFormata: 'Ново дело',
 });
 
@@ -263,7 +264,7 @@ export const NADPISI_LICHNI: NadpisiNaGanta = Object.freeze({
  * „обект · отговорник". Отговорникът се виждаше на екрана и го нямаше в главата
  * му — точно разминаването, което един дом премахва.
  */
-export function koloniNaDelata(parvata = 'Място'): KolonaSFiltar<Delo>[] {
+export function koloniNaDelata(parvata: string = DUMITE.imot): KolonaSFiltar<Delo>[] {
   return [
     { klyuch: 'myasto', ime: parvata, vid: 'tekst', vzemi: (d) => d.myasto },
     { klyuch: 'ime', ime: 'Дело', vid: 'tekst', vzemi: (d) => d.ime },
@@ -273,7 +274,7 @@ export function koloniNaDelata(parvata = 'Място'): KolonaSFiltar<Delo>[] {
 }
 
 /** Главата на имената · СМЯТА се от описателя, вече не се пише като низ. */
-export function glavataNaDelata(parvata = 'Място'): string {
+export function glavataNaDelata(parvata: string = DUMITE.imot): string {
   return koloniNaDelata(parvata)
     .map((k) => k.ime)
     .join(' · ');
@@ -307,7 +308,7 @@ export function narisuvayGant(
   // Двигателят реже по колоните (Място · Дело · Обект · Отговорник) и по
   // търсенето; Оценката остава свой филтър, защото не е колона. Дървовидната
   // наредба се пази: филтърът маха редове, не разбърква останалите.
-  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място');
+  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot);
   const fDvigatel = filtriray(klyuch, podredeni, koloniDela, dnes);
   const filtrirani = fDvigatel.redove.filter(
     (d) => !filtarOtsenka || d.otsenka === filtarOtsenka,
@@ -505,8 +506,8 @@ export function narisuvayGant(
  */
 /** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
 const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; dela: number; koy: string }>[] = [
-  { klyuch: 'ime', ime: 'Място', vid: 'tekst', vzemi: (r) => r.ime },
-  { klyuch: 'firma', ime: 'Фирма · управлява проекта', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
+  { klyuch: 'ime', ime: DUMITE.imot, vid: 'tekst', vzemi: (r) => r.ime },
+  { klyuch: 'firma', ime: 'Фирма · управлява имота', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
   { klyuch: 'koy', ime: 'Записал', vid: 'tekst', vzemi: (r) => r.koy },
   { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
 ];
@@ -522,13 +523,13 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
   return `
     <section data-sektsiya="gant-mesta" data-broy="${redove.length}">
       <div class="dyalglava">
-        <h2>Местата · проектите</h2>
+        <h2>Имотите</h2>
         <span>само заредените · отговорникът на ДЕЙСТВИЕТО е записалият</span>
       </div>
 
       ${
         redove.length === 0
-          ? '<p class="drebno">Още няма нито едно записано място — записва се от формата тук. Място, което само се среща по делата, не се реди само (И124 т.7).</p>'
+          ? '<p class="drebno">Още няма нито един записан имот — записва се от формата тук. Имот, който само се среща по делата, не се реди сам (И124 т.7).</p>'
           : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
         <table class="tablitsa" data-tablitsa="mestata">
           <thead>
@@ -549,7 +550,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
             .join('')}</tbody>
         </table>
       </div>${redZaSkritoto(filtriraniMesta, 'mestata')}
-      <p class="drebno">Папката на мястото се отваря с ДЕСЕН БУТОН върху реда
+      <p class="drebno">Папката на имота се отваря с ДЕСЕН БУТОН върху реда
       (или „⋯") — „да има пътища за неща само от там" (И124 т.3). Видим линк в
       колона вече няма.</p>`
       }
@@ -557,7 +558,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
       <form class="forma" id="${predstavka}forma-myasto">
         <div class="poleta">
           <div class="pole">
-            <label for="${predstavka}m-ime">Място</label>
+            <label for="${predstavka}m-ime">Имот</label>
             <input translate="no" type="text" id="${predstavka}m-ime" name="ime" required
                    list="${predstavka}m-imena" placeholder="Малинова Долина">
             <datalist id="${predstavka}m-imena">
@@ -565,7 +566,7 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
             </datalist>
           </div>
           <div class="pole">
-            <label for="${predstavka}m-firma">Фирма · управлява проекта</label>
+            <label for="${predstavka}m-firma">Фирма · управлява имота</label>
             <input translate="no" type="text" id="${predstavka}m-firma" name="firma"
                    placeholder="Винтекс Строй ЕООД">
           </div>
@@ -580,9 +581,9 @@ function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
           </div>
         </div>
         <div class="deystviya">
-          <button type="submit" class="glaven">Запиши мястото</button>
-          <span class="drebno">Фирмата и папката са <b>по избор</b> — мястото има смисъл
-          и само с име. Второто записване ПОПРАВЯ същото място, не ражда второ.</span>
+          <button type="submit" class="glaven">Запиши имота</button>
+          <span class="drebno">Фирмата и папката са <b>по избор</b> — имотът има смисъл
+          и само с име. Второто записване ПОПРАВЯ същия имот, не ражда втори.</span>
         </div>
       </form>
 
@@ -672,7 +673,7 @@ function blokNaZavarshenite(o: Ogledalo, predstavka: string, ot: string, doD: st
           ? ''
           : arhivnaTablitsa(
               'zavarsheni-dela',
-              ['Място', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
+              ['Имот', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
               vPerioda.map((d) =>
                 redVArhiva(d, `data-zavarsheno="${ekraniraj(d.id)}"`, [ekraniraj(d.do)]),
               ),
@@ -706,7 +707,7 @@ function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
           ? ''
           : arhivnaTablitsa(
               'otpadnali-dela',
-              ['Място', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
+              ['Имот', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
               redove.map((d) =>
                 redVArhiva(d, `data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo"`, []),
               ),
@@ -811,7 +812,7 @@ export function tablitsataSOcveteniPoleta(
           ${[...poMyasto.entries()]
             .map(
               ([myasto, spisak]) => `
-            <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
+            <div class="gant-myasto" title="Имотът е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
             ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi, dokumentiNa, nomeratNa(rachen, d.id))).join('')}`,
             )
             .join('')}
@@ -1000,7 +1001,7 @@ export function formaDelo(
              * „Тема" в личния — същото поле, същият речник, друга дума.
              */
             [
-              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място', z: true, m: 'Малинова' },
+              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot, z: true, m: 'Малинова' },
               { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно' },
               { k: 'ime', e: 'Дело', z: true, m: 'Акт 15' },
               { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков' },
@@ -1056,7 +1057,7 @@ export function formaDelo(
           <button type="submit">Запиши делото</button>
           <p class="greshka" id="${id('greshka-delo')}">${ekraniraj(greshkaDelo)}</p>
         </div>
-        <p class="drebno">Мястото и Обектът са КОЛОНИ, не нива: дело без обект е нормално.
+        <p class="drebno">Имотът и Обектът са КОЛОНИ на реда: дело без обект е нормално, а Обект без Имот няма (И131).
         Сгъва се само дело с поддела — „Имотите не се сгъват, сгъват се само делата и поддела."</p>
       </form>
     </section>`;
@@ -1122,7 +1123,7 @@ export function zakachiGant(
           },
           { opId: `myasto:${crypto.randomUUID()}` },
         );
-        k.vest('dobre', `Мястото „${String(d.get('ime') ?? '')}" е записано.`);
+        k.vest('dobre', `Имотът „${String(d.get('ime') ?? '')}" е записан.`);
       } catch (err) {
         k.vest('zle', err instanceof Error ? err.message : String(err));
       }

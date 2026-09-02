@@ -85,15 +85,15 @@ export interface RedVKnigata {
 const VGRADENI_KOLONI: Readonly<Record<IztochnikTablitsa, readonly { ime: string; po: PoKakvo }[]>> =
   Object.freeze({
     imoti: [
-      { ime: 'Имотът', po: 'imot' },
+      { ime: 'Обектът', po: 'imot' },
       { ime: 'Адресът', po: 'myasto' },
     ],
-    naemi: [{ ime: 'Имотът', po: 'imot' }],
-    vzemaniya: [{ ime: 'Имотът · през наема', po: 'imot' }],
-    plashtaniya: [{ ime: 'Имотът · през вземането', po: 'imot' }],
+    naemi: [{ ime: 'Обектът', po: 'imot' }],
+    vzemaniya: [{ ime: 'Обектът · през наема', po: 'imot' }],
+    plashtaniya: [{ ime: 'Обектът · през вземането', po: 'imot' }],
     razhodi: [],
     dela: [
-      { ime: 'Мястото', po: 'myasto' },
+      { ime: 'Имотът', po: 'myasto' },
       { ime: 'Обектът', po: 'obekt' },
     ],
   });
