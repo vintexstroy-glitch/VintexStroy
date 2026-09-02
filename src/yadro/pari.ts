@@ -5,13 +5,13 @@
  * Негова дума (23.08): „ЛЕВ НЯМА… пишеш в евро, не в евроцента." Затова всичко,
  * което човек ВИЖДА, е в евро с думата и знака — а вътре се пази най-малката
  * единица, защото ДДС, изваден от обща цена, я ражда: без нея инвариантът
- * „основа + ДДС == обща" пада. Типът остава `Stotinki` — той е ЕДИНИЦАТА,
+ * „основа + ДДС == обща" пада. Типът остава `Tsentove` — той е ЕДИНИЦАТА,
  * не левът; преименуване би пипнало всеки запис в Журнала за нула полза.
  */
 
 import { EVRO, type Valuta } from './valuta.js';
 
-export type Stotinki = number & { readonly __stotinki: unique symbol };
+export type Tsentove = number & { readonly __tsentove: unique symbol };
 
 export class GreshkaPari extends Error {
   constructor(message: string) {
@@ -20,39 +20,39 @@ export class GreshkaPari extends Error {
   }
 }
 
-/** Прави Stotinki от число. Хвърля, ако не е цяло и безопасно. */
-export function stotinki(n: number): Stotinki {
+/** Прави Tsentove от число. Хвърля, ако не е цяло и безопасно. */
+export function tsentove(n: number): Tsentove {
   if (!Number.isSafeInteger(n)) {
-    throw new GreshkaPari(`Парите са цели стотинки; получено: ${n}`);
+    throw new GreshkaPari(`Парите са цели центове; получено: ${n}`);
   }
-  return n as Stotinki;
+  return n as Tsentove;
 }
 
 /** Проверка без хвърляне — ползва се от валидацията на Вратата. */
-export function eStotinki(n: unknown): n is Stotinki {
+export function eTsentove(n: unknown): n is Tsentove {
   return typeof n === 'number' && Number.isSafeInteger(n);
 }
 
-export function sabiri(...chasti: readonly Stotinki[]): Stotinki {
+export function sabiri(...chasti: readonly Tsentove[]): Tsentove {
   let sbor = 0;
   for (const ch of chasti) sbor += ch;
-  return stotinki(sbor);
+  return tsentove(sbor);
 }
 
-export function izvadi(a: Stotinki, b: Stotinki): Stotinki {
-  return stotinki(a - b);
+export function izvadi(a: Tsentove, b: Tsentove): Tsentove {
+  return tsentove(a - b);
 }
 
 /** Обръща знака — основата на сторното. */
-export function obarni(a: Stotinki): Stotinki {
-  return stotinki(-a);
+export function obarni(a: Tsentove): Tsentove {
+  return tsentove(-a);
 }
 
 /**
- * Разпределя сума на части без загуба на стотинка.
+ * Разпределя сума на части без загуба на цент.
  * Остатъкът отива към първите части, за да е сборът точен.
  */
-export function razpredeli(suma: Stotinki, chasti: number): Stotinki[] {
+export function razpredeli(suma: Tsentove, chasti: number): Tsentove[] {
   if (!Number.isSafeInteger(chasti) || chasti <= 0) {
     throw new GreshkaPari(`Броят части трябва да е цяло положително число; получено: ${chasti}`);
   }
@@ -61,7 +61,7 @@ export function razpredeli(suma: Stotinki, chasti: number): Stotinki[] {
   const osnova = Math.floor(abs / chasti);
   const ostatak = abs - osnova * chasti;
   return Array.from({ length: chasti }, (_, i) =>
-    stotinki(znak * (osnova + (i < ostatak ? 1 : 0))),
+    tsentove(znak * (osnova + (i < ostatak ? 1 : 0))),
   );
 }
 
@@ -109,7 +109,7 @@ export function deliZakragleno(chislitel: number, znamenatel: number): number {
  * Хилядите се делят НА РЪКА, не през локала: не всяка среда носи същите
  * правила, а числото пред собственика трябва да е еднакво навсякъде.
  */
-export function kakvoPishe(s: Stotinki, v: Valuta = EVRO): string {
+export function kakvoPishe(s: Tsentove, v: Valuta = EVRO): string {
   const minus = s < 0 ? '-' : '';
   const abs = Math.abs(s);
   const tsyalo = String(Math.floor(abs / v.drobni)).replace(
@@ -135,7 +135,7 @@ export function kakvoPishe(s: Stotinki, v: Valuta = EVRO): string {
  * при долар; със или без знак на валута. Отказва всичко друго — входът е
  * мястото, където се спира дробното, не Вратата.
  */
-export function otSuma(tekst: string, v: Valuta = EVRO): Stotinki {
+export function otSuma(tekst: string, v: Valuta = EVRO): Tsentove {
   const chisto = tekst
     .replace(/[\s\u00A0\u202F]/g, '')
     .replace(/€|EUR|евро|\$|USD|долар/gi, '')
@@ -150,7 +150,7 @@ export function otSuma(tekst: string, v: Valuta = EVRO): Stotinki {
   const [, znak, tsyala, drobna = ''] = nameren;
   const stotni = Number(drobna.padEnd(2, '0'));
   const sbor = Number(tsyala) * v.drobni + stotni;
-  return stotinki(znak === '-' ? -sbor : sbor);
+  return tsentove(znak === '-' ? -sbor : sbor);
 }
 
 /** Старото име · остава като мост, за да не гръмне никой вносител. */
@@ -172,7 +172,7 @@ export const SUMATA_NAD_NULA = 'Сумата трябва да е повече �
  * Без знак на валута и без паузи за хиляди: полето е за РЕДАКТИРАНЕ, и
  * човекът пише върху числото, не върху украсата. `kakvoPishe` е за четене.
  */
-export function zaPisane(s: Stotinki, drobni = 100): string {
+export function zaPisane(s: Tsentove, drobni = 100): string {
   const znak = s < 0 ? '-' : '';
   const abs = Math.abs(s);
   return `${znak}${Math.floor(abs / drobni)},${String(abs % drobni).padStart(2, '0')}`;
@@ -181,7 +181,7 @@ export function zaPisane(s: Stotinki, drobni = 100): string {
 /**
  * ЗА ЕКРАНА · същото, но приема гол `number`.
  *
- * ЗАЩО СЪЩЕСТВУВА. `Stotinki` е маркиран тип и това е правилно: там, където се
+ * ЗАЩО СЪЩЕСТВУВА. `Tsentove` е маркиран тип и това е правилно: там, където се
  * СМЯТА, марката пази да не влезе цена в левове или наполовина закръглено
  * число. Но полетата в Огледалото са `number` — марката се губи, щом сумата
  * мине през Журнала.
@@ -195,12 +195,12 @@ export function zaPisane(s: Stotinki, drobni = 100): string {
  * число се КАЗВА, вместо да мине за нула.
  */
 export function pishi(st: number, v: Valuta = EVRO): string {
-  if (!Number.isSafeInteger(st)) return `⚠ не е цели стотинки: ${String(st)}`;
-  return kakvoPishe(st as Stotinki, v);
+  if (!Number.isSafeInteger(st)) return `⚠ не е цели центове: ${String(st)}`;
+  return kakvoPishe(st as Tsentove, v);
 }
 
 /** Същото за полето за писане — без знака на валутата. */
 export function pishiVPole(st: number, drobni = 100): string {
   if (!Number.isSafeInteger(st)) return '';
-  return zaPisane(st as Stotinki, drobni);
+  return zaPisane(st as Tsentove, drobni);
 }

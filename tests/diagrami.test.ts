@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
@@ -36,7 +36,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Домакинство',
-      naem_st: stotinki(500_00),
+      naem_st: tsentove(500_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -58,7 +58,7 @@ describe('месечните пари за диаграмата', () => {
     const vzemaneJuni = [...o1.vzemaniya.values()].find((v) => v.period === '2026-06')!;
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: vzemaneJuni.id, suma_st: stotinki(500_00), nachin: 'банка', data: '2026-06-07' },
+      { vzemaneId: vzemaneJuni.id, suma_st: tsentove(500_00), nachin: 'банка', data: '2026-06-07' },
       { opId: 'op-p-1' },
     );
     await deystviya.zapishiRazhod(
@@ -67,7 +67,7 @@ describe('месечните пари за диаграмата', () => {
         potok: 'fakturi',
         dostavchik: 'ЕВН',
         opis: 'ток',
-        suma_st: stotinki(120_00),
+        suma_st: tsentove(120_00),
         sektor: 'pokupki-uslugi',
         stavka: -1,
         nachin: 'банка',
@@ -109,7 +109,7 @@ describe('месечните пари за диаграмата', () => {
     const vzemane = [...o.vzemaniya.values()][0]!;
     await deystviya.priemiPlashtane(
       'P-star',
-      { vzemaneId: vzemane.id, suma_st: stotinki(100_00), nachin: 'в брой', data: '2020-01-01' },
+      { vzemaneId: vzemane.id, suma_st: tsentove(100_00), nachin: 'в брой', data: '2020-01-01' },
       { opId: 'op-p-star' },
     );
     const m = mesechnitePari(await deystviya.ogledalo(), '2026-08-22', 12);

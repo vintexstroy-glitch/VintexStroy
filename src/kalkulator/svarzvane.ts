@@ -64,7 +64,7 @@ interface ImotZaSvarzvane {
   readonly id: string;
   /** единицата, както е записана: „АП. № 1" */
   readonly edinitsa: string;
-  /** месечният наем в стотинки; 0 значи „няма действащ наем" */
+  /** месечният наем в центове; 0 значи „няма действащ наем" */
   readonly naem_mesechen_st: number;
 }
 

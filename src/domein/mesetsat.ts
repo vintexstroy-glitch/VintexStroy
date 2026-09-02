@@ -52,7 +52,7 @@ export const IMENA_NA_RAZDELITE: Readonly<Record<Razdel, string>> = Object.freez
 export interface RedNaMesetsa {
   readonly razdel: Razdel;
   readonly ime: string;
-  /** числото за ТОЗИ месец · цели стотинки */
+  /** числото за ТОЗИ месец · цели центове */
   readonly stoynost_st: number;
   /** колко записа са го образували · за сверката вход↔изход */
   readonly broy: number;
@@ -249,7 +249,7 @@ export function mesetsatKatoTablitsa(
  * Разделено с табулация, защото това е форматът, който и Ексел разбира, и
  * моделът чете без да гадае къде свършва колоната. Сумите излизат в ЕВРО с
  * точка — не защото навън се смята в дробни числа, а защото навън се ЧЕТЕ:
- * вътре стотинката си остава цяла и никой float не пипа Журнала (правило 3).
+ * вътре центът си остава цяла и никой float не пипа Журнала (правило 3).
  */
 export function kamTekst(t: MesetsatKatoTablitsa): string {
   const evro = (st: number): string => (st / 100).toFixed(2);

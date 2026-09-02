@@ -24,7 +24,7 @@
  * чийто извор го няма, показва НУЛА и казва какво чака; не се скрива
  * (правило 15: изключено ≠ липсващо).
  *
- * Всичко е цели стотинки (правило 3). Нула float, нула `toFixed`.
+ * Всичко е цели центове (правило 3). Нула float, нула `toFixed`.
  */
 
 import { obshtOstatak } from './krediti.js';
@@ -48,7 +48,7 @@ export const IMENA_NA_DZHOBOVETE: Readonly<Record<Dzhob, string>> = Object.freez
 /** Една съставка на едно поле — какво влиза и откъде се чете. */
 interface Sastavka {
   readonly ime: string;
-  /** цели стотинки · знакът е ИСТИНСКИ: отрицателното се вади */
+  /** цели центове · знакът е ИСТИНСКИ: отрицателното се вади */
   readonly suma_st: number;
   /** откъде идва — за следата назад */
   readonly otkade: string;

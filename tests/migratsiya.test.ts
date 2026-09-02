@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DnevnikVPametta,
-  stotinki,
+  tsentove,
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
@@ -38,10 +38,10 @@ function stend() {
 }
 
 const REDOVE: RedOtRegistara[] = [
-  { edinitsa: 'АП. № 1', myasto: 'Място А', kolona: 'колона 1', naem_st: stotinki(515_00) },
-  { edinitsa: 'АП. № 2', myasto: 'Място А', kolona: 'колона 1', naem_st: stotinki(613_00) },
-  { edinitsa: 'ОФИС № 3', myasto: 'Място Б', kolona: 'колона 2', naem_st: stotinki(517_00) },
-  { edinitsa: 'ПМ № 11', myasto: 'Място Б', kolona: 'колона 2', naem_st: stotinki(77_20) },
+  { edinitsa: 'АП. № 1', myasto: 'Място А', kolona: 'колона 1', naem_st: tsentove(515_00) },
+  { edinitsa: 'АП. № 2', myasto: 'Място А', kolona: 'колона 1', naem_st: tsentove(613_00) },
+  { edinitsa: 'ОФИС № 3', myasto: 'Място Б', kolona: 'колона 2', naem_st: tsentove(517_00) },
+  { edinitsa: 'ПМ № 11', myasto: 'Място Б', kolona: 'колона 2', naem_st: tsentove(77_20) },
 ];
 
 const OBYAVENO: ObyavenoOtLista = {
@@ -56,7 +56,7 @@ describe('сверка на регистъра, преди какъвто и д�
     expect(sverki.every((s) => s.nared)).toBe(true);
   });
 
-  it('хваща разлика от ЕДНА стотинка', () => {
+  it('хваща разлика от ЕДИН цент', () => {
     const sverki = sveriRegistara(
       REDOVE,
       { ...OBYAVENO, totali_st: { ...OBYAVENO.totali_st, 'колона 2': 594_19 } },
@@ -162,7 +162,7 @@ describe('миграция', () => {
     expect(await dnevnik.chetiVsichki('vintexstroy')).toHaveLength(8);
   });
 
-  it('отказва наем с дробни стотинки, преди сверката дори да почне', async () => {
+  it('отказва наем с дробни центове, преди сверката дори да почне', async () => {
     const { dnevnik, deystviya } = stend();
 
     await expect(

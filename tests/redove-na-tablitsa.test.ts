@@ -85,8 +85,8 @@ describe('редовете · пазачът пита ГЛАВАТА', () => {
     expect(() => proveriRed(red({ pari_st: { 5: 100_00 } }), GLAVATA)).toThrow(/затворена колона/);
   });
 
-  it('пари с дробна стотинка се отказват · цели стотинки (правило 3)', () => {
-    expect(() => proveriRed(red({ pari_st: { 2: 120.5 } }), GLAVATA)).toThrow(/ЦЕЛИ стотинки/);
+  it('пари с дробен цент се отказват · цели центове (правило 3)', () => {
+    expect(() => proveriRed(red({ pari_st: { 2: 120.5 } }), GLAVATA)).toThrow(/ЦЕЛИ центове/);
   });
 
   it('стойност в ЧУЖДА карта се отказва · сумата не е текст', () => {
@@ -144,7 +144,7 @@ describe('редовете · поправката и махането са ЗА
 });
 
 describe('редовете · сметките върху тях', () => {
-  it('сборът на колона е в ЦЕЛИ стотинки и МАХНАТИЯТ не влиза', async () => {
+  it('сборът на колона е в ЦЕЛИ центове и МАХНАТИЯТ не влиза', async () => {
     const { deystviya, o } = await knigata();
     await deystviya.zapishiRedNaTablitsa(red({ red: 'Ф-1', pari_st: { 2: 120_33 } }), {
       opId: 'r-1',
@@ -164,7 +164,7 @@ describe('редовете · сметките върху тях', () => {
     // а не да разчита викащият да го е направил преди него.
     const vsichki = [...((await o()).redoveNaTablitsi.get('Фактури') ?? new Map()).values()];
     expect(vsichki.length).toBe(3);
-    // 120,33 + 80,67 = 201,00 · и нито една стотинка не се губи по пътя
+    // 120,33 + 80,67 = 201,00 · и нито един цент не се губи по пътя
     expect(sborNaKolona(vsichki, '2')).toBe(201_00);
     expect(Number.isInteger(sborNaKolona(vsichki, '2'))).toBe(true);
   });

@@ -42,7 +42,7 @@ import { fold } from '../src/ogledalo/ogledalo.js';
 import { sgani } from '../src/ogledalo/sgavane.js';
 import { smetki } from '../src/domein/smetki.js';
 import { otvoriDnevnik } from '../src/nositel/dnevnik-indexeddb.js';
-import { stotinki } from '../src/yadro/pari.js';
+import { tsentove } from '../src/yadro/pari.js';
 import { SHA } from '../tests/pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -148,7 +148,7 @@ async function golyamZhurnal(): Promise<Sabitie[]> {
   await d.dobaviImot('I-1', { adres: 'А', edinitsa: 'х', ploshtad_kvsm: 0 }, { opId: 'i' });
   for (let n = 1; n <= 40; n += 1) {
     await d.dobaviNaem(`N-${n}`, {
-      imotId: 'I-1', naemetel: `н ${n}`, naem_st: stotinki(500_00 + n), padezhDen: 5,
+      imotId: 'I-1', naemetel: `н ${n}`, naem_st: tsentove(500_00 + n), padezhDen: 5,
       ot: '2020-01-01', do: '', depozit_st: 0,
       sektor: n % 3 ? 'naem-zhilishten' : 'naem-targovski',
     }, { opId: `n-${n}` });
@@ -161,12 +161,12 @@ async function golyamZhurnal(): Promise<Sabitie[]> {
     for (let n = 1; n <= 40 && broy < BROY; n += 1) {
       await d.nachisliVzemane(`V-${period}-${n}`, {
         naemId: `N-${n}`, period, osnovanie: 'наем',
-        suma_st: stotinki(500_00 + n), padezh: `${period}-05`,
+        suma_st: tsentove(500_00 + n), padezh: `${period}-05`,
       }, { opId: `v-${period}-${n}` });
       broy += 1;
       if (broy < BROY && n % 2 === 0) {
         await d.priemiPlashtane(`P-${period}-${n}`, {
-          vzemaneId: `V-${period}-${n}`, suma_st: stotinki(500_00 + n),
+          vzemaneId: `V-${period}-${n}`, suma_st: tsentove(500_00 + n),
           nachin: n % 4 ? 'банка' : 'в брой', data: `${period}-10`,
         }, { opId: `p-${period}-${n}` });
         broy += 1;

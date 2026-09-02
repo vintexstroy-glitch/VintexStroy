@@ -163,7 +163,7 @@ export function koefitsient(
  * законът от ADR-012: закръгленото никога не влиза в сбор.
  *
  * Редът на делението е нарочен: първо се умножават ЦЕЛИТЕ числа (площ в кв.см
- * × база в стотинки × два коефициента в б.т.), после се дели веднъж. Обратният
+ * × база в центове × два коефициента в б.т.), после се дели веднъж. Обратният
  * ред би закръглил по средата и разликата щеше да расте с всеки обект.
  */
 export function tsenaTochno(n: {
@@ -267,7 +267,7 @@ export function tsenaPoSastoyanie(n: {
 }): number {
   const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   if (!Number.isSafeInteger(n.naem_mesechen_st) || n.naem_mesechen_st < 0) {
-    throw new GreshkaMatritsa(`Наемът се дава в цели стотинки; получено: ${n.naem_mesechen_st}`);
+    throw new GreshkaMatritsa(`Наемът се дава в цели центове; получено: ${n.naem_mesechen_st}`);
   }
   if (m.dohodnost_bt <= 0) {
     throw new GreshkaMatritsa('Доходност нула или под нула не капитализира — сметката е невъзможна.');
@@ -389,7 +389,7 @@ export function ostavashti_bt(matritsa?: Matritsa): number {
  *
  * ОСТАТЪКЪТ ОТ ПРЕНОРМИРАНЕТО отива на НАЙ-ГОЛЯМОТО от оцелелите тегла и това
  * е назовано (`matematika` §4): остатък, който изчезва, се появява по-късно
- * като „сметката не затваря с една стотинка".
+ * като „сметката не затваря с един цент".
  *
  * Всичко в `BigInt`, делене ВЕДНЪЖ накрая.
  */
@@ -485,7 +485,7 @@ export function ochakvanNaem_st(
   const m = matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   const naem_st_kvm = m.naem_st_kvm[vid];
   if (naem_st_kvm === undefined) return 0;
-  // площ (кв.см) × наем (ст./м²) ÷ 10 000 → стотинки на месец
+  // площ (кв.см) × наем (ст./м²) ÷ 10 000 → центове на месец
   return Math.round((obshta_kvsm * naem_st_kvm) / 10_000);
 }
 

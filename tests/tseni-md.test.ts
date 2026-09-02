@@ -30,7 +30,7 @@ describe('четецът на „ЦЕНИ МД"', () => {
     expect(eListTseniMD({ ime: 'х', redove: [['а', 'б']] })).toBe(false);
   });
 
-  it('чете всички редове · площите в цели кв.см · цената в стотинки', () => {
+  it('чете всички редове · площите в цели кв.см · цената в центове', () => {
     const p = prochetiTseniMD(LIST);
     expect(p.redove.length).toBe(6);
     expect(p.propusnati).toBe(0);

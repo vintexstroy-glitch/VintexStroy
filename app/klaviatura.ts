@@ -16,7 +16,7 @@
  *
  * СТАТУС-ЛЕНТАТА е причината обхватът да съществува: маркираш колона суми и
  * долу пише Брой · Сбор · Средно — без бутон, без екран, както в Excel.
- * Кое е пари, НЕ се гадае по текста: евро-клетката носи стотинките си в
+ * Кое е пари, НЕ се гадае по текста: евро-клетката носи центовете си в
  * `data-st`, сложен при рисуването от самата стойност на модела (правило 20 ·
  * ADR-014). Клетка без `data-st` влиза в броя, но никога в сбора — затова
  * м², проценти и точки не могат да се смесят с евро в едно число.
@@ -29,7 +29,7 @@
  * груповите действия ще стъпят върху същия обхват.
  */
 
-import { eStotinki, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { eTsentove, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import { opitajStornoNaMnogo, stornoOtButona, type ZaStorno } from './storno.js';
 import type { Konteks } from './ekranite.js';
@@ -79,7 +79,7 @@ function mahniZnaka(): void {
 // ── сметката на избора · чиста, за да има тест ────────────────────────────
 interface KletkaVIzbora {
   readonly tekst: string;
-  /** стотинките от `data-st`, или null — клетката не е пари */
+  /** центовете от `data-st`, или null — клетката не е пари */
   readonly st: number | null;
 }
 
@@ -88,7 +88,7 @@ interface SmetkaNaIzbora {
   readonly broy: number;
   readonly broyPari: number;
   readonly sbor_st: number;
-  /** закръглено до стотинка САМО за показ — то никога не влиза в сбор */
+  /** закръглено до цент САМО за показ — то никога не влиза в сбор */
   readonly sredno_st: number;
 }
 
@@ -103,7 +103,7 @@ export function smetniIzbora(kletki: readonly KletkaVIzbora[]): SmetkaNaIzbora {
       sbor += k.st;
     }
   }
-  // към НАЙ-БЛИЗКАТА стотинка, симетрично за минуса — Math.round сам по себе
+  // към НАЙ-БЛИЗКИЯ цент, симетрично за минуса — Math.round сам по себе
   // си тегли -0,5 към нулата, а +0,5 нагоре, и средното на дългове би куцало.
   const sredno = broyPari === 0 ? 0 : Math.sign(sbor) * Math.round(Math.abs(sbor) / broyPari);
   return { broy, broyPari, sbor_st: sbor, sredno_st: sredno };
@@ -114,7 +114,7 @@ function stNa(kletka: HTMLElement): number | null {
   const surovo = kletka.dataset['st'];
   if (surovo === undefined) return null;
   const n = Number(surovo);
-  return eStotinki(n) ? n : null;
+  return eTsentove(n) ? n : null;
 }
 
 // ── статус-лентата ────────────────────────────────────────────────────────

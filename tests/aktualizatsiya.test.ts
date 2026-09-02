@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { otCSV } from '../src/iztochnik/csv.js';
 import { razchetiRazhodi } from '../src/iztochnik/razchitane.js';
@@ -146,7 +146,7 @@ describe('поправен файл за стар период', () => {
       'R-rachen',
       {
         potok: 'zaplati', dostavchik: 'екип', opis: 'февруари',
-        suma_st: stotinki(2000_00), sektor: 'zaplati', nachin: 'в брой',
+        suma_st: tsentove(2000_00), sektor: 'zaplati', nachin: 'в брой',
         data: '2026-02-28', dokument: '',
       },
       { opId: 'op-rachen' },

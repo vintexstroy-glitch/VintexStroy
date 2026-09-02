@@ -386,9 +386,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
             (x) => `
           <div class="red sverka" translate="no">
             <span class="kletka"><b>${ekraniraj(x.kakvo)}</b></span>
-            <span class="suma"${vStotinki(x.belezhka, x.vhod)}>${merka(x.belezhka, x.vhod)}</span>
-            <span class="suma"${vStotinki(x.belezhka, x.izhod)}>${merka(x.belezhka, x.izhod)}</span>
-            <span class="suma${x.nared ? '' : ' duljimo'}"${vStotinki(x.belezhka, x.razlika)}>${merka(x.belezhka, x.razlika)}</span>
+            <span class="suma"${vTsentove(x.belezhka, x.vhod)}>${merka(x.belezhka, x.vhod)}</span>
+            <span class="suma"${vTsentove(x.belezhka, x.izhod)}>${merka(x.belezhka, x.izhod)}</span>
+            <span class="suma${x.nared ? '' : ' duljimo'}"${vTsentove(x.belezhka, x.razlika)}>${merka(x.belezhka, x.razlika)}</span>
             <span>${znachkaNaSverkata(x.nared)}</span>
           </div>`,
           )
@@ -1013,7 +1013,7 @@ function merka(belezhka: string | undefined, chislo: number): string {
 
 /** `data-st` за статус-лентата — само когато мярката наистина е пари.
  *  Бройка без белега не влиза в сбор: евро и бройки не се смесват. */
-function vStotinki(belezhka: string | undefined, chislo: number): string {
+function vTsentove(belezhka: string | undefined, chislo: number): string {
   return belezhka === MERKA.pari ? ` data-st="${chislo}"` : '';
 }
 

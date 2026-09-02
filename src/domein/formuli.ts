@@ -249,7 +249,7 @@ export function smetniFormula(
     case 'razlika':
       return a! - b!;
     case 'proizvedenie':
-      // стотинки × стотни (или стотни × стотни) → делим веднъж, накрая
+      // центове × стотни (или стотни × стотни) → делим веднъж, накрая
       return Math.round((a! * b!) / 100);
     case 'protsent':
       // стойност × стотни от процент → / 100 (стотните) / 100 (процентът)
@@ -298,7 +298,7 @@ interface SmetnataKolona {
   readonly ime: string;
   readonly vid: VidStoynost;
   readonly redove: readonly SmetnatRed[];
-  /** сборът на смятаните редове · за колона в евро това са стотинки */
+  /** сборът на смятаните редове · за колона в евро това са центове */
   readonly sbor: number;
   /** редове, при които операнд не се чете като число — казват се, не се крият */
   readonly spanali: readonly number[];

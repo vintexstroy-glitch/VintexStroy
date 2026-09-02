@@ -26,7 +26,7 @@
 
 import type { PayloadTablitsaOtFaylSazdadena } from './sabitiya.js';
 import { sborNaKolona, vidaNaKolonata, type RedNaTablitsa } from './redove-na-tablitsa.js';
-import { kakvoPishe, stotinki } from '../yadro/pari.js';
+import { kakvoPishe, tsentove } from '../yadro/pari.js';
 
 class GreshkaRazrez extends Error {
   override readonly name = 'GreshkaRazrez';
@@ -41,7 +41,7 @@ export function kletkataKatoTekst(
   const vid = vidaNaKolonata(t, kolona);
   if (vid === 'evro') {
     const st = r.pari_st[kolona];
-    return st === undefined ? '' : kakvoPishe(stotinki(st));
+    return st === undefined ? '' : kakvoPishe(tsentove(st));
   }
   if (vid === 'protsent' || vid === 'chislo') {
     const n = r.chisla[kolona];
@@ -55,7 +55,7 @@ export interface Grupa {
   /** стойността, по която е събрана; празната клетка е СВОЯ група */
   readonly stoynost: string;
   readonly broy: number;
-  /** колона → сбор в цели стотинки · само паричните колони */
+  /** колона → сбор в цели центове · само паричните колони */
   readonly sbor_st: Readonly<Record<string, number>>;
 }
 

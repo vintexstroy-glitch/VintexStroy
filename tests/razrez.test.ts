@@ -56,9 +56,9 @@ describe('разрезът · групите', () => {
     expect(grupi.map((g) => g.broy)).toEqual([2, 2]);
   });
 
-  it('сборът на групата е в ЦЕЛИ стотинки · и точен до стотинка', () => {
+  it('сборът на групата е в ЦЕЛИ центове · и точен до цент', () => {
     const [angelov, yanev] = razrezPoKolona(REDOVE, GLAVATA, '0');
-    // 250,33 + 99,67 = 350,00 · нито една стотинка не се губи по пътя
+    // 250,33 + 99,67 = 350,00 · нито един цент не се губи по пътя
     expect(angelov!.sbor_st['1']).toBe(350_00);
     expect(angelov!.sbor_st['2']).toBe(70_00);
     expect(yanev!.sbor_st['1']).toBe(150_00);

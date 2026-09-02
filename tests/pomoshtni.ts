@@ -2,7 +2,7 @@ import type { Operatsiya } from '../src/yadro/index.js';
 import { sha256Node } from '../src/nositel/hash-node.js';
 
 /** Носителят за тестовете. Ядрото нарочно няма стойност по подразбиране. */
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 
@@ -47,7 +47,7 @@ export async function mesetsSChisla(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Наемател',
-      naem_st: stotinki(1000_00),
+      naem_st: tsentove(1000_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -61,7 +61,7 @@ export async function mesetsSChisla(d: Deystviya): Promise<void> {
   const vzemane = [...(await d.ogledalo()).vzemaniya.values()][0]!;
   await d.priemiPlashtane(
     'P-1',
-    { vzemaneId: vzemane.id, suma_st: stotinki(800_00), nachin: 'банка', data: '2026-08-10' },
+    { vzemaneId: vzemane.id, suma_st: tsentove(800_00), nachin: 'банка', data: '2026-08-10' },
     { opId: 'op-plashtane' },
   );
 
@@ -71,7 +71,7 @@ export async function mesetsSChisla(d: Deystviya): Promise<void> {
       potok: 'fakturi',
       dostavchik: 'Доставчик',
       opis: 'поддръжка',
-      suma_st: stotinki(300_00),
+      suma_st: tsentove(300_00),
       sektor: 'pokupki-uslugi',
       nachin: 'банка',
       data: '2026-08-12',
@@ -86,7 +86,7 @@ export async function mesetsSChisla(d: Deystviya): Promise<void> {
       potok: 'krediti',
       dostavchik: 'Банка',
       opis: 'вноска',
-      suma_st: stotinki(200_00),
+      suma_st: tsentove(200_00),
       sektor: 'krediti',
       nachin: 'банка',
       data: '2026-08-15',

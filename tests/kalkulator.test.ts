@@ -528,7 +528,7 @@ describe('В · разходният подход', () => {
     const stara = tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(50) });
     // Цялата строителна част: 100 м² × 900 € = 90 000 €
     expect(nova - stara).toBe(90_000_00);
-    // А останалото Е земята, до последната стотинка.
+    // А останалото Е земята, до последния цент.
     expect(stara).toBe(10_000_00);
   });
 

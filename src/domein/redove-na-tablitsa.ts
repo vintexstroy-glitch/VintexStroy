@@ -17,7 +17,7 @@
  *
  * Стойностите НЕ стоят в една обща карта. Три са, и всяка казва какво носи:
  *
- *   `pari_st` — цели стотинки, само за колона от вид `evro` (правило 3);
+ *   `pari_st` — цели центове, само за колона от вид `evro` (правило 3);
  *   `chisla`  — процент и число;
  *   `tekst`   — текст и дата.
  *
@@ -50,7 +50,7 @@ export interface RedNaTablitsa {
   readonly tablitsa: string;
   /** ключ на реда · дава го викащият, не се извежда от съдържанието */
   readonly red: string;
-  /** колона (номер като низ) → ЦЕЛИ стотинки · само за вид `evro` */
+  /** колона (номер като низ) → ЦЕЛИ центове · само за вид `evro` */
   readonly pari_st: Readonly<Record<string, number>>;
   /** колона → число · процент и число */
   readonly chisla: Readonly<Record<string, number>>;
@@ -135,7 +135,7 @@ export function proveriRed(r: RedNaTablitsa, t: PayloadTablitsaOtFaylSazdadena):
         const n = stoynost as number;
         if (!Number.isInteger(n)) {
           throw new GreshkaRedNaTablitsa(
-            `„${t.glavi[nomer]}" е пари — иска ЦЕЛИ стотинки, а дойде ${String(n)}.`,
+            `„${t.glavi[nomer]}" е пари — иска ЦЕЛИ центове, а дойде ${String(n)}.`,
           );
         }
       }
@@ -159,7 +159,7 @@ export function redovete(
 }
 
 /**
- * СБОРЪТ НА КОЛОНА · в цели стотинки, без нито едно закръгляне.
+ * СБОРЪТ НА КОЛОНА · в цели центове, без нито едно закръгляне.
  *
  * Оттук нататък „месечен сбор на колона" не е отделен запис в Журнала, а
  * СМЕТКА върху редовете — както знакът и скритото (правила 20 · 23).

@@ -9,11 +9,11 @@
  * Отделни акумулатори по държава/сектор, не един общ
  * (`docs/01-arhitekturen-dokument.md` §5, `references/tables/finansi.md`).
  *
- * Всичко е цели стотинки и целочислена аритметика. Никакъв float —
- * там се губи стотинката.
+ * Всичко е цели центове и целочислена аритметика. Никакъв float —
+ * там се губи центът.
  */
 
-import { deliZakragleno, stotinki, type Stotinki } from '../yadro/pari.js';
+import { deliZakragleno, tsentove, type Tsentove } from '../yadro/pari.js';
 
 export class GreshkaDDS extends Error {
   constructor(message: string) {
@@ -106,9 +106,9 @@ export function sektoriNaRazhod(): readonly Akumulator[] {
 }
 
 interface RazbivkaDDS {
-  readonly obshta_st: Stotinki;
-  readonly osnova_st: Stotinki;
-  readonly dds_st: Stotinki;
+  readonly obshta_st: Tsentove;
+  readonly osnova_st: Tsentove;
+  readonly dds_st: Tsentove;
   readonly stavka: number;
 }
 
@@ -124,7 +124,7 @@ interface RazbivkaDDS {
  */
 export function ddsOtObshta(obshta_st: number, stavka: number): RazbivkaDDS {
   if (!Number.isSafeInteger(obshta_st)) {
-    throw new GreshkaDDS(`Сумата е цели стотинки; получено: ${obshta_st}`);
+    throw new GreshkaDDS(`Сумата е цели центове; получено: ${obshta_st}`);
   }
   if (!Number.isSafeInteger(stavka) || stavka < 0) {
     throw new GreshkaDDS(`Ставката е цял процент, не по-малък от нула; получено: ${stavka}`);
@@ -135,9 +135,9 @@ export function ddsOtObshta(obshta_st: number, stavka: number): RazbivkaDDS {
   const dds = znak * deliZakragleno(abs * stavka, 100 + stavka);
 
   return {
-    obshta_st: stotinki(obshta_st),
-    dds_st: stotinki(dds),
-    osnova_st: stotinki(obshta_st - dds),
+    obshta_st: tsentove(obshta_st),
+    dds_st: tsentove(dds),
+    osnova_st: tsentove(obshta_st - dds),
     stavka,
   };
 }

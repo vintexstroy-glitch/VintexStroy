@@ -1,7 +1,7 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
-/** 2 · имоти | 3 · дробни стотинки */
+/** 2 · имоти | 3 · дробни центове */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const { stranitsa: p, broyach } = ctx;
   let razdel = '—';
@@ -37,8 +37,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       true,
     );
 
-    // ══ 3 · дробни стотинки на входа ═════════════════════════════════════
-    razdel = '3 · дробни стотинки';
+    // ══ 3 · дробни центове на входа ═════════════════════════════════════
+    razdel = '3 · дробни центове';
     for (const losha of ['1150,555', '12.34.56', 'абв']) {
       await p.fill('#naem-naemetel', 'опит');
       await p.fill('#naem-suma', losha);

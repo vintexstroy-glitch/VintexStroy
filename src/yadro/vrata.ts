@@ -16,7 +16,7 @@ import type { Dnevnik } from './dnevnik.js';
 import { GreshkaDnevnik } from './dnevnik.js';
 import type { DrajkaNaKotva } from './kotva.js';
 import { izchisliHash, proveriVerigata, type Sha256 } from './hash.js';
-import { eStotinki } from './pari.js';
+import { eTsentove } from './pari.js';
 import type { Pravata } from './pravata.js';
 import type { Operatsiya, Sabitie } from './sabitie.js';
 
@@ -188,7 +188,7 @@ export class Vrata {
         );
       }
       // Същите проверки като при ЗАПИС (находка на сверката): дотук пипнат
-      // файл с половин стотинка или NFD-текст влизаше, стига хешовете му да са
+      // файл с половин цент или NFD-текст влизаше, стига хешовете му да са
       // преизчислени. Байтовете НЕ се нормализират — това би счупило веригата;
       // каквото не е NFC, се ОТКАЗВА с думи (правило 12), не се поправя тихо.
       try {
@@ -524,7 +524,7 @@ function proveriValidnost(op: Operatsiya): void {
  * масив, значи дефект не е имало; но правило 3 казва „Вратата ги проверява"
  * БЕЗ уговорка, а проверка със сляпо петно е по-лоша от липсваща: тя изглежда
  * като гаранция. Първият разделен ред („един ред от картата на две теми")
- * щеше да мине с дробна стотинка и никой нямаше да разбере откъде идва.
+ * щеше да мине с дробен цент и никой нямаше да разбере откъде идва.
  *
  * Индексът влиза в пътеката (`payload.chasti[1].suma_st`), за да казва
  * отказът КОЯ част е сгрешена, а не само че някоя е.
@@ -537,7 +537,7 @@ function proveriParite(v: Readonly<Record<string, unknown>>, pat: string): void 
 
 function proveriEdno(klyuch: string, stoynost: unknown, pale: string): void {
   // МАСИВЪТ СЕ ГЛЕДА ПРЪВ, и редът не е вкус. Гледа ли се пръв ключът, поле
-  // `sumi_st: [100, 200]` пада като „не е цели стотинки" — вярно за масива,
+  // `sumi_st: [100, 200]` пада като „не е цели центове" — вярно за масива,
   // безсмислено за човека. Ключът се НОСИ надолу към всеки член: така масив с
   // наставка е масив ОТ СУМИ, а масив от обекти се обхожда по полетата им.
   if (Array.isArray(stoynost)) {
@@ -556,10 +556,10 @@ function proveriEdno(klyuch: string, stoynost: unknown, pale: string): void {
       }
       return;
     }
-    if (!eStotinki(stoynost)) {
+    if (!eTsentove(stoynost)) {
       throw new GreshkaVrata(
         'NEVALIDNO',
-        `${pale} е поле за пари и трябва да е цели стотинки; получено: ${String(stoynost)}`,
+        `${pale} е поле за пари и трябва да е цели центове; получено: ${String(stoynost)}`,
       );
     }
     return;

@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { smetki } from '../src/domein/smetki.js';
@@ -61,7 +61,7 @@ async function dvaMeseca(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: NAEMATEL,
-      naem_st: stotinki(500_00),
+      naem_st: tsentove(500_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -75,7 +75,7 @@ async function dvaMeseca(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: FIRMA,
-      naem_st: stotinki(1200_00),
+      naem_st: tsentove(1200_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -99,7 +99,7 @@ async function dvaMeseca(d: Deystviya): Promise<void> {
         potok: 'fakturi',
         dostavchik: DOSTAVCHIK,
         opis: 'цимент',
-        suma_st: stotinki(suma as number),
+        suma_st: tsentove(suma as number),
         sektor: 'pokupki-materiali',
         nachin: 'банка',
         data: `${period as string}-12`,
@@ -202,7 +202,7 @@ describe('предходният месец', () => {
         potok: 'zaplati',
         dostavchik: DOSTAVCHIK,
         opis: 'заплати',
-        suma_st: stotinki(3400_00),
+        suma_st: tsentove(3400_00),
         sektor: 'zaplati',
         nachin: 'банка',
         data: '2026-08-28',
@@ -292,15 +292,15 @@ describe('какво излиза НАВЪН · границата на ADR-029'
     expect(tekst).toContain('разлика 0.00');
   });
 
-  it('сумите са в евро с точка, а вътре стотинката остава ЦЯЛА', async () => {
+  it('сумите са в евро с точка, а вътре центът остава ЦЯЛА', async () => {
     const { deystviya } = stend();
     await dvaMeseca(deystviya);
     const o = await deystviya.ogledalo();
     const t = mesetsatKatoTablitsa(o, PERIOD, KOGATO);
 
     for (const r of t.redove) {
-      expect(Number.isSafeInteger(r.stoynost_st), `${r.ime} не е цели стотинки`).toBe(true);
-      expect(Number.isSafeInteger(r.predi_st), `${r.ime} не е цели стотинки`).toBe(true);
+      expect(Number.isSafeInteger(r.stoynost_st), `${r.ime} не е цели центове`).toBe(true);
+      expect(Number.isSafeInteger(r.predi_st), `${r.ime} не е цели центове`).toBe(true);
     }
     expect(kamTekst(t)).toContain('1200.00');
   });

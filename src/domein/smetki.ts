@@ -19,7 +19,7 @@ import { DnevnikNaSverki, MERKA, sverka, type Sverka } from '../yadro/sverka.js'
 import { akumulator, ddsOtObshta, stavkaNaReda, type Akumulator } from './dds.js';
 import { prihodOtProdazhbi } from './prodazhbi.js';
 import { sveriDDS, type Dvizhenie, type RezultatSverka } from './sverka-dds.js';
-import type { Stotinki } from '../yadro/pari.js';
+import type { Tsentove } from '../yadro/pari.js';
 import type { Ogledalo, Razhod } from '../ogledalo/ogledalo.js';
 import { platenoDDSZaPerioda } from '../ogledalo/ogledalo.js';
 import type { Period } from './nachislyavane.js';
@@ -331,19 +331,19 @@ export function otIzvlechenie(o: Ogledalo, period: Period): Razhod[] {
 function dvizhenie(r: Razhod): Dvizhenie {
   return {
     data: r.data,
-    suma_st: r.suma_st as Stotinki,
+    suma_st: r.suma_st as Tsentove,
     dokument: r.dokument,
     opisanie: `${r.dostavchik} · ${r.opis}`,
   };
 }
 
 /** Изваденото ДДС на купчина редове, всеки със СВОЯТА ставка. */
-function ddsNa(redove: readonly Razhod[]): Stotinki {
+function ddsNa(redove: readonly Razhod[]): Tsentove {
   let sbor = 0;
   for (const r of redove) {
     sbor += ddsOtObshta(r.suma_st, stavkaNaReda(r.sektor, r.stavka)).dds_st;
   }
-  return sbor as Stotinki;
+  return sbor as Tsentove;
 }
 
 /**
@@ -368,7 +368,7 @@ export function sveriDDSZaPerioda(o: Ogledalo, period: Period): RezultatSverka {
     izvlecheniya: izvlecheniya.map(dvizhenie),
     dds_ot_fakturi_st: ddsNa(fakturi),
     dds_ot_izvlecheniya_st: ddsNa(izvlecheniya),
-    dds_vneseno_st: vneseno as Stotinki,
+    dds_vneseno_st: vneseno as Tsentove,
   });
 }
 

@@ -18,7 +18,7 @@ import {
   type Krai,
 } from '../src/domein/mnogo-kam-mnogo.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
-import { stotinki } from '../src/yadro/pari.js';
+import { tsentove } from '../src/yadro/pari.js';
 import { stend } from './pomoshtni.js';
 
 const IMOT: Krai = { vid: 'imot', id: 'I-1' };
@@ -44,7 +44,7 @@ async function knigata() {
       potok: 'fakturi',
       dostavchik: 'Д',
       opis: 'ремонт',
-      suma_st: stotinki(100_00),
+      suma_st: tsentove(100_00),
       sektor: 'razhod-obsht',
       nachin: 'банка',
       data: '2026-08-25',
@@ -202,7 +202,7 @@ describe('много-към-много · РЕДЪТ НА СЪЗДАДЕНА Т�
       {
         tablitsa: 'Фактури',
         red: 'Ф-1',
-        pari_st: { 1: stotinki(100_00) },
+        pari_st: { 1: tsentove(100_00) },
         chisla: {},
         tekst: { 0: 'Д' },
         mahnat: false,
@@ -255,7 +255,7 @@ describe('много-към-много · РЕДЪТ НА СЪЗДАДЕНА Т�
       {
         tablitsa: 'Фактури',
         red: 'Ф-1',
-        pari_st: { 1: stotinki(100_00) },
+        pari_st: { 1: tsentove(100_00) },
         chisla: {},
         tekst: { 0: 'Д' },
         mahnat: true,

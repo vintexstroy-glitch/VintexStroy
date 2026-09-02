@@ -9,7 +9,7 @@ import {
   DnevnikNaSverki,
   DnevnikVPametta,
   proveriVerigata,
-  stotinki,
+  tsentove,
   sverka,
   Vrata,
   VsichkoRazresheno,
@@ -44,11 +44,11 @@ const IMOT = {
 const NAEM = {
   imotId: 'I-1',
   naemetel: 'Стройпласт ЕООД',
-  naem_st: stotinki(1150_00),
+  naem_st: tsentove(1150_00),
   padezhDen: 16,
   ot: '2024-03-01',
   do: '2027-02-28',
-  depozit_st: stotinki(1150_00),
+  depozit_st: tsentove(1150_00),
   sektor: 'naem-targovski',
 };
 
@@ -56,7 +56,7 @@ const VZEMANE = {
   naemId: 'N-1',
   period: '2026-08',
   osnovanie: 'наем',
-  suma_st: stotinki(1150_00),
+  suma_st: tsentove(1150_00),
   padezh: '2026-08-16',
 };
 
@@ -81,7 +81,7 @@ describe('резен 1 · от имот до платен наем', () => {
 
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(1150_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V-1', suma_st: tsentove(1150_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-plashtane' },
     );
 
@@ -103,12 +103,12 @@ describe('резен 1 · от имот до платен наем', () => {
 
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(400_00), nachin: 'в брой', data: '2026-08-20' },
+      { vzemaneId: 'V-1', suma_st: tsentove(400_00), nachin: 'в брой', data: '2026-08-20' },
       { opId: 'op-1' },
     );
     await deystviya.priemiPlashtane(
       'P-2',
-      { vzemaneId: 'V-1', suma_st: stotinki(300_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V-1', suma_st: tsentove(300_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-2' },
     );
 
@@ -126,7 +126,7 @@ describe('резен 1 · от имот до платен наем', () => {
 
     const plashtane = await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(1150_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V-1', suma_st: tsentove(1150_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-plashtane' },
     );
     expect(duljimo(await deystviya.ogledalo())).toBe(0);
@@ -157,7 +157,7 @@ describe('резен 1 · от имот до платен наем', () => {
 
     const danni = {
       vzemaneId: 'V-1',
-      suma_st: stotinki(1150_00),
+      suma_st: tsentove(1150_00),
       nachin: 'банка' as const,
       data: '2026-08-22',
     };
@@ -176,7 +176,7 @@ describe('резен 1 · от имот до платен наем', () => {
     await pusniPatya(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(600_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V-1', suma_st: tsentove(600_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-1' },
     );
 
@@ -193,12 +193,12 @@ describe('резен 1 · от имот до платен наем', () => {
     await pusniPatya(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(333_33), nachin: 'банка', data: '2026-08-20' },
+      { vzemaneId: 'V-1', suma_st: tsentove(333_33), nachin: 'банка', data: '2026-08-20' },
       { opId: 'op-1' },
     );
     await deystviya.priemiPlashtane(
       'P-2',
-      { vzemaneId: 'V-1', suma_st: stotinki(666_67), nachin: 'банка', data: '2026-08-21' },
+      { vzemaneId: 'V-1', suma_st: tsentove(666_67), nachin: 'банка', data: '2026-08-21' },
       { opId: 'op-2' },
     );
 
@@ -215,7 +215,7 @@ describe('резен 1 · от имот до платен наем', () => {
     await pusniPatya(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V-1', suma_st: stotinki(1150_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V-1', suma_st: tsentove(1150_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-plashtane' },
     );
 
@@ -236,7 +236,7 @@ describe('резен 1 · от имот до платен наем', () => {
     expect(sverki.vsichki.every((s) => s.razlika === 0)).toBe(true);
   });
 
-  it('Вратата отказва наем с дробни стотинки, преди да стигне до Журнала', async () => {
+  it('Вратата отказва наем с дробни центове, преди да стигне до Журнала', async () => {
     const { dnevnik, deystviya } = stend();
     await deystviya.dobaviImot('I-1', IMOT, { opId: 'op-imot' });
 

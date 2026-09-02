@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
@@ -42,7 +42,7 @@ async function nasadiPrihod(d: Deystviya) {
     {
       imotId: 'I-1',
       naemetel: 'Стройпласт ЕООД',
-      naem_st: stotinki(1200_00),
+      naem_st: tsentove(1200_00),
       padezhDen: 5,
       ot: '2026-01-01',
       do: '',
@@ -59,7 +59,7 @@ function razhod(chast: Partial<Parameters<Deystviya['zapishiRazhod']>[1]> = {}) 
     potok: 'fakturi',
     dostavchik: 'Материали ООД',
     opis: 'цимент',
-    suma_st: stotinki(600_00),
+    suma_st: tsentove(600_00),
     sektor: 'pokupki-materiali',
     nachin: 'банка' as const,
     data: '2026-02-14',
@@ -96,7 +96,7 @@ describe('входящият ДДС', () => {
   it('може да излезе отрицателно — за възстановяване', async () => {
     const { deystviya: d } = stend();
     await nasadiPrihod(d);
-    await d.zapishiRazhod('R-1', razhod({ suma_st: stotinki(3000_00) }), { opId: 'op-r1' });
+    await d.zapishiRazhod('R-1', razhod({ suma_st: tsentove(3000_00) }), { opId: 'op-r1' });
 
     const s = smetki(await d.ogledalo(), PERIOD, KOGATO);
     expect(s.dds_vhod_st).toBe(500_00);
@@ -108,12 +108,12 @@ describe('входящият ДДС', () => {
     await nasadiPrihod(d);
     await d.zapishiRazhod(
       'R-z',
-      razhod({ potok: 'zaplati', sektor: 'zaplati', dostavchik: 'екип', opis: 'февруари', suma_st: stotinki(2000_00), dokument: '' }),
+      razhod({ potok: 'zaplati', sektor: 'zaplati', dostavchik: 'екип', opis: 'февруари', suma_st: tsentove(2000_00), dokument: '' }),
       { opId: 'op-rz' },
     );
     await d.zapishiRazhod(
       'R-k',
-      razhod({ potok: 'krediti', sektor: 'krediti', dostavchik: 'банка', opis: 'вноска', suma_st: stotinki(800_00), dokument: '' }),
+      razhod({ potok: 'krediti', sektor: 'krediti', dostavchik: 'банка', opis: 'вноска', suma_st: tsentove(800_00), dokument: '' }),
       { opId: 'op-rk' },
     );
 
@@ -145,7 +145,7 @@ describe('сверката на разхода', () => {
     const { deystviya: d } = stend();
     await nasadiPrihod(d);
     await d.zapishiRazhod('R-1', razhod(), { opId: 'op-r1' });
-    await d.zapishiRazhod('R-2', razhod({ sektor: 'pokupki-uslugi', suma_st: stotinki(240_00) }), { opId: 'op-r2' });
+    await d.zapishiRazhod('R-2', razhod({ sektor: 'pokupki-uslugi', suma_st: tsentove(240_00) }), { opId: 'op-r2' });
 
     const s = smetki(await d.ogledalo(), PERIOD, KOGATO);
     expect(s.sverki).toHaveLength(5);
@@ -189,7 +189,7 @@ describe('таблицата на потоците', () => {
     await nasadiPrihod(d);
     await d.priemiPlashtane(
       'P-1',
-      { vzemaneId: `V:${PERIOD}:N-1`, suma_st: stotinki(1200_00), nachin: 'банка', data: '2026-02-20' },
+      { vzemaneId: `V:${PERIOD}:N-1`, suma_st: tsentove(1200_00), nachin: 'банка', data: '2026-02-20' },
       { opId: 'op-p1' },
     );
 

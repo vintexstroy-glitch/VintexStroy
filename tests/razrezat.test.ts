@@ -12,7 +12,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import {
@@ -53,11 +53,11 @@ function stend() {
 async function nasadi(d: Deystviya): Promise<void> {
   await d.dobaviImot('I-1', { adres: 'Малинова', edinitsa: 'бл. 1', ploshtad_kvsm: 0 }, { opId: 'o1' });
   await d.dobaviNaem('N-1', {
-    imotId: 'I-1', naemetel: 'Домакинство', naem_st: stotinki(500_00), padezhDen: 5,
+    imotId: 'I-1', naemetel: 'Домакинство', naem_st: tsentove(500_00), padezhDen: 5,
     ot: '2024-01-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten',
   }, { opId: 'o2' });
   await d.dobaviNaem('N-2', {
-    imotId: 'I-1', naemetel: 'Стройпласт  ЕООД', naem_st: stotinki(1200_00), padezhDen: 5,
+    imotId: 'I-1', naemetel: 'Стройпласт  ЕООД', naem_st: tsentove(1200_00), padezhDen: 5,
     ot: '2024-01-01', do: '', depozit_st: 0, sektor: 'naem-targovski',
   }, { opId: 'o3' });
   await nachisliZaPeriod({ deystviya: d, period: PERIOD, kogato: KOGATO });
@@ -66,10 +66,10 @@ async function nasadi(d: Deystviya): Promise<void> {
   const vzemaneNa = (naemId: string) => [...o.vzemaniya.values()].find((v) => v.naemId === naemId)!.id;
 
   await d.priemiPlashtane('P-1',
-    { vzemaneId: vzemaneNa('N-1'), suma_st: stotinki(500_00), nachin: 'банка', data: '2026-08-10' },
+    { vzemaneId: vzemaneNa('N-1'), suma_st: tsentove(500_00), nachin: 'банка', data: '2026-08-10' },
     { opId: 'o4' });
   await d.priemiPlashtane('P-2',
-    { vzemaneId: vzemaneNa('N-2'), suma_st: stotinki(300_00), nachin: 'в брой', data: '2026-08-12' },
+    { vzemaneId: vzemaneNa('N-2'), suma_st: tsentove(300_00), nachin: 'в брой', data: '2026-08-12' },
     { opId: 'o5' });
 
   const razhod = (
@@ -77,7 +77,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     nachin: 'банка' | 'в брой', potok: string, data: string,
   ) =>
     d.zapishiRazhod(id, {
-      potok, dostavchik, opis: 'проба', suma_st: stotinki(suma), sektor: 'razhod-obsht',
+      potok, dostavchik, opis: 'проба', suma_st: tsentove(suma), sektor: 'razhod-obsht',
       nachin, data, dokument: '', stavka: 0, klyuch: '', izvor: '',
     }, { opId: `op-${id}` });
 
@@ -102,7 +102,7 @@ describe('речникът на разрезите', () => {
 });
 
 describe('СВЕРКАТА вход↔изход · сборът на разрезите Е неразбитият сбор', () => {
-  it('и за ШЕСТТЕ разреза, до стотинка', async () => {
+  it('и за ШЕСТТЕ разреза, до цент', async () => {
     const d = stend();
     await nasadi(d);
     const o = await d.ogledalo();

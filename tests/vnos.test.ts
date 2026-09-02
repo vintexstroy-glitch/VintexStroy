@@ -10,7 +10,7 @@ import {
   DnevnikVPametta,
   GreshkaVrata,
   proveriVerigata,
-  stotinki,
+  tsentove,
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
@@ -43,7 +43,7 @@ async function nasadi(d: Deystviya, kolko = 2) {
     await d.dobaviNaem(
       'N-1',
       {
-        imotId: 'I-1', naemetel: 'Стройпласт ЕООД', naem_st: stotinki(1200_00),
+        imotId: 'I-1', naemetel: 'Стройпласт ЕООД', naem_st: tsentove(1200_00),
         padezhDen: 5, ot: '2026-01-01', do: '', depozit_st: 0, sektor: 'naem-targovski',
       },
       { opId: 'op-naem' },

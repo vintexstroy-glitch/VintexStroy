@@ -1994,7 +1994,7 @@ export function prosrocheni(o: Ogledalo, dnes: string): ProsrocheneVzemane[] {
     .sort((a, b) => b.dniZakasnenie - a.dniZakasnenie || a.id.localeCompare(b.id));
 }
 
-/** Остатъкът по наеми — карта naemId → дължимо в стотинки. */
+/** Остатъкът по наеми — карта naemId → дължимо в центове. */
 export function duljimoPoNaem(o: Ogledalo): Map<string, number> {
   const karta = new Map<string, number>();
   for (const v of o.vzemaniya.values()) {

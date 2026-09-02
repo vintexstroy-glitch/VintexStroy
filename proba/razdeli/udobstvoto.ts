@@ -123,13 +123,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // Shift+стрелка опъва обхват по колоната със сумите; лентата смята.
     const sumiPoKletki = await p.$$eval('.red.naem .suma[data-st]', (r) =>
       r.map((x) => Number(x.dataset.st)));
-    proveri('евро-клетките носят стотинките си (data-st)', sumiPoKletki.length > 1, true);
+    proveri('евро-клетките носят центовете си (data-st)', sumiPoKletki.length > 1, true);
     await p.click('.red.naem .suma');
     proveri('една клетка не вдига лентата', await statusnaLenta(), null);
     await p.keyboard.press('Shift+ArrowDown');
     const naLentata = await statusnaLenta();
     proveri('Shift+стрелка опъва обхват и лентата се показва', naLentata !== null, true);
-    proveri('сборът е от стотинките на клетките, не от текста',
+    proveri('сборът е от центовете на клетките, не от текста',
       chisloto(naLentata ?? '', 'Сбор:'), ((sumiPoKletki[0] as any) + (sumiPoKletki[1] as any)) / 100);
     proveri('и средното се показва', (naLentata ?? '').includes('Средно'), true);
 
@@ -337,7 +337,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       }
       return { sbor, pokazano: (g as any).querySelector('.sborove')?.textContent ?? '' };
     });
-    proveri('сборът на групата е сборът на редовете ѝ, стотинка по стотинка',
+    proveri('сборът на групата е сборът на редовете ѝ, цент по цент',
       Number(sverkaNaGrupa.pokazano.replace(/[^\d,-]/g, '').replace(',', '.')),
       sverkaNaGrupa.sbor / 100);
 
@@ -1516,7 +1516,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('подразбраното е БЕЗ разбивка · един ред сборове',
       await p.$$eval('.gant-red.sumi', (e) => e.length), 1);
 
-    /** Сборът на всички числа в редовете със сборове · в стотинки, от текста. */
+    /** Сборът на всички числа в редовете със сборове · в центове, от текста. */
     const sborNaEkrana = async (): Promise<number> =>
       p.$$eval('.gant-red.sumi .gant-suma', (kletki) =>
         kletki.reduce((s, k) => {

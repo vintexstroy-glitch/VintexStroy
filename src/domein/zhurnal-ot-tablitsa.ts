@@ -36,7 +36,7 @@
  */
 
 import { kletka, svedenaGlava, type Tablitsa } from '../iztochnik/tablitsa.js';
-import { kakvoPishe, otSuma, stotinki } from '../yadro/pari.js';
+import { kakvoPishe, otSuma, tsentove } from '../yadro/pari.js';
 import type { KolonaNaLista, List } from '../iznos/excel.js';
 import type { Sabitie } from '../yadro/index.js';
 
@@ -222,7 +222,7 @@ export function opisanieNa(s: Sabitie): string {
   return k === '' ? '' : String(s.payload[k]);
 }
 
-/** Сумата на едно събитие в цели стотинки; `undefined` значи „това не е пари". */
+/** Сумата на едно събитие в цели центове; `undefined` значи „това не е пари". */
 export function sumaNa(s: Sabitie): number | undefined {
   const k = parichnoPole(s.payload);
   return k === '' ? undefined : (s.payload[k] as number);
@@ -252,7 +252,7 @@ export function listNaZhurnala(sabitiya: readonly Sabitie[], ime = 'ЖУРНАЛ
         s.type,
         `${s.sashtnost.vid}:${s.sashtnost.id}`,
         opisanieNa(s),
-        suma === undefined ? '' : kakvoPishe(stotinki(suma)).replace(/ ?€$/, '').trim(),
+        suma === undefined ? '' : kakvoPishe(tsentove(suma)).replace(/ ?€$/, '').trim(),
         s.opId,
         s.hash.slice(0, 16),
       ];
@@ -283,7 +283,7 @@ interface Promyana {
   readonly kolona: string;
   readonly bilo: string;
   readonly stava: string;
-  /** за „Сума" · новата стойност в цели стотинки */
+  /** за „Сума" · новата стойност в цели центове */
   readonly stava_st?: number;
   /** името на полето в payload, което се мени */
   readonly pole: string;
@@ -475,7 +475,7 @@ function bilotoNa(s: Sabitie, kolona: string): string {
       return opisanieNa(s);
     case 'Сума': {
       const suma = sumaNa(s);
-      return suma === undefined ? '' : kakvoPishe(stotinki(suma)).replace(/ ?€$/, '').trim();
+      return suma === undefined ? '' : kakvoPishe(tsentove(suma)).replace(/ ?€$/, '').trim();
     }
     case 'Ключ':
       return s.opId;

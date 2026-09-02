@@ -21,7 +21,7 @@ import {
   valuta,
   zakragli,
 } from '../src/yadro/valuta.js';
-import { kakvoPishe, otSuma, sabiri, stotinki } from '../src/yadro/pari.js';
+import { kakvoPishe, otSuma, sabiri, tsentove } from '../src/yadro/pari.js';
 
 describe('левът вече не съществува · валутите са ДВЕ', () => {
   it('и двете са изброени поименно, със сто цента', () => {
@@ -40,17 +40,17 @@ describe('левът вече не съществува · валутите са
 
 describe('всяка се изписва по СВОИТЕ норми', () => {
   it('еврото · знакът ОТЗАД, тясна пауза, запетая', () => {
-    expect(kakvoPishe(stotinki(123456))).toBe('1\u202F234,56\u202F€');
-    expect(kakvoPishe(stotinki(-305))).toBe('-3,05\u202F€');
+    expect(kakvoPishe(tsentove(123456))).toBe('1\u202F234,56\u202F€');
+    expect(kakvoPishe(tsentove(-305))).toBe('-3,05\u202F€');
   });
 
   it('доларът · знакът ОТПРЕД, запетая за хилядите, ТОЧКА за дробните', () => {
-    expect(kakvoPishe(stotinki(123456), DOLAR)).toBe('$1,234.56');
-    expect(kakvoPishe(stotinki(-305), DOLAR)).toBe('$-3.05');
+    expect(kakvoPishe(tsentove(123456), DOLAR)).toBe('$1,234.56');
+    expect(kakvoPishe(tsentove(-305), DOLAR)).toBe('$-3.05');
   });
 
   it('едно и също число изглежда РАЗЛИЧНО в двете — и това е целта', () => {
-    const milion = stotinki(1_000_000_00);
+    const milion = tsentove(1_000_000_00);
     // Тясната пауза се пише ИЗРИЧНО: обикновен интервал тук изглежда еднакво
     // на екрана и различно за машината — точно капанът, който правило 11 лови
     // при буквите, само че при паузите.
@@ -135,7 +135,7 @@ describe('закръглянето · цените НАГОРЕ, сметкит�
       expect(greshno).toBeGreaterThanOrEqual(pravilno);
     }
     // и конкретният пример, който се помни: три по 50 цента
-    const chasti = [50, 50, 50].map((s) => stotinki(s));
+    const chasti = [50, 50, 50].map((s) => tsentove(s));
     expect(zakragli(sabiri(...chasti), 'tsyalo')).toBe(200); // 1,50 → 2 €
     expect(chasti.map((s) => zakragli(s, 'tsyalo')).reduce((a, b) => a + b, 0)).toBe(300); // 3 € — грешно
   });

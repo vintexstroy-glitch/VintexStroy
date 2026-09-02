@@ -364,7 +364,7 @@ export async function chisloNaPoleto2(p: Page, klyuch: string): Promise<number> 
   return Number(tekst.replace(/[^\d-]/g, ''));
 }
 
-/** Числото на едно поле от Отчети, в цели стотинки — за да се СМЯТА, не да се сравнява текст. */
+/** Числото на едно поле от Отчети, в цели центове — за да се СМЯТА, не да се сравнява текст. */
 export async function chisloNaPoleto(p: Page, klyuch: string): Promise<number> {
   const tekst = await tekstNaPoleto(p, klyuch);
   // „−12 500,00 €" → −1250000; неразделимите интервали и знакът за евро падат

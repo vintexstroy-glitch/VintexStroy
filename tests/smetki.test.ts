@@ -6,7 +6,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { smetki } from '../src/domein/smetki.js';
@@ -40,7 +40,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Домакинство',
-      naem_st: stotinki(500_00),
+      naem_st: tsentove(500_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -54,7 +54,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Стройпласт ЕООД',
-      naem_st: stotinki(1200_00),
+      naem_st: tsentove(1200_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -117,7 +117,7 @@ describe('редът ДДС', () => {
     expect(s.sverki.every((x) => x.nared)).toBe(true);
   });
 
-  it('всяка сверка казва в какво се мери — стотинки не се четат като бройки', async () => {
+  it('всяка сверка казва в какво се мери — центове не се четат като бройки', async () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
 
@@ -150,7 +150,7 @@ describe('потоците пари', () => {
       'P-1',
       {
         vzemaneId: `V:${PERIOD}:N-targ`,
-        suma_st: stotinki(600_00),
+        suma_st: tsentove(600_00),
         nachin: 'в брой',
         data: '2026-08-20',
       },
@@ -160,7 +160,7 @@ describe('потоците пари', () => {
       'P-2',
       {
         vzemaneId: `V:${PERIOD}:N-zhil`,
-        suma_st: stotinki(500_00),
+        suma_st: tsentove(500_00),
         nachin: 'банка',
         data: '2026-08-21',
       },
@@ -208,7 +208,7 @@ describe('потоците пари', () => {
       'P-1',
       {
         vzemaneId: `V:${PERIOD}:N-targ`,
-        suma_st: stotinki(100_00),
+        suma_st: tsentove(100_00),
         nachin: 'в брой',
         data: '2026-09-02',
       },
@@ -229,7 +229,7 @@ describe('сторно и стари събития', () => {
       'P-1',
       {
         vzemaneId: `V:${PERIOD}:N-targ`,
-        suma_st: stotinki(600_00),
+        suma_st: tsentove(600_00),
         nachin: 'в брой',
         data: '2026-08-20',
       },
@@ -260,7 +260,7 @@ describe('сторно и стари събития', () => {
       {
         imotId: 'I-1',
         naemetel: 'от старо време',
-        naem_st: stotinki(300_00),
+        naem_st: tsentove(300_00),
         padezhDen: 5,
         ot: '2024-01-01',
         do: '',
@@ -283,9 +283,9 @@ describe('сторно и стари събития', () => {
 });
 
 describe('пинът · мярката се твърди с ръка (резен 46 · група В)', () => {
-  it('мерките са ДВЕ · стотинки и брой', () => {
+  it('мерките са ДВЕ · центове и брой', () => {
     expect(Object.keys(MERKA)).toEqual(['pari', 'broy']);
-    expect(MERKA.pari).toBe('стотинки');
+    expect(MERKA.pari).toBe('центове');
     expect(MERKA.broy).toBe('брой');
   });
 });

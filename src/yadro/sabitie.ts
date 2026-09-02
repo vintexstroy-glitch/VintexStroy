@@ -73,7 +73,7 @@ export interface Operatsiya extends Sarzevina {
 
 /**
  * Записано събитие. Само за четене — Журналът е само за добавяне.
- * Полетата за пари в payload завършват на `_st` и са цели стотинки.
+ * Полетата за пари в payload завършват на `_st` и са цели центове.
  */
 export interface Sabitie extends Sarzevina {
   /** цяло, монотонно В РАМКИТЕ НА НАЕМАТЕЛ */
