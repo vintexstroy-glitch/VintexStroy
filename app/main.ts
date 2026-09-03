@@ -63,6 +63,7 @@ import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
 import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { IMENA_NA_GRUPITE, naDveGrupi, rabotnite } from '../src/domein/lenta.js';
 import {
   PARVIYAT_PODTAB,
   PODTABOVE_NA_SMETKI,
@@ -1170,8 +1171,7 @@ function strana(
    */
   const podredeni = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
   const skriti = skritiPunktove();
-  const punktove = (vidimiPunktove(podredeni, skriti) as KoyEkran[])
-    .map((koy) => {
+  const punktat = (koy: KoyEkran): string => {
       const e = EKRANI[koy];
       /**
        * НАСТРОЙКИ Е ПАДАЩ РЕД, не обикновен пункт (И101 т.2 · ADR-045).
@@ -1194,8 +1194,29 @@ function strana(
       return `<button type="button" class="navred${koy === ekran ? ' tuk' : ''}" data-ekran="${koy}">
         ${ikona(e.ikona, 'ikona navikona')}<span class="navime">${e.ime}</span>${znachka}
       </button>`;
-    })
-    .join('');
+  };
+  /**
+   * ДВЕ ГРУПИ, ЕДИН <nav> (резен 118 · ADR-163). Негово, 08.08: „Бутоните за
+   * табовете да са на два реда, втория да почва с Преписки, контакти, продажби
+   * архив, цени и настройки" — прието на 02.09 като две ВИДИМИ групи с
+   * разделител. Групирането е по ЧЛЕНСТВО на ключа, при рисуване: редът
+   * остава един плосък списък (трите слоя на ADR-066 не се пипат, нула
+   * събития). Разделителят е СЪСЕД на пунктовете, не обвивка: обвивка би
+   * счупила `.nav > [data-ekran]` — селекторът, с който падащият ред на
+   * екрана си намира пункта. Втора група без нито един пункт разделител не
+   * получава; празна тя не може да е, Настройки не се скрива (ADR-066 §3).
+   */
+  const vidimi = vidimiPunktove(podredeni, skriti) as KoyEkran[];
+  const grupite = naDveGrupi(vidimi, rabotnite(REDAT_NA_LENTATA));
+  const razdel =
+    grupite.vtorostepennite.length === 0
+      ? ''
+      : `<div class="navrazdel" role="separator" data-lenta-razdel="vtorostepennite"
+        aria-label="${IMENA_NA_GRUPITE.vtorostepennite}"><span class="navime">${IMENA_NA_GRUPITE.vtorostepennite}</span></div>`;
+  const punktove =
+    grupite.rabotata.map((k) => punktat(k as KoyEkran)).join('') +
+    razdel +
+    grupite.vtorostepennite.map((k) => punktat(k as KoyEkran)).join('');
 
   return `
     <aside class="strana${svita ? ' svita' : ''}">

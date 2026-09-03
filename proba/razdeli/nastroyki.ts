@@ -1039,6 +1039,11 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
 
   proveri('пунктът Настройки ВОДИ и служителя · не само отваря реда',
     await p.$eval('#nastroyki-vhod', (e) => e.hasAttribute('data-ekran')), true);
+  // ДВЕТЕ ГРУПИ И ЗА СЛУЖИТЕЛЯ (резен 118): Таблото не се скрива и е в
+  // първата, Настройки не се скрива и е във втората — разделителят никога не
+  // виси сам, при никоя роля.
+  proveri('и служителят вижда двете групи с разделител',
+    await p.$$eval('.nav > [data-lenta-razdel]', (e) => e.length), 1);
   await naEkran(p, 'nastroyki', '[data-samo-tvoite]');
   await p.keyboard.press('Escape'); // падащият ред се отвори с пункта · маха се от пътя
   proveri('падащият ред знае кой гледа',

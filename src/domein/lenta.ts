@@ -69,3 +69,78 @@ export function napraviRedNaLentata(red: readonly string[]): readonly string[] {
 export function redOtZhurnala(red: readonly string[] | undefined): readonly string[] {
   return bezPovtoreniya(red);
 }
+
+/**
+ * ═══ ЛЕНТАТА НА ДВЕ ГРУПИ (резен 118 · ADR-163) ═══
+ *
+ * Негово, 08.08 (р52·[206]): „Бутоните за табовете да са на два реда, втория
+ * да почва с Преписки, контакти, продажби архив, цени и настройки." Прието на
+ * 02.09 („5 ок. Давай", И131) като вариант Б от „Петте въпроса": двата му реда
+ * като две ВИДИМИ групи с разделител; редът вътре не мърда.
+ *
+ * ГРАНИЦАТА е ПИН С РЪКА — първият пункт на втората група. Не е изведена от
+ * никоя друга константа: изведена, тя щеше да се мести тихо с всеки нов екран.
+ * Втората група е по изречението му (Контактите носят преписките; Стойност е
+ * наследникът на таб Цени; Настройки накрая) плюс неказаните (Табове · ИИ ·
+ * Лично — при системните, И121 т.6). „Продажби архив" от 08.08 днес е СЕКЦИЯ
+ * в Продажби (И114), затова Продажби и Плащания Архив стоят в работата —
+ * тълкуване под неговото „ок", не негово изречение, и се казва като такова.
+ *
+ * ГРУПИРАНЕТО Е ПРИ РИСУВАНЕ, ПО ЧЛЕНСТВО. Редът остава ЕДИН плосък списък
+ * (трите слоя на ADR-066 не се пипат, нула нови събития); групата на всеки
+ * ключ е свойство на ключа, не на мястото му. Записан ред, който пресича
+ * групите, не се губи и не се отказва — той се РАЗДЕЛЯ при рисуване, и всяка
+ * група пази реда му вътре в себе си.
+ */
+export const PARVIYAT_VAV_VTORATA = 'kontakti';
+
+export type GrupaNaLentata = 'rabotata' | 'vtorostepennite';
+
+/** Думите са НАШИ (ADR-153 §2 т.9), не негови · сменят се с една дума. */
+export const IMENA_NA_GRUPITE: Readonly<Record<GrupaNaLentata, string>> = Object.freeze({
+  rabotata: 'работата',
+  vtorostepennite: 'второстепенните',
+});
+
+/** Ключовете на РАБОТАТА · всичко преди границата в началния ред. */
+export function rabotnite(redat: readonly string[]): readonly string[] {
+  const i = redat.indexOf(PARVIYAT_VAV_VTORATA);
+  return Object.freeze(i < 0 ? [...redat] : redat.slice(0, i));
+}
+
+/** Групата на един ключ · непознатият е при системните (И121 т.6). */
+export function grupataNa(klyuch: string, rabotni: readonly string[]): GrupaNaLentata {
+  return rabotni.includes(klyuch) ? 'rabotata' : 'vtorostepennite';
+}
+
+export interface DveGrupi {
+  readonly rabotata: readonly string[];
+  readonly vtorostepennite: readonly string[];
+}
+
+/** Подреденият ред на ДВЕ · стабилно: редът вътре във всяка е редът отвън. */
+export function naDveGrupi(podredeni: readonly string[], rabotni: readonly string[]): DveGrupi {
+  return Object.freeze({
+    rabotata: Object.freeze(podredeni.filter((k) => grupataNa(k, rabotni) === 'rabotata')),
+    vtorostepennite: Object.freeze(podredeni.filter((k) => grupataNa(k, rabotni) === 'vtorostepennite')),
+  });
+}
+
+/**
+ * МОЖЕ ЛИ ДА СЕ МЕСТИ · само към съсед от СЪЩАТА група.
+ *
+ * „Личният ред продължава да мести вътре в групата": последният на работата
+ * няма „надолу", първият на второстепенните няма „нагоре". Стрелка към нищото
+ * учи човека да не вярва на стрелките.
+ */
+export function mozheDaSeMesti(
+  podredeni: readonly string[],
+  klyuch: string,
+  posoka: 'gore' | 'dolu',
+  rabotni: readonly string[],
+): boolean {
+  const grupa = naDveGrupi(podredeni, rabotni)[grupataNa(klyuch, rabotni)];
+  const i = grupa.indexOf(klyuch);
+  if (i < 0) return false;
+  return posoka === 'gore' ? i > 0 : i < grupa.length - 1;
+}

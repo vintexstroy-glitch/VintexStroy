@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PARVIYAT_VAV_VTORATA, rabotnite } from '../src/domein/lenta.js';
 import { EKRANI, REDAT_NA_LENTATA } from '../app/ekranite.js';
 import { imaIkona } from '../app/ikoni.js';
 
@@ -93,5 +94,19 @@ describe('регистърът на екраните', () => {
       'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
       'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
     ]);
+  });
+
+  it('двете групи · седем в работата, шест второстепенни (резен 118 · ADR-163)', () => {
+    // Границата е ПИН С РЪКА в домейна; тук се брои, че редът и границата
+    // се покриват: работата е точно първите седем, второстепенните — от
+    // Контакти до Настройки. Табло е в първата (пътят обратно), Настройки —
+    // във втората, и двете не се скриват — значи разделителят никога не виси сам.
+    expect(rabotnite(REDAT_NA_LENTATA)).toEqual([
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
+    ]);
+    expect(REDAT_NA_LENTATA.slice(rabotnite(REDAT_NA_LENTATA).length)).toEqual([
+      'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
+    ]);
+    expect(REDAT_NA_LENTATA[rabotnite(REDAT_NA_LENTATA).length]).toBe(PARVIYAT_VAV_VTORATA);
   });
 });

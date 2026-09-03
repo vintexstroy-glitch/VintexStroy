@@ -49,6 +49,8 @@ import { butonSIkona } from './ikoni.js';
 import { kolkoMyasto } from '../src/nositel/hranilishte.js';
 import { presmetni, sDumi, type KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
+import { IMENA_NA_GRUPITE, grupataNa, rabotnite } from '../src/domein/lenta.js';
+import { REDAT_NA_LENTATA } from './ekranite.js';
 import { dumiteNaProbvaneto, probvanetoEIzteklo, type Probvane } from '../src/domein/probvane.js';
 
 const KLYUCH = 'masterbook:izbor';
@@ -254,8 +256,10 @@ function kartaOtmetki(izbor: Izbor): string {
  *
  * ═══ ЗАЩО ТЯ Е ЕДНА, А ДЕЙСТВИЯТА СА ТРИ ═══
  *
- * Редът се подрежда В ЛЕНТАТА — там са стрелките и там го гледа човекът.
- * Тук стоят ДРУГИТЕ три неща, които в лентата нямат място:
+ * Редът се подрежда от Настройки · „Подредбата на екраните" (ADR-117: „Махни
+ * това смешно разместване. То ще се прави от всеки стопанин от настройки") —
+ * дотук тук пишеше „в лентата, там са стрелките", а стрелките паднаха от нея.
+ * Тук стоят ДРУГИТЕ три неща, които там нямат място:
  *
  *   · ВИДИМОСТТА · отметка на всеки пункт, ЛИЧНА. Скритият пункт го няма в
  *     лентата — значи няма и къде да се върне от нея. Затова картата изрежда
@@ -268,7 +272,7 @@ function kartaOtmetki(izbor: Izbor): string {
  *     бутон — не при всяко местене: инак Журналът щеше да се пълни с междинни
  *     подредби, а те не са решения, а движение на ръката.
  *
- * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (лентата) и се
+ * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (Настройки) и се
  * ПУБЛИКУВА на друго. Дотук същият похват е в `kontekstno-menyu.ts`: „менюто е
  * втора дръжка на същата врата, не втора врата."
  */
@@ -278,6 +282,7 @@ function kartaLenta(
   moyatRedEPipnat: boolean,
 ): string {
   const skriti = punktove.filter((p) => p.skrit).length;
+  const rabotni = rabotnite(REDAT_NA_LENTATA);
   return `
     <section data-sektsiya="tablo-lenta" class="karta">
       <div class="dyalglava">
@@ -291,7 +296,13 @@ function kartaLenta(
       <div class="vazmozhnosti" data-sektsiya="lenta-punktove">
         ${punktove
           .map(
-            (p) => `
+            (p, i) => `${
+              // РАЗДЕЛИТЕЛЯТ И ТУК (резен 118 · ADR-163) · пред първия от втората
+              // група; без белег на пункт, за да не се брои като пункт.
+              i > 0 && grupataNa(p.klyuch, rabotni) === 'vtorostepennite' && grupataNa(punktove[i - 1]!.klyuch, rabotni) === 'rabotata'
+                ? `<p class="drebno navrazdel" data-lenta-razdel="vtorostepennite">${IMENA_NA_GRUPITE.vtorostepennite}</p>`
+                : ''
+            }
           <label class="vazm${p.skrit ? ' izklyuchena' : ''}">
             <input type="checkbox" data-punkt="${ekraniraj(p.klyuch)}"${p.skrit ? '' : ' checked'}${
               NESKRIVAEMI.includes(p.klyuch) ? ' disabled' : ''
@@ -323,8 +334,8 @@ function kartaLenta(
         }
       </div>
       <p class="drebno">
-        Редът се мести със стрелките В ЛЕНТАТА и е <b>твой</b> — нула записа в
-        Журнала. ${
+        Редът се мести от Настройки · „Подредбата на екраните" и е <b>твой</b> —
+        нула записа в Журнала; местенето е вътре в групата (резен 118). ${
           negov
             ? 'Бутонът горе взима реда, който виждаш СЕГА, и го записва като НАЧАЛНИЯ за всички; всеки после може да го пренарежда за себе си.'
             : 'Началният ред идва от Стопанина; твоите размествания стоят върху него и не го менят.'

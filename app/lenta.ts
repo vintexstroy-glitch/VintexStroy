@@ -60,7 +60,7 @@ export function zakachiSvivachaNaLentata(koren: HTMLElement, prerisuvay: () => P
 /**
  * ШИРИНАТА НА ПАНЕЛА · негова поръчка, дословно (31.08):
  *
- * „…прибирането му с ЕДНО ДОКОСВАНЕ на разделителната линия и движението на
+ * „…прибирането му с ЕДНО ДОКОСВАНЕ на разделителната линия ии движението на
  *  ширините на таблото с ЗАДЪРЖАНЕ."
  *
  * Тоест ЕДНА линия, ДВЕ действия, разделени по време: късо докосване прибира,
@@ -199,7 +199,8 @@ export function zakachiRazdelitelya(koren: HTMLElement, prerisuvay: () => Promis
  * единайсетият екран се появи сам, и дванайсетият ще се появи също така.
  */
 
-import { podredi, premesti } from './podredba.js';
+import { podredi } from './podredba.js';
+import { grupataNa, mozheDaSeMesti, naDveGrupi } from '../src/domein/lenta.js';
 
 const KLYUCH_RED = 'lenta.red';
 const KLYUCH_SKRITI = 'lenta.skriti';
@@ -269,8 +270,19 @@ export function premestiVMoyaRed(
   osnoven: readonly string[],
   klyuch: string,
   posoka: 'gore' | 'dolu',
+  /** ключовете на РАБОТАТА · границата на групите (резен 118 · ADR-163) */
+  rabotni: readonly string[],
 ): readonly string[] {
-  const nov = premesti(podredeniPunktove(zhivi, osnoven, moyatRed()), klyuch, posoka);
+  const sega = podredeniPunktove(zhivi, osnoven, moyatRed());
+  // ПРЕЗ ГРАНИЦАТА НЕ СЕ МИНАВА: местенето е вътре в групата. Съседът от
+  // другата група не е съсед — редът се връща непокътнат, нищо не се пише.
+  if (!mozheDaSeMesti(sega, klyuch, posoka, rabotni)) return sega;
+  // Местенето е в ПЛОСКИЯ ред, а групата е свойство на ключа — затова съседът
+  // се търси ВЪТРЕ в групата: между двамата може да стои ключ от другата.
+  const grupa = naDveGrupi(sega, rabotni)[grupataNa(klyuch, rabotni)];
+  const i = grupa.indexOf(klyuch);
+  const sased = grupa[posoka === 'gore' ? i - 1 : i + 1]!;
+  const nov = sega.map((k) => (k === klyuch ? sased : k === sased ? klyuch : k));
   zapomniEkranno(KLYUCH_RED, [...nov]);
   return nov;
 }

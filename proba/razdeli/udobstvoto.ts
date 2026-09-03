@@ -605,7 +605,8 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
  * Дотук блокът стоеше веднага след пускането на Личното — единственият миг,
  * в който лентата предлагаше и него. От резен 98 (ADR-154) Личното е на
  * СЛУЖИТЕЛЯ, играе се в КРАЯ на прохода (смяната на човека презарежда
- * страницата) и §53 му брои секциите сам; тук се броят десетте на Стопанина.
+ * страницата) и §53 му брои секциите сам; тук се броят деветте на Стопанина
+ * (Служители излезе от лентата с резен 112).
  * И понеже блокът е вмъкнат по средата на прохода, накрая се ВРЪЩА на
  * екрана, от който е тръгнал — блок, който мести състояние под следващия, е
  * по-скъп от липсващ.
@@ -792,6 +793,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.navred .navime', (e) => (e as HTMLElement).checkVisibility()), false);
     proveri('но го носи цяло за четеца на екран',
       (await p.$eval('.navred .navime', (e) => e.textContent!.trim())).length > 0, true);
+    // РАЗДЕЛИТЕЛЯТ НА ГРУПИТЕ (резен 118): надписът пада със свиването, линията
+    // остава — знак без текст се побира в 52 px.
+    proveri('свита, лентата крие надписа на разделителя',
+      await p.$eval('.nav > [data-lenta-razdel] .navime', (e) => (e as HTMLElement).checkVisibility()), false);
+    proveri('но самият разделител стои като линия',
+      await p.$eval('.nav > [data-lenta-razdel]', (e) => (e as HTMLElement).checkVisibility()), true);
 
     razdel = '73 · Лентата · застопоряването се помни';
     await naEkran(p, 'pari', '#forma-nachisli');
@@ -852,6 +859,32 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('лентата е чиста от стрелки',
       await p.$$eval('[data-mesti]', (e) => e.length), 0);
 
+    // ══ 118 · ДВЕТЕ ГРУПИ · разделител между работата и второстепенните (ADR-163) ══
+    //
+    // Негово, 08.08: „Бутоните за табовете да са на два реда, втория да почва
+    // с Преписки, контакти…" — прието на 02.09 („5 ок") като две ВИДИМИ групи.
+    razdel = '118 · Лентата на две групи';
+    proveri('разделителят е ЕДИН и стои ВЪТРЕ в единствения nav',
+      await p.$$eval('.nav > [data-lenta-razdel]', (e) => e.length), 1);
+    proveri('и не е пункт · няма data-ekran и не е .navred',
+      await p.$eval('.nav > [data-lenta-razdel]',
+        (e) => !e.hasAttribute('data-ekran') && !e.classList.contains('navred')), true);
+    proveri('носи надписа си за четеца и за окото',
+      await p.$eval('.nav > [data-lenta-razdel] .navime', (e) => e.textContent!.trim()), 'второстепенните');
+    const okoloRazdela = await p.$eval('.nav > [data-lenta-razdel]', (e) => ({
+      predi: (e.previousElementSibling as HTMLElement | null)?.dataset['ekran']
+        ?? (e.previousElementSibling?.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'],
+      sled: (e.nextElementSibling as HTMLElement | null)?.dataset['ekran']
+        ?? (e.nextElementSibling?.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'],
+    }));
+    proveri('стои между последния на работата и първия на второстепенните',
+      `${okoloRazdela.predi} | ${okoloRazdela.sled}`, 'plashtaniya | kontakti');
+    proveri('Таблото е в първата група, Настройки — във втората · никоя не е празна',
+      await p.$$eval('.nav > *', (e) => {
+        const kl = e.map((x) => (x as HTMLElement).dataset['ekran'] ?? (x.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'] ?? (x.hasAttribute('data-lenta-razdel') ? '|' : ''));
+        return kl.indexOf('tablo') < kl.indexOf('|') && kl.indexOf('|') < kl.indexOf('nastroyki');
+      }), true);
+
     const predMestene = await broySabitiya(p);
     await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     proveri('Настройки изрежда ВСИЧКИ пунктове на лентата',
@@ -863,6 +896,17 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('първият ред няма ДЕЙСТВАЩА стрелка нагоре',
       (await p.$$eval('[data-lentapunkt] [data-posoka=gore]',
         (e) => e.map((x) => (x as HTMLButtonElement).disabled)))[0], true);
+    // ГРАНИЦАТА НА ГРУПАТА Е РЪБ (резен 118): последният на работата няма
+    // „надолу", първият на второстепенните няма „нагоре" — „личният ред
+    // продължава да мести вътре в групата". Дотук ръбът беше само на целия списък.
+    proveri('в картата стои разделителят на двете групи',
+      await p.$$eval('[data-tablitsa=red-na-lentata] [data-lenta-razdel]', (e) => e.length), 1);
+    proveri('последният на работата няма ДЕЙСТВАЩА стрелка надолу',
+      await p.$eval('[data-lentapunkt=plashtaniya] [data-posoka=dolu]', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('първият на второстепенните няма ДЕЙСТВАЩА стрелка нагоре',
+      await p.$eval('[data-lentapunkt=kontakti] [data-posoka=gore]', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('а нагоре от последния на работата се може',
+      await p.$eval('[data-lentapunkt=plashtaniya] [data-posoka=gore]', (e) => (e as HTMLButtonElement).disabled), false);
     await deystvieSPrerisuvane(p, () =>
       p.click(`[data-podredi=lenta][data-klyuch="${punktovePredi[1]}"][data-posoka=gore]`));
 
@@ -1817,6 +1861,9 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('хедърите са ГРУПИРАНИ по табове', grupi.length >= 3, true);
     const vLentata = await p.$$eval('.nav > [data-ekran]', (e) =>
       e.map((x) => x.getAttribute('data-ekran') ?? ''));
+    // БЕЗ ТОВА проверката долу минава ВАКУУМНО: празна лента дава празен ред,
+    // а празният ред е равен на сортирания празен ред (резен 118 го намери).
+    proveri('лентата се чете · не е празна', vLentata.length > 0, true);
     // САМО ОНЕЗИ, КОИТО ГИ ИМА В ЛЕНТАТА · находка на резен 18в.
     //
     // Дотук се сравняваха ВСИЧКИ групи, а онези без пункт в лентата дават −1.

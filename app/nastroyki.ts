@@ -109,8 +109,9 @@ import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import { izboratZaSemeystvo, sravniGlavi } from '../src/domein/obshta-glava.js';
 import type { Konteks } from './ekranite.js';
-import { EKRANI, type KoyEkran } from './ekranite.js';
+import { EKRANI, type KoyEkran, REDAT_NA_LENTATA } from './ekranite.js';
 import { moyatRed, podredeniPunktove, zabraviMoyaRed, premestiVMoyaRed } from './lenta.js';
+import { IMENA_NA_GRUPITE, naDveGrupi, rabotnite } from '../src/domein/lenta.js';
 import {
   broySganati,
   ekraniSPodredba,
@@ -1519,7 +1520,15 @@ function blokNaDeystviyata(): string {
 function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: boolean): string {
   const punktove = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
   const ekrani = ekraniSPodredba().filter((e: string) => videniteSektsii(e).length > 1);
-  const posleden = punktove.length - 1;
+  /**
+   * ДВЕТЕ ГРУПИ И ТУК (резен 118 · ADR-163): редовете стоят по групи, с
+   * разделител, и стрелките спират на ГРАНИЦАТА на групата — „личният ред
+   * продължава да мести вътре в групата". Ръбът на целия списък вече не е
+   * ръбът: последният на работата няма „надолу", първият на второстепенните
+   * няма „нагоре".
+   */
+  const rabotni = rabotnite(REDAT_NA_LENTATA);
+  const grupite = naDveGrupi(punktove, rabotni);
 
   const strelki = (kade: string, klyuch: string, i: number, kray: number): string =>
     `<span class="premestvane">
@@ -1528,6 +1537,15 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: b
       <button type="button" class="premestvach" data-podredi="${kade}" data-klyuch="${ekraniraj(klyuch)}"
         data-posoka="dolu"${i === kray ? ' disabled' : ''} aria-label="надолу">▼</button>
     </span>`;
+  const redoveNaGrupata = (klyuchove: readonly string[]): string =>
+    klyuchove
+      .map(
+        (k, i) => `<div class="red opis" data-lentapunkt="${ekraniraj(k)}">
+          <span translate="no">${ekraniraj(EKRANI[k as KoyEkran]?.ime ?? k)}</span>
+          ${strelki('lenta', k, i, klyuchove.length - 1)}
+        </div>`,
+      )
+      .join('');
 
   return `
     <section data-sektsiya="podredbata">
@@ -1541,14 +1559,15 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: b
 
       <div class="tablitsa" data-tablitsa="red-na-lentata">
         <div class="red glava"><span>пункт на лентата</span><span></span></div>
-        ${punktove
-          .map(
-            (k, i) => `<div class="red opis" data-lentapunkt="${ekraniraj(k)}">
-          <span translate="no">${ekraniraj(EKRANI[k as KoyEkran]?.ime ?? k)}</span>
-          ${strelki('lenta', k, i, posleden)}
-        </div>`,
-          )
-          .join('')}
+        ${redoveNaGrupata(grupite.rabotata)}
+        ${
+          grupite.vtorostepennite.length === 0
+            ? ''
+            : `<div class="red razdel" data-lenta-razdel="vtorostepennite" translate="no">
+          <span class="drebno">${IMENA_NA_GRUPITE.vtorostepennite}</span><span></span>
+        </div>`
+        }
+        ${redoveNaGrupata(grupite.vtorostepennite)}
       </div>
       <div class="deystviya">
         <button type="button" class="vtorichen malak" id="zabravi-reda-lenta">Върни реда на лентата</button>
@@ -1865,7 +1884,7 @@ export function zakachiNastroyki(
         const og = await k.deystviya.ogledalo();
         const vsichki = [...koren.querySelectorAll<HTMLElement>('[data-lentapunkt]')]
           .map((e) => e.dataset['lentapunkt'] ?? '');
-        premestiVMoyaRed(vsichki, og.redNaLentata, klyuch, posoka);
+        premestiVMoyaRed(vsichki, og.redNaLentata, klyuch, posoka, rabotnite(REDAT_NA_LENTATA));
       } else if (kade.startsWith('ekran:')) {
         premestiSektsiya(kade.slice('ekran:'.length), klyuch, posoka);
       }

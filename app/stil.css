@@ -877,6 +877,14 @@ fieldset.poleta > legend { padding: 0 0 4px; font-weight: 600; color: var(--mast
   font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
+/* РАЗДЕЛИТЕЛЯТ НА ДВЕТЕ ГРУПИ (резен 118 · ADR-163) · съсед на пунктовете, не
+   обвивка (виж бележката над `.nav`). Линия отгоре и дребен надпис; в свитата
+   лента надписът пада с останалите `.navime`, линията остава като знак. */
+.navrazdel { border-top: 1px solid var(--liniya); margin: 6px 0 2px; padding: 6px 10px 0; }
+.navrazdel .navime { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+.strana.svita .navrazdel { margin: 6px 8px 2px; padding: 0; }
+.red.razdel { background: var(--panel); }
+.red.razdel .drebno { letter-spacing: 0.06em; text-transform: uppercase; }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
 .navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
