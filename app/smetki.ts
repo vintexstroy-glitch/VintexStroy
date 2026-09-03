@@ -12,6 +12,7 @@ import { SUMATA_NAD_NULA, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/y
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
 import { prochetenoKSS } from './golyamo-delo.js';
+import { simulatsiyataNaKalkulatora } from './krediti.js';
 import { otData } from '../src/yadro/data.js';
 import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -929,6 +930,11 @@ function blokDelata(o: Ogledalo, dnes: string, izgled: 'smetki' | 'otchet' = 'sm
   const sumi = obobshteniRedove(r.koloni, [
     ...sumiZaObhvat(o, parvata.ot, poslednata.do),
     ...sumiPoRazbivki(o, parvata.ot, poslednata.do, izbraniRazbivki),
+    // СИМУЛАЦИЯТА на кредитния калкулатор · свой ред, нула събития (резен 117 ·
+    // И134: „калкулатора е само да симулира в Диаграмата на Сметки… без да
+    // влияеш на останалите"). Празно е, докато калкулаторът е изключен или
+    // не е смятал — тоест редът се появява само когато има какво да покаже.
+    ...simulatsiyataNaKalkulatora(dnes),
   ]);
   /**
    * ТАБЛИЦАТА ОТЛЯВО, ДИАГРАМАТА ОТДЯСНО · негово, 03.09 (И136): „В диаграмата

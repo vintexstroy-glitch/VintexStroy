@@ -142,7 +142,7 @@ interface SumaVKolona {
 }
 
 /** Един ред с пари · дневната сума, вече отнесена към своя разрез. */
-interface DenevnaSuma {
+export interface DenevnaSuma {
   readonly data: string;
   readonly prihod_st: number;
   readonly razhod_st: number;

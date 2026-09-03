@@ -562,12 +562,37 @@ export interface PredlozhenaVnoska {
   readonly taksa_st: number;
 }
 
+/**
+ * ДУМИТЕ, КОИТО НЕ РАЗПОЗНАВАТ НИЩО · всяка банка ги пише на всеки ред.
+ *
+ * „ПОЩЕНСКА БАНКА ВНОСКА КРЕДИТ" съдържа и трите — кредит, банка, вноска, —
+ * тъй че кредит, кръстен „Кредит BL00001", пасваше на ВСЕКИ ред за вноска и
+ * раждаше по едно излишно предложение на кредит. Намерено от прохода в мига,
+ * в който резен 117 роди втори кредит с общото име (ADR-167).
+ *
+ * Списъкът е кратък нарочно: той маха ШУМА, не имената. „Ипотека" остава
+ * дума, по която се познава — тя стои в името, не в бланката на банката.
+ */
+const DUMI_BEZ_ZNACHENIE: readonly string[] = Object.freeze([
+  'кредит',
+  'кредита',
+  'банка',
+  'банков',
+  'вноска',
+  'плащане',
+  'превод',
+  'заем',
+  'договор',
+]);
+
 /** Дума от името на кредита (поне 4 знака) стои ли в реда на банката. */
 function imeNaKreditSeSreshta(imeNaKredit: string, koyOtBankata: string): boolean {
   const red = svedeno(koyOtBankata);
   return svedeno(imeNaKredit)
     .split(/[^\p{L}\d]+/u)
-    .some((duma) => duma.length >= 4 && red.includes(duma));
+    .some(
+      (duma) => duma.length >= 4 && !DUMI_BEZ_ZNACHENIE.includes(duma) && red.includes(duma),
+    );
 }
 
 /**

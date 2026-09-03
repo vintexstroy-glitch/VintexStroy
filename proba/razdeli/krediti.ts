@@ -1,6 +1,7 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
 import { naPodtabNa, broySabitiya, deystvieSPrerisuvane, sSabitie } from '../yadro/pomoshtni.ts';
 import type { Page } from 'playwright-core';
+import { fileURLToPath } from 'node:url';
 
 /**
  * ОТВАРЯ ТЕМАТА „Кредитите" в Настройки.
@@ -242,6 +243,62 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     ),
     2,
   );
+
+  // ═══ 117 · ПОГАСИТЕЛНИЯТ ПЛАН ОТ ПДФ НА БАНКАТА (ADR-167) ═══
+  //
+  // „Кредититер се четат от пдф за погасителния план. Така се зареждат." (И134)
+  // Мострата е ИЗМИСЛЕНА (правило 29), но с направата на банката: шапка,
+  // осем колони, ПРОМЕНЛИВА лихва и собствен ред „Общо:" за сверката.
+  razdel = '117 · планът от ПДФ се ЧЕТЕ, но не се записва';
+  const prediPDF = await broySabitiya(p);
+  proveri('преди четене няма прочетен план',
+    await p.$eval('[data-plan-vnoski]', (e) => (e as HTMLElement).dataset['planVnoski']), '0');
+  await p.setInputFiles('#plan-fayl-pdf',
+    fileURLToPath(new URL('../../tests/mostri/pogasitelen-plan.pdf', import.meta.url)));
+  await p.waitForFunction(() =>
+    (document.querySelector('[data-plan-vnoski]') as HTMLElement | null)?.dataset['planVnoski'] === '6');
+  proveri('шестте вноски се четат от ПДФ-а', 
+    await p.$eval('[data-plan-vnoski]', (e) => (e as HTMLElement).dataset['planVnoski']), '6');
+  proveri('и трите сверки затварят · разлика нула',
+    await p.$eval('[data-plan-razlika]', (e) => (e as HTMLElement).dataset['planRazlika']), '0');
+  proveri('нито един невързан ред · главница + лихва = вноска',
+    await p.$eval('[data-plan-nevarzani]', (e) => (e as HTMLElement).dataset['planNevarzani']), '0');
+  proveri('четенето НЕ пише · записва човекът (правило 18)', await broySabitiya(p), prediPDF);
+
+  razdel = '117 · планът ражда НОВ кредит от шапката си';
+  // По подразбиране изборът е „НОВ кредит от шапката" — така вторият план не
+  // застъпва първия кредит, а „Кредититер се четат от пдф… Така се зареждат".
+  proveri('изборът по подразбиране е НОВ кредит',
+    await p.$eval('#plan-kam-kredit', (e) => (e as HTMLSelectElement).value), '');
+  const prediKrediti = await p.$$eval('[data-kredit]', (e) => e.length);
+  await deystvieSPrerisuvane(p, () => p.click('#plan-vkaray'));
+  proveri('кредитът и планът са ДВЕ събития · записът е на човека',
+    await broySabitiya(p), prediPDF + 2);
+  proveri('и кредитите станаха с един повече',
+    await p.$$eval('[data-kredit]', (e) => e.length), prediKrediti + 1);
+  const vestPlan = await p.$eval('.vest', (e) => (e as HTMLElement).textContent ?? '');
+  proveri('вестта казва И двете числа · лева и евро (И135б)',
+    vestPlan.includes('лв.') && vestPlan.includes('€'), true);
+  proveri('и казва, че лихвеният процент НЕ е в плана',
+    vestPlan.includes('не е в плана'), true);
+  proveri('новият кредит носи номера на договора в името си',
+    await p.$$eval('[data-kredit]', (e) =>
+      e.some((x) => (x.textContent ?? '').includes('BL00001'))), true);
+
+  // ═══ 117 · КАЛКУЛАТОРЪТ Е ОПЦИЯ И ПО ПОДРАЗБИРАНЕ ГО НЯМА (ADR-167) ═══
+  //
+  // „За калкулатора за кредии да е по малък и да е като опция само в Сметки за
+  // експерименти ДА СЕ ДОБАВЯ." (И134) Затова първо се проверява, че го няма,
+  // после се добавя от Настройки — и чак тогава смята.
+  razdel = '117 · калкулаторът се ДОБАВЯ от Настройки, не стои постоянно';
+  proveri('по подразбиране калкулаторът го НЯМА на екрана',
+    await p.$$eval('[data-sektsiya=kredit-kalkulator]', (e) => e.length), 0);
+  await vNastroyki(p);
+  await deystvieSPrerisuvane(p, () => p.click('#krediti-kalkulator'));
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
+  await p.waitForSelector('#forma-kalkulator');
+  proveri('след отметката калкулаторът е там · един, не два',
+    await p.$$eval('[data-sektsiya=kredit-kalkulator]', (e) => e.length), 1);
 
   razdel = '97в · Кредитният калкулатор · нула събития';
   const sabitiyaPredi = await broySabitiya(p);

@@ -502,6 +502,27 @@ describe('предложената вноска по кредит', () => {
     expect(p.suma_st).toBe(600_00);
   });
 
+  it('ОБЩАТА дума не разпознава нищо · „кредит" пасва на всеки ред', () => {
+    // Кредит, кръстен с бланкетна дума, пасваше на ВСЕКИ ред за вноска и
+    // раждаше по едно излишно предложение. Намерено от прохода, когато резен
+    // 117 зареди втори кредит от ПДФ (ADR-167).
+    const oshte = sKrediti();
+    const sObshtoIme = {
+      ...oshte,
+      krediti: new Map([
+        ...oshte.krediti,
+        [
+          'KR-9',
+          { ...oshte.krediti.get('KR-1')!, id: 'KR-9', ime: 'Кредит BL00001' },
+        ],
+      ]),
+    };
+    const r = sverkata([], [bankov({ klyuch: 'b1', suma_st: 600_00, koy: 'ПОЩЕНСКА БАНКА ВНОСКА КРЕДИТ' })]);
+    const predlozheniya = predlozheniyaPoKredit(r, sObshtoIme);
+    expect(predlozheniya).toHaveLength(1);
+    expect(predlozheniya[0]?.kreditId).toBe('KR-1');
+  });
+
   it('приходен ред НЕ предлага · вноската излиза, не влиза', () => {
     const r = sverkata(
       [],
