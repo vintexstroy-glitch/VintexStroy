@@ -202,6 +202,19 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     iska: 'iztochnitsi',
   },
   {
+    klyuch: 'sluzhiteli',
+    ime: 'Хората в програмата',
+    opis: 'вписване · роли · изпратените задачи и техните отговори',
+    ikona: 'ekran-sluzhiteli',
+    // ЕКРАНЪТ ДОЙДЕ ЦЯЛ (резен 112 · ADR-158). Негово, 03.09: „Служители е таб
+    // от настройки с включени секцията за правомощи." Пунктът в лентата падна;
+    // работата с хора живее до правата им, в един подтаб.
+    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'sluzhiteli-horata' },
+    grupa: 'hora',
+    // Служителят вижда СВОЯ лист: „чака отговор" е негова работа, не чужда.
+    za: VSICHKI,
+  },
+  {
     klyuch: 'pravata',
     ime: 'Кой какво вижда',
     opis: 'служители · роли · колонно право (Редактира · Вижда · Скрито)',
@@ -390,4 +403,82 @@ export function vizhdaSektsiyata(koy: KoyGleda, sektsiya: string): boolean {
   if (tema) return tema.za.includes(koy);
   if (LICHNI_SEKTSII.includes(sektsiya)) return true;
   return koy === 'stopanin';
+}
+
+/**
+ * ПОДТАБОВЕТЕ НА НАСТРОЙКИ · групата Е подтабът (резен 112 · ADR-158).
+ *
+ * Негово, 03.09: „**Свери всичко и го подреди правилно в подтабове.** Направи
+ * когато цъкнеш на подтаб от менюто да отваря само секцията вътре, а не да те
+ * препраща в скрола. Искам да са разделени и да са самостоятелни активни
+ * подтабове. **Събери ги по смисъл и теми в подтабовете.**"
+ *
+ * „По смисъл и теми" е точно ГРУПАТА: петте заглавия са негов избор от 27.08
+ * (ADR-057 §Б) и всяка тема вече носи своята. Значи подтаб не се измисля —
+ * той се ЧЕТЕ от онова, което вече стои. Втори списък „кой подтаб съдържа
+ * какво" щеше да се разминава с групите при първата нова тема (правило 17).
+ *
+ * ═══ СЕКЦИИТЕ БЕЗ ТЕМА ═══
+ *
+ * Екранът рисува и секции, които нямат тема в реда: помощни форми (новият
+ * бутон, новата колона), описи (браншовете, пътищата, картата на връзките),
+ * личната подредба. Те получават дом ПОИМЕННО тук. Дом по подразбиране няма:
+ * секция без ред тук пада в теста, вместо да се появи в случаен подтаб.
+ */
+const SEKTSII_BEZ_TEMA: Readonly<Record<string, KlyuchGrupa>> = Object.freeze({
+  // МОЕТО · онова, което пише в паметта на устройството, не в Журнала
+  podredbata: 'moeto',
+  'podredba-prazno': 'moeto',
+  // БИЗНЕСЪТ · хедърите, бутоните и описите около тях
+  'nastroyki-nov-buton': 'biznesat',
+  'nastroyki-nova-kolona': 'biznesat',
+  obrazets: 'biznesat',
+  semeystva: 'biznesat',
+  'semeystva-prazno': 'biznesat',
+  branshove: 'biznesat',
+  patishta: 'biznesat',
+  // ХОРА И ПРАВА · Служители дойде цял (резен 112)
+  'sluzhiteli-prashtane': 'hora',
+  'sluzhiteli-listat': 'hora',
+  // СИГУРНОСТ И АРХИВ
+  'zhurnal-sesii': 'sigurnost',
+  godinite: 'sigurnost',
+  karta: 'sigurnost',
+});
+
+/** Кои секции изобщо живеят на Настройки · темите плюс изброените без тема. */
+function sektsiiteNaNastroykite(): readonly string[] {
+  const otTemite = TEMI.filter(
+    (t) => t.kade.vid === 'sektsiya' && t.kade.ekran === 'nastroyki',
+  ).map((t) => (t.kade as { readonly sektsiya: string }).sektsiya);
+  return Object.freeze([...otTemite, ...Object.keys(SEKTSII_BEZ_TEMA)]);
+}
+
+/**
+ * В КОЙ ПОДТАБ живее една секция · `undefined` значи „няма дом".
+ *
+ * Липсващият дом НЕ се замазва с подразбиране: секция, паднала в случаен
+ * подтаб, се намира трудно и се обяснява още по-трудно. Тестът я лови.
+ */
+export function podtabatNa(sektsiya: string): KlyuchGrupa | undefined {
+  const tema = TEMI.find(
+    (t) => t.kade.vid === 'sektsiya' && t.kade.ekran === 'nastroyki' && t.kade.sektsiya === sektsiya,
+  );
+  if (tema) return tema.grupa;
+  return SEKTSII_BEZ_TEMA[sektsiya];
+}
+
+/**
+ * ПОДТАБОВЕТЕ, КОИТО ТОЗИ ЧОВЕК ВИЖДА · в реда на групите.
+ *
+ * Подтаб без нито една своя секция НЕ се рисува: празен таб обещава нещо, което
+ * го няма (правило 15). Затова служителят вижда два-три, а Стопанинът петте.
+ */
+export function podtabovete(koy: KoyGleda): readonly { readonly klyuch: KlyuchGrupa; readonly ime: string }[] {
+  const sektsii = sektsiiteNaNastroykite();
+  return Object.freeze(
+    GRUPI.filter((g) =>
+      sektsii.some((s) => podtabatNa(s) === g.klyuch && vizhdaSektsiyata(koy, s)),
+    ).map((g) => Object.freeze({ klyuch: g.klyuch, ime: g.ime })),
+  );
 }

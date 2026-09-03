@@ -780,6 +780,24 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    изрично правило (резен 99). Полето за името на НОВИЯ имот се крие, щом човек
    избере вече вкаран — а не се маха: изборът се сменя без прерисуване. */
 .pole[hidden] { display: none; }
+
+/* ── ПОДТАБОВЕТЕ НА НАСТРОЙКИ (резен 112 · ADR-158) ────────────────────────
+   Негово: „да са разделени и да са самостоятелни активни подтабове." Затова
+   лентата е РЕД ОТ БУТОНИ, а не списък с връзки: тя сменя кое се рисува.
+   Активният носи същия белег като пункта в лентата (`tuk`), за да се чете с
+   едно око — и не лепне: скролиращата кутия е `.telo` (ADR-148). */
+.podtabove {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 0 0 var(--space-md); padding-bottom: 8px;
+  border-bottom: 1px solid var(--liniya);
+}
+.podtab {
+  font: inherit; font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em;
+  padding: 7px 12px; border: 1px solid var(--liniya); border-radius: 5px;
+  background: var(--panel); color: var(--mastilo2); cursor: pointer;
+}
+.podtab:hover { color: var(--mastilo); border-color: var(--mastilo2); }
+.podtab.tuk { background: var(--aktsent); border-color: var(--aktsent); color: var(--hartiya); }
 /* ДВАТА БЛОКА НА ФОРМАТА · имотът и обектът се вкарват заедно (И132), но окото
    трябва да види къде свършва единият. `fieldset` носи решетката на `.poleta`,
    затова рамката му пада, а `legend` е само надпис. */

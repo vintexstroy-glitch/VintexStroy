@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { naPodtab, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 // `fileURLToPath`, а НЕ `.pathname` · на Windows второто дава „/C:/…" (ADR-152).
 import { fileURLToPath } from 'node:url';
 
@@ -325,7 +325,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // Първият ми опит го сложи в блока на Настройки — а той върви ПРЕДИ този и
   // тогава създадена таблица още няма нито една. Проходът тече по реда на
   // ЕКРАНИТЕ, не по реда на темите (същата бележка стои и при §129).
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   // ══ 132 · СЕМЕЙСТВОТО ОТ ГЛАВИ · две таблици стават една (резен 62) ═════
   //
   // Негово (ред 935): „Фактурите и двете са с еднакъв хедър. Така се
@@ -412,7 +412,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     sverka143.includes('4 реда → 4, разлика 0'), true);
 
   // РАЗПУСНАТОТО МАХА СЕКЦИЯТА · тя няма предмет без живо семейство.
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await deystvieSPrerisuvane(p, () => natisni(p, '#litse-semeystva'));
   await p.waitForSelector('[data-razpusni="Фактурите две"]');
   await sSabitie(p, () => p.click('[data-razpusni="Фактурите две"]'));

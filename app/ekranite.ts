@@ -17,7 +17,6 @@
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
-import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
@@ -50,7 +49,6 @@ export type KoyEkran =
   | 'ii'
   | 'tabove'
   | 'lichno'
-  | 'sluzhiteli'
   | 'kontakti'
   | 'prodazhbi'
   | 'plashtaniya'
@@ -260,7 +258,6 @@ export const REDAT_NA_LENTATA: readonly KoyEkran[] = Object.freeze([
   'plashtaniya',
   'kontakti',
   'stoynost',
-  'sluzhiteli',
   'tabove',
   'ii',
   'lichno',
@@ -330,6 +327,8 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         punktoveNaMenyuto(r),
         r.dnes,
         r.dostapniEkrani,
+        // ХОРАТА живеят в подтаб на Настройки от резен 112 (ADR-158).
+        r.kojSam,
       ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay, z.dnes),
   },
@@ -340,14 +339,6 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     iskaRolya: 'sobstvenik',
     narisuvay: () => narisuvayStoynost(),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
-  },
-  sluzhiteli: {
-    ime: 'Служители',
-    podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
-    ikona: 'ekran-sluzhiteli',
-    narisuvay: (r) =>
-      narisuvaySluzhiteli(r.ogledalo, r.kojSam, r.dnes, r.izbor),
-    zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {
     ime: 'Управление',

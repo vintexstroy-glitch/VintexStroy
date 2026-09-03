@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
+import { naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
 import { readFile } from 'node:fs/promises';
 import { ADRES } from '../yadro/server.ts';
 
@@ -103,7 +103,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ИЗМЕРЕНО, не обещано: номерът го няма в изнесения файл.
     razdel = '61 · Възстановяването · телефонът НЕ пътува';
-    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+    await naPodtab(p, 'sigurnost', '#zhurnal-iznesi');
     const [svalenSZapasen] = await Promise.all([
       p.waitForEvent('download'),
       natisni(p, '#iznesi'),

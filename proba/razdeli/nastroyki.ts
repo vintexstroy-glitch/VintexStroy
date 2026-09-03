@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { dokatoStane, dobaviImotBezObekt, OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
+import { naPodtab, dokatoStane, dobaviImotBezObekt, OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '19 · бутонът';
-    await naEkran(p, 'nastroyki', '#nov-buton');
+    await naPodtab(p, 'biznesat', '#nov-buton');
     // ТРИ ДУМИ, не две (резен 18). Дотук тук стоеше „2 / 10" и второто от
     // двете беше „Създаване на таблица" — път, който Е построен, но до който
     // НИТО ЕДИН бутон не води. Числото беше вярно за механизма и невярно за
@@ -36,8 +36,11 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     proveri('като сочат откъде се извървява днес',
       patishta.includes('Свали образец'), true);
     proveri('моделът от §18 се вижда тук', (await redove(p, '.red.model')).length, 1);
-    // §14 тръгна начисто; оттам насам са двете прилагания на §18.
+    // §14 тръгна начисто; оттам насам са двете прилагания на §18. Сверките
+    // живеят в подтаба СЧЕТОВОДСТВО (резен 112) — четат се там и се връщаме.
+    await naPodtab(p, 'schetovodstvo', '[data-sektsiya=sverki]');
     proveri('записаните сверки са две', (await redove(p, '.red.zapisanasverka')).length, 2);
+    await naPodtab(p, 'biznesat', '#nov-buton');
 
     await deystvieSPrerisuvane(p, () => p.click('#nov-buton'));
     await p.fill('#buton-ime', 'Извлечения ОББ');
@@ -95,7 +98,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
     proveri('сверката пак е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
 
-    await naEkran(p, 'nastroyki', '#nov-buton');
+    // СВЕРКАТА НА БУТОНА се чете в подтаба на сверките (резен 112).
+    await naPodtab(p, 'schetovodstvo', '[data-sektsiya=sverki]');
     const posledna = (await redove(p, '.red.zapisanasverka'))[0];
     proveri('последната сверка носи името на бутона', posledna?.[0]?.startsWith('Извлечения ОББ'), true);
     proveri('и казва от колко файла е', posledna?.[0]?.includes('2 файла'), true);
@@ -110,7 +114,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     // 14) матрицата стоеше при тях; темата смени адреса си с ЕДИН ред и §63
     // по-долу пази, че водù насам.
     razdel = '20 · колонното право';
-    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
+    await naPodtab(p, 'hora', '#izbor-pravo-chovek');
     // СТОПАНИНЪТ СТОИ В СПИСЪКА и без нито един вписан служител — той е първото
     // събитие в Журнала (ADR-043). Значи „още няма никого" се брои по ДРУГИТЕ.
     proveri('още няма вписан служител · само Стопанинът',
@@ -118,7 +122,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     proveri('и без избран хедър матрицата КАЗВА какво чака, вместо да е празна',
       Boolean(await p.$('[data-pravata-izberi]')), true);
 
-    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
+    await naPodtab(p, 'hora', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
@@ -128,7 +132,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
       optsii.some((r) => r.includes('Бамстера') && r.includes('редактира')), true);
 
     // ДВЕТЕ ПАДАЩИ · служителят, после хедърът; чак тогава има клетки.
-    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
+    await naPodtab(p, 'hora', '#izbor-pravo-chovek');
     await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
     proveri('вторият човек е в падащото',
       await p.$$eval('#izbor-pravo-chovek option', (o) => o.length), 2);
@@ -158,7 +162,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     const razhodPredi = await plochka(p, 'Разход');
 
     // ── СРЕДНАТА дума · новата · „гледа я, но не я пипа" ──────────────────
-    await naEkran(p, 'nastroyki', OBB_RED);
+    await naPodtab(p, 'hora', OBB_RED);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'vizhda'));
     await p.waitForSelector('.pravo.pravo-vizhda');
     proveri('свалената до „вижда" СЕ ВИЖДА · не пада от списъка',
@@ -176,7 +180,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     proveri('СКРИТОТО ПАК СЕ СМЯТА · числото не е мръднало', await plochka(p, 'Разход'), razhodPredi);
 
     // Върни я — скрий → върни → скрий не се губи (правило 20)
-    await naEkran(p, 'nastroyki', OBB_RED);
+    await naPodtab(p, 'hora', OBB_RED);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'redaktira'));
     proveri('връща се с най-широката', (await p.$$('.pravo.pravo-skrito')).length, 0);
     await sSabitie(p, () => p.selectOption(`${OBB_RED} .pravo select`, 'skrito'));
@@ -187,18 +191,18 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
     // значи изборът „редактира" стои записан, но не действа — и екранът го
     // казва, вместо да го преглътне. Това е и доказателството, че този екран
     // НЕ е втора врата към достъпа (правило 14 · И57).
-    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
+    await naPodtab(p, 'hora', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'nablyudatel');
     await sSabitie(p, () => p.click('#forma-sluzhitel button[type=submit]'));
-    await naEkran(p, 'nastroyki', OBB_RED);
+    await naPodtab(p, 'hora', OBB_RED);
     await p.waitForSelector('.pravo [data-ne-deystva]');
     proveri('на наблюдателя „редактира" НЕ действа · и се казва защо',
       (await p.$$eval('.pravo [data-ne-deystva]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('наблюдава'), true);
     // Обратно на „редактира" — останалата част от прохода го иска такъв.
-    await naEkran(p, 'sluzhiteli', '#forma-sluzhitel');
+    await naPodtab(p, 'hora', '#forma-sluzhitel');
     await p.fill('#forma-sluzhitel [name=imeyl]', 'Ivaylo85Petkov@gmail.com');
     await p.fill('#forma-sluzhitel [name=ime]', 'Бамстера');
     await p.selectOption('#forma-sluzhitel [name=rolya]', 'redaktor');
@@ -207,7 +211,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<{ razhodPredi: strin
 
     // ══ 21 · Редакторът на хедъри · трите вида номенклатура ══════════════
     razdel = '21 · Редакторът на хедъри';
-    await naEkran(p, 'nastroyki', '#litse-hedari');
+    await naPodtab(p, 'biznesat', '#litse-hedari');
     proveri('едно място, две лица', (await p.$$('#litse-opis')).length, 1);
 
     await izberiVnosenHedar(p);
@@ -273,7 +277,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '40 · формулната колона';
-    await naEkran(p, 'nastroyki', '#litse-hedari');
+    await naPodtab(p, 'biznesat', '#litse-hedari');
     await izberiVnosenHedar(p);
     await p.waitForSelector('.red.redaktor');
 
@@ -344,7 +348,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // ИЗБОРЪТ НА СЛУЖИТЕЛ Е ПОГЛЕД, не факт: живее в паметта на екрана и
     // презареждането го изчиства (`udobstvoto.blok1` презарежда преди този
     // блок). Затова тук се избира наново — точно каквото прави и човек.
-    await naEkran(p, 'nastroyki', '#izbor-pravo-chovek');
+    await naPodtab(p, 'hora', '#izbor-pravo-chovek');
     await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
     await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'Банка ОББ'));
     await p.waitForSelector('.pravo');
@@ -364,7 +368,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '40б · картата на връзките';
-    await naEkran(p, 'nastroyki', '[data-sektsiya="karta"]');
+    await naPodtab(p, 'sigurnost', '[data-sektsiya="karta"]');
     const karta = await tekstNa(p, '[data-sektsiya="karta"] .dyalglava');
     proveri('картата казва КОЛКО от колко са построени',
       /построени\s+\d+\s+от\s+\d+/.test(karta.replace(/\s+/g, ' ')), true);
@@ -386,7 +390,7 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '52 · Журналът от таблица';
-    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+    await naPodtab(p, 'sigurnost', '#zhurnal-iznesi');
 
     proveri('секцията стои в Настройки, не при Журнала',
       Boolean(await p.$('[data-sektsiya=zhurnalat]')), true);
@@ -473,7 +477,7 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и че старите записи стоят', vestPopravka.includes('непокътнати'), true);
 
     // СВРЪЗКАТА се вижда · с ДВЕТЕ дати, извън графата на нормалния ред
-    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+    await naPodtab(p, 'sigurnost', '#zhurnal-iznesi');
     const svrazkata = await p.$eval('.red.svrazka', (e) => e.textContent);
     proveri('свръзката стои в таблицата си', svrazkata.includes('С1'), true);
     proveri('с ДАТАТА НА ФАЙЛА, отделна от датата на записа',
@@ -511,7 +515,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '65 · Проверките при въвеждане';
-    await naEkran(p, 'nastroyki', '[data-sektsiya=parametri]');
+    await naPodtab(p, 'schetovodstvo', '[data-sektsiya=parametri]');
     proveri('осемте вида стоят на екрана',
       await p.$$eval('.red.parametar', (e) => e.length), 8);
     proveri('замразеният период е ЗАКОВАН · правило 9 не е параметър',
@@ -655,7 +659,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const temiVGrupi = await p.$$eval('#nastroyki-red [role=group] [data-tema]', (e) => e.length);
     proveri('всички теми стоят под някое заглавие',
       await p.$$eval('#nastroyki-red [data-tema]', (e) => e.length), temiVGrupi);
-    proveri('и са ОСЕМНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 18);
+    proveri('и са ДЕВЕТНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 19);
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 106 · ГОДИНАТА СЕ ЗАТВАРЯ (резен 28 · ADR-088) ═════════════════════
@@ -678,7 +682,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     await p.fill('#razhod-data', `${minalata}-11-12`);
     await sSabitie(p, () => p.click('#forma-razhod button[type=submit]'));
 
-    await naEkran(p, 'nastroyki', '[data-sektsiya=godinite]');
+    await naPodtab(p, 'sigurnost', '[data-sektsiya=godinite]');
     proveri('годината стои в таблицата, без да е търсена',
       Boolean(await p.$(`[data-godina="${minalata}"]`)), true);
     proveri('и състоянието ѝ е „чака затваряне"',
@@ -712,7 +716,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('затворената година НЕ отказва записа',
       await broySabitiya(p), prediRazminavane + 1);
 
-    await naEkran(p, 'nastroyki', '[data-sektsiya=godinite]');
+    await naPodtab(p, 'sigurnost', '[data-sektsiya=godinite]');
     proveri('и разминаването се появява със ЗНАК',
       await p.$eval(`[data-godina="${minalata}"] [data-raznika]`, (e) => (e as any).dataset.raznika), '1');
     proveri('с думи, разбираеми без легенда',
@@ -726,7 +730,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // ══ 111 · ПЕТТЕ МОДЕЛА ПО БРАНШ (резен 33 · ADR-093) ═════════
 
     razdel = '111 · Браншовете · петте стоят с имената си';
-    await naEkran(p, 'nastroyki', '[data-sektsiya=branshove]');
+    await naPodtab(p, 'biznesat', '[data-sektsiya=branshove]');
     proveri('петте са на екрана · нито четири, нито шест',
       await p.$$eval('[data-tablitsa=branshove] tbody tr', (e) => e.length), 5);
     proveri('секцията ГО КАЗВА · числото е негово',
@@ -778,7 +782,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   // ── НАСТРОЙКИ · вградената стои в избора и се редактира като всеки хедър ──
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   // §40 остави редактора на лицето „Опис" — изборът на хедър живее в първото.
   await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
   await p.waitForSelector('#izbor-hedar');
@@ -833,7 +837,7 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
       e.map((x) => x.textContent?.trim() ?? ''))).includes('южно'), true);
 
   // смяната на екран не я губи — тя е в Журнала, не в паметта на екрана
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await naEkran(p, 'imoti', '[data-tablitsa=imoti]');
   await p.waitForSelector('[data-tablitsa=imoti] .glavicha[data-kolona="dobavka-0"]');
   proveri('и стои след смяна на екрана — Журналът я носи',
@@ -848,7 +852,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await deystvieSPrerisuvane(p, () => p.click('#litse-hedari'));
   await p.waitForSelector('#izbor-hedar');
   await p.selectOption('#izbor-hedar', 'vgraden:imoti');
@@ -872,7 +876,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     await p.$eval('[data-tablitsa=imoti] .glava .glavicha', (e) => e.getAttribute('data-ime')), 'Обект');
 
   // ── ПРАЗНОТО ВРЪЩА кръщелното · връщане, не грешка ───────────────────────
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await p.waitForSelector('[data-ime-kodova="0"]');
   await p.fill('[data-ime-kodova="0"]', '');
   await sSabitie(p, () => p.click('[data-zapishi-kodova="0"]'));
@@ -890,7 +894,7 @@ export async function blok9(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   // ── РАЖДАНЕТО · формулна колона „брой по редове" върху добавка ───────────
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await p.waitForSelector('#izbor-hedar');
   // Изборът прерисува и при ВЕЧЕ избрания хедър — без изчакване кликът долу
   // се брои срещу ГРЕШНОТО прерисуване и формата „закъснява" (гонка, платена
@@ -953,7 +957,7 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
   // ── РАЖДАНЕТО · Журналът стои в избора като вградена ─────────────────────
-  await naEkran(p, 'nastroyki', '#litse-hedari');
+  await naPodtab(p, 'biznesat', '#litse-hedari');
   await p.waitForSelector('#izbor-hedar');
   proveri('Журналът · сесии стои в избора на хедър',
     (await p.$$eval('#izbor-hedar option', (o) =>
@@ -972,6 +976,8 @@ export async function blok10(ctx: KonteksNaProhoda): Promise<void> {
       e.map((x) => (x as HTMLInputElement).value))).includes('Бележка на деня'), true);
 
   // ── СЕСИИТЕ · клетката е бележка върху „ден | кой" ───────────────────────
+  // Журналът и сесиите му живеят в подтаба СИГУРНОСТ И АРХИВ (резен 112).
+  await naPodtab(p, 'sigurnost', '#sesii-otvori');
   await p.click('#sesii-otvori');
   await p.waitForSelector('[data-sektsiya=zhurnal-sesii][data-otvoren=da]');
   await p.waitForSelector('.sesiya-dobavki [data-redakt^="dobavka·vgraden:zhurnal·"]');
@@ -1040,13 +1046,32 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   proveri('стеснението се КАЗВА, веднъж и отгоре',
     (await tekstNa(p, '[data-samo-tvoite]')).includes('Стопанинът'), true);
 
-  // НЕГОВИТЕ секции стоят · присъдата е на домейна, екранът само пита.
+  // ПОДТАБОВЕТЕ МУ СА ПО-МАЛКО (резен 112 · ADR-158): празен подтаб не се
+  // рисува, значи служителят вижда САМО онези, в които има негова секция.
+  const negovitePodtabove = await p.$$eval('[data-podtab]', (e) =>
+    e.map((x) => x.getAttribute('data-podtab') ?? ''));
+  proveri('вижда своите подтабове, не петте',
+    negovitePodtabove.join(' · '), 'moeto · hora · schetovodstvo');
+
+  // НЕГОВИТЕ секции стоят · присъдата е на домейна, екранът само пита. Всяка
+  // се чете В СВОЯ подтаб: екранът рисува един наведнъж.
+  await naPodtab(p, 'schetovodstvo', '[data-sektsiya=sverki]');
   proveri('Записаните сверки СТОЯТ · те са на работещите',
     Boolean(await p.$('[data-sektsiya=sverki]')), true);
   // ЛИЧНАТА е ЕДНА · „темата на натоварването" падна с бутоните си
   // (И127 т.3 · резен 92 · ADR-149), и вече не се брои сред личните.
+  await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
   proveri('и личната стои · подредбата на екраните',
     Boolean(await p.$('[data-sektsiya=podredbata]')), true);
+  // И СВОЯТ ЛИСТ · работата с хора е негова, раздаването на права — не (И57).
+  await naPodtab(p, 'hora', '[data-sektsiya="sluzhiteli-horata"]');
+  proveri('вижда хората и своя лист',
+    Boolean(await p.$('[data-sektsiya="sluzhiteli-listat"]')), true);
+  // А ПРАВАТА ги няма ИЗОБЩО в подтаба му: темата е само на Стопанина (И57),
+  // значи секцията не се рисува — не се рисува и отказът ѝ. Стеснението е
+  // казано ВЕДНЪЖ и отгоре (`data-samo-tvoite`), не по секция.
+  proveri('а раздаването на права го няма при него · един подтаб, две присъди',
+    Boolean(await p.$('[data-sektsiya=pravata]')), false);
   proveri('а темата на натоварването я НЯМА · падна с бутоните си',
     Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), false);
 
@@ -1058,7 +1083,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
 
   // ── обратно стопанинът · екранът се връща ЦЯЛ ─────────────────────────────
   await varniSeKatoStopanina(p);
-  await naEkran(p, 'nastroyki', '[data-sektsiya=hedari]');
+  await naPodtab(p, 'biznesat', '[data-sektsiya=hedari]');
   await p.keyboard.press('Escape');
   proveri('за стопанина хедърите пак стоят · нищо не е отнето',
     Boolean(await p.$('[data-sektsiya=hedari]')), true);
@@ -1082,7 +1107,7 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
 
   // Стойност се отваря, за да напълни паметта си със секциите.
   await naEkran(p, 'stoynost', '.telo [data-sektsiya]');
-  await naEkran(p, 'nastroyki', '[data-podredba-ekran="stoynost"]');
+  await naPodtab(p, 'moeto', '[data-podredba-ekran="stoynost"]');
 
   const kartata = '[data-podredba-ekran="stoynost"]';
   const redPredi = await p.$$eval(`${kartata} [data-sektsiya-red]`, (e) =>

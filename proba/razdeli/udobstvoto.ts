@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -559,7 +559,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ── РАЗМЕСТВАНЕТО СТАВА ОТ НАСТРОЙКИ ─────────────────────────────────
     const predSabitiya = await broySabitiya(p);
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     proveri('Настройки знае секциите на екрана, който вече е отварян',
       (await p.$$eval('[data-podredba-ekran=smetki] [data-sektsiya-red]', (e) => e.length)) > 1,
       true);
@@ -647,8 +647,10 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // да го е отварял нито веднъж. „Лично" излезе от списъка с резен 98
     // (ADR-154): екранът е на СЛУЖИТЕЛЯ, Стопанинът няма пункт — секциите му се
     // броят в §53, докато служителят го е пуснал.
+    // ДЕВЕТ · „Служители" излезе от лентата с резен 112 (ADR-158): екранът
+    // живее като ПОДТАБ на Настройки, значи не е пункт и не се обхожда тук.
     const ekranite = ['imoti', 'pari', 'stoynost', 'gant', 'smetki',
-      'nastroyki', 'ii', 'tabove', 'sluzhiteli', 'tablo'] as const;
+      'nastroyki', 'ii', 'tabove', 'tablo'] as const;
     const nachalniyat = await koyEkranE();
 
     let bezMarker = 0;
@@ -668,7 +670,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       udvoeni += klyuchove.length - new Set(klyuchove).size;
     }
 
-    proveri('и десетте екрана се отварят от лентата', obhodeni, ekranite.length);
+    proveri('и деветте екрана се отварят от лентата', obhodeni, ekranite.length);
     proveri('и заедно носят секции за местене', vsichki > 40, true);
     proveri('НИТО ЕДНА не се ключува по заглавието си', bezMarker, 0);
     // Два еднакви ключа на един екран значат възел, прибавен два пъти при
@@ -851,7 +853,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-mesti]', (e) => e.length), 0);
 
     const predMestene = await broySabitiya(p);
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     proveri('Настройки изрежда ВСИЧКИ пунктове на лентата',
       await p.$$eval('[data-lentapunkt]', (e) => e.length), punktovePredi.length);
     // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
@@ -1601,7 +1603,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // Негови думи, 27.08 (И110): „Да има служители таб и там да се избират от
     // падащо меню и да се пращат задачите ЗА ПРИЕМАНЕ… но в листа на всеки
     // служител СИ СЕДИ." И от 08.08 (р57·[160]): „копче за всяко дело… РЪЧНО."
-    await naEkran(p, 'sluzhiteli', '[data-sektsiya="sluzhiteli-horata"]');
+    await naPodtab(p, 'hora', '[data-sektsiya="sluzhiteli-horata"]');
     // КОГО ГЛЕДАМ е ЕДИН избор за целия екран — и листът, и правата четат него
     // (ADR-022). §20 остави избран Бамстера; тук се гледа СВОЯТ лист, значи
     // изборът се връща на себе си, точно както би направил човек.
@@ -1705,8 +1707,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('всяко дело носи копче за пращане',
       (await p.$$eval('[data-prati]', (e) => e.length)) >= 1, true);
     // Копчето минава през СЪЩАТА врата · пунктът в лентата, не втора форма.
+    // От резен 112 вратата е Настройки → подтаб ХОРА (ADR-158): пунктът на
+    // Служители го няма, но пътят е пак човешкият.
     await deystvieSPrerisuvane(p, () => p.click('[data-prati]'));
     await p.waitForSelector('[data-sektsiya="sluzhiteli-prashtane"]');
+    proveri('копчето отваря подтаба ХОРА, не чужд',
+      await p.$eval('[data-podtab=hora]', (e) => e.classList.contains('tuk')), true);
     proveri('копчето води до Служители с ИЗБРАНОТО дело',
       await p.$eval('#z-delo', (e) => (e as HTMLSelectElement).value !== ''), true);
     await naEkran(p, 'imoti', '#forma-imot');
@@ -1717,7 +1723,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // и подредени КАКТО СА ПО ТАБОВЕТЕ В МЕНЮТО и ОТДЕЛЕНИ ПРИ СКРОЛ… можеш по
     // ЦЯЛО МЕНЮ или по отделна ТАБЛИЦА и КОЛОНА от хедъра да дадеш достъп."
     razdel = '88 · хедърите по табовете · трите обхвата';
-    await naEkran(p, 'nastroyki', '[data-sektsiya="pravata"]');
+    await naPodtab(p, 'hora', '[data-sektsiya="pravata"]');
     await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
 
     // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.

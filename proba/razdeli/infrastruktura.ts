@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -503,12 +503,28 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
+      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
+      ['nastroyki', '[data-podtabove]'],
       ['ii', '#nov-agent'],
       ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       proveri(`екран „${ekran}" · полетата са защитени`,
+        await p.evaluate(() => {
+          const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+          const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+          return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || (e as any).name).join(' · ')}`) : 'няма полета';
+        }),
+        'всички');
+    }
+
+    // И ВСЕКИ ПОДТАБ НА НАСТРОЙКИ (резен 112 · ADR-158): екранът вече рисува
+    // един наведнъж, значи обход само по него би пазил една пета от полетата.
+    for (const podtab of await p.$$eval('[data-podtab]', (e) =>
+      e.map((x) => x.getAttribute('data-podtab') ?? ''))) {
+      await naPodtab(p, podtab, `[data-podtab="${podtab}"].tuk`);
+      proveri(`подтаб „${podtab}" · полетата са защитени`,
         await p.evaluate(() => {
           const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
           const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
@@ -570,7 +586,9 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
+      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
+      ['nastroyki', '[data-podtabove]'],
       ['ii', '#nov-agent'],
       ['tablo', '#izlez'],
     ] as const) {
@@ -712,7 +730,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
 
     // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     // ПРЕЗ ГРУПАТА · трите действия на картата станаха група (ADR-057) и
     // видимо стои само последно избраното. Точно за това е `natisni`.
     await deystvieSPrerisuvane(p, () => natisni(p, '[data-razgani-vsichki="smetki"]'));
@@ -735,7 +753,9 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       ['kontakti', '#forma-kontakt'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
+      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
+      ['nastroyki', '[data-podtabove]'],
       ['ii', '#nov-agent'],
       ['tablo', '#izlez'],
     ] as const) {

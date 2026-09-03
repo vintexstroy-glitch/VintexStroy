@@ -685,3 +685,18 @@ export async function otvoriProfila(p: Page): Promise<void> {
   if (await p.$eval('#profil-panel', (e) => (e as HTMLElement).hidden)) await p.click('#profil-avatar');
   await p.waitForSelector('#profil-panel:not([hidden])');
 }
+
+/**
+ * ОТВАРЯ ПОДТАБ НА НАСТРОЙКИ · и чака секцията му (резен 112 · ADR-158).
+ *
+ * Негово, 03.09: „когато цъкнеш на подтаб от менюто да отваря само секцията
+ * вътре, а не да те препраща в скрола". Затова тук се натиска БУТОН на лентата,
+ * а после се чака ЗНАКЪТ на онова, което подтабът носи — свършеното, не времето.
+ */
+export async function naPodtab(p: Page, podtab: string, znak: string): Promise<void> {
+  if ((await p.$(`[data-podtab="${podtab}"].tuk`)) === null) {
+    await naEkran(p, 'nastroyki', `[data-podtab="${podtab}"]`);
+    await deystvieSPrerisuvane(p, () => p.click(`[data-podtab="${podtab}"]`));
+  }
+  await p.waitForSelector(znak);
+}

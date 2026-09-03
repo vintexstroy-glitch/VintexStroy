@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { naPodtab, OBB, OTKRIVASHTOTO, smeniPoleto, broySabitiya, chisloNaPoleto, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plati, plochka, redove, sSabitie, sSabitiya, smetni, tekstNa, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -1052,7 +1052,7 @@ export async function blok8(ctx: KonteksNaProhoda): Promise<void> {
     // паднаха с него; ЕИК-ът остава, защото контрагентът е СЧЕТОВОДСТВО, не
     // подаване, и грешният ЕИК пак трябва да пада ТУК, при вписването.
     razdel = '66 · Контрагентът · сбърканият ЕИК пада ТУК';
-    await naEkran(p, 'nastroyki', '#forma-kontragent');
+    await naPodtab(p, 'schetovodstvo', '#forma-kontragent');
     await p.selectOption('#kontragent-vid', 'firma');
     await p.fill('#kontragent-ime', 'ВинтексСтрой ЕООД');
     // Сменена ПОСЛЕДНА цифра: точно грешката при преписване, която контролната
@@ -1513,7 +1513,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
   // СМЕТНАТА за текущия изглед, тази чете Журнала. Проверката отива при
   // истинския им дом — инак тя щеше да мери грешната таблица и да мълчи,
   // когато записът изчезне.
-  await naEkran(p, 'nastroyki', '[data-sektsiya=sverki]');
+  await naPodtab(p, 'schetovodstvo', '[data-sektsiya=sverki]');
   proveri('записаната сверка стои в Журнала и се вижда',
     (await tekstNa(p, '[data-sektsiya=sverki]')).includes('Сверка с извлечението'), true);
   proveri('и носи СВОЯ период',

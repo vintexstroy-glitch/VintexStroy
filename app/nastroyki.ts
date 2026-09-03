@@ -35,6 +35,21 @@ import {
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
 import { sastoyaniyataNaImota } from '../src/domein/sastoyaniya-na-imot.js';
+import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
+
+/**
+ * КОЙ ПОДТАБ Е ОТВОРЕН · поглед, не запис (резен 112 · ADR-158).
+ *
+ * Живее в ПАМЕТТА на устройството, като всеки друг изглед (ADR-022): Журналът
+ * не помни на кой таб е стоял човекът, а следващият вход го заварва там, където
+ * го е оставил.
+ *
+ * ЧЕТЕ СЕ ПРИ ВСЯКО РИСУВАНЕ, не веднъж при зареждане. Падащият ред сменя
+ * подтаба, като пише В ПАМЕТТА (`zavediDoSektsiyata`) — променлива, прочетена
+ * веднъж, щеше да остане на старото и кликът върху тема щеше да изглежда като
+ * нищо. Един дом на факта, две дръжки към него (ADR-134 §3).
+ */
+
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
@@ -108,7 +123,14 @@ import {
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
-import { vizhdaSektsiyata, type KoyGleda } from '../src/domein/temi-nastroyki.js';
+import {
+  podtabatNa,
+  podtabovete,
+  vizhdaSektsiyata,
+  type KoyGleda,
+} from '../src/domein/temi-nastroyki.js';
+import type { Samolichnost } from '../src/yadro/samolichnost.js';
+import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import {
   eVgradenKlyuch,
   prazenModelZaVgradena,
@@ -200,6 +222,8 @@ export function narisuvayNastroyki(
    * екраните" щеше да предлага пункт, който човекът няма.
    */
   dostapni: readonly string[] = [],
+  /** КОЙ Е ВЛЯЗЪЛ · Служители живее тук от резен 112 и иска самоличността */
+  kojSam?: Samolichnost,
 ): string {
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
@@ -207,6 +231,20 @@ export function narisuvayNastroyki(
   // Присъдата на всяка секция е в домейна (`vizhdaSektsiyata`) — тук само се
   // пита. Секция, скрита оттук с гол `if`, би се разминала с падащия ред.
   const vizhda = (s: string): boolean => vizhdaSektsiyata(koy, s);
+  /**
+   * ЕДИН ПОДТАБ НАВЕДНЪЖ (резен 112 · ADR-158) · „да са самостоятелни активни
+   * подтабове". Секцията се рисува само когато е СВОЯ на активния — иначе
+   * екранът пак е един дълъг скрол, само че с лента отгоре.
+   *
+   * Запомненият подтаб може да е чужд (служител на устройството на Стопанина)
+   * или изчезнал — тогава се пада на ПЪРВИЯ видим, а не на празно.
+   */
+  const podtabove = podtabovete(koy);
+  const zapomnen = chetiEkranno('nastroyki.podtab', 'moeto');
+  const aktiven = podtabove.some((g) => g.klyuch === zapomnen)
+    ? zapomnen
+    : (podtabove[0]?.klyuch ?? 'moeto');
+  const tuk = (s: string): boolean => vizhda(s) && podtabatNa(s) === aktiven;
 
   return `
     ${
@@ -217,9 +255,11 @@ export function narisuvayNastroyki(
         : `<p class="drebno" data-samo-tvoite>Тук са ТВОИТЕ настройки. Стопанските —
       хедърите, бутоните, номенклатурите — ги вижда и мени само Стопанинът.</p>`
     }
+    ${lentataNaPodtabovete(podtabove, aktiven)}
+
     <div class="plochki">
       ${
-        vizhda('butoni')
+        tuk('butoni')
           ? `<div class="plochka">
         <span class="etiket">Бутони</span>
         <span class="chislo" translate="no">${butoni.length}</span>
@@ -228,7 +268,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('modeli')
+        tuk('modeli')
           ? `<div class="plochka">
         <span class="etiket">Модели на таблици</span>
         <span class="chislo" translate="no">${modeli.length}</span>
@@ -237,7 +277,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('sverki')
+        tuk('sverki')
           ? `<div class="plochka">
         <span class="etiket">Записани сверки</span>
         <span class="chislo" translate="no">${o.sverki.length}</span>
@@ -246,7 +286,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('patishta')
+        tuk('patishta')
           ? `<div class="plochka">
         <span class="etiket">Построени действия</span>
         <span class="chislo" translate="no">${
@@ -274,7 +314,7 @@ export function narisuvayNastroyki(
        * Сега изискването живее на ТЕМАТА (`temi-nastroyki.ts`), а тук отпадат
        * само двете ѝ секции. Правило 15: изключеното се КАЗВА, не се преглъща.
        */
-      !vizhda('butoni')
+      !tuk('butoni')
         ? ''
         : mozhe(izbor, 'iztochnitsi')
           ? blokNaButonite(butoni)
@@ -285,9 +325,9 @@ export function narisuvayNastroyki(
       план: пътища без облак водят наникъде. Всичко останало в Настройки работи.</p>
     </section>`
     }
-    ${dobavyam && vizhda('butoni') ? formaNaButon(modeli) : ''}
+    ${dobavyam && tuk('butoni') ? formaNaButon(modeli) : ''}
     ${
-      !vizhda('modeli')
+      !tuk('modeli')
         ? ''
         : mozhe(izbor, 'iztochnitsi')
           ? blokNaModelite(modeli)
@@ -298,25 +338,29 @@ export function narisuvayNastroyki(
       Хедърите и колоните им се редактират нормално.</p>
     </section>`
     }
-    ${vizhda('hedari') ? blokNaRedaktora(modeli, o) : ''}
+    ${tuk('hedari') ? blokNaRedaktora(modeli, o) : ''}
     ${
       /* КОЙ КАКВО ВИЖДА · върна се тук от Служители (И129 т.2 · резен 97 ·
          ADR-156): служител · хедър · трите думи над всяка колона. */
-      vizhda('pravata') ? sektsiyaNaPravata(o, izbor, koy === 'stopanin', punktove) : ''
+      tuk('sluzhiteli-horata') && kojSam ? narisuvaySluzhiteli(o, kojSam, dnes, izbor) : ''
     }
-    ${vizhda('parametri') ? blokNaParametrite(o) : ''}
-    ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
-    ${vizhda('sastoyaniya-imot') ? blokNaSastoyaniyataNaImota(o) : ''}
+    ${
+      /* ПРАВАТА стоят ДО хората · един подтаб, две решения (резен 112). */
+      tuk('pravata') ? sektsiyaNaPravata(o, izbor, koy === 'stopanin', punktove) : ''
+    }
+    ${tuk('parametri') ? blokNaParametrite(o) : ''}
+    ${tuk('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
+    ${tuk('sastoyaniya-imot') ? blokNaSastoyaniyataNaImota(o) : ''}
 
-    ${vizhda('krediti') ? blokNaKredititeVNastroyki() : ''}
-    ${vizhda('kontragenti') ? blokNaKontragentite(o) : ''}
-    ${vizhda('sverki') ? blokNaSverkite(o) : ''}
-    ${vizhda('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
-    ${vizhda('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
-    ${vizhda('branshove') ? blokNaBranshovete(dnes) : ''}
-    ${vizhda('patishta') ? blokNaDeystviyata() : ''}
-    ${blokNaPodredbata(o, dostapni, koy === 'stopanin')}
-    ${vizhda('karta') ? blokNaKartata() : ''}`;
+    ${tuk('krediti') ? blokNaKredititeVNastroyki() : ''}
+    ${tuk('kontragenti') ? blokNaKontragentite(o) : ''}
+    ${tuk('sverki') ? blokNaSverkite(o) : ''}
+    ${tuk('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
+    ${tuk('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
+    ${tuk('branshove') ? blokNaBranshovete(dnes) : ''}
+    ${tuk('patishta') ? blokNaDeystviyata() : ''}
+    ${tuk('podredbata') ? blokNaPodredbata(o, dostapni, koy === 'stopanin') : ''}
+    ${tuk('karta') ? blokNaKartata() : ''}`;
 }
 
 // ── НАП · активирането със съгласие (резен 17 · И108 · И112) ────────────────
@@ -1280,6 +1324,30 @@ function blokNaSastoyaniyataNaImota(o: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * ЛЕНТАТА НА ПОДТАБОВЕТЕ · един наведнъж (резен 112 · ADR-158).
+ *
+ * Негово, 03.09: „когато цъкнеш на подтаб от менюто **да отваря само секцията
+ * вътре, а не да те препраща в скрола**. Искам да са разделени и да са
+ * самостоятелни активни подтабове."
+ *
+ * Затова тук няма линкове към секции, а БУТОНИ, които сменят кое се рисува.
+ * Изборът е ПОГЛЕД (памет на устройството, нула събития) — както при всеки друг
+ * изглед; Журналът не помни на кой таб е стоял човекът.
+ */
+function lentataNaPodtabovete(spisak: readonly { readonly klyuch: string; readonly ime: string }[], aktiven: string): string {
+  return `
+    <nav class="podtabove" data-podtabove="${spisak.length}" aria-label="Подтабовете на Настройки">
+      ${spisak
+        .map(
+          (g) => `<button type="button" class="podtab${g.klyuch === aktiven ? ' tuk' : ''}"
+        data-podtab="${ekraniraj(g.klyuch)}" aria-pressed="${g.klyuch === aktiven ? 'true' : 'false'}"
+        translate="no">${ekraniraj(g.ime)}</button>`,
+        )
+        .join('')}
+    </nav>`;
+}
+
 function blokNaKontragentite(o: Ogledalo): string {
   const spisak = [...o.kontragenti.values()].sort(
     (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
@@ -1605,6 +1673,22 @@ export function zakachiNastroyki(
   zakachiKreditite(koren, k, prerisuvay);
   // Колонното право · двете падащи и клетките (резен 97 · ADR-156).
   zakachiPravata(koren, k, prerisuvay);
+  // ХОРАТА · екранът Служители живее в подтаб оттук (резен 112 · ADR-158).
+  // Вика се винаги: закачането само търси възли и мълчи, когато подтабът е друг.
+  zakachiSluzhitelite(koren, k, prerisuvay);
+
+  /**
+   * ЛЕНТАТА НА ПОДТАБОВЕТЕ · сменя КОЕ се рисува, не къде скролва.
+   *
+   * Изборът се помни на устройството и се чете при следващото рисуване —
+   * затова тук няма нищо освен запис и прерисуване (нула събития).
+   */
+  for (const buton of koren.querySelectorAll<HTMLButtonElement>('[data-podtab]')) {
+    buton.addEventListener('click', async () => {
+      zapomniEkranno('nastroyki.podtab', buton.dataset['podtab'] ?? 'moeto');
+      await prerisuvay();
+    });
+  }
 
   /**
    * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.

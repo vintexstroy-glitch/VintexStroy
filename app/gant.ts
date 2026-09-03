@@ -69,6 +69,7 @@ import {
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
 import { KOLONI_MESTATA, tablitsaNaImotite } from './imotite.js';
+import { podtabatNa } from '../src/domein/temi-nastroyki.js';
 import { DUMITE } from '../src/domein/dumite.js';
 import {
   dumataNaButona,
@@ -1209,11 +1210,19 @@ export function zakachiGant(
    * която минава и човек — пунктът в лентата. Втора форма за едно нещо се
    * разминава с първата при първата поправка (дословният урок на ADR-057:
    * „втора дръжка на същата врата, не втора врата").
+   *
+   * ОТ РЕЗЕН 112 вратата е ДРУГА: Служители е ПОДТАБ на Настройки (ADR-158),
+   * значи пунктът в лентата вече не съществува. Запомня се и подтабът — това е
+   * единственият дом на въпроса „къде живее тази секция" (`podtabatNa`), — и
+   * се натиска пунктът на Настройки. Пътят пак е човешкият, само че по-къс с
+   * едно натискане.
    */
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-prati]')) {
     b.addEventListener('click', () => {
       zapomniEkranno('sluzhiteli.delo', b.dataset.prati ?? '');
-      document.querySelector<HTMLElement>('[data-ekran=sluzhiteli]')?.click();
+      const podtab = podtabatNa('sluzhiteli-prashtane');
+      if (podtab) zapomniEkranno('nastroyki.podtab', podtab);
+      document.querySelector<HTMLElement>('[data-ekran=nastroyki]')?.click();
     });
   }
 

@@ -49,6 +49,7 @@
  */
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { podtabatNa } from '../src/domein/temi-nastroyki.js';
 import { ekraniraj } from './obshto.js';
 import { zapishiRedaNaSektsiite } from './podredba.js';
 import {
@@ -159,6 +160,21 @@ export async function zavediDoSektsiyata(
   prerisuvay: () => Promise<void>,
   tablitsa = '',
 ): Promise<void> {
+  /**
+   * НАСТРОЙКИ ОТВАРЯ ПОДТАБА, не скролва (резен 112 · ADR-158).
+   *
+   * Негово, 03.09: „когато цъкнеш на подтаб от менюто да отваря само секцията
+   * вътре, **а не да те препраща в скрола**." Затова редът първо СМЕНЯ подтаба
+   * и чак тогава рисува — инак темата води на екран, на който секцията ѝ не се
+   * рисува, и кликът изглежда като нищо.
+   *
+   * Кой подтаб носи коя секция знае домейнът (`podtabatNa`), не този файл:
+   * втора карта тук би се разминала с групите при първата нова тема.
+   */
+  if (ekran === 'nastroyki') {
+    const podtab = podtabatNa(sektsiya);
+    if (podtab) zapomniEkranno('nastroyki.podtab', podtab);
+  }
   await otvoriEkran(ekran);
   await prerisuvay();
   // СЛЕД прерисуването: старият възел вече го няма, а новият още не е намерен.
