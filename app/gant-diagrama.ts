@@ -51,6 +51,7 @@ import {
 import { IMENA_NA_TEMITE, type RedNaRazrez, type Reshetka, type TemaNaDiagramata } from '../src/domein/gant.js';
 import { stepenNa } from '../src/domein/dela.js';
 import { ekraniraj } from './obshto.js';
+import { pishi } from '../src/yadro/pari.js';
 import { zapomnenaVisochina } from './visochina.js';
 
 /**
@@ -65,7 +66,9 @@ const GLAVA = 34;
 const IMENA = 210;
 const OTSTAP = 14;
 /** Височина на една лента с пари · приходът нагоре, разходът надолу от средата. */
-const LENTA_PARI = 26;
+const LENTA_PARI = 34;
+/** Колко високо над (и под) стълбчето стои неговата ЦИФРА. */
+const NAD_STALBCHETO = 3;
 /** Колко от полукривата е за стълбче · останалото е въздух между лентите. */
 const NAY_VISOKO = 10;
 
@@ -221,17 +224,28 @@ function lentiSPari(
           const dyasno = x(denSled(posledna.do));
           const shirina = Math.max(1, dyasno - levo - 1);
           const vis = (st: number): number => (st / nayGolyamo) * NAY_VISOKO;
+          // ЦИФРАТА СТОИ В ДИАГРАМАТА · негово, 03.09 (И136): „В диаграмата са
+          // цифри, текстът е в таблицата отляво на диаграмата." Стълбчето казва
+          // ПРОПОРЦИЯТА, цифрата — точното число; без нея височината се чете на
+          // око и всяко сравнение между два реда е гадаене.
+          const sredNaKletkata = levo + shirina / 2;
+          const tsifra = (st: number, y: number, koya: string): string =>
+            `<text class="diagrama-tsifra ${koya}" x="${sredNaKletkata.toFixed(1)}" y="${y.toFixed(
+              1,
+            )}" text-anchor="middle" translate="no">${ekraniraj(pishi(st))}</text>`;
           const prihod =
             k.prihod_st > 0
               ? `<rect class="diagrama-pari prihod" x="${levo.toFixed(1)}" y="${(
                   sredata - vis(k.prihod_st)
-                ).toFixed(1)}" width="${shirina.toFixed(1)}" height="${vis(k.prihod_st).toFixed(1)}"></rect>`
+                ).toFixed(1)}" width="${shirina.toFixed(1)}" height="${vis(k.prihod_st).toFixed(1)}"></rect>` +
+                tsifra(k.prihod_st, sredata - vis(k.prihod_st) - NAD_STALBCHETO, 'prihod')
               : '';
           const razhod =
             k.razhod_st > 0
               ? `<rect class="diagrama-pari razhod" x="${levo.toFixed(1)}" y="${sredata.toFixed(
                   1,
-                )}" width="${shirina.toFixed(1)}" height="${vis(k.razhod_st).toFixed(1)}"></rect>`
+                )}" width="${shirina.toFixed(1)}" height="${vis(k.razhod_st).toFixed(1)}"></rect>` +
+                tsifra(k.razhod_st, sredata + vis(k.razhod_st) + NAD_STALBCHETO + 7, 'razhod')
               : '';
           return prihod + razhod;
         })

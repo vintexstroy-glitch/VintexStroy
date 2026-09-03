@@ -63,6 +63,11 @@ import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
 import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  PARVIYAT_PODTAB,
+  PODTABOVE_NA_SMETKI,
+  klyuchNaPametta,
+} from '../src/domein/podtabove-smetki.js';
 import { zakachiIstoriya } from './istoriya.js';
 import { zakachiDokumentite } from './dokumenti.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
@@ -1050,12 +1055,42 @@ async function trugvay(): Promise<void> {
 function napalniPamettaNaMenyutata(kontekstat: ZaRisuvane): void {
   for (const klyuch of kontekstat.dostapniEkrani) {
     if (klyuch === 'nastroyki') continue; // свой ред по ТЕМИ, не по секции
-    if (chetiEkranno<unknown[]>(`sektsii.${klyuch}`, []).length > 0) continue;
     try {
-      zapomniSektsiiteOtHTML(klyuch, EKRANI[klyuch as KoyEkran].narisuvay(kontekstat));
+      if (klyuch === 'smetki') {
+        napalniSmetkiteNaum(kontekstat);
+      } else if (chetiEkranno<unknown[]>(`sektsii.${klyuch}`, []).length === 0) {
+        zapomniSektsiiteOtHTML(klyuch, EKRANI[klyuch as KoyEkran].narisuvay(kontekstat));
+      }
     } catch {
       // Мълчи нарочно · вж. шапката.
     }
+  }
+}
+
+/**
+ * СМЕТКИ СЕ РИСУВА НАУМ ПО ПОДТАБ · само празните (резен 115 · ADR-161).
+ *
+ * Екранът показва ЕДИН подтаб наведнъж, а паметта на реда е ПО ПОДТАБ
+ * (`klyuchNaPametta`). Затова тук се рисуват наум само подтабовете, чийто ключ
+ * още НЕ Е ПИСАН — веднъж на устройство, без флаг и без пазач: нарисуваният
+ * подтаб е записал своето (и празното е запис), тъй че второто минаване не
+ * прави нищо. Подтабът е памет на устройството — сменя се и се ВРЪЩА какъвто
+ * беше, дори при грешка: пълненето на меню няма право да мести човека на
+ * друг таб.
+ */
+function napalniSmetkiteNaum(kontekstat: ZaRisuvane): void {
+  const prazni = PODTABOVE_NA_SMETKI.filter(
+    (p) => chetiEkranno<unknown[] | null>(klyuchNaPametta(p.klyuch), null) === null,
+  );
+  if (prazni.length === 0) return;
+  const beshe = chetiEkranno('smetki.podtab', PARVIYAT_PODTAB);
+  try {
+    for (const p of prazni) {
+      zapomniEkranno('smetki.podtab', p.klyuch);
+      zapomniSektsiiteOtHTML('smetki', EKRANI.smetki.narisuvay(kontekstat), p.klyuch);
+    }
+  } finally {
+    zapomniEkranno('smetki.podtab', beshe);
   }
 }
 

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naPodtab, dokatoStane, dobaviImotBezObekt, OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, dokatoStane, dobaviImotBezObekt, OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -674,7 +674,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const minalata = String(new Date().getFullYear() - 1);
 
     razdel = '106 · Годината · приключилата се ЯВЯВА сама';
-    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await naPodtabNa(p, 'smetki', 'razhod', '#razhod-dostavchik');
     await p.selectOption('#razhod-potok', 'fakturi');
     await p.fill('#razhod-dostavchik', 'Миналогодишен ЕООД');
     await p.fill('#razhod-opis', 'вар от миналата година');
@@ -706,7 +706,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '106 · Годината · разминаването се МЕРИ, не се отказва';
     const prediRazminavane = await broySabitiya(p);
-    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await naPodtabNa(p, 'smetki', 'razhod', '#razhod-dostavchik');
     await p.selectOption('#razhod-potok', 'fakturi');
     await p.fill('#razhod-dostavchik', 'Закъснял ЕООД');
     await p.fill('#razhod-opis', 'фактура, дошла късно');

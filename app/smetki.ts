@@ -105,6 +105,13 @@ import { blokNaTablitsaOtFayl, zakachiTablitsaOtFayl } from './tablitsa-ot-fayl.
 import { butonSIkona } from './ikoni.js';
 import { CHAKA_DUMA_ZA_DDS } from '../src/domein/prodazhbi.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { aktivniyatPodtab, lentataNaPodtabovete, zakachiPodtabovete } from './podtabove.js';
+import {
+  PARVIYAT_PODTAB,
+  PODTABOVE_NA_SMETKI,
+  podtabatNaSmetki,
+} from '../src/domein/podtabove-smetki.js';
+import { RAZBIVKITE, sumiPoRazbivki } from '../src/domein/razbivki.js';
 import {
   menyuOtZhivi,
   novoteVSpisatsite,
@@ -184,6 +191,15 @@ let vizhdanoTuk: KoeSeVizhda = {
   tablitsa: chetiEkranno('smetki.dela.tablitsa', true),
   diagrama: chetiEkranno('smetki.dela.diagrama', true),
 };
+
+/**
+ * КОИ РАЗБИВКИ СА ДОБАВЕНИ КАТО РЕДОВЕ (резен 115 · ADR-161).
+ *
+ * Негово, 03.09 (И136): „Тези редове могат С ИЗБОР да се добавят като редове и
+ * да се покаже в диаграмата цифрите за тях." Изборът е ПОГЛЕД — памет на
+ * устройството, нула събития, като темата и такта.
+ */
+let izbraniRazbivki = chetiEkranno<readonly string[]>('smetki.razbivki', []);
 
 /** Редовете на Калкулатора — само в паметта, никъде другаде. */
 interface RedNaSmyatane {
@@ -299,6 +315,17 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const razlika = s.sverki.reduce((sbor, x) => sbor + x.razlika, 0);
   const razhodi = obhvatat.flatMap((m) => razhodiZaPerioda(o, m));
   const filtriraniRazhodi = filtriray('razhodi', razhodi, KOLONI_RAZHODI, dnes);
+  /**
+   * ЕДИН ПОДТАБ НАВЕДНЪЖ (резен 115 · ADR-161) · „Табовете в СМетки са главния
+   * Сметки и подтабове: Приход, Разход, Отчвт, Баланс."
+   *
+   * Плочките отгоре и формата на периода НЕ влизат в подтаб: „данните от подтаб
+   * на Сметки Баланс се взимат и се вкарват и участват в показаните полета с
+   * данни отгоре." Подтаб, който крие собствения си хранител, показва числа без
+   * произход.
+   */
+  const aktiven = aktivniyatPodtab('smetki', PODTABOVE_NA_SMETKI, PARVIYAT_PODTAB);
+  const tuk = (sektsiya: string): boolean => podtabatNaSmetki(sektsiya) === aktiven;
 
   return `
     <div class="plochki">
@@ -323,10 +350,15 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         <span class="pod">${s.nared ? 'сверката затваря' : 'НЕ затваря — виж долу'}</span>
       </div>
     </div>
+    <p class="drebno" data-plochkite-otkade>Четирите плочки и коефициентите в
+    <b>Отчет</b> се хранят от данните на <b>Баланс</b> — затова те стоят НАД
+    лентата и се виждат на всеки подтаб (И136).</p>
 
-    ${formaSalda(o)}
+    ${lentataNaPodtabovete('smetki', PODTABOVE_NA_SMETKI, aktiven, 'Подтабовете на Сметки')}
 
-    <section data-sektsiya="smetki-smetki">
+    ${tuk('smetki-salda') ? formaSalda(o) : ''}
+
+    ${tuk('smetki-smetki') ? `<section data-sektsiya="smetki-smetki">
       <div class="dyalglava">
         <h2>Баланс</h2><span>${krayat === null ? ekraniraj(mesets) : `месечно · ${ekraniraj(mesets)}`}</span>
       </div>
@@ -348,9 +380,9 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       сградата и коя част е земя (чл. 45 ЗДДС) — счетоводна преценка, не
       аритметика. Тихо начислени 20 % върху продажба на имот са глоба, не
       закръгляне. Чака се: ${CHAKA_DUMA_ZA_DDS.map((x) => ekraniraj(x)).join(' · ')}.</p>
-    </section>
+    </section>` : ''}
 
-    <section data-sektsiya="smetki-dds">
+    ${tuk('smetki-dds') ? `<section data-sektsiya="smetki-dds">
       <div class="dyalglava">
         <h2>ДДС</h2>
         <span>отделни акумулатори по държава и сектор — не един общ</span>
@@ -374,22 +406,21 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
         </div>
       </div>
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
-    </section>
+    </section>` : ''}
 
-    ${blokNaDyalaOtchet()}
-    ${blokNaOtchetite(o, mesets, dnes)}
-    ${narisuvayKoefitsientite(o, dnes)}
+    ${tuk('otchet-dyal') ? blokNaDyalaOtchet() : ''}
+    ${tuk('smetki-otcheti') ? blokNaOtchetite(o, mesets, dnes) : ''}
+    ${tuk('koef-izbor') ? narisuvayKoefitsientite(o, dnes) : ''}
 
-    ${blokDelata(o, dnes)}
+    ${tuk('smetki-dela') ? blokDelata(o, dnes) : ''}
 
-    ${blokNaSverkataDDS(s.ddsSverka)}
+    ${tuk('smetki-sverka-dds') ? blokNaSverkataDDS(s.ddsSverka) : ''}
 
-    ${blokNaSverkataSIzvlechenie(o, mesets)}
+    ${tuk('smetki-izvlechenie') ? blokNaSverkataSIzvlechenie(o, mesets) : ''}
 
-    ${blokNaSpravkata(o, mesets, s.zaVnasyane_st)}
+    ${tuk('smetki-spravka') ? blokNaSpravkata(o, mesets, s.zaVnasyane_st) : ''}
 
-
-    <section data-sektsiya="smetki-sverka">
+    ${tuk('smetki-sverka') ? `<section data-sektsiya="smetki-sverka">
       <div class="dyalglava"><h2>Сверка</h2><span>вход ↔ изход ↔ разлика</span></div>
       <div class="tablitsa">
         ${GLAVA_NA_SVERKATA}
@@ -407,20 +438,20 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
           .join('')}
       </div>
       <p class="drebno">${ZASHTO_I_NULATA}</p>
-    </section>
+    </section>` : ''}
 
-    ${narisuvaySpravkite(o, dnes)}
+    ${tuk('nap-spravki') ? narisuvaySpravkite(o, dnes) : ''}
 
-    ${narisuvayKalendara(o, mesets, dnes)}
+    ${tuk('smetki-kalendar') ? narisuvayKalendara(o, mesets, dnes) : ''}
 
-    ${blokMesetsatZaAgenta(o, mesets)}
+    ${tuk('smetki-mesetsat') ? blokMesetsatZaAgenta(o, mesets) : ''}
 
-    ${blokNaZaplatite(o, dnes)}
+    ${tuk('zaplati') ? blokNaZaplatite(o, dnes) : ''}
 
-    ${formaRazhod(o, mesets)}
+    ${tuk('smetki-nov-razhod') ? formaRazhod(o, mesets) : ''}
 
     ${
-      razhodi.length === 0
+      razhodi.length === 0 || !tuk('smetki-razhodi')
         ? ''
         : `<section data-sektsiya="smetki-razhodi">
       <div class="dyalglava"><h2>Разходи за ${ekraniraj(nadpisObhvat)}</h2><span>${razhodi.length}</span></div>
@@ -442,13 +473,16 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     </section>`
     }
 
-    ${blokNaTablitsaOtFayl(o)}
+    ${tuk('tablitsa-ot-fayl') ? blokNaTablitsaOtFayl(o) : ''}
 
-    ${redPodRazhodite(o, mesets, dnes)}
+    ${tuk('krediti-red') ? redPodRazhodite(o, mesets, dnes) : ''}
 
-    ${blokNaKreditite(o, dnes)}
+    ${tuk('krediti') ? blokNaKreditite(o, dnes) : ''}
 
-    ${kalkulator()}
+    ${tuk('smetki-kalkulator') ? kalkulator() : ''}
+
+    ${tuk('smetki-prihodite') ? blokNaRazbivkite(o, obhvatat, 'приход') : ''}
+    ${tuk('smetki-razhodite') ? blokNaRazbivkite(o, obhvatat, 'разход') : ''}
   `;
 }
 
@@ -754,6 +788,91 @@ function redNaMesetsa(r: RedNaMesetsa): string {
     </div>`;
 }
 
+/**
+ * ПОСЛЕДНИЯТ ДЕН НА МЕСЕЦА · без библиотека и без гадаене по 30/31.
+ * `Date.UTC(година, месец, 0)` дава нулевия ден на СЛЕДВАЩИЯ, тоест последния
+ * на този — и февруари във високосна година излиза сам.
+ */
+function krayNaMesetsa(mesets: string): string {
+  const [g, m] = mesets.split('-').map(Number) as [number, number];
+  return `${mesets}-${String(new Date(Date.UTC(g, m, 0)).getUTCDate()).padStart(2, '0')}`;
+}
+
+/**
+ * СЕДЕМТЕ РАЗБИВКИ · таблицата им, и отметката „в диаграмата" (резен 115).
+ *
+ * Негово, 03.09 (И136): „КОгато избираш темата на таблицата разликата е, че
+ * добавя редове от табовете а Сметки: Наеми Кеш, Наеми Банка, Активни Продажби,
+ * Кредити, Заплати, Фактури Банка, Фактури Кеш. Тези редове могат с избор да се
+ * добавят като редове и да се покаже в диаграмата цифрите за тях."
+ *
+ * ЕДИН РИСУВАЧ, ТРИ МЕСТА: всичките седем стоят до диаграмата (главния подтаб),
+ * приходните три — в Приход, разходните четири — в Разход. Три копия на един и
+ * същ списък щяха да се разминат на първата поправка.
+ *
+ * ГРАНИЦАТА СЕ КАЗВА НА ГЛАС: шест от седемте вече са ВЪТРЕ в общия ред —
+ * добавени към него, те се броят два пъти. Затова редовете са РАЗБИВКА, а не
+ * добавка, и единственият, който стои извън общия ред, го пише на екрана.
+ */
+function blokNaRazbivkite(
+  o: Ogledalo,
+  obhvatat: readonly string[],
+  koi: 'vsichki' | 'приход' | 'разход',
+): string {
+  const parviyat = obhvatat[0] ?? '';
+  const posledniyat = obhvatat[obhvatat.length - 1] ?? parviyat;
+  if (parviyat === '') return '';
+  const ot = `${parviyat}-01`;
+  const doo = krayNaMesetsa(posledniyat);
+  const nashite = RAZBIVKITE.filter((i) => koi === 'vsichki' || i.posoka === koi);
+  const dnite = sumiPoRazbivki(o, ot, doo, nashite.map((i) => i.klyuch));
+  const sborNa = (klyuch: string): number =>
+    dnite
+      .filter((d) => d.razrez === klyuch)
+      .reduce((sbor, d) => sbor + d.prihod_st + d.razhod_st, 0);
+  const sektsiya =
+    koi === 'vsichki' ? 'smetki-razbivki' : koi === 'приход' ? 'smetki-prihodite' : 'smetki-razhodite';
+  const zaglavie =
+    koi === 'vsichki' ? 'Разбивките' : koi === 'приход' ? 'Приходът по разбивка' : 'Разходът по разбивка';
+  const izvan = nashite.filter((i) => !i.vObshtiya);
+
+  return `
+    <section data-sektsiya="${sektsiya}" data-razbivki="${nashite.length}">
+      <div class="dyalglava">
+        <h2>${ekraniraj(zaglavie)}</h2>
+        <span>${ekraniraj(parviyat)}${posledniyat === parviyat ? '' : ` → ${ekraniraj(posledniyat)}`} · отметнатият става РЕД в таблицата и диаграмата</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="${ekraniraj(sektsiya)}">
+        <div class="glava razbivka">
+          <span>В диаграмата</span><span>Разбивка</span><span>Откъде идва</span>
+          <span class="suma">Сума</span>
+        </div>
+        ${nashite
+          .map(
+            (i) => `
+        <div class="red razbivka" data-razbivka-red="${ekraniraj(i.klyuch)}" translate="no">
+          <span class="razbivka-kutiya"><input type="checkbox" data-razbivka="${ekraniraj(i.klyuch)}"${
+            izbraniRazbivki.includes(i.klyuch) ? ' checked' : ''
+          } aria-label="${ekraniraj(i.ime)} в диаграмата"></span>
+          <span class="kletka"><b>${ekraniraj(i.ime)}</b><span>${ekraniraj(i.posoka)}</span></span>
+          <span translate="yes">${ekraniraj(i.otkade)}</span>
+          <span class="suma" data-st="${sborNa(i.klyuch)}">${pishi(sborNa(i.klyuch))}</span>
+        </div>`,
+          )
+          .join('')}
+      </div>
+      <p class="drebno" data-razbivki-granitsa="${izvan.length}">Тези редове са
+      <b>РАЗБИВКА, не добавка</b>: ${
+        izvan.length === 0
+          ? 'всички до един вече стоят ВЪТРЕ в общия ред Приход/Разход, затова събирането им с него брои едни и същи пари два пъти.'
+          : `${izvan
+              .map((i) => `<b>${ekraniraj(i.ime)}</b>`)
+              .join(' · ')} стои ИЗВЪН общия ред — той се СМЯТА от вноските и не е записано плащане; останалите вече са вътре в него.`
+      }
+      Картата е банкови пари и влиза при Банка, не при Кеш.</p>
+    </section>`;
+}
+
 function blokDelata(o: Ogledalo, dnes: string): string {
   const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '';
@@ -761,8 +880,22 @@ function blokDelata(o: Ogledalo, dnes: string): string {
   const parvata = r.koloni[0]!;
   const poslednata = r.koloni[r.koloni.length - 1]!;
   // КОПИЕТО в Сметки чете БЕЗ разбивка: разрезът е лост на Управление, а тук
-  // таблицата е за сверка (И92 т.4). Един ред влиза, един ред излиза.
-  const sumi = obobshteniRedove(r.koloni, sumiZaObhvat(o, parvata.ot, poslednata.do));
+  // таблицата е за сверка (И92 т.4). Един ред влиза, един ред излиза — и към
+  // него се ДОБАВЯТ отметнатите разбивки (резен 115 · И136), всеки свой ред.
+  const sumi = obobshteniRedove(r.koloni, [
+    ...sumiZaObhvat(o, parvata.ot, poslednata.do),
+    ...sumiPoRazbivki(o, parvata.ot, poslednata.do, izbraniRazbivki),
+  ]);
+  /**
+   * ТАБЛИЦАТА ОТЛЯВО, ДИАГРАМАТА ОТДЯСНО · негово, 03.09 (И136): „В диаграмата
+   * са цифри, текстът е в таблицата отляво на диаграмата", и от И134:
+   * „таблицата и диаграмата, които са една до друга както в МС Проджект".
+   *
+   * Двете стоят в ЕДИН ред, докато и двете се виждат; скрие ли се едната,
+   * другата заема цялата ширина. Редът е ТАБЛИЦА → ДИАГРАМА и не се обръща:
+   * текстът се чете отляво надясно, а числото стои където е стълбчето.
+   */
+  const kolkoRedom = (vizhdanoTuk.tablitsa ? 1 : 0) + (vizhdanoTuk.diagrama ? 1 : 0);
   // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
   // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `
@@ -802,8 +935,11 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         }
       </div>
     </section>
-    ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes, sumi, temataTuk)}</div>` : ''}
-    ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
+    ${blokNaRazbivkite(o, mesetsiteVObhvata(parvata.ot.slice(0, 7), poslednata.do.slice(0, 7)), 'vsichki')}
+    <div class="redom${kolkoRedom === 2 ? ' dve' : ''}" data-smetki-redom="${kolkoRedom}">
+      ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
+      ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes, sumi, temataTuk)}</div>` : ''}
+    </div>
     ${formaDelo(o, dnes)}`;
 }
 
@@ -1485,6 +1621,29 @@ export function zakachiSmetki(
     zapomniEkranno('smetki.tsifrite', sTsifrite);
     await prerisuvay();
   });
+
+  // ЛЕНТАТА НА ПОДТАБОВЕТЕ · общият механизъм (резен 115 · ADR-161).
+  zakachiPodtabovete(koren, PARVIYAT_PODTAB, prerisuvay);
+
+  /**
+   * ОТМЕТКИТЕ НА РАЗБИВКИТЕ · „с избор да се добавят като редове" (И136).
+   *
+   * Отметнатият става РЕД в таблицата и в диаграмата. Изборът е ПОГЛЕД —
+   * памет на устройството, нула събития. Отметките стоят на ТРИ места (при
+   * диаграмата, в Приход и в Разход) и всички пишат в ЕДНА памет: инак
+   * отметнатото в Приход нямаше да се вижда до диаграмата.
+   */
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-razbivka]')) {
+    kutiya.addEventListener('change', async () => {
+      const klyuch = kutiya.dataset['razbivka'] ?? '';
+      if (klyuch === '') return;
+      izbraniRazbivki = kutiya.checked
+        ? [...new Set([...izbraniRazbivki, klyuch])]
+        : izbraniRazbivki.filter((x) => x !== klyuch);
+      zapomniEkranno('smetki.razbivki', izbraniRazbivki);
+      await prerisuvay();
+    });
+  }
 
   // ДВАТА БУТОНА · същото решение като в Управление (`prevkluchi`), друга памет.
   const skriyTuk = (koe: 'tablitsa' | 'diagrama') => async () => {

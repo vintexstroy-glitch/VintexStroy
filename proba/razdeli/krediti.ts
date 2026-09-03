@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, broySabitiya, deystvieSPrerisuvane, sSabitie } from '../yadro/pomoshtni.ts';
 import type { Page } from 'playwright-core';
 
 /**
@@ -45,7 +45,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
 
   proveri(
     'секцията Кредити стои в Сметки и е ВКЛЮЧЕНА',
@@ -196,7 +196,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     return d.toISOString().slice(0, 10);
   };
 
-  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
   // Кредитът от §97 е избран от записа си · планът му е на екрана.
   await p.waitForSelector('[data-sektsiya=krediti-plan][data-plan-izvor]');
   proveri(
@@ -261,6 +261,9 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     await broySabitiya(p), sabitiyaPredi);
 
   razdel = '97в · Предложената вноска от извлечението';
+  // Сверката с извлечението е в подтаб „Баланс" (резен 115 · ADR-161), а
+  // калкулаторът отгоре е в „Разход".
+  await naPodtabNa(p, 'smetki', 'balans', '[data-sektsiya=smetki-izvlechenie]');
   // Ред на банката с ДУМА от името на кредита · никой запис не го познава.
   // ЧЕТИРИНАЙСЕТ месеца напред, като §91: по-близък месец се оказа ЗАКЛЮЧЕН
   // от ДДС-справката на друг блок и записът тихо отказваше.
@@ -285,21 +288,20 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
   );
 
   // ОСТАТЪКЪТ преди · после натискането Е записът на човека.
-  const ostatakPredi = await p.$eval('[data-kredit]', (e) =>
-    Number((e as HTMLElement).dataset['ostatak']),
-  );
+  //
+  // ОТ РЕЗЕН 115 (ADR-161) ДВЕТЕ СА НА РАЗЛИЧНИ ПОДТАБА: предложението идва от
+  // сверката с извлечението (Баланс), а кредитът, чийто остатък пада, стои при
+  // Разхода. Затова остатъкът се чете там, а записът се прави тук.
   const glavnitsa = await p.$eval('[data-zapishi-vnoska]', (e) =>
     Number((e as HTMLElement).dataset['glavnitsa']),
   );
-  await sSabitie(p, () => p.click('[data-zapishi-vnoska]'));
-  await p.waitForFunction(
-    (predi) =>
-      Number(
-        (document.querySelector('[data-kredit]') as HTMLElement | null)?.dataset['ostatak'] ?? '0',
-      ) < predi,
-    ostatakPredi,
-    { timeout: 5_000 },
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-kredit]');
+  const ostatakPredi = await p.$eval('[data-kredit]', (e) =>
+    Number((e as HTMLElement).dataset['ostatak']),
   );
+  await naPodtabNa(p, 'smetki', 'balans', '[data-zapishi-vnoska]');
+  await sSabitie(p, () => p.click('[data-zapishi-vnoska]'));
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-kredit]');
   proveri(
     'остатъкът падна ТОЧНО с предложената главница',
     await p.$eval('[data-kredit]', (e) => Number((e as HTMLElement).dataset['ostatak'])),
@@ -307,6 +309,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
   );
 
   // Чисто след себе си · извлечението се забравя, записът остава.
+  await naPodtabNa(p, 'smetki', 'balans', '#zabravi-izvlechenie');
   await deystvieSPrerisuvane(p, () => p.click('#zabravi-izvlechenie'));
   proveri('затварянето маха предложенията заедно с извлечението',
     await p.$$eval('[data-predlozheni-vnoski]', (e) => e.length), 0);
@@ -325,7 +328,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
   const redPredi = await p.$eval('[data-red-proektsiya]', (e) =>
     Number((e as HTMLElement).dataset['redProektsiya']),
   );
@@ -347,7 +350,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     sabitiyaPredi,
   );
 
-  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
   proveri(
     'таблицата вече я НЯМА на екрана',
     await p.$eval('[data-sektsiya=krediti]', (e) => (e as HTMLElement).dataset['vklyuchena']),
@@ -370,7 +373,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   await vNastroyki(p);
   await p.click('#krediti-vklyucheni');
   await p.waitForSelector('[data-tablitsa-vkl=da]');
-  await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
   proveri(
     'и се връща обратно · изборът е обратим, защото е екран, не запис',
     await p.$eval('[data-sektsiya=krediti]', (e) => (e as HTMLElement).dataset['vklyuchena']),

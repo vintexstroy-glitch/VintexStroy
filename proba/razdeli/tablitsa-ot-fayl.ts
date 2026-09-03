@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naPodtab, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 // `fileURLToPath`, а НЕ `.pathname` · на Windows второто дава „/C:/…" (ADR-152).
 import { fileURLToPath } from 'node:url';
 
@@ -21,7 +21,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=tablitsa-ot-fayl]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=tablitsa-ot-fayl]');
 
   proveri(
     'преди четене няма предложение · нищо не се измисля',
@@ -288,7 +288,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // Втори лист на СЪЩАТА работа, с разместени колони и друга дума за едно и
   // също („Ставка" ↔ „АКТ Ставка"). Едната таблица не може да покаже проблема,
   // за който семейството съществува.
-  await naEkran(p, 'smetki', '[data-sektsiya=tablitsa-ot-fayl]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=tablitsa-ot-fayl]');
   await p.setInputFiles(
     '#fayl-tablitsa',
     fileURLToPath(new URL('../../primeri/fakturi-vtori-obekt.xlsx', import.meta.url)),
@@ -395,7 +395,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await p.fill('#ime-semeystvo', 'Фактурите две');
   await sSabitie(p, () => p.click('#forma-semeystvo button[type=submit]'));
 
-  await naEkran(p, 'smetki', '[data-sektsiya=semeystvo-kato-edna]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=semeystvo-kato-edna]');
   const kartata143 = '[data-semeystvo-kato-edna="Фактурите две"]';
   proveri143('семейството има карта с името си',
     Boolean(await p.$(kartata143)), true);
@@ -416,7 +416,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await deystvieSPrerisuvane(p, () => natisni(p, '#litse-semeystva'));
   await p.waitForSelector('[data-razpusni="Фактурите две"]');
   await sSabitie(p, () => p.click('[data-razpusni="Фактурите две"]'));
-  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=sazdadenite-tablitsi]');
   proveri143('без живо семейство секцията НЕ се ражда · няма предмет',
     Boolean(await p.$('[data-sektsiya=semeystvo-kato-edna]')), false);
 }
@@ -448,7 +448,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   const kamTablitsa = (ime: string): Promise<void> => izberi('#izbor-sazdadena', ime);
 
   // ── редът В-1 на „Втори обект" · гледаната страна ─────────────────────────
-  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=sazdadenite-tablitsi]');
   await kamTablitsa('Втори обект');
   const poletaV = await p.$$eval('#forma-red-na-tablitsa input[data-vid]', (e) =>
     e.map((x) => ({ id: x.id, vid: (x as HTMLElement).dataset['vid'] ?? '' })),
@@ -493,7 +493,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   }
 
   // ── сметката · на екрана на създадените таблици ───────────────────────────
-  await naEkran(p, 'smetki', '[data-sektsiya=sazdadenite-tablitsi]');
+  await naPodtabNa(p, 'smetki', 'prihod', '[data-sektsiya=sazdadenite-tablitsi]');
   await kamTablitsa('Втори обект');
   proveri('без избор няма rollup · сметка не се появява сама',
     await p.$$eval('[data-tablitsa=rollup]', (e) => e.length), 0);

@@ -240,11 +240,11 @@ function formaZaPrashtane(
               <div class="poleta tesni">
                 <div class="pole">
                   <label for="z-chas">Час от</label>
-                  <input type="time" id="z-chas" name="chas">
+                  <input translate="no" type="time" id="z-chas" name="chas">
                 </div>
                 <div class="pole">
                   <label for="z-do-chas">Час до</label>
-                  <input type="time" id="z-do-chas" name="doChas">
+                  <input translate="no" type="time" id="z-do-chas" name="doChas">
                 </div>
               </div>
               <div class="pole">

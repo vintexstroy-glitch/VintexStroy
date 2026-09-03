@@ -457,7 +457,7 @@ function redVKnigata(kniga: readonly RedVKnigata[], r: RedVKnigata): string {
 const IMENA_NA_STATSIONARNITE: Readonly<Record<string, string>> = Object.freeze({
   imoti: 'Имоти',
   pari: 'Пари',
-  smetki: 'Баланс',
+  smetki: 'Сметки',
   stoynost: 'Стойност на Състояние',
   gant: 'Управление',
   nastroyki: 'Настройки',

@@ -130,7 +130,7 @@ import {
   type KoyGleda,
 } from '../src/domein/temi-nastroyki.js';
 import type { Samolichnost } from '../src/yadro/samolichnost.js';
-import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { aktivniyatPodtab, lentataNaPodtabovete, zakachiPodtabovete } from './podtabove.js';
 import {
   eVgradenKlyuch,
   prazenModelZaVgradena,
@@ -240,10 +240,7 @@ export function narisuvayNastroyki(
    * или изчезнал — тогава се пада на ПЪРВИЯ видим, а не на празно.
    */
   const podtabove = podtabovete(koy);
-  const zapomnen = chetiEkranno('nastroyki.podtab', 'moeto');
-  const aktiven = podtabove.some((g) => g.klyuch === zapomnen)
-    ? zapomnen
-    : (podtabove[0]?.klyuch ?? 'moeto');
+  const aktiven = aktivniyatPodtab('nastroyki', podtabove, 'moeto');
   const tuk = (s: string): boolean => vizhda(s) && podtabatNa(s) === aktiven;
 
   return `
@@ -255,7 +252,7 @@ export function narisuvayNastroyki(
         : `<p class="drebno" data-samo-tvoite>Тук са ТВОИТЕ настройки. Стопанските —
       хедърите, бутоните, номенклатурите — ги вижда и мени само Стопанинът.</p>`
     }
-    ${lentataNaPodtabovete(podtabove, aktiven)}
+    ${lentataNaPodtabovete('nastroyki', podtabove, aktiven, 'Подтабовете на Настройки')}
 
     <div class="plochki">
       ${
@@ -1324,30 +1321,6 @@ function blokNaSastoyaniyataNaImota(o: Ogledalo): string {
     </section>`;
 }
 
-/**
- * ЛЕНТАТА НА ПОДТАБОВЕТЕ · един наведнъж (резен 112 · ADR-158).
- *
- * Негово, 03.09: „когато цъкнеш на подтаб от менюто **да отваря само секцията
- * вътре, а не да те препраща в скрола**. Искам да са разделени и да са
- * самостоятелни активни подтабове."
- *
- * Затова тук няма линкове към секции, а БУТОНИ, които сменят кое се рисува.
- * Изборът е ПОГЛЕД (памет на устройството, нула събития) — както при всеки друг
- * изглед; Журналът не помни на кой таб е стоял човекът.
- */
-function lentataNaPodtabovete(spisak: readonly { readonly klyuch: string; readonly ime: string }[], aktiven: string): string {
-  return `
-    <nav class="podtabove" data-podtabove="${spisak.length}" aria-label="Подтабовете на Настройки">
-      ${spisak
-        .map(
-          (g) => `<button type="button" class="podtab${g.klyuch === aktiven ? ' tuk' : ''}"
-        data-podtab="${ekraniraj(g.klyuch)}" aria-pressed="${g.klyuch === aktiven ? 'true' : 'false'}"
-        translate="no">${ekraniraj(g.ime)}</button>`,
-        )
-        .join('')}
-    </nav>`;
-}
-
 function blokNaKontragentite(o: Ogledalo): string {
   const spisak = [...o.kontragenti.values()].sort(
     (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
@@ -1677,18 +1650,8 @@ export function zakachiNastroyki(
   // Вика се винаги: закачането само търси възли и мълчи, когато подтабът е друг.
   zakachiSluzhitelite(koren, k, prerisuvay);
 
-  /**
-   * ЛЕНТАТА НА ПОДТАБОВЕТЕ · сменя КОЕ се рисува, не къде скролва.
-   *
-   * Изборът се помни на устройството и се чете при следващото рисуване —
-   * затова тук няма нищо освен запис и прерисуване (нула събития).
-   */
-  for (const buton of koren.querySelectorAll<HTMLButtonElement>('[data-podtab]')) {
-    buton.addEventListener('click', async () => {
-      zapomniEkranno('nastroyki.podtab', buton.dataset['podtab'] ?? 'moeto');
-      await prerisuvay();
-    });
-  }
+  // ЛЕНТАТА НА ПОДТАБОВЕТЕ · общият механизъм (резен 115 · ADR-161).
+  zakachiPodtabovete(koren, 'moeto', prerisuvay);
 
   /**
    * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.

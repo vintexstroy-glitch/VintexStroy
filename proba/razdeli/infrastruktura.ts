@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -22,7 +22,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-02');
     await p.click('#forma-period button[type=submit]');
-    await p.waitForFunction(() => document.body.innerText.includes('наем · търговски'));
+    await p.waitForFunction(() => (document.body.textContent ?? '').includes('Приход за 2026-02'));
     proveri('ДДС оцеля', await plochka(p, 'ДДС за внасяне'), '200,00 €');
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
@@ -145,6 +145,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
     proveri('двайсет и пет събития', await broySabitiya(p), 25 + OTKRIVASHTOTO);
     proveri('вестта казва, че сверката е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
+    await naPodtabNa(p, 'smetki', 'balans', '.red.smetka');
     proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3], '1 200,00 €');
 
     // поправен файл за същия месец: една сума сменена, един ред махнат
@@ -165,6 +166,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     await sSabitiya(p, 4, () => p.click('#prilozhi'));
     proveri('двайсет и девет събития', await broySabitiya(p), 29 + OTKRIVASHTOTO);
+    await naPodtabNa(p, 'smetki', 'balans', '.red.smetka');
     proveri(
       'Фактури казват това, което казва новият файл',
       (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3],
@@ -305,13 +307,16 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-03');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    // Справката и ДДС живеят в подтаб „Баланс" (резен 115 · ADR-161).
+    await naPodtabNa(p, 'smetki', 'balans', '#forma-spravka');
     proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Баланс'), '200,00 €');
 
     await p.fill('#spravka-data', '2026-04-10');
     await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
     proveri('казва, че месецът е заключен', (await tekstNa(p, '.vest')).includes('заключен'), true);
 
-    // заключеният месец отказва разход през формата
+    // заключеният месец отказва разход през формата (тя е в подтаб „Разход")
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
     await p.selectOption('#razhod-potok', 'fakturi');
     await p.fill('#razhod-dostavchik', 'Опит ООД');
     await p.fill('#razhod-opis', 'опит');
@@ -328,6 +333,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       /[A-Za-z]{4,}/.test(await tekstNa(p, '#greshka-razhod')), false);
 
     // внесеното на ръка — на части, разликата свети и после гасне
+    await naPodtabNa(p, 'smetki', 'balans', '#forma-dds-plateno');
     await p.fill('#dds-suma', '150,00');
     await p.fill('#dds-data', '2026-04-14');
     await sSabitie(p, () => p.click('#forma-dds-plateno button[type=submit]'));
@@ -499,7 +505,9 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от тях
+      // (резен 115), а „#razhod-dostavchik" живее само в РАЗХОД.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
@@ -519,18 +527,31 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
         'всички');
     }
 
-    // И ВСЕКИ ПОДТАБ НА НАСТРОЙКИ (резен 112 · ADR-158): екранът вече рисува
-    // един наведнъж, значи обход само по него би пазил една пета от полетата.
-    for (const podtab of await p.$$eval('[data-podtab]', (e) =>
-      e.map((x) => x.getAttribute('data-podtab') ?? ''))) {
-      await naPodtab(p, podtab, `[data-podtab="${podtab}"].tuk`);
-      proveri(`подтаб „${podtab}" · полетата са защитени`,
-        await p.evaluate(() => {
-          const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
-          const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
-          return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || (e as any).name).join(' · ')}`) : 'няма полета';
-        }),
-        'всички');
+    // И ВСЕКИ ПОДТАБ НА ДВАТА ЕКРАНА С ЛЕНТА (резен 112 · ADR-158 · резен 115 ·
+    // ADR-161): екранът рисува ЕДИН наведнъж, значи обход само по видимия би
+    // пазил една пета от полетата.
+    //
+    // СПИСЪКЪТ СЕ ЧЕТЕ НА СВОЯ ЕКРАН. Дотук се четеше там, където проходът е
+    // спрял (Табло) — а Таблото няма подтабове, тоест списъкът излизаше ПРАЗЕН
+    // и целият обход не проверяваше нищо. Обход, който мълчи вярно, е по-скъп
+    // от липсващ (ADR-051): затова тук първо се отива на екрана, и чак после
+    // се брои.
+    const golaPoveretka = async (): Promise<string> =>
+      p.evaluate(() => {
+        const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+        const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+        return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || (e as any).name).join(' · ')}`) : 'няма полета';
+      });
+    for (const ekran of ['nastroyki', 'smetki'] as const) {
+      await naEkran(p, ekran, `[data-podtabove-na=${ekran}]`);
+      const podtabove = await p.$$eval(`[data-podtabove-na=${ekran}] [data-podtab]`, (e) =>
+        e.map((x) => x.getAttribute('data-podtab') ?? ''));
+      proveri(`екран „${ekran}" · лентата носи подтабове`, podtabove.length > 0, true);
+      for (const podtab of podtabove) {
+        await naPodtabNa(p, ekran, podtab, `[data-podtabove-na=${ekran}] [data-podtab="${podtab}"].tuk`);
+        proveri(`подтаб „${ekran} · ${podtab}" · полетата са защитени`,
+          await golaPoveretka(), 'всички');
+      }
     }
 
     // ══ 67 · МНОГОТО ВЕРИГИ · вторият писач в ЕДНА книга (ADR-055) ══════════
@@ -582,13 +603,13 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ и НАСТРОЙКИ се познават по ЛЕНТАТА на подтабовете · тя стои на
+      // всеки от тях (резен 112 · резен 115), а формите живеят по един подтаб.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
-      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
-      ['nastroyki', '[data-podtabove]'],
+      ['nastroyki', '[data-podtabove-na=nastroyki]'],
       ['ii', '#nov-agent'],
       ['tablo', '#izlez'],
     ] as const) {
@@ -694,7 +715,8 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
 
     // ── СГЪВАНЕТО НА ДЯЛА · „да е СКРИТО с дребни бутончета" (И101) ────────
     razdel = '134б · дялът се сгъва';
-    await naEkran(p, 'smetki', '#forma-period');
+    // Салдата са в ГЛАВНИЯ подтаб на Сметки (резен 115 · ADR-161).
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-salda]');
     const vidimiPoleta = async (): Promise<number> =>
       p.$$eval('[data-sektsiya=smetki-salda] input, [data-sektsiya=smetki-salda] button:not([data-sgavane])', (e) =>
         e.filter((x) => {
@@ -726,7 +748,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // ЧАКА СЕ СЕКЦИЯТА, не поле в нея: сгънатият дял НЯМА видимо поле, и
     // чакането щеше да виси трийсет секунди върху собствения си успех.
     await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-salda]');
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-salda]');
     proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
 
     // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
@@ -748,14 +770,14 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ и НАСТРОЙКИ се познават по ЛЕНТАТА на подтабовете (резен 112 ·
+      // резен 115): формите им живеят по един подтаб, лентата — на всеки.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['kontakti', '#forma-kontakt'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
-      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
-      ['nastroyki', '[data-podtabove]'],
+      ['nastroyki', '[data-podtabove-na=nastroyki]'],
       ['ii', '#nov-agent'],
       ['tablo', '#izlez'],
     ] as const) {

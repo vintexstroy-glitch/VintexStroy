@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
@@ -1174,7 +1174,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // някой хедъри имат индивидуални колони за себе си."
     //
     // Сметки има ЧЕТИРИНАЙСЕТ секции и е екранът, на който това има смисъл.
-    await naEkran(p, 'smetki', '#forma-razhod');
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
     const otpechatatsi = async (): Promise<string[]> =>
       // ОБХВАТ: ЦЯЛАТА СТРАНИЦА · нарочно. Тук се взима отпечатък на ВСИЧКИ
     // секции, за да се сравни преди/след — стеснен, селекторът би мерил друго.
@@ -2280,12 +2280,17 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // „В Перид при Сметки липсва възможност за въвеждане на края на раз
     // глеждания периода. … Името е не Сметки а Баланс който включва Приход и
     // Разход и всички разпивки."
-    razdel = '117ж · Балансът · името и краят на периода';
+    razdel = '117ж · Сметки · подтабът Баланс и краят на периода';
     await naEkran(p, 'smetki', '#forma-period');
-    proveri('екранът се казва БАЛАНС, не Сметки',
-      await p.$eval('.shapka h1', (e) => e.textContent!.trim()), 'Баланс');
-    proveri('и в лентата пунктът е Баланс',
-      (await p.$eval('.nav', (e) => (e as any).innerText)).includes('Баланс'), true);
+    // ОТ РЕЗЕН 115 (И136 · ADR-161): името се ВЪРНА на „Сметки", а „Баланс"
+    // стана ЕДИН от петте подтаба. Последната дума бие (правило 28) — затова
+    // тук се мери новото твърдение, а не се кърпи старото.
+    proveri('екранът се казва пак СМЕТКИ',
+      await p.$eval('.shapka h1', (e) => e.textContent!.trim()), 'Сметки');
+    proveri('и в лентата пунктът е Сметки',
+      (await p.$eval('.nav', (e) => (e as any).innerText)).includes('Сметки'), true);
+    proveri('а Баланс е ПОДТАБ вътре',
+      Boolean(await p.$('[data-podtabove-na=smetki] [data-podtab=balans]')), true);
     proveri('периодът има ОТ и ДО · краят е по избор',
       await p.$$eval('#forma-period input[type=month]', (e) => e.length), 2);
 
@@ -2339,7 +2344,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // числа зависят от всичко, писано дотук.
 
     razdel = '118 · Календарът · седем колони, понеделник пръв';
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-kalendar]');
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-kalendar]');
     proveri('главата носи СЕДЕМ дни',
       await p.$$eval('.kalendar-glava span', (e) => e.length), 7);
     proveri('и първият е ПОНЕДЕЛНИК · българската норма',
@@ -2470,7 +2475,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     //  между всички таблици нак вероятно." *(И90)*
 
     razdel = '120 · Полетата · изворите са МЕЖДУ ВСИЧКИ таблици';
-    await naEkran(p, 'smetki', '#forma-pole');
+    await naPodtabNa(p, 'smetki', 'otchet', '#forma-pole');
     const proizhod = await p.$$eval('#pf-lyavo optgroup', (e) => e.map((x) => x.getAttribute('label')));
     proveri('менюто е групирано по ТРИ произхода',
       JSON.stringify(proizhod), JSON.stringify(['Отчети', 'Коефициенти', 'Данни на периода']));

@@ -50,6 +50,14 @@
 
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
 import { podtabatNa } from '../src/domein/temi-nastroyki.js';
+import {
+  PARVIYAT_PODTAB,
+  PODTABOVE_NA_SMETKI,
+  klyuchNaPametta,
+  podredeniPoPodtab,
+  podtabatNaSmetki,
+} from '../src/domein/podtabove-smetki.js';
+import { aktivniyatPodtab } from './podtabove.js';
 import { ekraniraj } from './obshto.js';
 import { zapishiRedaNaSektsiite } from './podredba.js';
 import {
@@ -87,7 +95,31 @@ interface Sektsiya {
 const OT_KOLKO = 2;
 
 function klyuchat(ekran: string): string {
+  // СМЕТКИ НЯМА ОБЩ КЛЮЧ (резен 115 · ADR-161): паметта му е по подтаб —
+  // `klyuchNaPametta`. Общ ключ през задната врата би върнал реда с една пета
+  // от екрана; затова тук се гърми, не се мълчи.
+  if (ekran === 'smetki') throw new Error('Сметки пази секциите си по подтаб · ползвай klyuchNaPametta.');
   return `sektsii.${ekran}`;
+}
+
+/** Ключът, в който ТОЗИ екран пише нарисуваното · за Сметки — ключът на активния подтаб. */
+function klyuchatNaZapisa(ekran: string, podtab?: string): string {
+  if (ekran !== 'smetki') return klyuchat(ekran);
+  const koy = podtab ?? aktivniyatPodtab('smetki', PODTABOVE_NA_SMETKI, PARVIYAT_PODTAB);
+  return klyuchNaPametta(PODTABOVE_NA_SMETKI.some((p) => p.klyuch === koy) ? (koy as (typeof PODTABOVE_NA_SMETKI)[number]['klyuch']) : PARVIYAT_PODTAB);
+}
+
+/**
+ * КАКВО ИЗРЕЖДА РЕДЪТ НА ЕДИН ЕКРАН · на групи.
+ *
+ * За екран без подтабове — една група без глава. За Сметки — петте подтаба в
+ * реда на лентата, всеки с главата си, четени от СВОИТЕ ключове. Нищо не се
+ * слива и не се гадае кое от старото е още вярно: всеки подтаб е записал
+ * своето, когато е бил нарисуван.
+ */
+function grupiteNaReda(koy: string, ekran: string, tuk: readonly Sektsiya[]): readonly { readonly ime: string; readonly sektsii: readonly Sektsiya[] }[] {
+  if (koy === 'smetki') return podredeniPoPodtab((p) => chetiEkranno<Sektsiya[]>(klyuchNaPametta(p), []));
+  return [{ ime: '', sektsii: koy === ekran ? tuk : chetiEkranno<Sektsiya[]>(klyuchat(koy), []) }];
 }
 
 /**
@@ -136,12 +168,17 @@ export function sektsiiteNa(koren: ParentNode): Sektsiya[] {
  * нула предсказване. Пише се само когато има какво: празен резултат не гаси
  * стара, вярна памет.
  */
-export function zapomniSektsiiteOtHTML(ekran: string, html: string): number {
+export function zapomniSektsiiteOtHTML(ekran: string, html: string, podtab?: string): number {
   const list = document.implementation.createHTMLDocument('');
   // Ситото търси `.telo` — низът на екрана е СЪДЪРЖАНИЕТО ѝ, не тя самата.
   list.body.innerHTML = `<div class="telo">${html}</div>`;
   const sektsii = sektsiiteNa(list.body);
-  if (sektsii.length > 0) zapomniEkranno(klyuchat(ekran), sektsii);
+  // За подтаб на Сметки и ПРАЗНОТО е отговор: ключът му е записан, значи
+  // „рисуван е, няма секции" — иначе пълненето би го рисувало наум при всяко
+  // отваряне на екран (проходът го намери като скорост, §37).
+  if (sektsii.length > 0 || ekran === 'smetki') {
+    zapomniEkranno(klyuchatNaZapisa(ekran, podtab), sektsii);
+  }
   return sektsii.length;
 }
 
@@ -174,6 +211,11 @@ export async function zavediDoSektsiyata(
   if (ekran === 'nastroyki') {
     const podtab = podtabatNa(sektsiya);
     if (podtab) zapomniEkranno('nastroyki.podtab', podtab);
+  }
+  // СМЕТКИ · същото, с втората карта (резен 115 · ADR-161). Тук подтаб ВИНАГИ
+  // има: непознатата секция пада в главния, вместо да не стане нищо.
+  if (ekran === 'smetki') {
+    zapomniEkranno('smetki.podtab', podtabatNaSmetki(sektsiya));
   }
   await otvoriEkran(ekran);
   await prerisuvay();
@@ -221,13 +263,14 @@ export function zakachiMenyutataNaEkranite(
   // Първо се ЗАПОМНЯ това, което стои на екрана в момента — така утре редът му
   // работи и от другаде.
   const tuk = sektsiiteNa(koren);
-  if (tuk.length > 0) zapomniEkranno(klyuchat(ekran), tuk);
+  if (tuk.length > 0) zapomniEkranno(klyuchatNaZapisa(ekran), tuk);
 
   for (const vhod of koren.querySelectorAll<HTMLButtonElement>('.nav > [data-ekran]')) {
     const koy = vhod.dataset['ekran']!;
     // Настройки си има СВОЙ ред (теми, не секции) и вече е обвит.
     if (vhod.closest('.menyu-nastroyki') || vhod.closest('.padasht-menyu')) continue;
-    const sektsii = koy === ekran ? tuk : chetiEkranno<Sektsiya[]>(klyuchat(koy), []);
+    const grupi = grupiteNaReda(koy, ekran, tuk);
+    const sektsii = grupi.flatMap((g) => g.sektsii);
     if (sektsii.length < OT_KOLKO) continue;
 
     const obvivka = document.createElement('div');
@@ -267,20 +310,29 @@ export function zakachiMenyutataNaEkranite(
     const semeystva = koy === ekran ? broySemeystva(sGlavi) : 0;
     red.innerHTML =
       `<p class="drebno za-kogo">Секциите на този екран</p>` +
-      sektsii
+      grupi
         .map(
-          (s) =>
-            `<button type="button" class="tema" role="menuitem" data-kam-sektsiya="${ekraniraj(
-              s.klyuch,
-            )}"><span class="dvete"><b>${ekraniraj(s.ime)}</b></span></button>` +
-            // ТАБЛИЦИТЕ РАЗДЕЛЕНИ · подпункт за всяка именувана, когато са 2+.
-            (s.tablitsi ?? [])
+          (g) =>
+            // ГЛАВА ПРЕД ВСЯКА ГРУПА (резен 115 · ADR-161) · само където има подтабове:
+            // трийсет пункта в един списък се четат като стена; групирани по
+            // подтаба, в който човек ще ги намери, казват и КЪДЕ отиват.
+            (g.ime === '' ? '' : `<p class="drebno za-kogo">${ekraniraj(g.ime)}</p>`) +
+            g.sektsii
               .map(
-                (t) =>
-                  `<button type="button" class="tema podtablitsa" role="menuitem"
+                (s) =>
+                  `<button type="button" class="tema" role="menuitem" data-kam-sektsiya="${ekraniraj(
+                    s.klyuch,
+                  )}"><span class="dvete"><b>${ekraniraj(s.ime)}</b></span></button>` +
+                  // ТАБЛИЦИТЕ РАЗДЕЛЕНИ · подпункт за всяка именувана, когато са 2+.
+                  (s.tablitsi ?? [])
+                    .map(
+                      (t) =>
+                        `<button type="button" class="tema podtablitsa" role="menuitem"
                      data-kam-sektsiya="${ekraniraj(s.klyuch)}"
                      data-kam-tablitsa="${ekraniraj(t.klyuch)}"><span class="dvete"><span
                      class="drebno">${ekraniraj(t.ime)}</span></span></button>`,
+                    )
+                    .join(''),
               )
               .join(''),
         )

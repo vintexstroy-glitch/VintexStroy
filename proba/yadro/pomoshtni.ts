@@ -359,6 +359,11 @@ export async function zapishiRazhod(
   p: Page,
   { potok, sektor, dostavchik, opis, suma, nachin, data, dokument, stavka, prepiska }: RazhodVhod,
 ): Promise<void> {
+  // ФОРМАТА ЖИВЕЕ В ПОДТАБ „РАЗХОД" (резен 115 · ADR-161). Помощникът я намира
+  // сам: инак всеки от трийсетината му викащи щеше да носи по един ред за това.
+  if ((await p.$('#forma-razhod')) === null) {
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
+  }
   await p.selectOption('#razhod-potok', potok);
   // Сектор се избира САМО при „Фактури". Заплатите и кредитите взимат
   // акумулатора си ОТ ПОТОКА (`app/smetki.ts` · `dds.ts`): те не носят ДДС и
@@ -481,6 +486,9 @@ export async function zapishiDelo(
 export async function smetni(p: Page, opis: string, suma: string, stavka: string): Promise<void> {
   // Екранът се прерисува целият след всяко действие — чака се РЕДЪТ да се появи,
   // не просто таблицата, иначе следващото писане пада върху сменен DOM.
+  if ((await p.$('#forma-smyatane')) === null) {
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-smyatane');
+  }
   const predi = await p.$$eval('.red.smyatane', (r) => r.length);
   await p.fill('#smyatane-opis', opis);
   await p.fill('#smyatane-suma', suma);
@@ -694,9 +702,27 @@ export async function otvoriProfila(p: Page): Promise<void> {
  * а после се чака ЗНАКЪТ на онова, което подтабът носи — свършеното, не времето.
  */
 export async function naPodtab(p: Page, podtab: string, znak: string): Promise<void> {
-  if ((await p.$(`[data-podtab="${podtab}"].tuk`)) === null) {
-    await naEkran(p, 'nastroyki', `[data-podtab="${podtab}"]`);
-    await deystvieSPrerisuvane(p, () => p.click(`[data-podtab="${podtab}"]`));
+  await naPodtabNa(p, 'nastroyki', podtab, znak);
+}
+
+/**
+ * СЪЩОТО, НО ЗА ВСЕКИ ЕКРАН С ПОДТАБОВЕ (резен 115 · ADR-161).
+ *
+ * Сметки получи лентата втори; механизмът е един (`app/podtabove.ts`), затова
+ * и помощникът е един. Ключовете на двата екрана не се застъпват, но селекторът
+ * пак минава през `[data-podtabove-na]`: гол `[data-podtab]` върху екран, който
+ * утре ще е трети, е точно дефектът, който обход Б брои.
+ */
+export async function naPodtabNa(
+  p: Page,
+  ekran: string,
+  podtab: string,
+  znak: string,
+): Promise<void> {
+  const znakNaButona = `[data-podtabove-na="${ekran}"] [data-podtab="${podtab}"]`;
+  if ((await p.$(`${znakNaButona}.tuk`)) === null) {
+    await naEkran(p, ekran, znakNaButona);
+    await deystvieSPrerisuvane(p, () => p.click(znakNaButona));
   }
   await p.waitForSelector(znak);
 }

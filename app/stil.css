@@ -946,6 +946,10 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   display: flex; flex-direction: column; gap: 1px;
   margin: 2px 0 6px 8px; padding-left: 8px;
   border-left: 2px solid var(--liniya);
+  /* ДЪЛГИЯТ РЕД СЕ ПРЕВЪРТА, не изтласква лентата (резен 115): Сметки изрежда
+     секциите на петте си подтаба и редът порасна над екрана — пункт под ръба
+     не се натиска, а човек не разбира, че има още. */
+  max-height: 60vh; overflow-y: auto;
 }
 /* ПРИБРАНОТО СЕ ПРИБИРА НАИСТИНА.
    `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а авторското
@@ -1982,9 +1986,32 @@ table.razbivka .drebno { font-size: 0.75rem; }
    (ADR-032 §1 · състояние никога само с цвят). Тук се различават по ПОСОКА —
    нагоре и надолу от нулевата линия — а цветът е само подсилване. */
 .diagrama-nula { stroke: var(--liniya); stroke-width: 1; }
+
+/* ТАБЛИЦАТА ОТЛЯВО, ДИАГРАМАТА ОТДЯСНО (И136 · резен 115) · „както в МС
+   Проджект". На тесен екран двете падат едно под друго: две колони на телефон
+   са два нечетими стълба. */
+.redom { display: grid; gap: var(--space-md); }
+.redom.dve { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.redom > div { min-width: 0; overflow-x: auto; }
+@media (max-width: 900px) { .redom.dve { grid-template-columns: minmax(0, 1fr); } }
+
+/* СЕДЕМТЕ РАЗБИВКИ · отметка · име · откъде · сума. */
+.glava.razbivka, .red.razbivka {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 2fr) 8rem;
+  gap: var(--space-md);
+  align-items: center;
+}
+.razbivka-kutiya { display: flex; justify-content: center; }
+.razbivka-kutiya input { width: 16px; height: 16px; accent-color: var(--aktsent); }
 .diagrama-pari.prihod { fill: var(--srok-normalno); }
 .diagrama-pari.razhod { fill: var(--aktsent); }
 .diagrama-parichna .diagrama-ime { fill: var(--mastilo2); }
+/* ЦИФРАТА В ДИАГРАМАТА (И136) · дребна, но четима: тя е точното число, докато
+   стълбчето е само пропорцията. Текстът на реда стои в таблицата ОТЛЯВО. */
+.diagrama-tsifra { font-size: 0.643rem; font-variant-numeric: tabular-nums; }
+.diagrama-tsifra.prihod { fill: var(--srok-normalno); }
+.diagrama-tsifra.razhod { fill: var(--aktsent); }
 
 /* ЛЕНТАТА · „ЦВЕТОВЕТЕ СПОРЕД СРОКА КАТО ПЛЪТНА ЛЕНТА" (р59·[41], главните са
    негови). Не се влачи — негова забрана (р83·[35]). */

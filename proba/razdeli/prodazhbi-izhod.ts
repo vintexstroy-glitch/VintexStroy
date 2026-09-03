@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, broySabitiya, naEkran, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /**
  * 103 · ИЗХОДЪТ НА СДЕЛКАТА · Приходи и Вземания (резен 23 · ADR-083).
@@ -22,7 +22,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=smetki-smetki]');
+  await naPodtabNa(p, 'smetki', 'balans', '[data-sektsiya=smetki-smetki]');
 
   // ── МЕСЕЦЪТ НА ВНОСКАТА ──────────────────────────────────────────────────
   await p.fill('#smetki-period', '2026-03');
@@ -86,6 +86,8 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   // вече са оставили свои сделки, и заковано очакване тук щеше да пада всеки
   // път, когато някой добави сделка другаде — тоест да лъже за собствения си
   // предмет. Платено веднага: първата версия чакаше 48 000 и видя 154 000.
+  // Полетата с формула са в подтаб „Отчет" (резен 115 · ADR-161).
+  await naPodtabNa(p, 'smetki', 'otchet', '[data-pole=vzemaniya]');
   const vzemanePredi = await p.$$eval('[data-pole=vzemaniya] .formula li .suma', (e) =>
     Number((e[1] as HTMLElement | undefined)?.dataset['st'] ?? NaN),
   );
@@ -106,7 +108,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   await p.fill('#dvizhenie-belezhka', 'капаро');
   await sSabitie(p, () => p.click('#forma-dvizhenie button[type=submit]'));
 
-  await naEkran(p, 'smetki', '[data-sektsiya=smetki-smetki]');
+  await naPodtabNa(p, 'smetki', 'balans', '[data-sektsiya=smetki-smetki]');
   await p.fill('#smetki-period', '2026-05');
   await p.click('#forma-period button[type=submit]');
   await p.waitForFunction(
@@ -126,6 +128,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   );
 
   const gledanePredi = await broySabitiya(p);
+  await naPodtabNa(p, 'smetki', 'otchet', '[data-pole=vzemaniya]');
   const vtoraSastavka = await p.$$eval('[data-pole=vzemaniya] .formula li', (e) =>
     e.map((x) => [
       (x.querySelector('.ime')?.textContent ?? '').trim(),
