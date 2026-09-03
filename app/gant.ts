@@ -32,7 +32,6 @@ import { ekraniraj } from './obshto.js';
 import {
   filtriray,
   glaviNaTablitsata,
-  glaviTh,
   izchistiFiltrite,
   poleZaTarsene,
   redZaSkritoto,
@@ -69,6 +68,7 @@ import {
   zhivite,
 } from '../src/domein/dela.js';
 import { mestata, sveriMestata } from '../src/domein/mesta.js';
+import { KOLONI_MESTATA, tablitsaNaImotite } from './imotite.js';
 import { DUMITE } from '../src/domein/dumite.js';
 import {
   dumataNaButona,
@@ -488,107 +488,58 @@ export function narisuvayGant(
 }
 
 /**
- * МЕСТАТА (проектите) · отговорник-ФИРМА и папка (резен 31 · ADR-091).
+ * ИМОТИТЕ до делата · таблица без форма (резен 99 · ADR-157).
  *
  * „На нивото на проекта дай ЛИНК КЪМ ПАПКАТА с проекта" и „в таблицата за
- * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])*.
+ * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])* — двете стоят.
  *
  * ═══ ДВА ОТГОВОРНИКА, КОИТО НЕ СЕ СМЕСВАТ ═══
  *
- * Мястото (проектът) го управлява ФИРМА; делото (задачата) го върши ЧОВЕК
- * *(р48·[44])*. Колоната тук КАЗВА кой е кой, за да не се четат двете като едно.
+ * Имотът го управлява ФИРМА; делото го върши ЧОВЕК *(р48·[44])*. Колоната тук
+ * КАЗВА кой е кой, за да не се четат двете като едно.
  *
- * ═══ НЕЗАПИСАНИТЕ СЕ ПОКАЗВАТ СЪЩО ═══
+ * ═══ ФОРМАТА СИ ОТИДЕ · ЕДИН ДОМ ═══
  *
- * Място, което само се среща по делата, стои в списъка с празни полета и белег
- * „още не е записано". Списък само от записаните щеше да КРИЕ точно работата —
- * човек вижда къде има какво да допълни, вместо да се сеща сам.
+ * Дотук имотът се записваше ОТ ТУК: „всипки се създават от Упрсвление. Само от
+ * там" *(р83·[18])*. На 03.09 той каза друго: „**Имоти и обекти се вкарват
+ * едновременно**, просто обекта е опция" — тоест единият вход е на екрана Имоти
+ * и носи и двете. Последната дума бие (правило 28), а две форми за един запис
+ * се разминават при първото ново поле (правило 17). Тук остава ТАБЛИЦАТА: до
+ * делата стои онова, което им трябва — кой имот, чия фирма, кой е записал,
+ * колко дела.
+ *
+ * ═══ САМО В СЛУЖЕБНОТО ═══
+ *
+ * Личният таб реди делата по ТЕМА, не по имот (`NADPISI_LICHNI`): таблица на
+ * имотите там би показала чужд списък под лично заглавие.
  */
-/** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
-const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; dela: number; koy: string }>[] = [
-  { klyuch: 'ime', ime: DUMITE.imot, vid: 'tekst', vzemi: (r) => r.ime },
-  { klyuch: 'firma', ime: 'Фирма · управлява имота', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
-  { klyuch: 'koy', ime: 'Записал', vid: 'tekst', vzemi: (r) => r.koy },
-  { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
-];
-
 function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
-  // САМО ЗАРЕДЕНИТЕ (И124 т.7 · ADR-134): „Тук се появяват само заредените
-  // обекти и отговорник е този който извършва действието." Само-срещаните по
-  // делата вече не се редят тук; „Записал" е извършващият (правило 14).
-  const redove = mestata(o, zhivite([...o.dela.values()]));
-  const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
-  const filtriraniMesta = filtriray('mestata', redove, KOLONI_MESTATA, dnes);
+  if (predstavka !== 'd-') return '';
+  const zhivi = zhivite([...o.dela.values()]);
+  const redove = mestata(o, zhivi);
+  const sv = sveriMestata(o, zhivi, dnes);
 
   return `
     <section data-sektsiya="gant-mesta" data-broy="${redove.length}">
       <div class="dyalglava">
         <h2>Имотите</h2>
-        <span>само заредените · отговорникът на ДЕЙСТВИЕТО е записалият</span>
+        <span>вписаните и онези, под които виси обект · записалият е извършителят</span>
       </div>
 
       ${
         redove.length === 0
-          ? '<p class="drebno">Още няма нито един записан имот — записва се от формата тук. Имот, който само се среща по делата, не се реди сам (И124 т.7).</p>'
-          : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
-        <table class="tablitsa" data-tablitsa="mestata">
-          <thead>
-            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}<th></th></tr>
-          </thead>
-          <tbody>${filtriraniMesta.redove
-            .map(
-              (r) => `
-            <tr data-myasto="${ekraniraj(r.ime)}" data-papka-adres="${ekraniraj(r.papka)}">
-              <td translate="no">${ekraniraj(r.ime)}</td>
-              <td translate="no">${ekraniraj(r.firma) || '<span class="drebno">—</span>'}</td>
-              <td translate="no">${ekraniraj(r.koy)}</td>
-              <td class="chislo" translate="no">${r.dela}</td>
-              <td><button type="button" class="vtorichen malak" data-mnogotochie
-                aria-label="Менюто на реда" title="Менюто на реда">⋯</button></td>
-            </tr>`,
-            )
-            .join('')}</tbody>
-        </table>
-      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}
-      <p class="drebno">Папката на имота се отваря с ДЕСЕН БУТОН върху реда
+          ? '<p class="drebno">Още няма нито един имот — вписва се от екрана <b>Имоти</b>, заедно с обекта си. Имот, който само се среща по делата, не се реди сам (И124 т.7).</p>'
+          : `${tablitsaNaImotite(redove, dnes, {
+              tablitsa: 'mestata',
+              beleg: 'data-myasto',
+              koloni: KOLONI_MESTATA,
+            })}<p class="drebno">Папката на имота се отваря с ДЕСЕН БУТОН върху реда
       (или „⋯") — „да има пътища за неща само от там" (И124 т.3). Видим линк в
-      колона вече няма.</p>`
+      колона вече няма. Новият имот се вписва от <b>Имоти</b>, заедно с обекта си.</p>`
       }
 
-      <form class="forma" id="${predstavka}forma-myasto">
-        <div class="poleta">
-          <div class="pole">
-            <label for="${predstavka}m-ime">Имот</label>
-            <input translate="no" type="text" id="${predstavka}m-ime" name="ime" required
-                   list="${predstavka}m-imena" placeholder="Малинова Долина">
-            <datalist id="${predstavka}m-imena">
-              ${redove.map((r) => `<option value="${ekraniraj(r.ime)}"></option>`).join('')}
-            </datalist>
-          </div>
-          <div class="pole">
-            <label for="${predstavka}m-firma">Фирма · управлява имота</label>
-            <input translate="no" type="text" id="${predstavka}m-firma" name="firma"
-                   placeholder="Винтекс Строй ЕООД">
-          </div>
-          <div class="pole">
-            <label for="${predstavka}m-papka">Линк към папката</label>
-            <!-- ПЛЕЙСХОЛДЪР БЕЗ АДРЕС · стената срещу кода брои всеки адрес в
-                 него, и е права да не различава плейсхолдър от истинско
-                 посягане: адрес в кода е адрес в кода. Думите вършат същата
-                 работа. -->
-            <input translate="no" type="url" id="${predstavka}m-papka" name="papka"
-                   placeholder="адресът на папката в Драйва">
-          </div>
-        </div>
-        <div class="deystviya">
-          <button type="submit" class="glaven">Запиши имота</button>
-          <span class="drebno">Фирмата и папката са <b>по избор</b> — имотът има смисъл
-          и само с име. Второто записване ПОПРАВЯ същия имот, не ражда втори.</span>
-        </div>
-      </form>
-
       <p class="drebno" data-mesta-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
-      разлика ${sv.razlika}. Показват се само заредените.</p>
+      разлика ${sv.razlika}.</p>
     </section>`;
 }
 
@@ -1108,27 +1059,7 @@ export function zakachiGant(
   const menyutata = rechnitsite(predstavka);
   zakachiMenyuta(koren, menyutata);
 
-  // МЯСТОТО (проектът) · записва се от УПРАВЛЕНИЕ, „само от там" (р83·[18]).
-  koren
-    .querySelector<HTMLFormElement>(`#${predstavka}forma-myasto`)
-    ?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const d = new FormData(e.target as HTMLFormElement);
-      try {
-        await k.deystviya.zapishiMyasto(
-          {
-            ime: String(d.get('ime') ?? ''),
-            firma: String(d.get('firma') ?? ''),
-            papka: String(d.get('papka') ?? ''),
-          },
-          { opId: `myasto:${crypto.randomUUID()}` },
-        );
-        k.vest('dobre', `Имотът „${String(d.get('ime') ?? '')}" е записан.`);
-      } catch (err) {
-        k.vest('zle', err instanceof Error ? err.message : String(err));
-      }
-      await prerisuvay();
-    });
+  // ИМОТЪТ СЕ ВПИСВА ОТ ИМОТИ (резен 99 · ADR-157) · тук няма форма, а таблица.
 
   // ═══ РЪЧНИЯТ РЕД · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34) ═══
   //

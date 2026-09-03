@@ -171,10 +171,82 @@ export async function sSabitie(p: Page, deystvie: () => Promise<unknown>): Promi
   }, predi);
 }
 
+/**
+ * ВКАРВА ОБЕКТ · и Имота му, ако още го няма (резен 99 · ADR-157).
+ *
+ * Негово, 03.09: „Имоти и обекти се вкарват едновременно, просто обекта е
+ * опция." Значи един и същ ход ражда ЕДНО или ДВЕ събития — и помощникът
+ * трябва да знае кое от двете чака, иначе `sSabitie` виси трийсет секунди с
+ * „нещо не стана" вместо с число.
+ *
+ * Затова първо се пита МЕНЮТО: там ли е вече този Имот, и вписан ли е. Вписан
+ * → само обектът (едно събитие); нов или само изведен от обектите си → и двете.
+ */
 export async function dobaviImot(p: Page, adres: string, edinitsa: string, ploshtad?: string): Promise<void> {
-  await p.fill('#imot-adres', adres);
+  const veche = await p.$$eval(
+    '#imot-imot option',
+    (optsii, ime) =>
+      optsii
+        .map((x) => ({ stoynost: (x as HTMLOptionElement).value, ime: (x as HTMLElement).dataset['ime'], vpisan: (x as HTMLElement).dataset['vpisan'] }))
+        .find((x) => x.ime === ime),
+    adres,
+  );
+  if (veche) {
+    await p.selectOption('#imot-imot', veche.stoynost);
+    // Изборът пълни полетата на имота без прерисуване — чака се СВЪРШЕНОТО,
+    // не времето (обход Е на честността).
+    await p.waitForFunction(
+      (ime) => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === ime,
+      adres,
+    );
+  } else {
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', adres);
+  }
   await p.fill('#imot-edinitsa', edinitsa);
   if (ploshtad) await p.fill('#imot-ploshtad', ploshtad);
+  await sSabitiya(p, veche?.vpisan === 'da' ? 1 : 2, () => p.click('#forma-imot button[type=submit]'));
+}
+
+/** Полетата на Имота · всичките по избор, както са и на екрана. */
+export interface ImotVhod {
+  readonly firma?: string;
+  readonly stoynost?: string;
+  readonly kvadratura?: string;
+  readonly sastoyanie?: string;
+  readonly papka?: string;
+}
+
+/**
+ * ВКАРВА САМО ИМОТ · без обект (резен 99).
+ *
+ * „има Имот без Обект" (И131 т.2) — това е ходът, който го прави. Едно събитие:
+ * обект не се ражда.
+ */
+export async function dobaviImotBezObekt(p: Page, ime: string, n: ImotVhod = {}): Promise<void> {
+  const veche = await p.$$eval(
+    '#imot-imot option',
+    (optsii, tarseno) =>
+      optsii
+        .map((x) => ({ stoynost: (x as HTMLOptionElement).value, ime: (x as HTMLElement).dataset['ime'] }))
+        .find((x) => x.ime === tarseno),
+    ime,
+  );
+  if (veche) {
+    await p.selectOption('#imot-imot', veche.stoynost);
+    await p.waitForFunction(
+      (tarseno) => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === tarseno,
+      ime,
+    );
+  } else {
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', ime);
+  }
+  if (n.firma !== undefined) await p.fill('#imot-firma', n.firma);
+  if (n.stoynost !== undefined) await p.fill('#imot-stoynost', n.stoynost);
+  if (n.kvadratura !== undefined) await p.fill('#imot-kvadratura', n.kvadratura);
+  if (n.sastoyanie !== undefined) await p.selectOption('#imot-sastoyanie', n.sastoyanie);
+  if (n.papka !== undefined) await p.fill('#imot-papka-imota', n.papka);
   await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
 }
 

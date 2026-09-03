@@ -776,6 +776,15 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    натроши на тесен екран. */
 .poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-sm); }
 .pole { display: flex; flex-direction: column; gap: 6px; }
+/* СКРИТО ПОЛЕ · авторският `display` бие `[hidden]` на браузъра, значи трябва
+   изрично правило (резен 99). Полето за името на НОВИЯ имот се крие, щом човек
+   избере вече вкаран — а не се маха: изборът се сменя без прерисуване. */
+.pole[hidden] { display: none; }
+/* ДВАТА БЛОКА НА ФОРМАТА · имотът и обектът се вкарват заедно (И132), но окото
+   трябва да види къде свършва единият. `fieldset` носи решетката на `.poleta`,
+   затова рамката му пада, а `legend` е само надпис. */
+fieldset.poleta { border: 0; margin: 0 0 var(--space-sm); padding: 0; }
+fieldset.poleta > legend { padding: 0 0 4px; font-weight: 600; color: var(--mastilo2); }
 /* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
    „<label class=pole><span>". Втората е в личните форми; без този ред нейният
    надпис остава с ръста на текста и полето до него изглежда от друг екран. */

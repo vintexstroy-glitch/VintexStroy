@@ -119,6 +119,7 @@ import type {
   PayloadTablitsaOtFaylSazdadena,
   PayloadGodinaZatvorena,
   PayloadMyastoZapisano,
+  PayloadSastoyanieNaImotZapisano,
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
@@ -362,6 +363,15 @@ export interface Ogledalo {
    * (`VIDOVE_DVIZHENIE`); тази карта носи само РАСТЕЖА.
    */
   readonly etapiNaProdazhbite: ReadonlyMap<string, PayloadEtapNaProdazhbaZapisan>;
+
+  /**
+   * СЪСТОЯНИЯТА НА ИМОТА · само ДОБАВЕНИТЕ (резен 99 · ADR-157).
+   *
+   * Шестте работни живеят в кода (`BAZOVI_SASTOYANIYA_NA_IMOT`) — те са негови
+   * от начало и не се пишат в Журнала. Тук е растежът, по същата сметка като
+   * при етапите на продажбата.
+   */
+  readonly sastoyaniyaNaImotite: ReadonlyMap<string, PayloadSastoyanieNaImotZapisano>;
 
   /**
    * КРЕДИТИТЕ · договорните данни (резен 19 · ADR-079).
@@ -849,6 +859,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prodazhbi = new Map<string, Prodazhba>();
   const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
+  const sastoyaniyaNaImotite = new Map<string, PayloadSastoyanieNaImotZapisano>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
   const pogasitelniPlanove = new Map<string, readonly VnoskaOtDogovora[]>();
@@ -1564,15 +1575,32 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'МястоЗаписано': {
         // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на фирмата или папката е ново
         // събитие върху същата същност, не второ място.
+        //
+        // НО ТРИТЕ ПОЛЕТА СЕ СЛИВАТ (резен 99): липсващо поле значи „не го
+        // пипам" и старото остава; подадената нула (или празно състояние) е
+        // решение на човек и чисти. Същата сметка като при папката на Обекта
+        // („ИмотПоправен"): слети, поправката на фирмата щеше да изтрие
+        // стойността мълчаливо.
         const p = s.payload as unknown as PayloadMyastoZapisano;
+        const staro = mesta.get(svedenotoMyasto(p.ime));
         mesta.set(svedenotoMyasto(p.ime), {
           ime: p.ime,
           firma: p.firma,
           papka: p.papka,
-          seq: mesta.get(svedenotoMyasto(p.ime))?.seq ?? s.seq,
+          stoynost_st: p.stoynost_st ?? staro?.stoynost_st ?? 0,
+          kvadratura_kvsm: p.kvadratura_kvsm ?? staro?.kvadratura_kvsm ?? 0,
+          sastoyanie: p.sastoyanie ?? staro?.sastoyanie ?? '',
+          seq: staro?.seq ?? s.seq,
           kogato: String(s.ts),
           koy: s.actor,
         });
+        break;
+      }
+
+      case 'СъстояниеНаИмотЗаписано': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · базовите шест не идват насам.
+        const p = s.payload as unknown as PayloadSastoyanieNaImotZapisano;
+        sastoyaniyaNaImotite.set(p.klyuch, p);
         break;
       }
 
@@ -1627,6 +1655,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // празното е точният му смисъл, старото не се пренаписва (правило 1).
           vid: p.vid ?? 'среща',
           adres: p.adres,
+          // ИМОТЪТ по избор (резен 99) · запис отпреди него го няма и е празен.
+          imot: p.imot ?? '',
           data: p.data,
           chas: p.chas ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
@@ -1914,6 +1944,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prodazhbi,
     dvizheniyaNaProdazhbi,
     etapiNaProdazhbite,
+    sastoyaniyaNaImotite,
     krediti,
     plashtaniyaPoKrediti,
     pogasitelniPlanove,

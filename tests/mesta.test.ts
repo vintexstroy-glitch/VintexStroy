@@ -8,7 +8,7 @@
  *
  * И границата, от следващия ден *(р48·[44])*: отговорникът на ДЕЛОТО е ЧОВЕК.
  *
- * Седемте обещания:
+ * Единайсетте обещания (седемте от резен 31 плюс четирите на резен 99 · ADR-157):
  *
  *   1. Мястото се записва · с фирма и папка, и двете ПО ИЗБОР.
  *   2. Празно име отказва с ДУМИ · името е и адресът.
@@ -17,6 +17,10 @@
  *   5. Двата отговорника НЕ се смесват · фирма на мястото, човек на делото.
  *   6. Незаписаните места СЕ ПОКАЗВАТ · списък само от записаните крие работата.
  *   7. Сверката брои различните имена · и нулата се казва.
+ *   8. Имотът носи СТОЙНОСТ · КВАДРАТУРА · СЪСТОЯНИЕ, и трите по избор (03.09).
+ *   9. Липсващото поле НЕ трие · подадената нула чисти.
+ *  10. Обектите ИЗВЕЖДАТ своя Имот · „невписан", докато не се впише.
+ *  11. Обект без имот или без единица се отказва с ДУМИ.
  */
 
 import { describe, expect, it } from 'vitest';
@@ -28,11 +32,14 @@ import {
   GreshkaMyasto,
   mestata,
   myastotoNa,
+  proveriImota,
   proveriMyastoto,
+  proveriObekta,
   sashtnostNaMyastoto,
   svedenotoMyasto,
   sveriMestata,
 } from '../src/domein/mesta.js';
+import { sastoyaniyataNaImota } from '../src/domein/sastoyaniya-na-imot.js';
 import { SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -180,7 +187,7 @@ describe('двата отговорника', () => {
 // ── 6 · СПИСЪКЪТ ──────────────────────────────────────────────────────────
 
 describe('списъкът на местата', () => {
-  it('показва САМО ЗАРЕДЕНИТЕ · И124 т.7 надживя показването на срещаните', async () => {
+  it('срещаното САМО ПО ДЕЛАТА пак не се реди · И124 т.7 стои', async () => {
     const { dnevnik, deystviya } = stend();
     await deystviya.zapishiDelo('D-1', DELO, { opId: 'op-d1' });
     await deystviya.zapishiDelo('D-2', { ...DELO, myasto: 'Хисаря' }, { opId: 'op-d2' });
@@ -284,5 +291,207 @@ describe('сверката на местата', () => {
     const o = await ogledaloto(dnevnik);
     expect(mestata(o, zhivite([...o.dela.values()]))).toEqual([]);
     expect(sveriMestata(o, zhivite([...o.dela.values()]), KOGATO).nared).toBe(true);
+  });
+});
+
+// ── 8 и 9 · ТРИТЕ ПОЛЕТА НА ИМОТА (резен 99 · ADR-157) ────────────────────
+
+const OBEKT = { adres: 'Малинова Долина', edinitsa: 'ап. 4', ploshtad_kvsm: 723_000 };
+
+describe('трите полета на имота', () => {
+  it('се записват · стойност в ЦЕНТОВЕ, квадратура в кв. САНТИМЕТРИ, състояние от списъка', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto(
+      {
+        ime: 'Малинова Долина',
+        firma: '',
+        papka: '',
+        stoynost_st: 25_000_000,
+        kvadratura_kvsm: 12_405_000,
+        sastoyanie: 'Строителство',
+      },
+      { opId: 'op-1' },
+    );
+
+    const m = myastotoNa(await ogledaloto(dnevnik), 'Малинова Долина')!;
+    expect(m.stoynost_st).toBe(25_000_000);
+    expect(m.kvadratura_kvsm).toBe(12_405_000);
+    expect(m.sastoyanie).toBe('Строителство');
+  });
+
+  it('и трите са ПО ИЗБОР · имот само с име е нула, нула и празно', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto({ ime: 'Хисаря', firma: '', papka: '' }, { opId: 'op-1' });
+
+    const m = myastotoNa(await ogledaloto(dnevnik), 'Хисаря')!;
+    expect(m.stoynost_st).toBe(0);
+    expect(m.kvadratura_kvsm).toBe(0);
+    expect(m.sastoyanie).toBe('');
+  });
+
+  it('числата са ЦЕЛИ и не под нулата · дробното значи евро вместо центове', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.zapishiMyasto(
+        { ime: 'Хисаря', firma: '', papka: '', stoynost_st: 250_000.5 },
+        { opId: 'op-1' },
+      ),
+    ).rejects.toThrow(GreshkaMyasto);
+    await expect(
+      deystviya.zapishiMyasto(
+        { ime: 'Хисаря', firma: '', papka: '', kvadratura_kvsm: -1 },
+        { opId: 'op-2' },
+      ),
+    ).rejects.toThrow(/не под нулата/);
+  });
+
+  it('състоянието е от НОМЕНКЛАТУРАТА · непознатото се отказва и изрежда списъка', async () => {
+    const { dnevnik, deystviya } = stend();
+    await expect(
+      deystviya.zapishiMyasto(
+        { ime: 'Хисаря', firma: '', papka: '', sastoyanie: 'на топло' },
+        { opId: 'op-1' },
+      ),
+    ).rejects.toThrow(/Строителство · Ремонт/);
+
+    // А ДОБАВЕНОТО от Настройки минава · същият списък, порасъл с едно.
+    await deystviya.zapishiSastoyanieNaImot({ klyuch: 'на топло' }, { opId: 'op-2' });
+    await deystviya.zapishiMyasto(
+      { ime: 'Хисаря', firma: '', papka: '', sastoyanie: 'на топло' },
+      { opId: 'op-3' },
+    );
+    expect(myastotoNa(await ogledaloto(dnevnik), 'Хисаря')!.sastoyanie).toBe('на топло');
+  });
+
+  it('и празното състояние минава · то значи „още не е казано"', () => {
+    const chisto = proveriImota({ ime: 'Х', firma: '', papka: '', sastoyanie: '' }, []);
+    expect(chisto.sastoyanie).toBe('');
+  });
+
+  it('ЛИПСВАЩОТО поле НЕ трие · поправка на фирмата пази стойността', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto(
+      { ime: 'Хисаря', firma: 'А ЕООД', papka: '', stoynost_st: 100_00, sastoyanie: 'Наем' },
+      { opId: 'op-1' },
+    );
+    await deystviya.zapishiMyasto({ ime: 'Хисаря', firma: 'Б ЕООД', papka: '' }, { opId: 'op-2' });
+
+    const m = myastotoNa(await ogledaloto(dnevnik), 'Хисаря')!;
+    expect(m.firma).toBe('Б ЕООД');
+    expect(m.stoynost_st).toBe(100_00);
+    expect(m.sastoyanie).toBe('Наем');
+    expect(m.seq).toBe(1);
+  });
+
+  it('а подадената НУЛА чисти · нулата е решение, липсата не е', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiMyasto(
+      { ime: 'Хисаря', firma: '', papka: '', stoynost_st: 100_00, sastoyanie: 'Наем' },
+      { opId: 'op-1' },
+    );
+    await deystviya.zapishiMyasto(
+      { ime: 'Хисаря', firma: '', papka: '', stoynost_st: 0, sastoyanie: '' },
+      { opId: 'op-2' },
+    );
+
+    const m = myastotoNa(await ogledaloto(dnevnik), 'Хисаря')!;
+    expect(m.stoynost_st).toBe(0);
+    expect(m.sastoyanie).toBe('');
+  });
+});
+
+// ── 10 · ИМОТИТЕ, ИЗВЕДЕНИ ОТ ОБЕКТИТЕ ────────────────────────────────────
+
+describe('имотите по обектите', () => {
+  it('обектът ИЗВЕЖДА своя имот · с белег „невписан" и с брой обекти', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.dobaviImot('I-1', OBEKT, { opId: 'op-o1' });
+    await deystviya.dobaviImot('I-2', { ...OBEKT, edinitsa: 'ап. 5' }, { opId: 'op-o2' });
+
+    const o = await ogledaloto(dnevnik);
+    const redove = mestata(o, zhivite([...o.dela.values()]));
+    expect(redove).toHaveLength(1);
+    expect(redove[0]!.ime).toBe('Малинова Долина');
+    expect(redove[0]!.vpisan).toBe(false);
+    expect(redove[0]!.obekti).toBe(2);
+    expect(redove[0]!.koy).toBe('');
+  });
+
+  it('вписването го ДОПЪЛВА · един ред, не два', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.dobaviImot('I-1', OBEKT, { opId: 'op-o' });
+    await deystviya.zapishiMyasto(
+      { ime: 'малинова долина', firma: 'А ЕООД', papka: '', stoynost_st: 500_00 },
+      { opId: 'op-m' },
+    );
+
+    const o = await ogledaloto(dnevnik);
+    const redove = mestata(o, zhivite([...o.dela.values()]));
+    expect(redove).toHaveLength(1);
+    expect(redove[0]!.vpisan).toBe(true);
+    expect(redove[0]!.firma).toBe('А ЕООД');
+    expect(redove[0]!.obekti).toBe(1);
+    // ЗАПИСАНОТО ИМЕ бие и над правописа на обекта.
+    expect(redove[0]!.ime).toBe('малинова долина');
+  });
+
+  it('и сверката брои ВПИСАНИТЕ И ИЗВЕДЕНИТЕ · входът се смята втори път', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.dobaviImot('I-1', OBEKT, { opId: 'op-o' });
+    await deystviya.zapishiMyasto({ ime: 'Хисаря', firma: '', papka: '' }, { opId: 'op-m' });
+
+    const o = await ogledaloto(dnevnik);
+    const s = sveriMestata(o, zhivite([...o.dela.values()]), KOGATO);
+    expect(s.vhod).toBe(2);
+    expect(s.izhod).toBe(2);
+    expect(s.nared).toBe(true);
+  });
+});
+
+// ── 11 · ПАЗАЧЪТ НА ОБЕКТА ────────────────────────────────────────────────
+
+describe('обектът', () => {
+  it('без ИМОТ се отказва с думи · адресът Е името на имота му', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.dobaviImot('I-1', { ...OBEKT, adres: '   ' }, { opId: 'op-1' }),
+    ).rejects.toThrow(/обект без имот няма/i);
+  });
+
+  it('и без ЕДИНИЦА · инак два обекта на един имот не се различават', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.dobaviImot('I-1', { ...OBEKT, edinitsa: '' }, { opId: 'op-1' }),
+    ).rejects.toThrow(/не се различават/);
+    expect(() => proveriObekta('Малинова', ' ')).toThrow(GreshkaMyasto);
+  });
+
+  it('а интервалите падат · „ Малинова " е същият имот', () => {
+    expect(proveriObekta('  Малинова  ', ' ап. 4 ')).toEqual({
+      adres: 'Малинова',
+      edinitsa: 'ап. 4',
+    });
+  });
+
+  it('и поправката минава през същия пазач', async () => {
+    const { deystviya } = stend();
+    await deystviya.dobaviImot('I-1', OBEKT, { opId: 'op-1' });
+    await expect(
+      deystviya.popraviImot(
+        { imotId: 'I-1', ...OBEKT, edinitsa: '', prichina: 'грешка' },
+        { opId: 'op-2' },
+      ),
+    ).rejects.toThrow(GreshkaMyasto);
+  });
+});
+
+// ── номенклатурата се среща със списъка ───────────────────────────────────
+
+describe('списъкът на състоянията', () => {
+  it('стига до проверката · шестте базови минават без нито един запис', async () => {
+    const { dnevnik } = stend();
+    const spisak = sastoyaniyataNaImota(await ogledaloto(dnevnik));
+    expect(proveriImota({ ime: 'Х', firma: '', papka: '', sastoyanie: 'Ремонт' }, spisak).sastoyanie)
+      .toBe('Ремонт');
   });
 });

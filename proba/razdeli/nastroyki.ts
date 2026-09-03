@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
+import { dokatoStane, dobaviImotBezObekt, OBB, broySabitiya, chisloNaPoleto2, deystvieSPrerisuvane, naEkran, natisniButon, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, varniSeKatoStopanina, vlezKatoSluzhitelya } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -655,7 +655,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     const temiVGrupi = await p.$$eval('#nastroyki-red [role=group] [data-tema]', (e) => e.length);
     proveri('всички теми стоят под някое заглавие',
       await p.$$eval('#nastroyki-red [data-tema]', (e) => e.length), temiVGrupi);
-    proveri('и са СЕДЕМНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 17);
+    proveri('и са ОСЕМНАЙСЕТ · Стопанинът вижда всичко', temiVGrupi, 18);
     await naEkran(p, 'imoti', '#forma-imot');
 
     // ══ 106 · ГОДИНАТА СЕ ЗАТВАРЯ (резен 28 · ADR-088) ═════════════════════
@@ -1051,7 +1051,7 @@ export async function blok11(ctx: KonteksNaProhoda): Promise<void> {
     Boolean(await p.$('[data-sektsiya=tema-natovarvane]')), false);
 
   // СТОПАНСКИТЕ ги НЯМА · изброени поименно, не „всичко останало".
-  for (const s of ['hedari', 'pravata', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
+  for (const s of ['hedari', 'pravata', 'sastoyaniya-imot', 'butoni', 'modeli', 'kontragenti', 'parametri', 'godinite', 'zhurnalat']) {
     proveri(`стопанската секция „${s}" я НЯМА за служителя`,
       Boolean(await p.$(`[data-sektsiya=${s}]`)), false);
   }
@@ -1126,4 +1126,73 @@ export async function blok12(ctx: KonteksNaProhoda): Promise<void> {
   proveri('личното разтваряне ляга върху началното, без запис',
     await p.$$eval('.telo .sganat', (e) => e.length) >= 1, true);
   await naEkran(p, 'imoti', '#forma-imot');
+}
+
+/**
+ * 148 · СЪСТОЯНИЯТА НА ИМОТА · номенклатура като етапите (резен 99 · ADR-157).
+ *
+ * Негово, 03.09: списъкът да е „номенклатура от Настройки, като етапите".
+ * Пази се цялата верига: шестте начални стоят · новото се добавя от Настройки ·
+ * веднага се избира в Имоти · и полето там КАЗВА, че расте само оттам (И97).
+ */
+export async function blok13(ctx: KonteksNaProhoda): Promise<void> {
+  const { stranitsa: p, broyach } = ctx;
+  const razdel = '148 · състоянията на Имота';
+  const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
+  const skrit = async (): Promise<boolean> =>
+    p.$eval('#nastroyki-red', (e) => (e as HTMLElement).hidden);
+  await dokatoStane(
+    p,
+    async () => {
+      if (await skrit()) await p.click('#nastroyki-vhod');
+    },
+    async () => !(await skrit()),
+    'падащият ред на Настройки се отваря',
+  );
+  await p.click('#nastroyki-red [data-tema="sastoyaniya-imot"]');
+  await p.waitForSelector('[data-sektsiya=sastoyaniya-imot]');
+
+  proveri('шестте начални стоят',
+    await p.$eval('[data-sastoyaniya-imot]', (e) => (e as HTMLElement).dataset['sastoyaniyaImot']), '6');
+  proveri('и добавени още няма · нулата се КАЗВА',
+    await p.$eval('[data-dobaveni-sastoyaniya]', (e) => (e as HTMLElement).dataset['dobaveniSastoyaniya']), '0');
+  proveri('„Строителство" е сред тях · оттам тръгва големият строеж',
+    await p.$$eval('[data-sastoyanie-imot="Строителство"]', (e) => e.length), 1);
+
+  // БАЗОВОТО НЕ СЕ ПРЕЗАПИСВА · отказът е с думи, на самия екран.
+  await p.fill('#sastoyanie-imot-ime', 'Наем');
+  await p.click('#forma-sastoyanie-imot button[type=submit]');
+  await p.waitForFunction(() =>
+    (document.querySelector('#greshka-sastoyanie-imot')?.textContent ?? '') !== '');
+  const otkazatNaBazovoto = await tekstNa(p, '#greshka-sastoyanie-imot');
+  proveri('негово от начало не се презаписва · и се КАЗВА',
+    otkazatNaBazovoto.includes('от начало') ? 'от начало' : otkazatNaBazovoto, 'от начало');
+
+  // НОВОТО РАСТЕ · цялата тройка се повтаря (клас Ж2 · същото като при етапа).
+  await dokatoStane(
+    p,
+    async () => {
+      await p.fill('#sastoyanie-imot-ime', 'в ремонт');
+      await p.click('#forma-sastoyanie-imot button[type=submit]');
+    },
+    () => p.$$eval('[data-sastoyanie-imot="в ремонт"]', (e) => e.length > 0),
+    'новото състояние „в ремонт" се появява в таблицата',
+  );
+  proveri('състоянията станаха СЕДЕМ',
+    await p.$eval('[data-sastoyaniya-imot]', (e) => (e as HTMLElement).dataset['sastoyaniyaImot']), '7');
+
+  // И ВЕДНАГА СЕ ИЗБИРА В ИМОТИ · менюто расте от Настройки, не от полето.
+  await naEkran(p, 'imoti', '#forma-imot');
+  proveri('новото стои в менюто на Имоти',
+    await p.$$eval('#imot-sastoyanie option', (o) =>
+      o.filter((x) => (x as HTMLOptionElement).value === 'в ремонт').length), 1);
+  proveri('и полето КАЗВА, че расте само от Настройки',
+    (await tekstNa(p, '[data-zaklyuchen="sastoyanie-imot"]')).includes('Настройки'), true);
+
+  // ЗАПИСВА СЕ НА ИМОТ · състоянието е ИЗБОР, не събитие (И131 т.3).
+  await dobaviImotBezObekt(p, 'Обеля', { sastoyanie: 'в ремонт' });
+  proveri('състоянието стои на реда на имота',
+    (await tekstNa(p, '[data-tablitsa=imotite] [data-imot="Обеля"]')).includes('в ремонт'), true);
 }

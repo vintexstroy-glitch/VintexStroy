@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
+import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviImotBezObekt, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, tekstNa } from '../yadro/pomoshtni.ts';
 
 /** 2 · имоти | 3 · дробни центове */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -15,13 +15,52 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval('.red.imot', (r) => r.map((x) => (x as any).innerText))).some(
         (t) => t.includes('72,40 м²') && !t.includes('€ м²')), true);
     await dobaviImot(p, 'Дианабад', 'ОФИС № 3', '');
-    proveri('два имота', await broySabitiya(p), 2 + OTKRIVASHTOTO);
+    // ЧЕТИРИ, не два: имотът и обектът се вкарват ЗАЕДНО (И132 · резен 99), а
+    // и двата имота са нови — по две събития на ход, и вестта го казва.
+    proveri('два имота с два обекта · четири събития', await broySabitiya(p), 4 + OTKRIVASHTOTO);
+    proveri('и вестта КАЗВА колко са влезли',
+      (await tekstNa(p, '.vest')).includes('2 събития'), true);
+
+    // ══ ИМОТ БЕЗ ОБЕКТ · „има Имот без Обект" (И131 т.2) ═════════════════
+    razdel = '2 · имотът без обект';
+    await dobaviImotBezObekt(p, 'Обеля', { stoynost: '250 000,00', kvadratura: '1 240,50' });
+    proveri('имотът влезе САМ · едно събитие', await broySabitiya(p), 5 + OTKRIVASHTOTO);
+    const obelya = await tekstNa(p, '[data-tablitsa=imotite] [data-imot="Обеля"]');
+    proveri('стойността му се вижда, в евро', obelya.includes('250 000,00'), true);
+    proveri('квадратурата — в м², без знак за валута',
+      obelya.includes('1240,50 м²') && !obelya.includes('€ м²'), true);
+    proveri('и нито един ОБЕКТ не се е родил', await p.$$eval('.red.imot', (r) => r.length), 2);
+
+    // ══ СЛЕД ПЪРВИЯ ОБЕКТ ВСЕКИ ЗАПИС ИСКА ОБЕКТ (И132) ══════════════════
+    razdel = '2 · имотът с обект иска обект';
+    const prediOtkaza = await broySabitiya(p);
+    await p.selectOption('#imot-imot', 'малинова');
+    await p.waitForSelector('[data-obekt-zadalzhitelen]:not([hidden])');
+    proveri('екранът КАЗВА го, преди натискането',
+      (await tekstNa(p, '[data-obekt-zadalzhitelen]')).includes('иска и Обект'), true);
+    await p.click('#forma-imot button[type=submit]');
+    await p.waitForFunction(() => (document.querySelector('#greshka-imot')?.textContent ?? '') !== '');
+    proveri('и отказът е с думи', (await tekstNa(p, '#greshka-imot')).includes('впиши и Обект'), true);
+    proveri('нищо не е влязло', await broySabitiya(p), prediOtkaza);
+
+    // ПРАЗНОТО ИМЕ · „обект без имот няма" (И129 т.3)
+    // ИЗБОРЪТ НЕ ПРЕРИСУВА (резен 99) · той пипа полета, не Журнала. Чака се
+    // ПОЛЕТО за име да се покаже — свършеното, не времето (обход Е).
+    await p.selectOption('#imot-imot', '');
+    await p.waitForSelector('[data-pole-ime]:not([hidden])');
+    await p.fill('#imot-edinitsa', 'без имот');
+    await p.click('#forma-imot button[type=submit]');
+    await p.waitForFunction(() => (document.querySelector('#greshka-imot')?.textContent ?? '') !== '');
+    proveri('имот без име се отказва с думи',
+      (await tekstNa(p, '#greshka-imot')).includes('иска ИМЕ'), true);
+    proveri('и пак нищо не е влязло', await broySabitiya(p), prediOtkaza);
+    await p.fill('#imot-edinitsa', '');
 
     // Наемателят нарочно носи опасен текст — минава ли през екранирането.
     await dobaviNaem(p, { imot: 'Малинова · АП. № 1', koy: 'Домакинство', suma: '500,00', sektor: 'naem-zhilishten', padezh: '5' });
     await dobaviNaem(p, { imot: 'Малинова · АП. № 1', koy: '<img src=x onerror=alert(1)>', suma: '300,00', sektor: 'naem-zhilishten', padezh: '5' });
     await dobaviNaem(p, { imot: 'Дианабад · ОФИС № 3', koy: 'Стройпласт ЕООД', suma: '1200,00', sektor: 'naem-targovski', padezh: '31' });
-    proveri('пет събития', await broySabitiya(p), 5 + OTKRIVASHTOTO);
+    proveri('осем събития', await broySabitiya(p), 8 + OTKRIVASHTOTO);
 
     proveri('единици', await plochka(p, 'Единици'), '2');
     proveri('отдадени', await plochka(p, 'Отдадени'), '2 / 2');
@@ -46,7 +85,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       await p.waitForFunction(() => document.querySelector('#greshka-naem')?.textContent !== '');
       proveri(`„${losha}" се отказва`, (await tekstNa(p, '#greshka-naem')).includes('Не е сума'), true);
     }
-    proveri('нито един отказан наем не влезе', await broySabitiya(p), 5 + OTKRIVASHTOTO);
+    proveri('нито един отказан наем не влезе', await broySabitiya(p), 8 + OTKRIVASHTOTO);
 
     // ══ 4 · начисляване ══════════════════════════════════════════════════
 }
@@ -62,13 +101,18 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // поправка на имот — наемът му НЕ се къса
     await deystvieSPrerisuvane(p, () => natisni(p, '.red.imot:has-text("Дианабад") [data-popravi-imot]'));
-    proveri('формата се напълни със стария адрес', await p.inputValue('#imot-adres'), 'Дианабад');
-    await p.fill('#imot-adres', 'Дианабад 4');
+    // ФОРМАТА Е ОБЩА (резен 99): избраният ИМОТ и полетата на ОБЕКТА се
+    // напълват заедно — поправя се обектът, имотът стои избран до него.
+    proveri('формата се напълни с имота на обекта',
+      await p.$eval('#imot-imot', (e) => (e as HTMLSelectElement).selectedOptions[0]?.dataset['ime']), 'Дианабад');
+    proveri('и с единицата му', await p.inputValue('#imot-edinitsa'), 'ОФИС № 3');
+    await p.fill('#imot-edinitsa', 'ОФИС № 3А');
     await p.fill('#imot-prichina', 'сбъркан номер');
+    // ЕДНО събитие: имотът не е пипан, значи не се презаписва (резен 99).
     await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
-    proveri('тринайсет събития', await broySabitiya(p), 13 + OTKRIVASHTOTO);
+    proveri('шестнайсет събития', await broySabitiya(p), 16 + OTKRIVASHTOTO);
     const sledPopravka = (await redove(p, '.red.imot')).find((x) => (x[0] as any).startsWith('Дианабад'));
-    proveri('новият адрес се вижда', sledPopravka?.[0], 'Дианабад 4 ОФИС № 3');
+    proveri('новата единица се вижда', sledPopravka?.[0], 'Дианабад ОФИС № 3А');
     proveri('наемът не се откачи', sledPopravka?.[1]?.startsWith('Стройпласт'), true);
 
     // поправка на наем — новата сума важи за напред
@@ -77,7 +121,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await p.fill('#naem-suma', '1300,00');
     await p.fill('#naem-prichina', 'вдигнат наем');
     await sSabitie(p, () => p.click('#forma-naem button[type=submit]'));
-    proveri('четиринайсет събития', await broySabitiya(p), 14 + OTKRIVASHTOTO);
+    proveri('седемнайсет събития', await broySabitiya(p), 17 + OTKRIVASHTOTO);
     proveri(
       'новата сума в списъка',
       (await redove(p, '.red.naem')).find((x) => (x[0] as any).startsWith('Стройпласт'))?.[3],
@@ -89,7 +133,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await p.fill('#prekrati-kraj', '2026-02-28');
     await p.fill('#prekrati-prichina', 'изнесоха се');
     await sSabitie(p, () => p.click('#forma-prekrati button[type=submit]'));
-    proveri('петнайсет събития', await broySabitiya(p), 15 + OTKRIVASHTOTO);
+    proveri('осемнайсет събития', await broySabitiya(p), 18 + OTKRIVASHTOTO);
     proveri(
       'наемът е прекратен',
       (await redove(p, '.red.naem')).find((x) => (x[0] as any).startsWith('Домакинство'))?.[4],
@@ -100,7 +144,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     // вратарят отказва, докато нещо живо виси
     await deystvieSPrerisuvane(p, () => natisni(p, '.red.imot:has-text("Малинова") [data-storno-imot]'));
     proveri('сторно на имот с наеми се отказва', (await tekstNa(p, '.vest')).includes('висят'), true);
-    proveri('нищо не влезе', await broySabitiya(p), 15 + OTKRIVASHTOTO);
+    proveri('нищо не влезе', await broySabitiya(p), 18 + OTKRIVASHTOTO);
 
     await deystvieSPrerisuvane(p, () => natisni(p, '.red.naem:has-text("Стройпласт") [data-storno-naem]'));
     proveri(
@@ -108,13 +152,13 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       (await tekstNa(p, '.vest')).includes('начислено вземане'),
       true,
     );
-    proveri('пак нищо не влезе', await broySabitiya(p), 15 + OTKRIVASHTOTO);
+    proveri('пак нищо не влезе', await broySabitiya(p), 18 + OTKRIVASHTOTO);
 
     // сторно на начисление БЕЗ плащания — минава
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('дължимо преди сторното', await plochka(p, 'Дължимо общо'), '800,00 €');
     await sSabitie(p, () => natisni(p, '.red.vzemane:has-text("Домакинство") [data-storno-vzemane]'));
-    proveri('шестнайсет събития', await broySabitiya(p), 16 + OTKRIVASHTOTO);
+    proveri('деветнайсет събития', await broySabitiya(p), 19 + OTKRIVASHTOTO);
     proveri('дължимото падна', await plochka(p, 'Дължимо общо'), '300,00 €');
 
     // ══ 11в · разходите → входящият ДДС ══════════════════════════════════

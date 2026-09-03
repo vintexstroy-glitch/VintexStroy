@@ -17,7 +17,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // проходът се прибира там изрично, както би направил и човек.
     await p.waitForSelector('.nav');
     await naEkran(p, 'imoti', '#forma-imot');
-    proveri('събитията оцеляха', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('събитията оцеляха', await broySabitiya(p), 15 + OTKRIVASHTOTO);
     proveri('месечният наем оцеля', await plochka(p, 'Месечен наем'), '2 000,00 €');
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-02');
@@ -33,7 +33,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
     // че вторият е нулевата сверка — и нулата ПАК се казва (правило 7).
     proveri('веригата е цяла, 13 звена', await tekstNa(p, '.vest'),
-      `Веригата е цяла · ${12 + OTKRIVASHTOTO} от ${12 + OTKRIVASHTOTO} звена. ` +
+      `Веригата е цяла · ${15 + OTKRIVASHTOTO} от ${15 + OTKRIVASHTOTO} звена. ` +
       'Сверката на единствената верига: нула сблъсъка.');
     await naEkran(p, 'imoti', '#forma-imot');
 
@@ -42,7 +42,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     const [svaleno] = await Promise.all([p.waitForEvent('download'), natisni(p, '#iznesi')]);
     const patyat = await svaleno.path();
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
-    proveri('изнесени 12 събития + откриващото', izneseni.length, 12 + OTKRIVASHTOTO);
+    proveri('изнесени 15 събития + откриващото', izneseni.length, 15 + OTKRIVASHTOTO);
     // ПЪРВОТО В ИЗНОСА Е СТОПАНИНЪТ · законът пътува с файла, не само с базата.
     proveri('и първото в износа е Стопанинът', izneseni[0].type, 'СтопанинЗаписан');
     proveri('всяко носи hash и prevHash', izneseni.every((x: any) => x.hash && x.prevHash !== undefined), true);
@@ -53,7 +53,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '10б · внасяне';
     await p.setInputFiles('#fayl', patyat);
     await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
-    proveri('същият файл не добавя нищо', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('същият файл не добавя нищо', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // подправен файл — отказва се изцяло
     const podpraven = `${patyat}.podpraven.json`;
@@ -66,14 +66,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     const otkaz = await tekstNa(p, '.vest');
     proveri('казва къде се къса', otkaz.includes('се къса на seq 4'), true);
     proveri('казва, че нищо не е внесено', otkaz.includes('Нищо не е внесено'), true);
-    proveri('Журналът не е пипнат', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('Журналът не е пипнат', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // файл, който изобщо не е Журнал
     const bokluk = `${patyat}.boklu.json`;
     await writeFile(bokluk, '{"каквото и да е": 1}');
     await p.setInputFiles('#fayl', bokluk);
     await p.waitForFunction(() => document.body.innerText.includes('не е редица от събития'));
-    proveri('и след боклук Журналът е цял', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('и след боклук Журналът е цял', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // ══ 11 · тесен екран ═════════════════════════════════════════════════
     razdel = '11 · тесен екран';
@@ -143,7 +143,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // +2 записа И +1 СверкаЗаписана: сверката вече живее в Журнала, не в паметта.
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
-    proveri('двайсет и две събития', await broySabitiya(p), 22 + OTKRIVASHTOTO);
+    proveri('двайсет и пет събития', await broySabitiya(p), 25 + OTKRIVASHTOTO);
     proveri('вестта казва, че сверката е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
     proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3], '1 200,00 €');
 
@@ -164,7 +164,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('филтърът „всичко" пак дава два', (await redove(p, '.red.razlika')).length, 2);
 
     await sSabitiya(p, 4, () => p.click('#prilozhi'));
-    proveri('двайсет и шест събития', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('двайсет и девет събития', await broySabitiya(p), 29 + OTKRIVASHTOTO);
     proveri(
       'Фактури казват това, което казва новият файл',
       (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3],
@@ -204,15 +204,16 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('Журналът не е пипан', await broySabitiya(p), 29 + OTKRIVASHTOTO);
 
     await naEkran(p, 'imoti', '#forma-imot');
-    await p.fill('#imot-adres', 'След инцидента');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'След инцидента');
     await p.fill('#imot-edinitsa', 'не влиза');
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('нищо ново не влезе', await broySabitiya(p), 29 + OTKRIVASHTOTO);
 
     // ══ 13 · хранилището и котвата ═══════════════════════════════════════
     razdel = '13 · хранилище и котва';
@@ -248,7 +249,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
         t.onerror = () => ne(t.error);
       });
       (db as any).close();
-    }, { akaunt: akauntNaEkrana, posledniyat: 26 + OTKRIVASHTOTO });
+    }, { akaunt: akauntNaEkrana, posledniyat: 29 + OTKRIVASHTOTO });
 
     await p.reload();
     await p.waitForSelector('.vest.zle');
@@ -258,12 +259,13 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и че кранът е дръпнат', trevoga.includes('Вратата е спряна'), true);
 
     await p.waitForSelector('#forma-imot');
-    await p.fill('#imot-adres', 'След котвата');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'След котвата');
     await p.fill('#imot-edinitsa', 'не влиза');
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('записът е отказан с думи', (await tekstNa(p, '#greshka-imot')).includes('котвата'), true);
-    proveri('Журналът остава на 24', await broySabitiya(p), 24 + OTKRIVASHTOTO);
+    proveri('Журналът остава на 27', await broySabitiya(p), 27 + OTKRIVASHTOTO);
     // ══ 14 · справката заключва, архивът излиза, филтрите режат ══════════
     razdel = '14 · справка, архив, филтри';
     // Котвата спря Вратата в раздел 13 — за тези проверки се тръгва начисто.
@@ -429,7 +431,8 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // Работи ли се офлайн, или само се гледа: нов имот трябва да влезе.
     await naEkran(p, 'imoti', '#forma-imot');
     await dobaviImot(p, 'Офлайн', 'без мрежа', '');
-    proveri('и се ПИШЕ офлайн', await broySabitiya(p), predi + 1);
+    // ДВЕ събития: „Офлайн" е нов имот и влиза заедно с обекта си (резен 99).
+    proveri('и се ПИШЕ офлайн', await broySabitiya(p), predi + 2);
 
     await p.context().setOffline(false);
     tishina.ochakvana = false;

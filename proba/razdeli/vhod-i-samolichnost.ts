@@ -63,7 +63,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$eval('[data-pole="stopanin"] .pod', (e) => e.textContent)).includes('това си ти'),
       true);
     await naEkran(p, 'imoti', '#forma-imot');
-    proveri('без обекти', (await tekstNa(p, '.prazno')).includes('Още няма нито един обект'), true);
+    proveri('без обекти',
+      (await tekstNa(p, '[data-sektsiya=imoti-spisak] .prazno')).includes('Още няма нито един обект'), true);
+    proveri('и без имоти · двете празноти са РАЗЛИЧНИ',
+      (await tekstNa(p, '[data-sektsiya=imotite] .prazno')).includes('Още няма нито един Имот'), true);
 
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('Пари при празно: дължимо', await plochka(p, 'Дължимо общо'), '0,00 €');

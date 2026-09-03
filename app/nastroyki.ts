@@ -34,6 +34,7 @@ import {
   type Kontragent,
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
+import { sastoyaniyataNaImota } from '../src/domein/sastoyaniya-na-imot.js';
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
@@ -305,6 +306,7 @@ export function narisuvayNastroyki(
     }
     ${vizhda('parametri') ? blokNaParametrite(o) : ''}
     ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
+    ${vizhda('sastoyaniya-imot') ? blokNaSastoyaniyataNaImota(o) : ''}
 
     ${vizhda('krediti') ? blokNaKredititeVNastroyki() : ''}
     ${vizhda('kontragenti') ? blokNaKontragentite(o) : ''}
@@ -1215,6 +1217,69 @@ function blokNaEtapite(o: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * СЪСТОЯНИЯТА НА ИМОТА · номенклатура като етапите (резен 99 · ADR-157).
+ *
+ * Негово, 03.09: списъкът да е „номенклатура от Настройки, като етапите".
+ * Шестте начални са работните от ADR-153 §3; новото се ДОБАВЯ, а базово не се
+ * презаписва — същата граница като при етапите на продажбата.
+ *
+ * Защо ТУК, а не в полето на Имоти: върху състоянието ще СМЯТА резен 104/110
+ * („Строителство" ражда голямото дело и площообразуването), а „меню, върху
+ * което системата смята, расте само от Настройки" (И97).
+ */
+function blokNaSastoyaniyataNaImota(o: Ogledalo): string {
+  const spisak = sastoyaniyataNaImota(o);
+  const dobaveni = spisak.filter((s) => !s.bazov);
+  return `
+    <section data-sektsiya="sastoyaniya-imot">
+      <div class="dyalglava">
+        <h2>Състоянията на Имота</h2>
+        <span>шест начални + твоите · менюто в Имоти расте само оттук</span>
+      </div>
+
+      <p class="drebno">Негово, 02.09: „Оценката е Спешно и Важно, а <b>Състояние и
+      Статут е едно и стщо ползвай Състояние</b>." Състоянието е ИЗБОР на имота,
+      не събитие — а изборът се пълни оттук.</p>
+
+      <form id="forma-sastoyanie-imot" class="redditsa">
+        <label class="pole">
+          <span>Име на състоянието</span>
+          <input translate="no" name="sastoyanie" id="sastoyanie-imot-ime" placeholder="както ще стои в менюто">
+        </label>
+        <button type="submit">Добави състояние</button>
+      </form>
+      <p class="greshka" id="greshka-sastoyanie-imot"></p>
+
+      <p class="drebno" data-sastoyaniya-imot="${spisak.length}" data-dobaveni-sastoyaniya="${dobaveni.length}">
+      ${spisak.length} състояния общо · ${dobaveni.length} добавени.
+      ${
+        dobaveni.length === 0
+          ? 'Нито едно още — менюто стои с шестте начални.'
+          : 'Добавеното застава СЛЕД началните и веднага се избира в Имоти.'
+      }</p>
+
+      <div class="tablitsa" data-tablitsa="sastoyaniya-imot">
+        <div class="red glava etapred" translate="no">
+          <span class="kletka">Състояние</span>
+          <span class="kletka">Откъде</span>
+        </div>
+        ${spisak
+          .map(
+            (s) => `
+        <div class="red etapred" translate="no" data-sastoyanie-imot="${ekraniraj(s.klyuch)}">
+          <span class="kletka">${ekraniraj(s.klyuch)}</span>
+          <span class="kletka">${s.bazov ? 'от начало' : 'добавено'}</span>
+        </div>`,
+          )
+          .join('')}
+      </div>
+
+      <p class="drebno"><b>Началните шест не се презаписват.</b> „Изпълнен" не е
+      седмо състояние — то е краят на Строителство или на Ремонт, тоест ДЕЛО.</p>
+    </section>`;
+}
+
 function blokNaKontragentite(o: Ogledalo): string {
   const spisak = [...o.kontragenti.values()].sort(
     (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
@@ -1614,6 +1679,29 @@ export function zakachiNastroyki(
         { opId: `etap-prodazhba:${crypto.randomUUID()}` },
       );
       k.vest('dobre', 'Етапът е добавен · колоната вече стои в Продажби.');
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = dumiZaGreshka(err);
+    }
+  });
+
+  /**
+   * НОВО СЪСТОЯНИЕ НА ИМОТА · същият ход като етапа (резен 99 · ADR-157).
+   *
+   * Отказът остава НА ЕКРАНА, не като вест: човекът още гледа полето си.
+   */
+  const formaSastoyanie = koren.querySelector<HTMLFormElement>('#forma-sastoyanie-imot');
+  formaSastoyanie?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const izhod = koren.querySelector<HTMLElement>('#greshka-sastoyanie-imot')!;
+    izhod.textContent = '';
+    const danni = new FormData(formaSastoyanie);
+    try {
+      await k.deystviya.zapishiSastoyanieNaImot(
+        { klyuch: String(danni.get('sastoyanie') ?? '') },
+        { opId: `sastoyanie-imot:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Състоянието е добавено · вече стои в менюто на Имоти.');
       await prerisuvay();
     } catch (err) {
       izhod.textContent = dumiZaGreshka(err);

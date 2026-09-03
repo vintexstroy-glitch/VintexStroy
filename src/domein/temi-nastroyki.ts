@@ -233,6 +233,15 @@ export const TEMI: readonly TemaNastroyka[] = Object.freeze([
     za: SAMO_STOPANINAT,
   },
   {
+    klyuch: 'sastoyaniya-imot',
+    ime: 'Състоянията на Имота',
+    opis: 'шест начални + твоите · менюто в Имоти расте само оттук',
+    ikona: 'ekran-imoti',
+    kade: { vid: 'sektsiya', ekran: 'nastroyki', sektsiya: 'sastoyaniya-imot' },
+    grupa: 'biznesat',
+    za: SAMO_STOPANINAT,
+  },
+  {
     klyuch: 'krediti',
     ime: 'Кредитите',
     opis: 'таблицата под Разходи · „в Настройки да има опция да изключваш и последната таблица"',

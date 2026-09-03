@@ -33,6 +33,8 @@
 
 import { sverka, MERKA, type Sverka } from '../yadro/sverka.js';
 import type { Ogledalo } from '../ogledalo/ogledalo.js';
+import type { PayloadMyastoZapisano } from './sabitiya.js';
+import type { SastoyanieNaImot } from './sastoyaniya-na-imot.js';
 
 /**
  * СВЕДЕНОТО ИМЕ · за адреса и за свързването.
@@ -82,9 +84,85 @@ export interface Myasto {
   readonly firma: string;
   /** линк към папката на проекта в Драйва · по избор */
   readonly papka: string;
+  /** СТОЙНОСТТА · цели центове · нула значи „още не е казана" (резен 99) */
+  readonly stoynost_st: number;
+  /** КВАДРАТУРАТА · цели кв. сантиметри · нула значи „още не е казана" */
+  readonly kvadratura_kvsm: number;
+  /** СЪСТОЯНИЕТО · ключ от номенклатурата · празно значи „още не е казано" */
+  readonly sastoyanie: string;
   readonly seq: number;
   readonly kogato: string;
   readonly koy: string;
+}
+
+/**
+ * ПРОВЕРКАТА НА ТРИТЕ ПОЛЕТА · при Вратата, преди записа (резен 99 · ADR-157).
+ *
+ * Числата са ЦЕЛИ и не под нулата: стойността е в центове (правило 3), а
+ * квадратурата — в кв. сантиметри. Дробно число тук значи, че някой е подал
+ * евро вместо центове, и записано веднъж, остава завинаги (правило 1).
+ *
+ * Състоянието се среща със СПИСЪКА, който се подава отвън: ядрото на мястото не
+ * сгъва Огледало, а Вратата вече го е прочела. Непознато състояние се отказва с
+ * думи и с изброен списък — иначе менюто щеше да е надпис (правило 15).
+ *
+ * ЛИПСВАЩОТО поле минава непокътнато: то значи „не го пипам" и сгъването пази
+ * старото. Проверява се само подаденото.
+ */
+export function proveriImota(
+  danni: PayloadMyastoZapisano,
+  sastoyaniya: readonly SastoyanieNaImot[],
+): PayloadMyastoZapisano {
+  const ime = proveriMyastoto(danni.ime);
+  const tsyaloNadNula = (chislo: number, kakvo: string, edinitsa: string): void => {
+    if (!Number.isSafeInteger(chislo) || chislo < 0) {
+      throw new GreshkaMyasto(
+        `${kakvo} на имота се пази в ${edinitsa} — цяло число, не под нулата. ` +
+          `Дошло: „${chislo}".`,
+      );
+    }
+  };
+  if (danni.stoynost_st !== undefined) tsyaloNadNula(danni.stoynost_st, 'Стойността', 'цели центове');
+  if (danni.kvadratura_kvsm !== undefined) {
+    tsyaloNadNula(danni.kvadratura_kvsm, 'Квадратурата', 'цели кв. сантиметри');
+  }
+  if (danni.sastoyanie !== undefined && danni.sastoyanie !== '') {
+    if (!sastoyaniya.some((s) => s.klyuch === danni.sastoyanie)) {
+      throw new GreshkaMyasto(
+        `„${danni.sastoyanie}" не е състояние на имот. Изброените са: ` +
+          `${sastoyaniya.map((s) => s.klyuch).join(' · ')}. Нови се добавят от Настройки.`,
+      );
+    }
+  }
+  return { ...danni, ime };
+}
+
+/**
+ * ПРОВЕРКАТА НА ОБЕКТА · адресът е ИМЕТО на неговия Имот (резен 99 · ADR-157).
+ *
+ * Негово, 02.09: „Обектите са само към Имот… **Обект без Имот няма**." Пазачът
+ * не пита дали Имотът е ВПИСАН — той съществува по построение: адресът Е името
+ * му, а списъкът на Имотите реди и изведените от обектите (`mestata`). Пази се
+ * само празнотата: обект без адрес виси под безименен имот, а обект без единица
+ * не се различава от съседа си на същия адрес.
+ */
+export function proveriObekta(
+  adres: string,
+  edinitsa: string,
+): { readonly adres: string; readonly edinitsa: string } {
+  const a = adres.trim();
+  const e = edinitsa.trim();
+  if (a === '') {
+    throw new GreshkaMyasto(
+      'Обектът няма имот. Адресът на обекта Е името на имота му — обект без имот няма.',
+    );
+  }
+  if (e === '') {
+    throw new GreshkaMyasto(
+      'Обектът няма единица (ап. 4 · гараж 2). Без нея два обекта на един имот не се различават.',
+    );
+  }
+  return { adres: a, edinitsa: e };
 }
 
 /**
@@ -102,21 +180,51 @@ export interface RedNaMyasto {
   readonly ime: string;
   readonly firma: string;
   readonly papka: string;
-  /** колко ЖИВИ дела стоят на това място */
+  /** трите му полета · нулата и празното значат „още не е казано" (резен 99) */
+  readonly stoynost_st: number;
+  readonly kvadratura_kvsm: number;
+  readonly sastoyanie: string;
+  /** колко ЖИВИ дела стоят на този имот */
   readonly dela: number;
-  /** КОЙ е записал мястото · извършващият действието (И124 т.7 · правило 14) */
+  /** колко ОБЕКТА носи · те са и причината редът да съществува, ако не е вписан */
+  readonly obekti: number;
+  /** ВПИСАН ли е · или само се извежда от обектите си (резен 99) */
+  readonly vpisan: boolean;
+  /** КОЙ е записал имота · извършващият действието (И124 т.7 · правило 14) */
   readonly koy: string;
 }
 
+/** Кои имена идват от ОБЕКТИТЕ · сведено име → правописът на първия и броят. */
+function poObektite(o: Ogledalo): Map<string, { readonly ime: string; broy: number }> {
+  const karta = new Map<string, { ime: string; broy: number }>();
+  for (const i of o.imoti.values()) {
+    const k = svedenotoMyasto(i.adres);
+    if (k === '') continue;
+    const veche = karta.get(k);
+    if (veche) veche.broy += 1;
+    else karta.set(k, { ime: i.adres.trim(), broy: 1 });
+  }
+  return karta;
+}
+
 /**
- * САМО ЗАРЕДЕНИТЕ МЕСТА (И124 т.7 · резен 77 · ADR-134).
+ * ИМОТИТЕ НА КНИГАТА · вписаните И изведените от обектите (резен 99 · ADR-157).
  *
  * Негова дума, 31.08: „Тук се появяват само заредените обекти и отговорник е
  * този който извършва действието." Тя надживя избора от резен 31, който
- * показваше и само-срещаните по делата с белег „още не е записано" —
- * последната дума бие (правило 28); надживеният избор е записан с датата си
- * в ADR-134. Броят на делата ПАК се смята от живите дела — той е поглед,
- * не запис.
+ * показваше и само-срещаните ПО ДЕЛАТА с белег „още не е записано" (ADR-134).
+ * Това си остава: име, което само се среща по дела, НЕ ражда ред.
+ *
+ * На 03.09 обаче дойде друг източник. На въпроса какво да става със стари
+ * Обекти, чийто Имот никога не е вписван: „**Няма такива. Да се пита, провери
+ * или да се измисли и да може да се редактира.**" Тоест Имотът на един Обект
+ * СЪЩЕСТВУВА по построение — адресът на обекта Е името му. Такъв ред влиза
+ * тук с `vpisan: false`: казва се, че не е вписан (правило 15), и се довършва
+ * с един запис от формата.
+ *
+ * Разликата между двата източника е разликата между ДУМА и ЗАПИС: делото носи
+ * името като текст, а обектът виси НА имота — махнеш ли имота, обектът остава
+ * без дом.
  */
 export function mestata(
   o: Ogledalo,
@@ -128,16 +236,24 @@ export function mestata(
     if (k === '') continue;
     broy.set(k, (broy.get(k) ?? 0) + 1);
   }
+  const obekti = poObektite(o);
 
   return Object.freeze(
-    [...o.mesta.keys()].sort().map((k) => {
-      const zapis = o.mesta.get(k)!;
+    [...new Set([...o.mesta.keys(), ...obekti.keys()])].sort().map((k) => {
+      const zapis = o.mesta.get(k);
       return Object.freeze({
-        ime: zapis.ime,
-        firma: zapis.firma,
-        papka: zapis.papka,
+        // ЗАПИСАНОТО ИМЕ БИЕ · то е написаното нарочно; правописът на обекта е
+        // това, което човек е успял да напише в бързината.
+        ime: zapis?.ime ?? obekti.get(k)!.ime,
+        firma: zapis?.firma ?? '',
+        papka: zapis?.papka ?? '',
+        stoynost_st: zapis?.stoynost_st ?? 0,
+        kvadratura_kvsm: zapis?.kvadratura_kvsm ?? 0,
+        sastoyanie: zapis?.sastoyanie ?? '',
         dela: broy.get(k) ?? 0,
-        koy: zapis.koy,
+        obekti: obekti.get(k)?.broy ?? 0,
+        vpisan: zapis !== undefined,
+        koy: zapis?.koy ?? '',
       });
     }),
   );
@@ -146,17 +262,19 @@ export function mestata(
 /**
  * СВЕРКАТА · вход↔изход, и нулата се записва (правило 7).
  *
- * Входът са ЗАПИСАНИТЕ места в Огледалото; изходът е дължината на списъка.
- * Място, изгубено по пътя, значи запис, който екранът не показва никъде.
+ * Входът се смята ВТОРИ ПЪТ и по друг път: записаните плюс онези адреси на
+ * обекти, които нямат запис. Изходът е дължината на списъка. Имот, изгубен по
+ * пътя, значи или запис, или цял обект, който екранът не показва никъде.
  */
 export function sveriMestata(
   o: Ogledalo,
   zhiviDela: readonly { readonly myasto: string }[],
   kogato: string,
 ): Sverka {
+  const bezZapis = [...poObektite(o).keys()].filter((k) => !o.mesta.has(k)).length;
   return sverka(
-    'имотите · записаните',
-    o.mesta.size,
+    'имотите · вписаните и по обектите',
+    o.mesta.size + bezZapis,
     mestata(o, zhiviDela).length,
     kogato,
     MERKA.broy,

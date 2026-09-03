@@ -69,13 +69,13 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       potok: 'fakturi', sektor: 'pokupki-materiali', dostavchik: 'Материали ООД',
       opis: 'цимент', suma: '600,00', nachin: 'банка', data: '2026-02-14', dokument: '1042',
     });
-    proveri('седемнайсет събития', await broySabitiya(p), 17 + OTKRIVASHTOTO);
+    proveri('двайсет събития', await broySabitiya(p), 20 + OTKRIVASHTOTO);
 
     await zapishiRazhod(p, {
       potok: 'zaplati', sektor: 'pokupki-materiali', dostavchik: 'екип',
       opis: 'заплати февруари', suma: '2000,00', nachin: 'в брой', data: '2026-02-28', dokument: '',
     });
-    proveri('осемнайсет събития', await broySabitiya(p), 18 + OTKRIVASHTOTO);
+    proveri('двайсет и едно събития', await broySabitiya(p), 21 + OTKRIVASHTOTO);
 
     const smetkiR = Object.fromEntries(
       (await redove(p, '.red.smetka')).map((x) => [(x[0] as any).split(' ')[0], x[3]]),
@@ -97,7 +97,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // сторно на фактурата — входящият ДДС си отива с нея
     await sSabitie(p, () => natisni(p, '.red.razhod:has-text("Материали ООД") [data-storno-razhod]'));
-    proveri('деветнайсет събития', await broySabitiya(p), 19 + OTKRIVASHTOTO);
+    proveri('двайсет и две събития', await broySabitiya(p), 22 + OTKRIVASHTOTO);
     proveri('за внасяне се връща', await plochka(p, 'ДДС за внасяне'), '200,00 €');
     proveri('разходът остава само заплатите', await plochka(p, 'Разход за'), '2 000,00 €');
 

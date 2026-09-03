@@ -101,10 +101,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // а във ФОРМА картата мълчи: стрелката в поле не мести клетки
     await p.click('.red.naem .kletka');
-    await p.click('#imot-adres');
+    await p.click('#imot-ime');
     await p.keyboard.press('ArrowDown');
     proveri('в поле картата мълчи',
-      await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-adres');
+      await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-ime');
 
     // ══ 29 · обхватът и статус-лентата · Брой · Сбор · Средно ═══════════
     razdel = '29 · статус-лентата';
@@ -182,13 +182,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('лентата пада със селекцията', await statusnaLenta(), null);
 
     // ЧЕРНОВАТА: прерисуването я убива, Ctrl+Z я връща — до Вратата, не след нея
-    await p.fill('#imot-adres', 'Черновата живее');
+    await p.fill('#imot-ime', 'Черновата живее');
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
     proveri('прерисуването уби черновата',
-      await p.$eval('#imot-adres', (e) => (e as any).value), '');
+      await p.$eval('#imot-ime', (e) => (e as any).value), '');
     await p.keyboard.press('Control+z');
     proveri('Ctrl+Z я връща в полето',
-      await p.$eval('#imot-adres', (e) => (e as any).value), 'Черновата живее');
+      await p.$eval('#imot-ime', (e) => (e as any).value), 'Черновата живее');
     proveri('и НЕ пише в Журнала — границата е Вратата',
       await broySabitiya(p), predaSborove + 2);
 
@@ -197,7 +197,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // иначе второ „Запиши" прави дубликат в Журнала.
     await dobaviImot(p, 'Записаният имот', 'ап. 9');
     await p.keyboard.press('Control+z');
-    const sledZapis = await p.$eval('#imot-adres', (e) => (e as any).value);
+    const sledZapis = await p.$eval('#imot-ime', (e) => (e as any).value);
     proveri('Ctrl+Z след Запиши НЕ връща записаното',
       sledZapis === 'Записаният имот', false);
     // подредбата се прибира на изходния ред — два клика довършват цикъла
@@ -1831,7 +1831,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '115 · Папката · лошият адрес не стига до Журнала';
     const prediLoshiya = await broySabitiya(p);
-    await p.fill('#imot-adres', 'Витоша');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'Витоша');
     await p.fill('#imot-edinitsa', 'МАГ. № 1');
     await p.fill('#imot-papka', 'javascript:alert(1)');
     // ОТКАЗЪТ НЕ ПРЕРИСУВА · той пише в полето за грешка и оставя формата, за
@@ -1841,11 +1842,13 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (document.querySelector('#greshka-imot')?.textContent ?? '').length > 0);
     proveri('отказът се КАЗВА с думи',
       (await tekstNa(p, '#greshka-imot')).includes('не се приема'), true);
-    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediLoshiya);
+    proveri('и НИЩО не влиза в Журнала · нито имотът, нито обектът',
+      await broySabitiya(p), prediLoshiya);
 
     razdel = '115 · Папката · записва се · пътят е ДЕСНИЯТ БУТОН (И124 т.3)';
     await p.fill('#imot-papka', ADRES_NA_PAPKA);
-    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    // ДВЕ събития: „Витоша" е НОВ имот и влиза заедно с обекта си (резен 99).
+    await sSabitiya(p, 2, () => p.click('#forma-imot button[type=submit]'));
     proveri('новият обект носи папка',
       await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
     // „Да има пътища за неща само от там": видимият линк в колоната ПАДНА
@@ -1871,7 +1874,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
 
     razdel = '115 · Папката · „различни за различни обекти" се БРОИ';
-    await p.fill('#imot-adres', 'Витоша');
+    // ВТОРИЯТ обект на СЪЩИЯ имот · имотът вече е вписан, значи ЕДНО събитие.
+    await p.selectOption('#imot-imot', 'витоша');
+    await p.waitForFunction(() =>
+      (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === 'Витоша');
     await p.fill('#imot-edinitsa', 'МАГ. № 2');
     await p.fill('#imot-papka', ADRES_NA_PAPKA);
     await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
@@ -2156,8 +2162,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await p.waitForSelector('[data-sektsiya=darvo-na-stroezha]');
     proveri('предложението се появява при НОВ адрес',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 1);
-    proveri('и е само ЕДНО събитие · имотът, не дървото',
-      await broySabitiya(p), prediPredlozhenie + 1);
+    // ДВЕ събития · имотът И обектът му, но НИТО ЕДНО дело: дървото е
+    // предложение, а записва човекът (правило 18).
+    proveri('и са само ДВЕ събития · имотът с обекта си, не дървото',
+      await broySabitiya(p), prediPredlozhenie + 2);
     proveri('казва броя · 22 дела, броени от шаблона',
       (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('22 дела'), true);
     proveri('и казва, че записва ЧОВЕКЪТ (правило 18)',
@@ -2167,7 +2175,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await deystvieSPrerisuvane(p, () => p.click('#darvo-ne-sega'));
     proveri('предложението изчезва',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
-    proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 1);
+    proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 2);
 
     razdel = '117е · СЪЩИЯТ адрес не предлага втори строеж';
     await dobaviImot(p, 'Върба', 'вила 2');
@@ -2180,7 +2188,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     await p.waitForSelector('#darvo-sazdai');
     await deystvieSPrerisuvane(p, () => p.click('#darvo-sazdai'));
     proveri('двайсет и двете дела са в Журнала',
-      await broySabitiya(p), prediDarvo + 1 + 22);
+      await broySabitiya(p), prediDarvo + 2 + 22);
     proveri('и сверката се КАЗВА · разлика 0',
       (await p.$eval('.vest', (e) => (e as any).innerText)).includes('22 от 22 дела · разлика 0'), true);
     await naEkran(p, 'gant', '#d-forma-delo');
