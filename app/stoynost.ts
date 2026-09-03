@@ -33,8 +33,7 @@ import {
   zaVpisvane,
 } from '../src/kalkulator/sazdavane.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
-import { tablitsiteNa } from '../src/iztochnik/chetetsat.js';
-import { type Tablitsa } from '../src/iztochnik/tablitsa.js';
+import { tablitsiSasSito } from './tablitsi-ot-fayl.js';
 import { rabotnaKniga } from '../src/iznos/excel.js';
 import {
   eListSPloshti,
@@ -823,30 +822,3 @@ async function vpishiMD(
  * Полето за файл живее В РАЗМЕТКАТА, а не се прави в движение: така работи и
  * в браузър без модерния избирач, и машина може да го напълни (проходът).
  */
-/**
- * Чете таблиците от ЕДИН файл и ги пресява по име на лист.
- *
- * НЕ се казва `tablitsiOtFayl` — това име значи друго в `iztochnitsi.ts`: там
- * то взима байтове и вид (включително ПДФ) и не пресява нищо. Едно име за две
- * различни неща е капан за онзи, който чете кода по-късно.
- */
-async function tablitsiSasSito(
-  fayl: File,
-  sito: (t: Tablitsa) => boolean,
-): Promise<Tablitsa[]> {
-  const danni = await fayl.arrayBuffer();
-  const vsichki = await tablitsiteNa(new Uint8Array(danni), fayl.name);
-  // Ситото е за книга с МНОГО листове: там „Sheet3" и „разбивка" носят друг
-  // обект и биха добавили чужди квадрати. Файл с един лист е самият той —
-  // изнесеното от човека рядко се казва „площо".
-  if (vsichki.length <= 1) return vsichki;
-
-  const minali = vsichki.filter((t) => sito(t));
-  if (minali.length === 0) {
-    throw new Error(
-      `Във „${fayl.name}" няма лист с площи. От книга с много листове се четат ` +
-        'само „площо" и „земя" — останалите носят друг обект или обобщения.',
-    );
-  }
-  return minali;
-}

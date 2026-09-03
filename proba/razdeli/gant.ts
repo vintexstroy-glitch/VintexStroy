@@ -144,12 +144,18 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       e.map((x) => (x.textContent ?? '').trim()));
     proveri('менюто на Имота носи трите дръжки ПРЕДИ папката, поименно и в ред',
       punktoveUpravlenie.slice(0, 3).join(' · '), 'Нов обект · Ново дело · Нова среща');
-    proveri('и папката, и копирането остават · пет бутона с линк',
-      punktoveUpravlenie.join(' · '), 'Нов обект · Ново дело · Нова среща · Папката в Драйва · Копирай реда');
+    // Историята на реда е шестият (резен 104 · ADR-165): датата на всяка смяна
+    // на Състоянието се ЧЕТЕ от Журнала — нищо не се записва втори път.
+    proveri('и папката, копирането и Историята остават · шест бутона с линк',
+      punktoveUpravlenie.join(' · '),
+      'Нов обект · Ново дело · Нова среща · Папката в Драйва · Копирай реда · История');
     // „Ново дело" · отваря СЪЩАТА форма в Управление с Имота вече вписан.
     await p.click('.kontekstno-menyu button:has-text("Ново дело")');
     await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
     await p.waitForSelector('#d-forma-delo');
+    // СЪЩИЯТ екран се прерисува: старата форма стои, докато новата дойде.
+    // Чака се СВЪРШЕНОТО (обход Е), не първата намерена форма.
+    await p.waitForFunction(() => (document.querySelector('#d-myasto') as HTMLInputElement | null)?.value === 'Малинова');
     proveri('„Ново дело" предизбира Имота във формата на Управление',
       await p.$eval('#d-myasto', (e) => (e as HTMLInputElement).value), 'Малинова');
     proveri('и полето Имот на делото ПРЕДЛАГА вписаните Имоти · „избор от наличното" (И124 т.8)',

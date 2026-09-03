@@ -25,6 +25,8 @@ import {
   delataOtShablona,
   KORENAT_NA_STROEZHA,
   SHABLON_NA_STROEZHA,
+  opIdNaDeloOtShablona,
+  predlagaLiDarvo,
 } from '../src/domein/darvo-na-stroezha.js';
 import {
   grupirano,
@@ -45,7 +47,9 @@ import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaT
 import { butonIstoriya } from './istoriya.js';
 import { broyDokumenti, butonNaDokumentite } from './dokumenti.js';
 import { butonSIkona } from './ikoni.js';
-import { kvSmVM2, ploshtVKvSm } from '../src/kalkulator/chetene.js';
+import { eListSPloshti, kvSmVM2, ploshtVKvSm, prochetiPloshti, type ProchetenObekt } from '../src/kalkulator/chetene.js';
+import { opIdNaObekta, ploshttaZaImota, zaVpisvane } from '../src/kalkulator/sazdavane.js';
+import { tablitsiSasSito } from './tablitsi-ot-fayl.js';
 import { mestata, svedenotoMyasto, sveriMestata, type RedNaMyasto } from '../src/domein/mesta.js';
 import { sastoyaniyataNaImota } from '../src/domein/sastoyaniya-na-imot.js';
 import { zhivite } from '../src/domein/dela.js';
@@ -319,24 +323,48 @@ let imotiteSega = new Map<string, RedNaMyasto>();
  * в МСПроджект." Машината ПРЕДЛАГА, записва човекът (правило 18) — затова
  * това е памет на екрана, не събитие: отказът не оставя следа в Журнала.
  */
-let predlozhenoDarvo: { readonly myasto: string; readonly obekt: string } | null = null;
+let predlozhenoDarvo: { readonly myasto: string } | null = null;
+/**
+ * ПЛОЩООБРАЗУВАНЕТО КЪМ ДЪРВОТО (резен 104 · ADR-165) · „При вкарване на Голямо
+ * дело се вкарва с него и площообразуване на обкти които са продукта между
+ * суровините Имот и Голямо дело с подделата." Файлът е ПО ИЗБОР: без него се
+ * ражда само дървото. Чете се със същия четец като в Калкулатора; прочетеното
+ * е поглед (памет на модула), записва човекът с „Създай".
+ */
+let ploshtiKamDarvoto: { readonly obekti: readonly ProchetenObekt[]; readonly propusnati: number; readonly fayl: string } | null = null;
 
 function blokNaDarvoto(): string {
   if (!predlozhenoDarvo) return '';
+  const pl = ploshtiKamDarvoto;
   return `
     <section class="karta izbrana" data-sektsiya="darvo-na-stroezha">
       <div class="dyalglava">
-        <h2>Нов адрес · голямото дело на строежа</h2>
+        <h2>„${KORENAT_NA_STROEZHA}" · голямото дело на строежа</h2>
         <span>предложение — записва човекът (правило 18)</span>
       </div>
-      <p class="drebno">„${ekraniraj(predlozhenoDarvo.myasto)}" е НОВ адрес. Началото на
-      строителство е „${KORENAT_NA_STROEZHA}" с дървесни разклонения като в MS Project —
-      ${broyatNaShablona()} дела, всяко после се мени свободно от Управление:</p>
+      <p class="drebno">„${ekraniraj(predlozhenoDarvo.myasto)}" е в Състояние
+      „${KORENAT_NA_STROEZHA}" и още няма голямо дело. Началото е „${KORENAT_NA_STROEZHA}" с
+      дървесни разклонения като в MS Project — ${broyatNaShablona()} дела, всяко после се
+      мени свободно от Управление (И131 т.2: „почва като статус Строителство за Имота"):</p>
       <ul class="drebno" translate="no">${SHABLON_NA_STROEZHA.map(
         (k) => `<li><b>${ekraniraj(k.ime)}</b> · ${k.stapki.map((x) => ekraniraj(x)).join(' · ')}</li>`,
       ).join('')}</ul>
+      <p class="drebno" data-darvo-ploshti="${pl ? pl.obekti.length : 0}">
+        <b>Площообразуването влиза с него</b> (по избор): Обектите са продуктът на Имота и
+        голямото дело. ${
+          pl
+            ? `Прочетени ${pl.obekti.length} обекта от „${ekraniraj(pl.fayl)}"${
+                pl.propusnati > 0 ? ` · ${pl.propusnati} пропуснати реда` : ''
+              } — ще се родят под „${ekraniraj(predlozhenoDarvo.myasto)}" заедно с дървото.`
+            : 'Без файл се ражда само дървото; Обектите после се добавят на ръка или от Калкулатора.'
+        }
+        <button type="button" class="vtorichen malak" id="darvo-cheti-ploshti">${pl ? 'Друг файл' : 'Чети площообразуване'}</button>
+        <input translate="no" type="file" id="darvo-fayl-ploshti" accept=".xlsx,.xlsb,.csv" hidden>
+      </p>
       <div class="deystviya">
-        <button type="button" class="glaven" id="darvo-sazdai">Създай дървото · ${broyatNaShablona()} дела</button>
+        <button type="button" class="glaven" id="darvo-sazdai">Създай дървото · ${broyatNaShablona()} дела${
+          pl ? ` · ${pl.obekti.length} обекта` : ''
+        }</button>
         <button type="button" class="vtorichen" id="darvo-ne-sega">Не сега</button>
         <span class="drebno">Отказът не записва нищо — предложение без следа.</span>
       </div>
@@ -1217,15 +1245,22 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
           napisano.push(`Обектът „${edinitsa}"`);
         }
         formaImot.reset();
-        // ПРЕДЛОЖЕНИЕТО ЗА ДЪРВОТО тръгва от ИМОТ, който изобщо го нямаше — не
-        // от невписания: сградата на Калкулатора вече си има дела или нарочно
-        // няма („Дела не се раждат", ADR-089).
-        if (star === undefined) predlozhenoDarvo = { myasto: ime, obekt: edinitsa };
+        // ПРЕДЛОЖЕНИЕТО ЗА ДЪРВОТО тръгва от СЪСТОЯНИЕТО „Строителство" (резен
+        // 104 · ADR-165 · И131 т.2: „почва като статус Строителство за Имота"),
+        // не от новия адрес (резен 69, надживян по спусъка) — и само докато под
+        // Имота няма живо коренно дело: второ дърво е дубъл.
+        const predlaga = predlagaLiDarvo(
+          sastoyanie,
+          zhivite([...(await k.deystviya.ogledalo()).dela.values()]),
+          ime,
+        );
+        predlozhenoDarvo = predlaga ? { myasto: ime } : null;
+        if (!predlaga) ploshtiKamDarvoto = null;
         k.vest(
           'dobre',
           `${napisano.join(' и ')} ${napisano.length === 1 ? 'е записан' : 'са записани'} · ` +
             `${napisano.length} ${napisano.length === 1 ? 'събитие' : 'събития'} в Журнала.` +
-            (star === undefined ? ' Нов Имот — предложението за голямото дело е долу.' : ''),
+            (predlaga ? ` Състояние „${KORENAT_NA_STROEZHA}" — предложението за голямото дело е долу.` : ''),
         );
       }
       await prerisuvay();
@@ -1240,34 +1275,88 @@ export function zakachiFormite(koren: HTMLElement, k: Konteks, prerisuvay: () =>
   // ── дървото на строежа: създава ЧОВЕКЪТ, отказът е без следа ─────────────
   koren.querySelector<HTMLButtonElement>('#darvo-sazdai')?.addEventListener('click', async () => {
     if (!predlozhenoDarvo) return;
+    const myasto = predlozhenoDarvo.myasto;
     const redove = delataOtShablona(
-      predlozhenoDarvo.myasto,
-      predlozhenoDarvo.obekt,
+      myasto,
       // „отговорник е този който извършва действието" (И124 т.7)
       k.kojSam.imeyl,
       dnesKato(),
       () => `D:${crypto.randomUUID()}`,
     );
     let zapisani = 0;
+    let rodeni = 0;
+    let veche = 0;
+    const obekti = ploshtiKamDarvoto?.obekti ?? [];
     try {
       for (const red of redove) {
-        await k.deystviya.zapishiDelo(red.id, red.danni, { opId: `darvo:${red.id}` });
+        // opId носи ДЕЙСТВИЕТО (правило 5 · 20): Имот + път в шаблона. Второ
+        // натискане след грешка по средата връща същите дела, не втори корен.
+        await k.deystviya.zapishiDelo(red.id, red.danni, { opId: opIdNaDeloOtShablona(myasto, red.pat) });
         zapisani += 1;
+      }
+      // ПЛОЩООБРАЗУВАНЕТО ВЛИЗА С НЕГО (И131 т.2): Обектите са продуктът на Имота
+      // и голямото дело. Същите правила като при сградата в Калкулатора (ADR-089):
+      // вече родените се броят, не се удвояват; opId е адресът на обекта.
+      if (obekti.length > 0) {
+        const zv = zaVpisvane(obekti, myasto, await k.deystviya.ogledalo());
+        veche = zv.veche;
+        for (const ob of zv.novi) {
+          await k.deystviya.dobaviImot(
+            `I:${crypto.randomUUID()}`,
+            { adres: myasto, edinitsa: ob.obekt, ploshtad_kvsm: ploshttaZaImota(ob) },
+            { opId: opIdNaObekta(myasto, ob.obekt) },
+          );
+          rodeni += 1;
+        }
       }
     } catch (e) {
       k.vest('zle', dumiZaGreshka(e));
       return;
     }
-    // Сверка вход↔изход · и нулата се казва (правило 7).
+    // Сверка вход↔изход · и нулата се казва (правило 7). Делата и Обектите
+    // поотделно: те са две партиди с два входа.
+    const razlikaDela = redove.length - zapisani;
+    const razlikaObekti = obekti.length - rodeni - veche;
     k.vest(
-      'dobre',
-      `Дървото е записано: ${zapisani} от ${redove.length} дела · разлика ${redove.length - zapisani}.`,
+      razlikaDela === 0 && razlikaObekti === 0 ? 'dobre' : 'zle',
+      `Дървото е записано: ${zapisani} от ${redove.length} дела · разлика ${razlikaDela}.` +
+        (obekti.length > 0
+          ? ` Обектите: ${rodeni} от ${obekti.length} обекта${veche > 0 ? ` · ${veche} вече ги имаше` : ''} · разлика ${razlikaObekti}.`
+          : ''),
     );
     predlozhenoDarvo = null;
+    ploshtiKamDarvoto = null;
     await prerisuvay();
   });
   koren.querySelector<HTMLButtonElement>('#darvo-ne-sega')?.addEventListener('click', async () => {
     predlozhenoDarvo = null;
+    ploshtiKamDarvoto = null;
+    await prerisuvay();
+  });
+  // ПЛОЩООБРАЗУВАНЕТО · четецът на Калкулатора, същият файл, същите правила.
+  koren.querySelector<HTMLButtonElement>('#darvo-cheti-ploshti')?.addEventListener('click', () => {
+    koren.querySelector<HTMLInputElement>('#darvo-fayl-ploshti')?.click();
+  });
+  koren.querySelector<HTMLInputElement>('#darvo-fayl-ploshti')?.addEventListener('change', async (e) => {
+    const fayl = (e.target as HTMLInputElement).files?.[0];
+    if (!fayl) return;
+    try {
+      const tablitsi = await tablitsiSasSito(fayl, (t) => eListSPloshti(t.ime));
+      const obekti: ProchetenObekt[] = [];
+      let propusnati = 0;
+      for (const t of tablitsi) {
+        const r = prochetiPloshti(t);
+        obekti.push(...r.obekti);
+        propusnati += r.propusnati;
+      }
+      ploshtiKamDarvoto = { obekti: Object.freeze(obekti), propusnati, fayl: fayl.name };
+      k.vest(
+        'dobre',
+        `Прочетени ${obekti.length} обекта${propusnati > 0 ? ` · ${propusnati} пропуснати реда` : ''} — записва се с „Създай дървото", не сега.`,
+      );
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+    }
     await prerisuvay();
   });
 

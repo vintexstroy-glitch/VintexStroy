@@ -41,6 +41,8 @@ import {
 import { kvSmVM2 } from '../src/kalkulator/chetene.js';
 import { pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
+import { butonIstoriya } from './istoriya.js';
+import { sashtnostNaMyastoto } from '../src/domein/mesta.js';
 
 /** Колоните на ИМОТИ · целият ред, с трите му полета. */
 export const KOLONI_IMOTITE: readonly KolonaSFiltar<RedNaMyasto>[] = [
@@ -148,7 +150,13 @@ export function tablitsaNaImotite(
             <tr ${n.beleg}="${ekraniraj(r.ime)}" data-vpisan="${r.vpisan ? 'da' : 'ne'}"
                 data-papka-adres="${ekraniraj(r.papka)}">
               ${n.koloni.map((k) => kletka(r, k)).join('')}
-              <td><button type="button" class="vtorichen malak" data-mnogotochie
+              <td>${
+                /* ИСТОРИЯТА НА ИМОТА (резен 104 · ADR-165) · датата на всяка смяна на
+                   Състоянието Е в Журнала по построение — всяко „МястоЗаписано" на
+                   същността, с подписания си `ts`. Нищо не се записва втори път:
+                   панелът само чете. Невписаният Имот няма запис — няма и История. */
+                r.vpisan ? butonIstoriya('myasto', sashtnostNaMyastoto(r.ime)) : ''
+              }<button type="button" class="vtorichen malak" data-mnogotochie
                 aria-label="Менюто на реда" title="Менюто на реда">⋯</button></td>
             </tr>`,
             )

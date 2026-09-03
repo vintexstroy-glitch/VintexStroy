@@ -1,15 +1,37 @@
 /**
- * ДЪРВОТО НА СТРОЕЖА · шаблонът, който новият Имот ПРЕДЛАГА (резен 69).
+ * ДЪРВОТО НА СТРОЕЖА · шаблонът, който Състояние „Строителство" ПРЕДЛАГА
+ * (резен 69 · резен 104).
  *
- * Негова дума *(И124 т.1 · ADR-120)*:
+ * Негови думи:
  *
  *   „При започване на нов Имот с нов Обекти строителството е голямо дело с
- *    мног дървесни разклонения като в МСПроджект."
+ *    мног дървесни разклонения като в МСПроджект." *(И124 т.1 · 31.08)*
+ *
+ *   „Груповите дървета за обект който почва като статус Строителство за
+ *    Имота… При вкарване на Голямо дело се вкарва с него и площообразуване на
+ *    обкти които са продукта между суровините Имот и Голямо дело с подделата."
+ *    *(И131 т.2 · 02.09)*
  *
  * Самото ДЪРВО е построено отдавна (`dela.ts` · резен 12б: под-дела на N
- * нива, номера 1.2.3). Тук е само ВРЪЗКАТА: новият адрес ражда ПРЕДЛОЖЕНИЕ
- * за голямото дело — а записва ЧОВЕКЪТ (правило 18): машината показва
- * дървото, човекът натиска „Създай".
+ * нива, номера 1.2.3). Тук е само ВРЪЗКАТА: Състоянието „Строителство" на
+ * Имота ражда ПРЕДЛОЖЕНИЕ за голямото дело — а записва ЧОВЕКЪТ (правило 18):
+ * машината показва дървото, човекът натиска „Създай".
+ *
+ * ═══ СПУСЪКЪТ Е СЪСТОЯНИЕТО, НЕ НОВИЯТ АДРЕС (резен 104 · ADR-165) ═══
+ *
+ * Резен 69 предлагаше дървото при Имот, който изобщо го е нямало (И124 т.1,
+ * 31.08). И131 т.2 (02.09) го надживя по СПУСЪКА: „почва като статус
+ * Строителство за Имота". Механизмът остана — предложение · записва човекът ·
+ * сверка. Предлага се, докато под Имота няма живо коренно дело
+ * „Строителство"; има ли, строежът вече е започнал и второ дърво е дубъл.
+ * Коренът на дървото и първото базово състояние на Имота са ЕДНА дума — тест
+ * го заковава кръстосано.
+ *
+ * ═══ ДЪРВОТО Е НА ИМОТА ═══
+ *
+ * „Голямо дело с Много поддела на ИМота" — затова делата от шаблона не носят
+ * Обект: Обектите са ПРОДУКТЪТ на строежа и се раждат до него, от
+ * площообразуването (`app/imoti.ts`), не се вписват в делото.
  *
  * ═══ ОТКЪДЕ СА ФАЗИТЕ ═══
  *
@@ -18,10 +40,12 @@
  * акта — Акт 14 (груб строеж), Акт 15 (предаване), Акт 16 (ползване).
  * Имената са ПРЕДЛОЖЕНИЕ — той ги мени в Управление както всяко дело;
  * сроковете тръгват от днешния ден по същата причина: неговите дати са
- * негови.
+ * негови. Неговият КСС и линеен график (И131 т.2, средното изречение) са
+ * друг ред на плана и чакат примерен файл; дотогава шаблонът е резервата.
  */
 
 import type { PayloadDeloZapisano } from './sabitiya.js';
+import { svedenotoMyasto } from './mesta.js';
 
 export interface KlonNaShablona {
   readonly ime: string;
@@ -68,14 +92,14 @@ export function broyatNaShablona(): number {
  */
 export function delataOtShablona(
   myasto: string,
-  obekt: string,
   otgovornik: string,
   dnes: string,
   novId: () => string,
-): readonly { readonly id: string; readonly danni: PayloadDeloZapisano }[] {
+): readonly { readonly id: string; readonly pat: string; readonly danni: PayloadDeloZapisano }[] {
   const obshto = (ime: string, nadDelo: string): PayloadDeloZapisano => ({
     myasto,
-    obekt,
+    // дървото е на ИМОТА · Обектите са продуктът му, не поле на делото
+    obekt: '',
     ime,
     otgovornik,
     ot: dnes,
@@ -86,14 +110,49 @@ export function delataOtShablona(
     nadDelo,
     dokument: '',
   });
-  const koren = { id: novId(), danni: obshto(KORENAT_NA_STROEZHA, '') };
+  const koren = { id: novId(), pat: '0', danni: obshto(KORENAT_NA_STROEZHA, '') };
   const redove = [koren];
-  for (const klon of SHABLON_NA_STROEZHA) {
-    const faza = { id: novId(), danni: obshto(klon.ime, koren.id) };
+  SHABLON_NA_STROEZHA.forEach((klon, f) => {
+    const faza = { id: novId(), pat: `${f + 1}`, danni: obshto(klon.ime, koren.id) };
     redove.push(faza);
-    for (const stapka of klon.stapki) {
-      redove.push({ id: novId(), danni: obshto(stapka, faza.id) });
-    }
-  }
+    klon.stapki.forEach((stapka, st) => {
+      redove.push({ id: novId(), pat: `${f + 1}.${st + 1}`, danni: obshto(stapka, faza.id) });
+    });
+  });
   return redove;
+}
+
+/**
+ * АДРЕСЪТ НА ДЕЙСТВИЕТО за едно дело от шаблона · Имот + път в шаблона.
+ *
+ * Правило 5 · правило 20: `opId` носи ДЕЙСТВИЕТО, не случайно число. Резен 69
+ * ползваше `randomUUID` — при грешка по средата второто натискане раждаше
+ * втори корен и втори двайсет и две. С пътя в шаблона второто натискане
+ * връща същия резултат, както `opIdNaObekta` при сградата (ADR-089).
+ */
+export function opIdNaDeloOtShablona(myasto: string, pat: string): string {
+  return `darvo:${svedenotoMyasto(myasto)}:${pat}`;
+}
+
+/** Има ли под Имота ЖИВО коренно дело „Строителство" · тогава дърво не се предлага. */
+export function imaZhivKoren(
+  zhiviDela: readonly { readonly myasto: string; readonly ime: string; readonly nadDelo: string }[],
+  myasto: string,
+): boolean {
+  const sveden = svedenotoMyasto(myasto);
+  return zhiviDela.some(
+    (d) => d.ime === KORENAT_NA_STROEZHA && d.nadDelo === '' && svedenotoMyasto(d.myasto) === sveden,
+  );
+}
+
+/**
+ * ПРЕДЛАГА ЛИ СЕ ДЪРВОТО · Състоянието е „Строителство" и строежът още не е
+ * започнал (няма жив корен). Чиста функция, за да има тест.
+ */
+export function predlagaLiDarvo(
+  sastoyanie: string,
+  zhiviDela: readonly { readonly myasto: string; readonly ime: string; readonly nadDelo: string }[],
+  myasto: string,
+): boolean {
+  return sastoyanie === KORENAT_NA_STROEZHA && !imaZhivKoren(zhiviDela, myasto);
 }

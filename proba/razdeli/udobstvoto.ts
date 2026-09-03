@@ -1,6 +1,8 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { naPodtabNa, naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo, dobaviImotBezObekt } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -2276,26 +2278,37 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.diagrama-red title', (t) =>
         t.some((x) => (x.textContent ?? '').includes('09:30'))), true);
 
-    // ═══ 117е · НОВИЯТ ИМОТ РАЖДА ГОЛЯМОТО ДЕЛО (резен 69 · И124 т.1) ═══
+    // ═══ 117е · СЪСТОЯНИЕ „СТРОИТЕЛСТВО" РАЖДА ГОЛЯМОТО ДЕЛО (резен 69 · 104) ═══
     //
     // „При започване на нов Имот с нов Обекти строителството е голямо дело с
-    // мног дървесни разклонения като в МСПроджект." Машината ПРЕДЛАГА,
-    // записва ЧОВЕКЪТ (правило 18).
-    razdel = '117е · Новият адрес ражда ПРЕДЛОЖЕНИЕ, не записи';
+    // мног дървесни разклонения като в МСПроджект." (И124 т.1) · „Груповите
+    // дървета за обект който почва като статус Строителство за Имота… При
+    // вкарване на Голямо дело се вкарва с него и площообразуване на обкти"
+    // (И131 т.2). Машината ПРЕДЛАГА, записва ЧОВЕКЪТ (правило 18).
+    razdel = '117е · Състоянието „Строителство" ражда ПРЕДЛОЖЕНИЕ, не записи';
     await naEkran(p, 'imoti', '#forma-imot');
     const prediPredlozhenie = await broySabitiya(p);
-    await dobaviImot(p, 'Върба', 'вила 1');
+    // НОВ адрес БЕЗ Състояние · дотук предлагаше (резен 69); от резен 104
+    // спусъкът е Състоянието, не адресът (И131 т.2 надживя И124 т.1 по спусъка).
+    // Имотът е БЕЗ Обект: Състоянието е негово поле, а след първия Обект всеки
+    // запис иска Обект (И132) — Имот с Обект не може да смени Състоянието „сам".
+    await dobaviImotBezObekt(p, 'Върба');
+    proveri('новият адрес САМ не предлага дърво · спусъкът е Състоянието',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
+    proveri('и е ЕДНО събитие · Имотът', await broySabitiya(p), prediPredlozhenie + 1);
+    await dobaviImotBezObekt(p, 'Върба', { sastoyanie: 'Строителство' });
     await p.waitForSelector('[data-sektsiya=darvo-na-stroezha]');
-    proveri('предложението се появява при НОВ адрес',
+    proveri('Състояние „Строителство" ражда предложението',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 1);
-    // ДВЕ събития · имотът И обектът му, но НИТО ЕДНО дело: дървото е
-    // предложение, а записва човекът (правило 18).
-    proveri('и са само ДВЕ събития · имотът с обекта си, не дървото',
+    // ЕДНО събитие · Имотът със Състоянието си, но НИТО ЕДНО дело.
+    proveri('и е само ЕДНО събитие · Състоянието, не дървото',
       await broySabitiya(p), prediPredlozhenie + 2);
     proveri('казва броя · 22 дела, броени от шаблона',
       (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('22 дела'), true);
     proveri('и казва, че записва ЧОВЕКЪТ (правило 18)',
       (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('правило 18'), true);
+    proveri('и че площообразуването влиза с него · по избор',
+      await p.$eval('[data-darvo-ploshti]', (e) => (e as HTMLElement).dataset['darvoPloshti']), '0');
 
     razdel = '117е · „Не сега" не оставя следа';
     await deystvieSPrerisuvane(p, () => p.click('#darvo-ne-sega'));
@@ -2303,22 +2316,48 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
     proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 2);
 
-    razdel = '117е · СЪЩИЯТ адрес не предлага втори строеж';
-    await dobaviImot(p, 'Върба', 'вила 2');
-    proveri('вторият имот на адреса НЕ ражда предложение',
+    razdel = '117е · без „Строителство" няма предложение';
+    await dobaviImotBezObekt(p, 'Гълъбец', { sastoyanie: 'Наем' });
+    proveri('Имот в „Наем" НЕ ражда дърво',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
 
-    razdel = '117е · „Създай дървото" · записва се ЦЯЛОТО, със сверка';
+    razdel = '117е · „Създай дървото" · с площообразуването, ЦЯЛОТО, със сверка';
     const prediDarvo = await broySabitiya(p);
-    await dobaviImot(p, 'Гълъбец', 'парцел А');
+    await dobaviImotBezObekt(p, 'Гълъбец', { sastoyanie: 'Строителство' });
     await p.waitForSelector('#darvo-sazdai');
+    // ПЛОЩООБРАЗУВАНЕТО ВЛИЗА С НЕГО (И131 т.2) · същият файл като в Калкулатора.
+    const ploshtiZaDarvoto = join(tmpdir(), 'ploshto-galabets.csv');
+    await writeFile(
+      ploshtiZaDarvoto,
+      [
+        'кота;етаж;№;обект;застроена площ, F1;общи части F2;F2;Общо F1+F2;прилежащ (придаден) двор',
+        'кота ±0,00;първи;1;Апартамент 1;40,00;2,48;5,22;45,22;',
+        ';;2;Апартамент 2;57,00;3,53;7,44;64,44;',
+        'кота +2,85;втори;3;Апартамент 3;54,80;3,39;7,15;61,95;',
+        ';;;;151,80;9,40;19,81;171,61;',
+      ].join('\n'),
+    );
+    await p.setInputFiles('#darvo-fayl-ploshti', ploshtiZaDarvoto);
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-darvo-ploshti]') as HTMLElement | null)?.dataset['darvoPloshti'] === '3');
+    proveri('четенето на площите НЕ пише · записва човекът', await broySabitiya(p), prediDarvo + 1);
     await deystvieSPrerisuvane(p, () => p.click('#darvo-sazdai'));
-    proveri('двайсет и двете дела са в Журнала',
-      await broySabitiya(p), prediDarvo + 2 + 22);
-    proveri('и сверката се КАЗВА · разлика 0',
-      (await p.$eval('.vest', (e) => (e as any).innerText)).includes('22 от 22 дела · разлика 0'), true);
+    proveri('двайсет и две дела И три обекта са в Журнала',
+      await broySabitiya(p), prediDarvo + 1 + 22 + 3);
+    const vestDarvo = await p.$eval('.vest', (e) => (e as any).innerText);
+    proveri('и сверката на делата се КАЗВА · разлика 0', vestDarvo.includes('22 от 22 дела · разлика 0'), true);
+    proveri('и сверката на обектите също', vestDarvo.includes('3 от 3 обекта') && vestDarvo.includes('разлика 0'), true);
+    proveri('Обектите са родени ПОД Имота · групата на строящия се Имот',
+      await p.$$eval('.red.imot', (e) =>
+        e.filter((x) => (x as HTMLElement).dataset['obektAdres'] === 'Гълъбец').length), 3);
+    // Строежът е започнал · второ „Строителство" НЕ предлага второ дърво. Имотът
+    // вече има Обекти, значи записът иска Обект (И132): четвърти апартамент, а
+    // Състоянието „Строителство" идва с избора на Имота (резен 99 · ADR-157).
+    await dobaviImot(p, 'Гълъбец', 'Апартамент 4');
+    proveri('с жив корен под Имота дърво повече не се предлага',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
     await naEkran(p, 'gant', '#d-forma-delo');
-    proveri('дървото стои под мястото си в Управление',
+    proveri('дървото стои под Имота си в Управление',
       await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 22);
     proveri('и разклоненията са ПОД корена · има поддела',
       await p.$$eval('.gant-delo.poddelo[data-grupa="Гълъбец"]', (e) => e.length) > 0, true);
