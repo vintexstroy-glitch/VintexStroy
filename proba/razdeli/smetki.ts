@@ -599,6 +599,22 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
       smetkiTekst.includes('Управление на Времевия Ред в Делата'), true);
     proveri('диаграмата на Ганта стои до копието',
       await p.$$eval('svg.diagrama:not(.stalbove)', (r) => r.length), 1);
+    // ОТ РЕЗЕН 114 (ADR-160): „едната ще кореспондира с Управление, а другата в
+    // сметки" — тук диаграмата се отваря на ПАРИ и парите най-после стигат до
+    // нея (дотук Сметки не ги подаваше и полето стоеше празно).
+    proveri('и се отваря на тема ПАРИ · тук парите са работата',
+      await p.$eval('[data-tema-diagrama]', (e) => (e as HTMLElement).dataset['temaDiagrama']), 'pari');
+    // ПАРИТЕ СТИГАТ ДО НЕЯ · сверява се срещу ТАБЛИЦАТА до нея, не наизуст:
+    // толкова ленти, колкото реда със суми носи копието (нула е нула и за двете).
+    const sumiVTablitsata = await p.$$eval('.gant-red.sumi', (e) => e.length);
+    proveri('парите стигат до полето · колкото са редовете със суми',
+      await p.$$eval('[data-sektsiya=smetki-dela-diagrama] .diagrama-parichna', (e) => e.length),
+      sumiVTablitsata);
+    // И СЕ СМЕНЯ · „да могат да се сменят от падащо меню и да са заедно".
+    await deystvieSPrerisuvane(p, () => p.selectOption('#smetki-tema-diagrama', 'tekst'));
+    proveri('темата се сменя и тук · делата се връщат на осата',
+      (await p.$$eval('[data-sektsiya=smetki-dela-diagrama] .diagrama-red', (e) => e.length)) >= 1, true);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#smetki-tema-diagrama', 'pari'));
     proveri('копието се ЧЕТЕ — няма нито един сгъвач',
       await p.$$eval('#ekran button.sgavach', (r) => r.length), 0);
     // И95 обърна старото „няма форма": „да създаваш както като в Управление".

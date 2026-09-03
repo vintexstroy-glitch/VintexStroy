@@ -73,11 +73,15 @@ import { podtabatNa } from '../src/domein/temi-nastroyki.js';
 import { DUMITE } from '../src/domein/dumite.js';
 import {
   dumataNaButona,
+  IMENA_NA_TEMITE,
   mozheDaSeSkrie,
   obobshteniRedove,
+  podrazbranaTema,
   prevkluchi,
   reshetka,
+  TEMI_NA_DIAGRAMATA,
   type RedNaRazrez,
+  type TemaNaDiagramata,
 } from '../src/domein/gant.js';
 import {
   IMENA_NA_RAZREZITE,
@@ -123,6 +127,8 @@ interface PogledNaGanta {
   diagrama: boolean;
   /** негово, 31.08: „Да може да се крие" · таблицата, като диаграмата */
   tablitsa: boolean;
+  /** КОЯ ТЕМА рисува диаграмата · Текст или Пари (резен 114 · ADR-160) */
+  tema: TemaNaDiagramata;
   /**
    * ЕДИНСТВЕНИЯТ останал свой филтър: Оценката НЕ Е колона на таблицата,
    * затова падащото ѝ меню не дублира колонен филтър и остава (резен 75в).
@@ -198,6 +204,9 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     tablitsa: chetiEkranno(`${klyuch}.tablitsa`, true),
     filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
+    // „едната ще кореспондира с Управление, а другата в сметки" (И133): всеки
+    // екран се отваря със СВОЯТА, а изборът после е негов.
+    tema: chetiEkranno<TemaNaDiagramata>(`${klyuch}.tema`, podrazbranaTema(klyuch)),
   };
   POGLEDI.set(klyuch, nov);
   return nov;
@@ -214,6 +223,7 @@ function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.tablitsa`, p.tablitsa);
   zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
+  zapomniEkranno(`${p.klyuch}.tema`, p.tema);
 }
 
 /**
@@ -431,6 +441,13 @@ export function narisuvayGant(
           <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
         </div>
         <div class="pole">
+          <label for="tema-diagrama">Тема на диаграмата</label>
+          <select translate="no" id="tema-diagrama">${TEMI_NA_DIAGRAMATA.map(
+            (x) =>
+              `<option value="${x}"${x === p.tema ? ' selected' : ''}>${IMENA_NA_TEMITE[x]}</option>`,
+          ).join('')}</select>
+        </div>
+        <div class="pole">
           <label for="f-razrez">Разбий по</label>
           <select translate="no" id="f-razrez">${RAZREZI.map(
             (x) =>
@@ -475,7 +492,7 @@ export function narisuvayGant(
             ${tablitsa ? `<div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
               broyDokumenti(o, 'delo', id), rachen,
             )}</div>` : ''}
-            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
+            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi, p.tema)}</div>` : ''}
           </div>`
     }
 
@@ -1183,6 +1200,18 @@ export function zakachiGant(
    */
   koren.querySelector<HTMLSelectElement>('#f-razrez')?.addEventListener('change', async (e) => {
     p.razrez = (e.target as HTMLSelectElement).value as Razrez;
+    zapomniPogleda(p);
+    await prerisuvay();
+  });
+
+  /**
+   * ТЕМАТА НА ДИАГРАМАТА · Текст или Пари (резен 114 · ADR-160).
+   *
+   * Същият вид дръжка като разреза: поглед, не запис. Осата и решетката са
+   * общи — сменя се само какво стои върху тях.
+   */
+  koren.querySelector<HTMLSelectElement>('#tema-diagrama')?.addEventListener('change', async (e) => {
+    p.tema = (e.target as HTMLSelectElement).value as TemaNaDiagramata;
     zapomniPogleda(p);
     await prerisuvay();
   });

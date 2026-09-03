@@ -58,11 +58,15 @@ import { NACHINI_NA_PLASHTANE, VID, type NachinNaPlashtane } from '../src/domein
 import { podredi, zhivite } from '../src/domein/dela.js';
 import {
   dumataNaButona,
+  IMENA_NA_TEMITE,
   mozheDaSeSkrie,
   obobshteniRedove,
+  podrazbranaTema,
   prevkluchi,
   reshetka,
+  TEMI_NA_DIAGRAMATA,
   type KoeSeVizhda,
+  type TemaNaDiagramata,
 } from '../src/domein/gant.js';
 import { sumiZaObhvat } from '../src/domein/otcheti.js';
 import { mesechnitePari } from '../src/domein/diagrami.js';
@@ -161,6 +165,14 @@ let periodDo: string | null = chetiEkranno<string | null>('smetki.periodDo', nul
  * ЕКРАНА и нищо друго (правило 23) — сборовете пак се смятат.
  */
 let sTsifrite = chetiEkranno('smetki.tsifrite', true);
+/**
+ * ТЕМАТА НА ДИАГРАМАТА ТУК · Пари по подразбиране (резен 114 · ADR-160).
+ *
+ * Негово, 03.09: „едната ще кореспондира с Управление, а другата в сметки… но
+ * да могат да се сменят от падащо меню и да са заедно." Затова изборът стои и
+ * тук, а подразбраното идва от домейна — не от литерал на екрана.
+ */
+let temataTuk = chetiEkranno<TemaNaDiagramata>('smetki.tema', podrazbranaTema('smetki'));
 /**
  * КОЕ СЕ ВИЖДА тук · негово, 31.08: „Да и на двете места. Да може да се крие."
  *
@@ -764,6 +776,16 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         <span class="vazm-tyalo"><b>Приходите и Разходите в решетката</b>
         <span>скриването пипа екрана и нищо друго — сборовете ПАК се смятат (правило 23)</span></span>
       </label>
+      <div class="poleta tesni">
+        <div class="pole">
+          <label for="smetki-tema-diagrama">Тема на диаграмата</label>
+          <select translate="no" id="smetki-tema-diagrama">${TEMI_NA_DIAGRAMATA.map(
+            (x) =>
+              `<option value="${x}"${x === temataTuk ? ' selected' : ''}>${IMENA_NA_TEMITE[x]}</option>`,
+          ).join('')}</select>
+          <span class="drebno">Осата е една · сменя се какво стои върху нея (И133).</span>
+        </div>
+      </div>
       <div class="lostove" data-izgled-na-delata>
         <button type="button" id="smetki-kam-diagrama" class="vtorichen"${
           mozheDaSeSkrie(vizhdanoTuk, 'diagrama') ? '' : ' disabled'
@@ -780,7 +802,7 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         }
       </div>
     </section>
-    ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes)}</div>` : ''}
+    ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes, sumi, temataTuk)}</div>` : ''}
     ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
     ${formaDelo(o, dnes)}`;
 }
@@ -1477,6 +1499,16 @@ export function zakachiSmetki(
     ?.addEventListener('click', skriyTuk('diagrama'));
   koren.querySelector<HTMLButtonElement>('#smetki-kam-tablitsa')
     ?.addEventListener('click', skriyTuk('tablitsa'));
+
+  // ТЕМАТА НА ДИАГРАМАТА · поглед, не запис (резен 114 · ADR-160). Осата е
+  // една; сменя се какво стои върху нея.
+  koren
+    .querySelector<HTMLSelectElement>('#smetki-tema-diagrama')
+    ?.addEventListener('change', async (e) => {
+      temataTuk = (e.target as HTMLSelectElement).value as TemaNaDiagramata;
+      zapomniEkranno('smetki.tema', temataTuk);
+      await prerisuvay();
+    });
 
   // СКРИВАНЕТО НА СТОРНИРАНИТЕ Е ЛИЧНО · памет на екрана, нула събития.
   koren.querySelector<HTMLButtonElement>('#pogaseni-prevkl')?.addEventListener('click', async () => {

@@ -48,7 +48,7 @@ import {
   svetofar,
   type Delo,
 } from '../src/domein/dela.js';
-import type { RedNaRazrez, Reshetka } from '../src/domein/gant.js';
+import { IMENA_NA_TEMITE, type RedNaRazrez, type Reshetka, type TemaNaDiagramata } from '../src/domein/gant.js';
 import { stepenNa } from '../src/domein/dela.js';
 import { ekraniraj } from './obshto.js';
 import { zapomnenaVisochina } from './visochina.js';
@@ -84,6 +84,14 @@ export function narisuvayDiagrama(
    * диаграмата друго, и никой не знае кое е вярното.
    */
   sumi: readonly RedNaRazrez[] = [],
+  /**
+   * ТЕМАТА · какво стои върху общата ос (резен 114 · ADR-160).
+   *
+   * „Текст" рисува ДЕЛАТА и не пипа парите; „Пари" рисува лентите с приход и
+   * разход и не реди дела. Осата, решетката и днешната линия са общи — те са
+   * онова, което прави двете „едно" (И133).
+   */
+  tema: TemaNaDiagramata = 'tekst',
 ): string {
   // ЕДНОТО число на реда (И104): диаграмата чете СЪЩАТА запомнена височина,
   // която движи решетката. SVG смята координати, не CSS променливи — затова
@@ -99,8 +107,11 @@ export function narisuvayDiagrama(
   // Ширината расте с броя колони, за да не се смачка при такт „месец".
   const shirinaVreme = Math.max(560, r.koloni.length * 26);
   const shirina = IMENA + shirinaVreme;
-  const visokoNaDelata = dela.reduce((s, d) => s + (d.nadDelo ? REDLO : RED), 0);
-  const parichniLenti = sumi.filter((red) => red.kletki.some((k) => k.prihod_st || k.razhod_st));
+  // ТЕМАТА РЕШАВА КОЕ СЕ РИСУВА · височината следва нея, не подадените данни.
+  const naEkrana = tema === 'tekst' ? dela : [];
+  const visokoNaDelata = naEkrana.reduce((s, d) => s + (d.nadDelo ? REDLO : RED), 0);
+  const parichniLenti =
+    tema === 'pari' ? sumi.filter((red) => red.kletki.some((k) => k.prihod_st || k.razhod_st)) : [];
   const visochina = GLAVA + visokoNaDelata + parichniLenti.length * LENTA_PARI + 28;
 
   const x = (data: string): number =>
@@ -109,12 +120,12 @@ export function narisuvayDiagrama(
   const dnesX = x(dnes);
 
   let y = GLAVA;
-  const redove = dela
+  const redove = naEkrana
     .map((d) => {
       // СТЕПЕНТА, не булев тест (резен 12б): дотук подподделото се рисуваше
       // ТОЧНО като подделото. Смята се ВЕДНЪЖ тук и се подава — инак всеки ред
       // би обикалял веригата на родителите си повторно.
-      const stepen = stepenNa(dela, d.id);
+      const stepen = stepenNa(naEkrana, d.id);
       // Височината пада само ВЕДНЪЖ: по-тънко от най-тънкото не се чете.
       // Отстъпът обаче расте с всяка степен — той носи дървото.
       const visok = stepen > 0 ? REDLO : RED;
@@ -128,12 +139,16 @@ export function narisuvayDiagrama(
     <section data-sektsiya="gant-diagrama">
       <div class="dyalglava">
         <h2>Диаграма на Ганта</h2>
-        <span>${parva.ot} → ${posledna.do} · лентата е ВРЕМЕ, не клетки</span>
+        <span>${parva.ot} → ${posledna.do} · ${ekraniraj(IMENA_NA_TEMITE[tema])} · лентата е ВРЕМЕ, не клетки</span>
       </div>
       <div class="diagrama-obvivka">
         <svg class="diagrama" viewBox="0 0 ${shirina} ${visochina}"
              width="${shirina}" height="${visochina}" role="img"
-             aria-label="Диаграма на Ганта с ${dela.length} дела">
+             aria-label="${
+               tema === 'tekst'
+                 ? `Диаграма на Ганта с ${naEkrana.length} дела`
+                 : `Диаграма на Ганта с ${parichniLenti.length} реда пари`
+             }" data-tema-diagrama="${tema}">
           ${resetkaOtLinii(r, x, visochina)}
           <line class="diagrama-dnes" x1="${dnesX.toFixed(1)}" y1="8"
                 x2="${dnesX.toFixed(1)}" y2="${visochina - 14}"></line>

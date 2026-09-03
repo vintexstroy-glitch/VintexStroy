@@ -5,8 +5,11 @@
  */
 import { describe, expect, it } from 'vitest';
 import {
+  IMENA_NA_TEMITE,
+  TEMI_NA_DIAGRAMATA,
   dumataNaButona,
   mozheDaSeSkrie,
+  podrazbranaTema,
   prevkluchi,
   type KoeSeVizhda,
 } from '../src/domein/gant.js';
@@ -62,5 +65,30 @@ describe('кое се вижда · скриването е избор, не р�
     expect(dumataNaButona({ tablitsa: false, diagrama: true }, 'tablitsa')).toBe(
       'Покажи таблицата',
     );
+  });
+});
+
+/**
+ * ДВЕТЕ ТЕМИ НА ДИАГРАМАТА · Текст и Пари (резен 114 · ADR-160).
+ *
+ * И133: „Календара и Диаграмата на Гант са едно и за това нека Диаграмата на
+ * Гант има филтър с две теми, Тейст и пари. Така едната ще кореспондира с
+ * Управление, а другата в сметки."
+ */
+describe('темите на диаграмата · Текст и Пари', () => {
+  it('са ДВЕ и се твърдят с ръка · не се извеждат от кода', () => {
+    expect([...TEMI_NA_DIAGRAMATA]).toEqual(['tekst', 'pari']);
+    expect(IMENA_NA_TEMITE.tekst).toContain('делата');
+    expect(IMENA_NA_TEMITE.pari).toContain('приход');
+  });
+
+  it('всеки екран се отваря със СВОЯТА · „едната кореспондира с Управление, другата в сметки"', () => {
+    expect(podrazbranaTema('gant')).toBe('tekst');
+    expect(podrazbranaTema('smetki')).toBe('pari');
+  });
+
+  it('а личното и непознатият ключ падат на ТЕКСТ · диаграма без пари е диаграма на делата', () => {
+    expect(podrazbranaTema('lichno')).toBe('tekst');
+    expect(podrazbranaTema('нямагоняма')).toBe('tekst');
   });
 });

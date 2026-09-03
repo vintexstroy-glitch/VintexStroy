@@ -1559,6 +1559,18 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '81 · Разбивката · парите В ПОЛЕТО на диаграмата';
     // Негов въпрос: „…а в самата диаграма да се РАЗПРЕДЕЛИ В ПОЛЕТО от нея и
     // пресято спрямо такта."
+    //
+    // ОТ РЕЗЕН 114 парите са ТЕМА (ADR-160). Управление се отваря на „Текст" —
+    // там делата са работата, — значи преди да се броят ленти, темата се сменя.
+    proveri('Управление се отваря на ТЕКСТ · „едната кореспондира с Управление"',
+      await p.$eval('[data-tema-diagrama]', (e) => (e as HTMLElement).dataset['temaDiagrama']), 'tekst');
+    proveri('и на тази тема парични ленти НЯМА · осата носи делата',
+      await p.$$eval('.diagrama-parichna', (e) => e.length), 0);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#tema-diagrama', 'pari'));
+    proveri('темата „Пари" сменя КАКВО стои върху същата ос',
+      await p.$eval('[data-tema-diagrama]', (e) => (e as HTMLElement).dataset['temaDiagrama']), 'pari');
+    proveri('и делата вече не се редят там · един предмет наведнъж',
+      await p.$$eval('.diagrama .diagrama-red', (e) => e.length), 0);
     const lentiVPoleto = await p.$$eval('.diagrama-parichna', (e) => e.length);
     const redoveNaSumite = await p.$$eval('.gant-red.sumi', (e) => e.length);
     console.log(`\n  ПАРИТЕ В ПОЛЕТО: ${lentiVPoleto} ленти в диаграмата\n`);
@@ -1597,6 +1609,9 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('изборът преживява смяна на екран',
       await p.$eval('#f-razrez', (e) => (e as HTMLSelectElement).value), 'nachin');
     await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'bez'));
+    // ТЕМАТА СЕ ВРЪЩА · блок, който мести състояние под следващия, е по-скъп
+    // от липсващ (същото правило като при §68 и §69).
+    await deystvieSPrerisuvane(p, () => p.selectOption('#tema-diagrama', 'tekst'));
     await naEkran(p, 'imoti', '#forma-imot');
 
     razdel = '82 · Служителите · задачата се праща и се ПРИЕМА в програмата';
