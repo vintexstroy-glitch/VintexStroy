@@ -54,8 +54,16 @@ import {
 import { mozhe, type Izbor } from '../src/domein/planove.js';
 import { horataVProgramata } from './pravata.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { ekraniraj } from './obshto.js';
-import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { dnesKato, ekraniraj } from './obshto.js';
+import { chetiEkranno, zabraviEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  IMENA_NA_TAKTOVETE,
+  kartaNaSluzhitelya,
+  sasedenProzorets,
+  sveriKartata,
+  TAKTOVE_NA_KARTATA,
+  type TaktNaKartata,
+} from '../src/domein/karta-na-sluzhitelya.js';
 import type { Konteks } from './ekranite.js';
 
 /** Кого гледам · поглед върху екрана, помни се (ADR-022). */
@@ -134,7 +142,8 @@ export function narisuvaySluzhiteli(
     </section>
 
     ${hora.length === 0 ? '' : formaZaPrashtane(o, hora, kogo, dnes, mozhe(izbor, 'kalendar'))}
-    ${hora.length === 0 ? '' : listatNa(o, kogo, az)}`;
+    ${hora.length === 0 ? '' : listatNa(o, kogo, az)}
+    ${hora.length === 0 ? '' : kartataNa(o, kogo, dnes)}`;
 }
 
 /**
@@ -418,11 +427,176 @@ async function pratiPokanata(
   }
 }
 
+/**
+ * КАРТАТА НА СЛУЖИТЕЛЯ · седмица или месец (резен 113 · ADR-159).
+ *
+ * Негово, 03.09: „да виждаш и задачите които са активни и **там ги разпределяш**
+ * като прави картата на всеки служител за седмица или за месец."
+ *
+ * ═══ РАЗПРЕДЕЛЯНЕТО Е ЗАПИС, НЕ ПОГЛЕД ═══
+ *
+ * Преместването на задача е ВТОРО изпращане със СЪЩИЯ номер — механизмът вече
+ * съществува („Повторният запис на същия `zadachaId` ПОПРАВЯ задачата"), и
+ * затова тук не се ражда нов вид събитие. Поканата и бележката пътуват
+ * непокътнати: инак Журналът щеше да твърди, че покана не е тръгвала.
+ *
+ * ═══ ДЕЛОТО НЕ СЕ МЕСТИ ═══
+ *
+ * Срокът на ДЕЛОТО си остава негов; тук се мести КОГА този човек ще го свърши.
+ * Двете се разминават нарочно — и екранът го казва, вместо да го премълчи.
+ */
+function kartataNa(o: Ogledalo, kogo: string, dnes: string): string {
+  const takt = chetiEkranno<TaktNaKartata>('sluzhiteli.takt', 'sedmitsa');
+  const den = chetiEkranno('sluzhiteli.den', dnes);
+  const imenaNaDelata = new Map([...o.dela.values()].map((d) => [d.id, d.ime]));
+  const karta = kartaNaSluzhitelya({
+    izprateni: o.izprateniZadachi,
+    otgovori: o.otgovoriNaZadachi,
+    imenaNaDelata,
+    imeyl: kogo,
+    takt,
+    den,
+  });
+  const sv = sveriKartata(karta, dnes);
+  const parviyat = karta.dni[0]!.den;
+  const posledniyat = karta.dni[karta.dni.length - 1]!.den;
+
+  return `
+    <section data-sektsiya="sluzhiteli-karta" class="karta">
+      <div class="dyalglava">
+        <h2>Картата на ${ekraniraj(o.sluzhiteli.get(kogo)?.ime ?? (kogo === o.stopanin ? 'Стопанина' : kogo))}</h2>
+        <span>активните задачи по дни · разпределят се тук</span>
+      </div>
+
+      <div class="deystviya">
+        ${TAKTOVE_NA_KARTATA.map(
+          (t) => `<button type="button" class="vtorichen${t === takt ? ' tuk' : ''}"
+            data-karta-takt="${t}" aria-pressed="${t === takt ? 'true' : 'false'}">${
+              IMENA_NA_TAKTOVETE[t]
+            }</button>`,
+        ).join('')}
+        <button type="button" class="vtorichen malak" data-karta-nazad aria-label="Назад">‹</button>
+        <button type="button" class="vtorichen malak" data-karta-dnes>днес</button>
+        <button type="button" class="vtorichen malak" data-karta-napred aria-label="Напред">›</button>
+        <span class="drebno" data-karta-prozorets translate="no">${ekraniraj(parviyat)} … ${ekraniraj(posledniyat)}</span>
+      </div>
+
+      <div class="karta-mrezha" data-karta-dni="${karta.dni.length}" data-karta-aktivni="${karta.aktivni}">
+        ${karta.dni
+          .map(
+            (d) => `
+        <div class="karta-den${d.den === dnes ? ' dnes' : ''}" data-karta-den="${ekraniraj(d.den)}">
+          <b translate="no">${ekraniraj(d.den.slice(8))}</b>
+          ${d.zadachi
+            .map(
+              (z) => `
+          <div class="karta-zadacha ${ekraniraj(z.sastoyanie)}" data-karta-zadacha="${ekraniraj(z.zadachaId)}"
+               translate="no" title="${ekraniraj(z.delo)} · ${ekraniraj(z.ot)} … ${ekraniraj(z.do)}">
+            <span>${ekraniraj(z.delo || z.deloId)}</span>
+            <span class="drebno">${z.chas === '' ? 'цял ден' : `${ekraniraj(z.chas)}–${ekraniraj(z.doChas)}`}</span>
+            ${
+              z.nachalo
+                ? `<select class="premesti" data-premesti="${ekraniraj(z.zadachaId)}" aria-label="Премести на ден">
+                <option value="">премести…</option>
+                ${karta.dni
+                  .map(
+                    (x) =>
+                      `<option value="${ekraniraj(x.den)}">${ekraniraj(x.den.slice(8))}.${ekraniraj(
+                        x.den.slice(5, 7),
+                      )}</option>`,
+                  )
+                  .join('')}
+              </select>`
+                : '<span class="drebno">продължава</span>'
+            }
+          </div>`,
+            )
+            .join('')}
+        </div>`,
+          )
+          .join('')}
+      </div>
+
+      <p class="drebno" data-karta-sverka>Сверка вход↔изход: ${sv.vhod} активни → ${sv.izhod} положени,
+      разлика ${sv.razlika}.${
+        karta.otkazani > 0
+          ? ` Отказаните (${karta.otkazani}) НЕ се разпределят — те стоят в листа му.`
+          : ''
+      }</p>
+      <p class="drebno">Тук стои <b>поетото</b> — изпратената задача. Дело с неговото име, но
+      без изпращане, не влиза: отговорникът е ИМЕ, а служителят е имейл, и свързването им
+      по прилика би сложило чужда работа на нечий ден. Преместването пише <b>второ
+      изпращане</b> със същия номер (поправка, не втора задача) и <b>не мести срока на
+      делото</b> — той си остава негов.</p>
+    </section>`;
+}
+
 export function zakachiSluzhitelite(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * КАРТАТА · тактът, прозорецът и преместването (резен 113 · ADR-159).
+   *
+   * Тактът и денят са ПОГЛЕД (памет на устройството); преместването е ЗАПИС —
+   * второ изпращане със същия номер. Двете не се смесват: първите две не
+   * пипат Журнала, третото минава през Вратата като всяко друго решение.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-karta-takt]')) {
+    b.addEventListener('click', async () => {
+      zapomniEkranno('sluzhiteli.takt', b.dataset['kartaTakt'] ?? 'sedmitsa');
+      await prerisuvay();
+    });
+  }
+  for (const [znak, napred] of [['[data-karta-nazad]', -1], ['[data-karta-napred]', 1]] as const) {
+    koren.querySelector<HTMLButtonElement>(znak)?.addEventListener('click', async () => {
+      const takt = chetiEkranno<TaktNaKartata>('sluzhiteli.takt', 'sedmitsa');
+      zapomniEkranno(
+        'sluzhiteli.den',
+        sasedenProzorets(takt, chetiEkranno('sluzhiteli.den', dnesKato()), napred),
+      );
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLButtonElement>('[data-karta-dnes]')?.addEventListener('click', async () => {
+    zabraviEkranno('sluzhiteli.den');
+    await prerisuvay();
+  });
+
+  for (const menyu of koren.querySelectorAll<HTMLSelectElement>('[data-premesti]')) {
+    menyu.addEventListener('change', async () => {
+      const noviyat = menyu.value;
+      if (noviyat === '') return;
+      menyu.disabled = true;
+      try {
+        const o = await k.deystviya.ogledalo();
+        const stara = o.izprateniZadachi.get(menyu.dataset['premesti'] ?? '');
+        if (!stara) throw new Error('Задачата изчезна, докато картата стоеше отворена.');
+        // ДЪЛЖИНАТА ПЪТУВА С НЕЯ · тридневна задача остава тридневна, само
+        // почва другаде. Инак „преместване" би значело и „скъсяване".
+        const dni = Math.round(
+          (Date.parse(`${stara.do}T00:00:00Z`) - Date.parse(`${stara.ot}T00:00:00Z`)) / 86_400_000,
+        );
+        await k.deystviya.pratiZadacha(
+          {
+            ...stara,
+            ot: noviyat,
+            do: new Date(Date.parse(`${noviyat}T00:00:00Z`) + dni * 86_400_000)
+              .toISOString()
+              .slice(0, 10),
+            kogato: new Date().toISOString(),
+          },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest('dobre', `Задачата е преместена на ${noviyat}. Срокът на делото не е пипан.`);
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      }
+      await prerisuvay();
+    });
+  }
+
   for (const red of koren.querySelectorAll<HTMLElement>('[data-chovek]')) {
     red.addEventListener('click', async () => {
       izbran = red.dataset.chovek ?? '';

@@ -1647,6 +1647,63 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('сгрешена сума'), true);
 
+    // ══ 149 · КАРТАТА НА СЛУЖИТЕЛЯ · седмица и месец (резен 113 · ADR-159) ══
+    //
+    // Негово, 03.09 (И133): „да виждаш и задачите които са активни и ТАМ ГИ
+    // РАЗПРЕДЕЛЯШ като прави картата на всеки служител за седмица или за месец."
+    razdel = '149 · картата на служителя';
+    proveri('картата стои под листа му',
+      await p.$$eval('[data-sektsiya=sluzhiteli-karta]', (e) => e.length), 1);
+    proveri('седмицата е СЕДЕМ дни · понеделник пръв',
+      await p.$eval('[data-karta-dni]', (e) => (e as HTMLElement).dataset['kartaDni']), '7');
+    const aktivniVKartata = Number(
+      await p.$eval('[data-karta-aktivni]', (e) => (e as HTMLElement).dataset['kartaAktivni']),
+    );
+    proveri('и активните задачи са в нея · отказаната не се разпределя',
+      aktivniVKartata >= 1, true);
+    proveri('сверката се КАЗВА, дори когато е нула',
+      (await tekstNa(p, '[data-karta-sverka]')).includes('разлика 0'), true);
+    proveri('и КАЗВА, че брои поетото, не делата по име',
+      (await tekstNa(p, '[data-sektsiya=sluzhiteli-karta]')).includes('поетото'), true);
+
+    // МЕСЕЦЪТ · вторият такт, същата мрежа
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-takt=mesets]'));
+    proveri('месецът реди календарните си дни',
+      (await p.$eval('[data-karta-dni]', (e) => Number((e as HTMLElement).dataset['kartaDni']))) >= 28, true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-takt=sedmitsa]'));
+    proveri('и се връща на седмица', await p.$eval('[data-karta-dni]', (e) => (e as HTMLElement).dataset['kartaDni']), '7');
+
+    // ПРОЗОРЕЦЪТ СЕ МЕСТИ · и „днес" го връща
+    const prozoretsPredi = await tekstNa(p, '[data-karta-prozorets]');
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-napred]'));
+    proveri('напред сменя прозореца',
+      (await tekstNa(p, '[data-karta-prozorets]')) !== prozoretsPredi, true);
+    // ДЪЛГАТА ЗАДАЧА ПРЕСИЧА СЕДМИЦИ · това е вярно, не дефект: делото от
+    // §24 тече десет дни. Инвариантът, който важи във ВСЕКИ прозорец, е
+    // сверката — активните да са равни на положените.
+    proveri('и в другия прозорец сверката пак затваря',
+      (await tekstNa(p, '[data-karta-sverka]')).includes('разлика 0'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-dnes]'));
+    proveri('„днес" връща прозореца на днешния',
+      await tekstNa(p, '[data-karta-prozorets]'), prozoretsPredi);
+
+    // ══ РАЗПРЕДЕЛЯНЕТО · ВТОРО изпращане със същия номер, не втора задача ══
+    const zadachiPrediPremestvane = await p.$$eval(
+      '[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length);
+    const dnite = await p.$$eval('[data-karta-den]', (e) =>
+      e.map((x) => x.getAttribute('data-karta-den') ?? ''));
+    const kadeBeshe = await p.$eval('[data-karta-zadacha]', (e) =>
+      (e.closest('[data-karta-den]') as HTMLElement | null)?.dataset['kartaDen'] ?? '');
+    const drugDen = dnite.find((d) => d !== kadeBeshe) ?? '';
+    await sSabitie(p, () => p.selectOption('[data-premesti]', drugDen));
+    proveri('преместването е ЕДНО събитие · поправка, не втора задача',
+      await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length),
+      zadachiPrediPremestvane);
+    proveri('и задачата вече стои на другия ден',
+      await p.$$eval(`[data-karta-den="${drugDen}"] [data-karta-zadacha]`, (e) => e.length) >= 1, true);
+    proveri('а вестта казва, че срокът на ДЕЛОТО не е пипан',
+      (await tekstNa(p, '.vest')).includes('Срокът на делото не е пипан'), true);
+
     razdel = '83 · Поканата в календара · ПО ИЗБОР, и границата се КАЗВА';
     // Негови думи, 27.08 (И110): „по имейл ПО ИЗБОР и задължително в програмата…
     // но на Стопанина му показва приел ли е на календара или не."

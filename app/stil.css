@@ -798,6 +798,32 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
 }
 .podtab:hover { color: var(--mastilo); border-color: var(--mastilo2); }
 .podtab.tuk { background: var(--aktsent); border-color: var(--aktsent); color: var(--hartiya); }
+
+/* ── КАРТАТА НА СЛУЖИТЕЛЯ (резен 113 · ADR-159) ────────────────────────────
+   Негово: „картата на всеки служител за седмица или за месец". Мрежата е
+   СЕДЕМ колони и при двата такта — седмицата е един ред, месецът са пет:
+   така окото чете еднакво и двете, вместо да се учи на два изгледа. */
+.karta-mrezha {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+  margin: var(--space-sm) 0;
+}
+.karta-den {
+  min-height: 64px; padding: 5px 6px;
+  border: 1px solid var(--liniya); border-radius: 5px; background: var(--panel);
+}
+.karta-den.dnes { border-color: var(--aktsent); }
+.karta-den > b { display: block; font-size: 0.786rem; color: var(--mastilo2); margin-bottom: 3px; }
+.karta-zadacha {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 5px; margin-bottom: 4px; border-radius: 4px;
+  border-left: 3px solid var(--mastilo2); background: var(--hartiya);
+  font-size: 0.786rem;
+}
+/* Двете състояния се четат по РЪБА, не по цвят сам: чакащата е топла, приетата
+   е зелена — същите два цвята, с които говори целият екран. */
+.karta-zadacha.chaka { border-left-color: var(--toplo); }
+.karta-zadacha.prieta { border-left-color: var(--zeleno); }
+.karta-zadacha .premesti { font: inherit; font-size: 0.786rem; max-width: 100%; }
 /* ДВАТА БЛОКА НА ФОРМАТА · имотът и обектът се вкарват заедно (И132), но окото
    трябва да види къде свършва единият. `fieldset` носи решетката на `.poleta`,
    затова рамката му пада, а `legend` е само надпис. */
