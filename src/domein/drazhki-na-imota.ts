@@ -41,7 +41,15 @@ export interface Drazhka {
   readonly sektsiya: string;
 }
 
-/** Четирите, поименно · думите идват от `DUMITE`, за да има ЕДИН дом (правило 17). */
+/**
+ * ТРИТЕ, поименно · думите идват от `DUMITE`, за да има ЕДИН дом (правило 17).
+ *
+ * Тук пишеше „Четирите" над ТРИ записа — броено число, преписано от изречение
+ * (ADR-164 говори за „четирите дръжки", защото брои и Папката, която НЕ е тук:
+ * тя идва от `data-papka-adres` на реда, не от този списък). Намерено при
+ * сверката на резен 110: агент го ПРЕПИСА като факт, вместо да го преброи —
+ * точно капанът, срещу който е правило 17.
+ */
 export const DRAZHKITE_NA_IMOTA: readonly Drazhka[] = Object.freeze([
   Object.freeze({ klyuch: 'nov-obekt', ime: `Нов ${DUMITE.obekt.toLocaleLowerCase('bg-BG')}`, ekran: 'imoti', sektsiya: 'imoti-nov' }),
   Object.freeze({ klyuch: 'novo-delo', ime: `Ново ${DUMITE.delo.toLocaleLowerCase('bg-BG')}`, ekran: 'gant', sektsiya: 'gant-forma' }),

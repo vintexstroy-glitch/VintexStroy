@@ -71,6 +71,7 @@ import {
   klyuchNaPametta,
 } from '../src/domein/podtabove-smetki.js';
 import { zakachiIstoriya } from './istoriya.js';
+import { imaGolyamoDelo } from './golyamo-delo.js';
 import { zakachiDokumentite } from './dokumenti.js';
 import { zakachiKontekstnoMenyu } from './kontekstno-menyu.js';
 import { zakachiKlaviatura } from './klaviatura.js';
@@ -748,6 +749,7 @@ async function trugvay(): Promise<void> {
         lichnoVklyucheno,
         lichnoPipnato,
         negov: eStopanin(kojSam.imeyl, ogledalo),
+        imaGolyamoDelo: imaGolyamoDelo(ogledalo),
       }),
     };
 
@@ -985,6 +987,7 @@ async function trugvay(): Promise<void> {
         lichnoVklyucheno,
         lichnoPipnato,
         negov: eStopanin(kojSam.imeyl, og),
+        imaGolyamoDelo: imaGolyamoDelo(og),
       });
 
     // ЛЕНТАТА · свива се и се застопорява (негова дума, 27.08 · ADR-058).
@@ -1111,7 +1114,15 @@ function dostapniteEkrani(n: {
   readonly lichnoPipnato: boolean;
   /** Стопанинът ли гледа · той няма личен таб (ADR-154) */
   readonly negov: boolean;
-  /** връзката с НАП · ФАКТ от Журнала, не отметка (резен 17) */
+  /**
+   * ИМА ЛИ ГОЛЯМО ДЕЛО · ФАКТ от Журнала, не отметка (резен 110 · ADR-166).
+   *
+   * „Дори Гоялмо Дело се появява като отделен таб при посикване" — поискването
+   * е записаното дърво на строежа (резен 104). Няма голямо дело значи няма
+   * предмет, а не скрито по право: затова сметката е тук, при другите
+   * състояния, а не `iska` в регистъра.
+   */
+  readonly imaGolyamoDelo: boolean;
 }): readonly KoyEkran[] {
   // РЕДЪТ Е РЕШЕНИЕ, не подредба на файл (И125 · резен 85): списъкът с
   // изворите на всяко място живее до регистъра, в `ekranite.ts`.
@@ -1125,6 +1136,7 @@ function dostapniteEkrani(n: {
       // ПРИБРАНОТО пада от лентата и се връща от Таблото, където изключеното
       // се връща. Трите състояния са различни: „не е пипано" ≠ „прибрано"
       // ≠ „включено", и това е причината да не е един булев.
+      if (koy === 'golyamodelo') return n.imaGolyamoDelo;
       if (koy === 'lichno') {
         // СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ (ADR-154 · И131 т.1: „Стопанина ням,а опция
         // за личен."). Главният имейл не е служител (ADR-043); границата е на
@@ -1168,6 +1180,7 @@ function strana(
     lichnoVklyucheno,
     lichnoPipnato,
     negov: gledashtiyat === 'stopanin',
+    imaGolyamoDelo: imaGolyamoDelo(o),
   });
   /**
    * ТРИТЕ СЛОЯ НА РЕДА · и ЧЕТВЪРТИЯТ въпрос, кое се вижда (резен 15 · И111).

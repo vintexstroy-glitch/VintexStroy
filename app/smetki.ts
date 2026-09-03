@@ -11,6 +11,7 @@
 import { SUMATA_NAD_NULA, kakvoPishe, otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { ekraniraj } from './obshto.js';
+import { prochetenoKSS } from './golyamo-delo.js';
 import { otData } from '../src/yadro/data.js';
 import { MERKA, ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -299,6 +300,38 @@ export function lentataNaBalansa(dnes: string): string {
       </form>`;
 }
 
+/**
+ * ПРОЧЕТЕНАТА КСС · ТУК Е ВТОРОТО Ѝ МЯСТО (резен 110 · ADR-166).
+ *
+ * Негово, 03.09: „…а КСС е за Сметки." Чете се в таб „Голямо дело" — входът е
+ * ЕДИН — и се ПОКАЗВА тук, докато стои отворена. Нула събития: сметката е
+ * ОФЕРТА за разход, не платен разход, и валутата ѝ е на чуждия файл.
+ *
+ * Секцията се появява само когато има прочетено; иначе подтаб „Разход" би
+ * носил празна карта, която обещава нещо, което го няма (правило 15).
+ */
+function blokNaKSSVSmetki(): string {
+  const k = prochetenoKSS();
+  if (k === null) return '';
+  const pishiChislo = (st: number): string => (st / 100).toFixed(2).replace('.', ',');
+  return `
+    <section class="karta" data-sektsiya="smetki-kss">
+      <div class="dyalglava">
+        <h2>Количествено-стойностна сметка</h2>
+        <span data-kss-v-smetki="${k.chetene.redove.length}">${k.chetene.redove.length} реда · „${ekraniraj(k.myasto)}"</span>
+      </div>
+      <p class="drebno">От „${ekraniraj(k.fayl)}" · сбор
+        <b translate="no">${pishiChislo(k.chetene.sbor_st)}</b> ·
+        ${
+          k.chetene.obyaven_st === 0
+            ? 'файлът не казва свой сбор'
+            : `разлика с файла <b translate="no">${pishiChislo(k.chetene.razlika_st)}</b>`
+        }.
+        Числата са на чуждия файл и НЕ влизат в Журнала — сметката е оферта, не
+        платен разход. Четенето е в таб „Голямо дело".</p>
+    </section>`;
+}
+
 export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
   const mesets = period ?? dnes.slice(0, 7);
   // КРАЯТ (И124 т.11) · сборовете и разбивките гледат ОБХВАТА; месечните
@@ -448,6 +481,8 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
     ${tuk('smetki-mesetsat') ? blokMesetsatZaAgenta(o, mesets) : ''}
 
     ${tuk('zaplati') ? blokNaZaplatite(o, dnes) : ''}
+
+    ${tuk('smetki-kss') ? blokNaKSSVSmetki() : ''}
 
     ${tuk('smetki-nov-razhod') ? formaRazhod(o, mesets) : ''}
 

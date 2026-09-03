@@ -134,15 +134,29 @@ export function opIdNaDeloOtShablona(myasto: string, pat: string): string {
   return `darvo:${svedenotoMyasto(myasto)}:${pat}`;
 }
 
+/**
+ * ЖИВИЯТ КОРЕН на строежа под този Имот · самото ГОЛЯМО ДЕЛО, ако го има.
+ *
+ * Един дом за въпроса „започнал ли е строежът тук" (правило 17): резен 104 го
+ * пита, за да НЕ предложи второ дърво, а резен 110 — за да закачи прочетения
+ * линеен график ПОД него („Голямо дело с Много поддела", И131 т.2). Две сметки
+ * за едно и също щяха да се разминат при първата поправка.
+ */
+export function zhiviyatKoren<
+  T extends { readonly myasto: string; readonly ime: string; readonly nadDelo: string },
+>(zhiviDela: readonly T[], myasto: string): T | undefined {
+  const sveden = svedenotoMyasto(myasto);
+  return zhiviDela.find(
+    (d) => d.ime === KORENAT_NA_STROEZHA && d.nadDelo === '' && svedenotoMyasto(d.myasto) === sveden,
+  );
+}
+
 /** Има ли под Имота ЖИВО коренно дело „Строителство" · тогава дърво не се предлага. */
 export function imaZhivKoren(
   zhiviDela: readonly { readonly myasto: string; readonly ime: string; readonly nadDelo: string }[],
   myasto: string,
 ): boolean {
-  const sveden = svedenotoMyasto(myasto);
-  return zhiviDela.some(
-    (d) => d.ime === KORENAT_NA_STROEZHA && d.nadDelo === '' && svedenotoMyasto(d.myasto) === sveden,
-  );
+  return zhiviyatKoren(zhiviDela, myasto) !== undefined;
 }
 
 /**

@@ -90,19 +90,23 @@ describe('регистърът на екраните', () => {
     // Таблото първо (файлът му почва с двете табла · р48·[37]); Плащания
     // Архив СЛЕД Продажби (р52·[288]); вторият ред — Контакти и Стойност
     // (Цени), с Настройки НАКРАЯ (р52·[206]). Пада на глас при разместване.
+    // ГОЛЯМО ДЕЛО влезе СЛЕД Управление (резен 110 · ADR-166): то работи върху
+    // делата на строежа и е техният вход. Пунктът стои в реда, но се ПОЯВЯВА
+    // само когато има живо голямо дело — „при посикване" е факт от Журнала,
+    // не място в списъка.
     expect(REDAT_NA_LENTATA).toEqual([
-      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'golyamodelo', 'prodazhbi', 'plashtaniya',
       'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
     ]);
   });
 
-  it('двете групи · седем в работата, шест второстепенни (резен 118 · ADR-163)', () => {
+  it('двете групи · осем в работата, шест второстепенни (резен 118 · ADR-163)', () => {
     // Границата е ПИН С РЪКА в домейна; тук се брои, че редът и границата
     // се покриват: работата е точно първите седем, второстепенните — от
     // Контакти до Настройки. Табло е в първата (пътят обратно), Настройки —
     // във втората, и двете не се скриват — значи разделителят никога не виси сам.
     expect(rabotnite(REDAT_NA_LENTATA)).toEqual([
-      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'golyamodelo', 'prodazhbi', 'plashtaniya',
     ]);
     expect(REDAT_NA_LENTATA.slice(rabotnite(REDAT_NA_LENTATA).length)).toEqual([
       'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',

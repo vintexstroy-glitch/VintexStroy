@@ -3,6 +3,7 @@ import { naPodtabNa, naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, do
 import { join } from 'node:path';
 import { writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -2361,6 +2362,65 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 22);
     proveri('и разклоненията са ПОД корена · има поддела',
       await p.$$eval('.gant-delo.poddelo[data-grupa="Гълъбец"]', (e) => e.length) > 0, true);
+
+    // ═══ 110 · ГОЛЯМОТО ДЕЛО · линейният график и КСС (ADR-166) ═══
+    //
+    // „Дори Гоялмо Дело се появява като отделен таб при посикване и само там
+    // може да вкараш линеен график и да направиш Линейния график с тажлицата и
+    // диаграмата от модела на Гант. Тогава ще може да го има и в Управление и в
+    // Сметки. Там ще се прибира към ИМот на който принадлежи." (03.09)
+    razdel = '110 · табът се появява ПРИ ПОИСКВАНЕ · с голямото дело';
+    // Дървото на „Гълъбец" е записано по-горе, значи пунктът вече го има.
+    proveri('пунктът „Голямо дело" стои в лентата, щом има голямо дело',
+      await p.$$eval('[data-ekran=golyamodelo]', (e) => e.length), 1);
+    await naEkran(p, 'golyamodelo', '#gd-imot');
+    proveri('екранът предлага само Имотите със строеж',
+      await p.$eval('[data-imoti-s-darvo]', (e) => (e as HTMLElement).dataset['imotiSDarvo']), '1');
+    proveri('и още няма прочетен график · нула реда',
+      await p.$eval('[data-grafik-redove]', (e) => (e as HTMLElement).dataset['grafikRedove']), '0');
+
+    razdel = '110 · линейният график се ЧЕТЕ, но не се записва';
+    const prediGrafika = await broySabitiya(p);
+    await p.setInputFiles('#gd-fayl-grafik',
+      fileURLToPath(new URL('../../tests/mostri/lineen-grafik.pdf', import.meta.url)));
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-grafik-redove]') as HTMLElement | null)?.dataset['grafikRedove'] === '5');
+    proveri('петте реда се четат от ПДФ-а · с координати, не по вид',
+      await p.$eval('[data-grafik-redove]', (e) => (e as HTMLElement).dataset['grafikRedove']), '5');
+    proveri('и дървото им има ТРИ степени · отстъпът носи подделата',
+      await p.$eval('[data-grafik-stepeni]', (e) => (e as HTMLElement).dataset['grafikStepeni']), '3');
+    proveri('четенето НЕ пише · записва човекът (правило 18)', await broySabitiya(p), prediGrafika);
+    proveri('таблицата и диаграмата са от модела на Гант',
+      (await p.$$('[data-sektsiya=golyamo-delo-grafik] .gant')).length > 0 &&
+        (await p.$$('[data-sektsiya=golyamo-delo-grafik] svg')).length > 0, true);
+
+    razdel = '110 · записът слага делата ПОД голямото дело, със сверка';
+    await deystvieSPrerisuvane(p, () => p.click('#grafik-zapishi'));
+    proveri('петте дела са в Журнала', await broySabitiya(p), prediGrafika + 5);
+    const vestGrafik = await p.$eval('.vest', (e) => (e as HTMLElement).textContent ?? '');
+    proveri('и сверката вход↔изход се КАЗВА · разлика 0',
+      vestGrafik.includes('5 от 5 дела') && vestGrafik.includes('разлика 0'), true);
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('делата от графика се виждат в Управление, под Имота си',
+      await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 27);
+
+    razdel = '110 · КСС се чете и се показва в Сметки, без нито едно събитие';
+    await naEkran(p, 'golyamodelo', '#gd-imot');
+    const prediKSS = await broySabitiya(p);
+    await p.setInputFiles('#gd-fayl-kss',
+      fileURLToPath(new URL('../../tests/mostri/kss.pdf', import.meta.url)));
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-kss-redove]') as HTMLElement | null)?.dataset['kssRedove'] === '5');
+    proveri('петте реда на сметката се четат',
+      await p.$eval('[data-kss-redove]', (e) => (e as HTMLElement).dataset['kssRedove']), '5');
+    proveri('сборът се сверява с реда „Общо:" на файла · разлика нула',
+      await p.$eval('[data-kss-razlika]', (e) => (e as HTMLElement).dataset['kssRazlika']), '0');
+    proveri('и всеки ред се връзва · количество × цена = стойност',
+      await p.$eval('[data-kss-nevarzani]', (e) => (e as HTMLElement).dataset['kssNevarzani']), '0');
+    proveri('четенето на КСС не пише нищо', await broySabitiya(p), prediKSS);
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
+    proveri('прочетената сметка се вижда и в Сметки · подтаб Разход',
+      await p.$eval('[data-kss-v-smetki]', (e) => (e as HTMLElement).dataset['kssVSmetki']), '5');
 
     // ═══ 117ж · БАЛАНСЪТ · периодът с КРАЙ (резен 70 · И124 т.11) ═══
     //

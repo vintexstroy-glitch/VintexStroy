@@ -17,6 +17,7 @@
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
+import { narisuvayGolyamoDelo, zakachiGolyamoDelo } from './golyamo-delo.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
@@ -44,6 +45,7 @@ export type KoyEkran =
   | 'pari'
   | 'stoynost'
   | 'gant'
+  | 'golyamodelo'
   | 'smetki'
   | 'nastroyki'
   | 'ii'
@@ -258,6 +260,7 @@ export const REDAT_NA_LENTATA: readonly KoyEkran[] = Object.freeze([
   'pari',
   'smetki',
   'gant',
+  'golyamodelo',
   'prodazhbi',
   'plashtaniya',
   'kontakti',
@@ -352,6 +355,16 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ikona: 'ekran-gant',
     narisuvay: (r) => narisuvayGant(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiGant(z.koren, z.k, z.prerisuvay),
+  },
+  golyamodelo: {
+    ime: 'Голямо дело',
+    podnaslov: 'линейният график и КСС · входът е ЕДИН, показването е на две места',
+    ikona: 'ekran-gant',
+    // БЕЗ `iskaRolya`: наблюдателят не вижда бутоните (те са в `zakachi`), но
+    // прочетеното е ПОГЛЕД. Пунктът се появява само когато има голямо дело —
+    // сметката е в `main.ts` (`dostapniteEkrani`), защото иска Огледалото.
+    narisuvay: (r) => narisuvayGolyamoDelo(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiGolyamoDelo(z.koren, z.k, z.prerisuvay, z.dnes),
   },
   ii: {
     ime: 'ИИ',

@@ -67,6 +67,8 @@ const KADE: Readonly<Record<string, KlyuchPodtabSmetki>> = Object.freeze({
   'krediti-predstoyashti': 'razhod',
   'kredit-kalkulator': 'razhod',
   'smetki-kalkulator': 'razhod',
+  // КСС · прочетената сметка е ОФЕРТА за разход (резен 110 · ADR-166)
+  'smetki-kss': 'razhod',
 
   // ── ОТЧЕТ · коефициентите, гнездата, полетата с формула ──
   'otchet-dela': 'otchet',
