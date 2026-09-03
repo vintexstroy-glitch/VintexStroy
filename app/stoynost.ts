@@ -65,6 +65,7 @@ import {
   zakachiKalkulator,
 } from './kalkulator.js';
 import { matritsaOtNastroyki, sluchay } from '../src/kalkulator/nastroyki.js';
+import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
@@ -116,6 +117,75 @@ export function sboratZaKapitala(): number | undefined {
 }
 
 /**
+ * СТОЙНОСТТА НА АКТИВА · КАЛКУЛАТОРЪТ СМЯТА И ПОКАЗВА, НЕ РЕДАКТИРА
+ * (резен 105 · ADR-168).
+ *
+ * Негово, 09.08 (р57·[199]): „Няма активи вече, коригирай казва се Стойност на
+ * Състояние и **няма редакция от там**, а само изчисляане на стойност на
+ * имотите като оценка на всички наши активи."
+ *
+ * Затова тук НЯМА бутон, който пише. Първата версия на този резен сложи
+ * „Впиши стойността в Имота" — и това беше МОЯ формулировка в плана („той
+ * предлага, човек записва"), не негова дума. Правило 28: последната негова
+ * дума бие, а тя казва обратното. Числото се СМЯТА и се ПОКАЗВА срещу онова,
+ * което стои в книгата; вписването си остава във формата на Имота, където
+ * човекът го е сложил.
+ *
+ * Показваната разлика е сверка (правило 7): сметнатото минус вписаното, и
+ * нулата се казва. Тя отговаря на въпроса „остаряла ли е стойността в
+ * книгата", без да пипа нито едно число.
+ */
+function blokNaSravnenieto(o: Ogledalo): string {
+  const sVpisana = [...o.mesta.values()].filter((m) => m.stoynost_st > 0);
+  const vpisano_st = sVpisana.reduce((sbor, m) => sbor + m.stoynost_st, 0);
+  // ТОЧНОТО число, не закръгленото: „закръгленото НИКОГА не влиза в сбор"
+  // (правило 3). Същата цена вече е плащана в този файл — `sboratZaKapitala`
+  // беше поправен по същата причина, и обяснението стои над него.
+  const smetnata_st = smetnato?.saglasuvana_tochno_st ?? 0;
+  const razlika_st = smetnata_st - vpisano_st;
+  return `
+    <section class="karta" data-sektsiya="stoynost-sravnenie">
+      <div class="dyalglava">
+        <h2>Оценката срещу книгата</h2>
+        <span data-smetnata-stoynost="${smetnata_st}">${
+          smetnata_st === 0
+            ? 'няма сметнато · прочети площообразуване или ценова листа'
+            : `съгласуваната оценка е ${pishi(smetnata_st)}`
+        }</span>
+      </div>
+      <div class="tablitsa" data-tablitsa="stoynost-sravnenie">
+        <div class="red glava" translate="no">
+          <span>Какво</span><span class="suma">Число</span>
+        </div>
+        <div class="red" data-sravnenie="vpisano">
+          <span>Вписано в книгата · ${sVpisana.length} ${sVpisana.length === 1 ? 'Имот' : 'Имота'}</span>
+          <span class="suma" translate="no">${pishi(vpisano_st)}</span>
+        </div>
+        <div class="red" data-sravnenie="smetnato">
+          <span>Сметнато сега · съгласуваната оценка</span>
+          <span class="suma" translate="no">${pishi(smetnata_st)}</span>
+        </div>
+        <div class="red" data-sravnenie="razlika" data-razlika="${razlika_st}">
+          <span><b>Разлика</b></span>
+          <span class="suma${razlika_st === 0 ? '' : ' zle'}" translate="no">${sZnak(razlika_st)}</span>
+        </div>
+      </div>
+      <p class="drebno"><b>Един ред, не по Имот — и това се КАЗВА</b> (правило 15).
+      Калкулаторът смята по ОБЕКТИ, а обектът в Огледалото не носи връзка към
+      своя Имот: разбивка по Имоти щеше да покаже едно и също число на всеки
+      ред и да нарече това сверка. Връзката чака резен 107 („Имот без Обект и
+      Обект с Имот могат да се изберат в Калкулатора", И129 т.4).</p>
+      <p class="drebno"><b>Оттук не се редактира</b> — негово, 09.08: „няма
+      редакция от там, а само изчисляане на стойност на имотите като оценка на
+      всички наши активи". Стойността на Имота се вписва във формата му, в
+      Имоти; тук се вижда КОЛКО се разминава с днешната оценка.</p>
+      <p class="drebno">Сравнява се СЪГЛАСУВАНАТА стойност — трите подхода,
+      претеглени, и в ТОЧНОТО ѝ число. „А · по площ" е цена за ПРОДАЖБА, не
+      оценка на актива (ADR-016).</p>
+    </section>`;
+}
+
+/**
  * ДВЕТЕ СЕКЦИИ · неговото предложение в И96 т.2, изпълнено.
  *
  *   „Ако се налага направи **секция Калкулатор и секция Ценова листа**."
@@ -126,10 +196,12 @@ export function sboratZaKapitala(): number | undefined {
  * Разделени, защото се гледат от различни хора в различен момент: матрицата се
  * пипа веднъж на сезон, листата — всеки ден.
  */
-export function narisuvayStoynost(): string {
+export function narisuvayStoynost(o: Ogledalo): string {
   const n = nastroykiteNaKalkulatora();
   return `
     ${sektsiyaKalkulator()}
+
+    ${blokNaSravnenieto(o)}
 
     <div class="dyalglava">
       <h2>Ценова листа</h2>

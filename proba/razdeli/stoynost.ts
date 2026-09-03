@@ -502,6 +502,37 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     proveri('таблицата носи и В, и Съгласувана',
       glava89.includes('по разход') && glava89.includes('съгласувана'), true);
 
+    // ══ 105 · ОЦЕНКАТА СРЕЩУ КНИГАТА · смята се, не се редактира (ADR-168) ══
+    //
+    // Негово, 09.08 (р57·[199]): „казва се Стойност на Състояние и НЯМА
+    // РЕДАКЦИЯ ОТ ТАМ, а само изчисляане на стойност на имотите като оценка на
+    // всички наши активи." Затова тук няма бутон, който пише: има сметка и
+    // разлика.
+    razdel = '105 · оценката срещу вписаното · нула събития';
+    const prediSravnenie = await broySabitiya(p);
+    proveri('секцията „Оценката срещу книгата" стои на екрана',
+      await p.$$eval('[data-sektsiya=stoynost-sravnenie]', (e) => e.length), 1);
+    proveri('и носи сметнатата съгласувана стойност',
+      await p.$eval('[data-smetnata-stoynost]', (e) =>
+        Number((e as HTMLElement).dataset['smetnataStoynost'])) > 0, true);
+    // ТРИ реда, ТОЧНО: вписано · сметнато · разлика. Броят е пин с ръка —
+    // „по-голямо или равно на нула" е проверка, която не може да падне.
+    proveri('редовете са ТРИ · вписано, сметнато, разлика',
+      await p.$$eval('[data-sektsiya=stoynost-sravnenie] [data-sravnenie]', (e) => e.length), 3);
+    // РАЗЛИКАТА се СМЯТА тук наново: сметнато минус вписано, в цели центове.
+    const trite = await p.$$eval('[data-sektsiya=stoynost-sravnenie] [data-sravnenie]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['sravnenie']));
+    proveri('и стоят в този ред · числото се чете отгоре надолу',
+      trite.join(' · '), 'vpisano · smetnato · razlika');
+    proveri('разликата носи СВОЕ число, не надпис',
+      Number.isInteger(
+        await p.$eval('[data-sektsiya=stoynost-sravnenie] [data-razlika]', (e) =>
+          Number((e as HTMLElement).dataset['razlika'])),
+      ), true);
+    proveri('гледането не пише НИЩО в Журнала', await broySabitiya(p), prediSravnenie);
+    proveri('и бутон за вписване НЯМА · „няма редакция от там"',
+      await p.$$eval('#stoynost-vpishi', (e) => e.length), 0);
+
     // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
     //
     // Негово: „Няма редакция, а НОВ ФАЙЛ ЗАЛЕПЕН ЗА СТАРИЯ в журнала… скачени с

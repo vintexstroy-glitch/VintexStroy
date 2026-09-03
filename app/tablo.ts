@@ -875,7 +875,12 @@ function kartaSpiratchka(izbor: Izbor, koj: Samolichnost, nuzhno: number): strin
       </div>
 
       <p class="drebno">
-        <span class="znachka ${znachka}" data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(
+        <!-- СВОЙ БЕЛЕГ, не „оценка": същата дума в Контакти носи Айзенхауер
+             (спешно-важно…), а тук — мястото на устройството (stiga · tyasno).
+             Един белег с две значения е двусмислен за всеки обход и смесва
+             латиница с кирилица в едно поле (правило 11). Намерено при
+             сверката на резен 105 (ADR-168). -->
+        <span class="znachka ${znachka}" data-mestoto="${ekraniraj(p.otsenka)}">${ekraniraj(
           p.otsenka === 'ne e pitano'
             ? 'не е питано'
             : p.otsenka === 'stiga'

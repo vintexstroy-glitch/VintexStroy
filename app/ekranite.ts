@@ -346,7 +346,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
     ikona: 'ekran-stoynost',
     iskaRolya: 'sobstvenik',
-    narisuvay: () => narisuvayStoynost(),
+    narisuvay: (r) => narisuvayStoynost(r.ogledalo),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
   },
   gant: {
