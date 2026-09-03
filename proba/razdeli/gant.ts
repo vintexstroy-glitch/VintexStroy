@@ -130,6 +130,84 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.keyboard.press('Escape');
     await p.waitForFunction(() => document.querySelector('.kontekstno-menyu') === null);
 
+    // ══ 100 · ЧЕТИРИТЕ ДРЪЖКИ ОТ МЕНЮТО НА ИМОТА (И124 т.8 · ADR-164) ═══════
+    //
+    // „Има място където се създават Имоти и отделно Дело или Среща или друго
+    // вкарано по избор от стопанина." Мястото е менюто на реда: дръжки към
+    // СЪЩИТЕ форми с предизбран Имот. Тук се играе от Управление (редът носи
+    // `data-myasto`), после от Имоти (`data-imot`) и от реда на Обекта.
+    razdel = '100 · дръжките на Имота · Управление';
+    const predDrazhkata = await broySabitiya(p);
+    await p.click('[data-tablitsa=mestata] [data-myasto="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    const punktoveUpravlenie = await p.$$eval('.kontekstno-menyu button', (e) =>
+      e.map((x) => (x.textContent ?? '').trim()));
+    proveri('менюто на Имота носи трите дръжки ПРЕДИ папката, поименно и в ред',
+      punktoveUpravlenie.slice(0, 3).join(' · '), 'Нов обект · Ново дело · Нова среща');
+    proveri('и папката, и копирането остават · пет бутона с линк',
+      punktoveUpravlenie.join(' · '), 'Нов обект · Ново дело · Нова среща · Папката в Драйва · Копирай реда');
+    // „Ново дело" · отваря СЪЩАТА форма в Управление с Имота вече вписан.
+    await p.click('.kontekstno-menyu button:has-text("Ново дело")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#d-forma-delo');
+    proveri('„Ново дело" предизбира Имота във формата на Управление',
+      await p.$eval('#d-myasto', (e) => (e as HTMLInputElement).value), 'Малинова');
+    proveri('и полето Имот на делото ПРЕДЛАГА вписаните Имоти · „избор от наличното" (И124 т.8)',
+      await p.$$eval('#d-myasto-spisak option', (e) =>
+        e.some((x) => (x as HTMLOptionElement).value === 'Малинова')), true);
+    proveri('предизборът е движение на ръката · нула събития', await broySabitiya(p), predDrazhkata);
+
+    razdel = '100 · дръжките на Имота · Имоти и Контакти';
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.click('[data-tablitsa=imotite] [data-imot="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('същото меню и от Имоти · един код, два екрана',
+      (await p.$$eval('.kontekstno-menyu button', (e) => e.map((x) => (x.textContent ?? '').trim())))
+        .slice(0, 3).join(' · '), 'Нов обект · Ново дело · Нова среща');
+    // „Нова среща" · Контакти, формата на ангажимента с Имота избран.
+    await p.click('.kontekstno-menyu button:has-text("Нова среща")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#forma-sreshta');
+    proveri('„Нова среща" предизбира Имота в Контакти',
+      await p.$eval('#sr-imot', (e) => (e as HTMLSelectElement).value), 'Малинова');
+    proveri('и формата предлага всичките видове ангажимент · „Среща ИЛИ друго"',
+      await p.$$eval('#spisak-vidove-angazhiment option', (e) => e.length) >= 4, true);
+    // „Нов обект" · Имоти, формата с Имота избран и полето за ново име скрито.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.click('[data-tablitsa=imotite] [data-imot="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    await p.click('.kontekstno-menyu button:has-text("Нов обект")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForFunction(() => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.value === 'малинова');
+    proveri('„Нов обект" предизбира Имота във формата на Имоти',
+      await p.$eval('#imot-imot option:checked', (e) => (e as HTMLOptionElement).dataset['ime']), 'Малинова');
+    proveri('и полето за ново име е скрито · Имотът вече е избран',
+      await p.$eval('[data-pole-ime]', (e) => (e as HTMLElement).hidden), true);
+
+    razdel = '100 · дръжките на Обекта · само „Ново дело"';
+    // „Делата са за Имот и за Обект" (И131 т.2) · Обект под Обект той няма.
+    // РЕДЪТ СЕ ЧЕТЕ, не се гадае: по-ранни раздели поправят и сторнират
+    // обекти, и закован адрес би мерил чуждо състояние. Взима се първият жив
+    // Обект на екрана, с адреса и единицата от собствените му белези.
+    const obektat = await p.$eval('.red.imot', (e) => ({
+      adres: (e as HTMLElement).dataset['obektAdres'] ?? '',
+      edinitsa: (e as HTMLElement).dataset['obektEdinitsa'] ?? '',
+    }));
+    proveri('редът на Обекта носи адреса и единицата си', obektat.adres !== '' && obektat.edinitsa !== '', true);
+    await p.click('.red.imot .kletka', { button: 'right' });
+    await p.waitForSelector('.kontekstno-menyu');
+    const punktoveObekt = await p.$$eval('.kontekstno-menyu button', (e) =>
+      e.map((x) => (x.textContent ?? '').trim()));
+    proveri('редът на Обекта носи „Ново дело" и НЕ носи „Нов обект" и „Нова среща"',
+      `${punktoveObekt.includes('Ново дело')} · ${punktoveObekt.includes('Нов обект')} · ${punktoveObekt.includes('Нова среща')}`,
+      'true · false · false');
+    await p.click('.kontekstno-menyu button:has-text("Ново дело")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#d-forma-delo');
+    proveri('от Обекта делото носи и Имота, и Обекта',
+      `${await p.$eval('#d-myasto', (e) => (e as HTMLInputElement).value)} · ${await p.$eval('#d-obekt', (e) => (e as HTMLInputElement).value)}`,
+      `${obektat.adres} · ${obektat.edinitsa}`);
+
     razdel = '109 · Имотите · второто записване ПОПРАВЯ';
     const prediPopravka = await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length);
     await naEkran(p, 'imoti', '#forma-imot');

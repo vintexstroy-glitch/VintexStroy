@@ -63,6 +63,7 @@ import { butniSvoyata, drapniChuzhdite } from '../src/nositel/drayv.js';
 import { DrayvNaGoogle, vzemiZheton } from './drayv-google.js';
 import { zakachiFiltri } from './filtri.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { otbelezhiEkrana } from './predizbor.js';
 import { IMENA_NA_GRUPITE, naDveGrupi, rabotnite } from '../src/domein/lenta.js';
 import {
   PARVIYAT_PODTAB,
@@ -682,6 +683,8 @@ async function trugvay(): Promise<void> {
   }
 
   async function prerisuvay(): Promise<void> {
+    // Предизбраният Имот от менюто на реда живее само на своя екран (ADR-164).
+    otbelezhiEkrana(ekran);
     const sabitiya = await dnevnik.chetiVsichki(veriga);
     sastoyanieNaVerigata = { ...sastoyanieNaVerigata, broi: sabitiya.length };
     const ogledalo = await deystviya.ogledalo();
@@ -938,7 +941,14 @@ async function trugvay(): Promise<void> {
       zakachiIstoriya(koren, k);
       // ДОКУМЕНТИТЕ · ЕДИН закачач за трите екрана (резен 17б · ADR-073).
       zakachiDokumentite(koren, k, prerisuvay);
-      zakachiKontekstnoMenyu(koren, k);
+      // Менюто на реда носи и дръжките към формите (резен 100 · ADR-164) —
+      // и затова пита за РОЛЯТА, като редакцията: път към писане не се
+      // предлага на наблюдател (правило 23).
+      zakachiKontekstnoMenyu(koren, k, {
+        rolya: rolyataNa(kojSam.imeyl, ogledalo),
+        otvoriEkran,
+        prerisuvay,
+      });
       zakachiKlaviatura(koren, k, prerisuvay);
       zakachiRedaktsiya(koren, k, prerisuvay, rolyataNa(kojSam.imeyl, ogledalo));
     }

@@ -39,12 +39,12 @@ function faylove(papka, kray = '.ts') {
   return spisak.sort();
 }
 
-const chети = (f) => readFileSync(join(KOREN, f), 'utf8');
+const cheti = (f) => readFileSync(join(KOREN, f), 'utf8');
 
 // ── КОИ БЕЛЕЗИ СА ДВУСМИСЛЕНИ · живеят в ПОВЕЧЕ от един екран ─────────────
 const poBeleg = new Map();
 for (const f of faylove('app')) {
-  for (const m of chети(f).matchAll(/\bdata-([a-z][a-z0-9-]*)\s*=/g)) {
+  for (const m of cheti(f).matchAll(/\bdata-([a-z][a-z0-9-]*)\s*=/g)) {
     if (!poBeleg.has(m[1])) poBeleg.set(m[1], new Set());
     poBeleg.get(m[1]).add(f);
   }
@@ -76,7 +76,7 @@ const OBYAVENO = /ОБХВАТ: ЦЯЛАТА СТРАНИЦА/;
 function obhodB() {
   const nam = [];
   for (const f of faylove('proba')) {
-    const redove = chети(f).split('\n');
+    const redove = cheti(f).split('\n');
     redove.forEach((red, i) => {
       for (const m of red.matchAll(/\$\$?eval\(\s*['"`]([^'"`]+)['"`]/g)) {
         const g = /^\[data-([a-z0-9-]+)\]/.exec(m[1].trim());
@@ -175,7 +175,7 @@ function obhodE() {
   const chete = /\$\$?eval\(|tekstNa\(/;
   const nam = [];
   for (const f of faylove('proba')) {
-    const redove = chети(f).split('\n');
+    const redove = cheti(f).split('\n');
     redove.forEach((red, i) => {
       // ДЕКЛАРАЦИЯТА не е викане · инак самият помощник се обявява за находка.
       if (/^\s*(export\s+)?(async\s+)?function\b/.test(red)) return;
@@ -229,7 +229,7 @@ function obhodZh() {
   const podava = /type=submit|press\('Enter'/;
   const nam = [];
   for (const f of faylove('proba')) {
-    const redove = chети(f).split('\n');
+    const redove = cheti(f).split('\n');
     redove.forEach((red, i) => {
       if (!prerisuva.test(red) || CHAKA.test(red)) return;
       if (rabotni(redove, i - 1, 2, -1).some((x) => CHAKA.test(x))) return;
@@ -256,7 +256,7 @@ function obhodZh() {
 function obhodA() {
   const nam = [];
   for (const f of [...faylove('tests'), ...faylove('proba')]) {
-    chети(f).split('\n').forEach((red, i) => {
+    cheti(f).split('\n').forEach((red, i) => {
       const t = red.trim();
       if (t.startsWith('//') || t.startsWith('*')) return;
       if (/\b[a-z]\w*\(\s*[A-Z][A-Z_0-9]{3,}\s*[+\-*/]/.test(red)) {
@@ -313,7 +313,7 @@ function obhodV() {
     if (dalbochina > 5) return modul;
     let izvor;
     try {
-      izvor = chети(`${modul}.ts`);
+      izvor = cheti(`${modul}.ts`);
     } catch {
       return modul;
     }
@@ -372,8 +372,8 @@ function obhodV() {
   return nam;
 }
 
-const faylove_t = () => faylove('tests').map((f) => [f, chети(f)]);
-const faylove_p = () => faylove('proba').map((f) => [f, chети(f)]);
+const faylove_t = () => faylove('tests').map((f) => [f, cheti(f)]);
+const faylove_p = () => faylove('proba').map((f) => [f, cheti(f)]);
 
 /**
  * ПРАГОВЕТЕ · нула за изчистеното, ХРАПОВ праг за останалото.

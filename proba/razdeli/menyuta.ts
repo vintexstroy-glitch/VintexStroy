@@ -12,8 +12,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('полето „Имот" носи СПИСЪК, а не само текст',
       await p.$eval('#d-myasto', (e) => e.getAttribute('list')), 'd-myasto-spisak');
     const mestaVSpisaka = await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => (x as any).value));
+    // ОТ РЕЗЕН 100 (И124 т.8 „избор от наличното за дело"): след живите места
+    // стоят и ВПИСАНИТЕ Имоти без дело — първите две остават живите.
     proveri('и в списъка стоят ЖИВИТЕ места, най-писаното горе',
-      mestaVSpisaka, ['Малинова', 'Хисаря']);
+      mestaVSpisaka.slice(0, 2), ['Малинова', 'Хисаря']);
     proveri('отговорниците също · речникът е на всяко поле',
       (await p.$$eval('#d-otgovornik-spisak option', (o) => o.map((x) => (x as any).value))).length, 3);
     proveri('и НИЩО ново не е записано за речниците',

@@ -1,4 +1,5 @@
 import { imaRachenRed, nomeratNa, sledPremestvane } from '../src/domein/porednost.js';
+import { vzemiPredizbraniya } from './predizbor.js';
 /**
  * УПРАВЛЕНИЕ НА ВРЕМЕВИЯ РЕД В ДЕЛАТА · седмият екран.
  *
@@ -67,7 +68,7 @@ import {
   zavarshenite,
   zhivite,
 } from '../src/domein/dela.js';
-import { mestata, sveriMestata } from '../src/domein/mesta.js';
+import { mestata, svedenotoMyasto, sveriMestata } from '../src/domein/mesta.js';
 import { KOLONI_MESTATA, tablitsaNaImotite } from './imotite.js';
 import { podtabatNa } from '../src/domein/temi-nastroyki.js';
 import { DUMITE } from '../src/domein/dumite.js';
@@ -158,10 +159,25 @@ function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu
 }
 
 /** Четирите менюта наведнъж · за закачането след рисуване. */
-function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
+function menyutataNaFormata(
+  o: Ogledalo,
+  nadpisi: NadpisiNaGanta,
+  /** вписаните Имоти · влизат в речника на полето (И124 т.8) · празно в личния */
+  imotite: readonly string[] = [],
+): ReadonlyMap<string, Menyu> {
   const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot;
+  // „ИЗБОР ОТ НАЛИЧНОТО ЗА ДЕЛО" (И124 т.8 · резен 100): полето Имот предлага
+  // и ВПИСАНИТЕ Имоти, не само местата от живите дела — иначе Имот без нито
+  // едно дело не се предлагаше, а дръжката от менюто му го предизбираше в
+  // поле, което не го познава. Двата списъка се сливат по броя: най-честото
+  // от делата напред, вписаните след него.
+  const zhivi = zhivite([...o.dela.values()]);
+  // Без дубъл по СВЕДЕНО име: „малинова" от Имоти и „Малинова" от делата са
+  // един Имот — правописът на делата води, вписаният влиза само ако липсва.
+  const znae = new Set(zhivi.map((d) => svedenotoMyasto(d.myasto)));
+  const samoNovite = imotite.filter((i) => !znae.has(svedenotoMyasto(i)));
   return new Map<string, Menyu>([
-    ['myasto', menyutoNaDelata(o, 'myasto', parvata)],
+    ['myasto', menyuOtZhivi('myasto', parvata, [...zhivi.map((d) => d.myasto), ...samoNovite])],
     ['obekt', menyutoNaDelata(o, 'obekt', 'Обект')],
     ['ime', menyutoNaDelata(o, 'ime', 'Дело')],
     ['otgovornik', menyutoNaDelata(o, 'otgovornik', 'Отговорник')],
@@ -951,8 +967,17 @@ export function formaDelo(
   nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
 ): string {
   const id = (kratko: string) => `${predstavka}${kratko}`;
-  const menyutata = menyutataNaFormata(o, nadpisi);
+  // Служебната форма познава вписаните Имоти; личната е по Тема (ADR-154).
+  const sluzhebna = predstavka === 'd-';
+  const menyutata = menyutataNaFormata(
+    o,
+    nadpisi,
+    sluzhebna ? mestata(o, zhivite([...o.dela.values()])).map((r) => r.ime) : [],
+  );
   zapomniRechnitsite(predstavka, menyutata);
+  // ПРЕДИЗБРАНИЯТ ИМОТ (и Обект) от дръжката „Ново дело" на менюто на реда
+  // (резен 100 · ADR-164). Чете се веднъж; формата е СЪЩАТА.
+  const predizbran = sluzhebna ? vzemiPredizbraniya('gant') : null;
   return `
     <section data-sektsiya="gant-forma" class="karta">
       <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
@@ -966,14 +991,14 @@ export function formaDelo(
              * делата. Всичките четири ОПИСВАТ (системата не смята върху тях),
              * значи растат свободно от полето: „нищо не спира човека".
              *
-             * Първата колона носи надписа на погледа: „Място" в служебния,
-             * „Тема" в личния — същото поле, същият речник, друга дума.
+             * Първата колона носи надписа на погледа: Имот (`DUMITE.imot`) в
+             * служебния, „Тема" в личния — същото поле, същият речник, друга дума.
              */
             [
-              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot, z: true, m: 'Малинова' },
-              { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно' },
-              { k: 'ime', e: 'Дело', z: true, m: 'Акт 15' },
-              { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков' },
+              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot, z: true, m: 'Малинова', s: predizbran?.imot ?? '' },
+              { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно', s: predizbran?.obekt ?? '' },
+              { k: 'ime', e: 'Дело', z: true, m: 'Акт 15', s: '' },
+              { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков', s: '' },
             ]
               .map((p) =>
                 poleSMenyu({
@@ -983,6 +1008,7 @@ export function formaDelo(
                   menyu: menyutata.get(p.k)!,
                   zadalzhitelno: p.z,
                   mestodarzhatel: p.m,
+                  stoynost: p.s,
                 }),
               )
               .join('')

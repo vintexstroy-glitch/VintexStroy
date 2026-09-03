@@ -10,6 +10,7 @@
  */
 
 import { otLeva, pishi, pishiVPole } from '../src/yadro/pari.js';
+import { vzemiPredizbraniya } from './predizbor.js';
 import { broySPapka, povtoreniPapki, sveriPapkite } from '../src/domein/papki.js';
 import { IMOT_I_OBEKT } from '../src/domein/dumite.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
@@ -389,7 +390,14 @@ export function narisuvayImoti(sastoyanie: SastoyanieNaEkrana): string {
   const filtriraniImoti = filtriray('imoti', imoti, koloniImoti, dnes);
 
   const popravyanImot = rezhim.kakvo === 'popravi-imot' ? ogledalo.imoti.get(rezhim.id) : undefined;
-  const izbraniyatImot = popravyanImot ? imotiteSega.get(svedenotoMyasto(popravyanImot.adres)) : undefined;
+  // ПРЕДИЗБРАНИЯТ ИМОТ от дръжката „Нов обект" (резен 100 · ADR-164): същата
+  // форма, същият избор в `#imot-imot` — само че вече направен. Чете се веднъж.
+  const predizbran = vzemiPredizbraniya('imoti');
+  const izbraniyatImot = popravyanImot
+    ? imotiteSega.get(svedenotoMyasto(popravyanImot.adres))
+    : predizbran
+      ? imotiteSega.get(svedenotoMyasto(predizbran.imot))
+      : undefined;
   const popravyanNaem = rezhim.kakvo === 'popravi-naem' ? ogledalo.naemi.get(rezhim.id) : undefined;
   const prekratyavan = rezhim.kakvo === 'prekrati' ? ogledalo.naemi.get(rezhim.id) : undefined;
 
@@ -958,7 +966,8 @@ function redImot(imot: Imot, naemi: readonly Naem[], o: Ogledalo, dobavki: strin
           : `и още ${zhivi.length - 1} · ${zhivi.slice(1).map((n) => ekraniraj(n.naemetel)).join(', ')}`
       }</span>`;
   return `
-    <div class="red imot" translate="no" data-papka-adres="${ekraniraj(imot.papka)}">
+    <div class="red imot" translate="no" data-papka-adres="${ekraniraj(imot.papka)}"
+      data-obekt-adres="${ekraniraj(imot.adres)}" data-obekt-edinitsa="${ekraniraj(imot.edinitsa)}">
       <span class="kletka"><b>${ekraniraj(imot.adres)}</b><span>${ekraniraj(imot.edinitsa)}</span></span>
       <span class="kletka">${koy}</span>
       <span class="kletka" data-redakt="imot-ploshtad·${ekraniraj(imot.id)}" data-surovo="${imot.ploshtad_kvsm}" title="Двоен клик или F2 — поправка на място"><span>${imot.ploshtad_kvsm > 0 ? `${kvSmVM2(imot.ploshtad_kvsm)} м²` : '—'}</span></span>

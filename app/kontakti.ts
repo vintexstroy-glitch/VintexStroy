@@ -41,7 +41,8 @@ import {
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 import { ekraniraj } from './obshto.js';
-import { mestata, type RedNaMyasto } from '../src/domein/mesta.js';
+import { mestata, type RedNaMyasto, svedenotoMyasto } from '../src/domein/mesta.js';
+import { vzemiPredizbraniya } from './predizbor.js';
 import {
   filtriray,
   glaviTh,
@@ -384,7 +385,7 @@ function sektsiyaKontakti(
       <p class="drebno" data-kontakti-sverka>Сверка вход↔изход: ${sv.vhod} преписки →
       ${sv.izhod} преброени по контакти, разлика ${sv.razlika}.</p>
 
-      ${blokSreshti(sreshti, imena, dnes, imotite)}
+      ${blokSreshti(sreshti, imena, dnes, imotite, vzemiPredizbraniya('kontakti')?.imot ?? '')}
     </section>`;
 }
 
@@ -405,6 +406,8 @@ function blokSreshti(
   dnes: string,
   /** ИМОТИТЕ за падащото · вписаните и изведените от обектите (резен 99) */
   imotite: readonly RedNaMyasto[],
+  /** ПРЕДИЗБРАНИЯТ Имот от дръжката „Нова среща" (резен 100 · ADR-164) · празно иначе */
+  predizbranImot = '',
 ): string {
   const podredeni = [...sreshti].sort(
     (a, b) => a.data.localeCompare(b.data) || a.kontakt.localeCompare(b.kontakt, 'bg'),
@@ -456,8 +459,9 @@ function blokSreshti(
             ${imotite
               .map(
                 (r) =>
-                  '<option value="' + ekraniraj(r.ime) + '">' + ekraniraj(r.ime) +
-                  (r.vpisan ? '' : ' · невписан') + '</option>',
+                  '<option value="' + ekraniraj(r.ime) + '"' +
+                  (svedenotoMyasto(r.ime) === svedenotoMyasto(predizbranImot) ? ' selected' : '') +
+                  '>' + ekraniraj(r.ime) + (r.vpisan ? '' : ' · невписан') + '</option>',
               )
               .join('')}
           </select>
