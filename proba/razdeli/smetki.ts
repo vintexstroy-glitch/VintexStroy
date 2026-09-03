@@ -553,11 +553,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '123б · дялът Отчет · Прогнозата + коефициентите под едно име';
 
     proveri('банерът на дяла стои и БРОИ състава',
-      await p.$eval('[data-otchet-sastav]', (e) => e.getAttribute('data-otchet-sastav')), '6');
-    proveri('и шестте секции носят белега на дяла',
+      await p.$eval('[data-otchet-sastav]', (e) => e.getAttribute('data-otchet-sastav')), '7');
+    proveri('и шестте секции на коефициентите носят белега на дяла',
       await p.$$eval('section[data-dyal="otchet"]', (e) =>
         e.map((x) => (x as HTMLElement).dataset['sektsiya']).join(' · ')),
       'smetki-otcheti · koef-sastoyanie · koef-svoy · koef-izbor · koef-izbraniyat · koef-vsichki');
+
     proveri('чакащото по отчета се КАЗВА поименно · екселът и симулацията',
       await p.$eval('[data-otchet-chaka]', (e) => e.getAttribute('data-otchet-chaka')), '2');
 
@@ -604,6 +605,22 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       true);
 
     // ВРАТАТА ОТКАЗВА · и отказът се ЧЕТЕ на екрана (правило 15).
+    // СВОЯТ Е ЕДИН ОТ ВСИЧКИТЕ (резен 116 · И135): стои в падащото меню, в
+    // таблицата за периода и се рисува в диаграмата — през същия рисувач.
+    razdel = '125б · своят коефициент стои до вградените';
+    const svoiVMenyuto = await p.$$eval('#koef-koefitsient option[value^="svoy:"]', (e) => e.length);
+    proveri('своят стои в падащото меню „Коефициент"', svoiVMenyuto > 0, true);
+    proveri('и в таблицата за периода · със знак „свой"',
+      (await p.$$eval('.red.koef-red[data-koef^="svoy:"] [data-svoy-v-tablitsata]', (e) => e.length)) > 0, true);
+    const svoyatKlyuch = await p.$eval('#koef-koefitsient option[value^="svoy:"]', (e) => (e as HTMLOptionElement).value);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', svoyatKlyuch));
+    proveri('избран, той се рисува като диаграма или казва защо няма стойност',
+      Boolean(await p.$('svg.koef-diagrama, [data-sektsiya=koef-izbraniyat]')), true);
+    proveri('и параметрите му са двете величини, поименно',
+      await p.$$eval('.red.koef-parametar:not(.koef-rezultat)', (e) => e.length), 2);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#koef-koefitsient', 'noi'));
+    razdel = '125 · свой коефициент';
+
     await napishiSigurno(p, '#svoy-ime', 'Едно и също');
     await p.selectOption('#svoy-gore', 'prihod_st');
     await p.selectOption('#svoy-dolu', 'prihod_st');
@@ -630,6 +647,7 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
   let razdel = '—';
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
+
     razdel = '39 · диаграмите в Сметки';
     await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-dela]');
     const smetkiTekst = await p.evaluate(() => document.body.textContent);
@@ -727,6 +745,28 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     proveri('стълбът на текущия месец расте точно с новия разход',
       await p.$eval('svg.stalbove .stalbove-mesets:last-of-type', (g) => Number(g.dataset.razhodSt)),
       stalbPredi + 3300);
+
+    // ══ 116 · ТАБЛИЦАТА И ДИАГРАМАТА НАД ОТЧЕТА (И134 · ADR-162) ══
+    // Тук, а не в §123б: секцията се ражда с първото дело, а делата се раждат
+    // в §39 — проверка преди тях мери липса, не построеното.
+    razdel = '116 · таблицата и диаграмата над Отчета';
+    // СЕДМАТА в дяла · „секция Отчети под таблицата и диаграмата, които са една до друга".
+    // „секция Отчети под таблицата и диаграмата, които са една до друга".
+    // Двете стоят в реда `.redom` СЛЕД секцията с лостовете, не вътре в нея —
+    // същото строение като в главния подтаб (резен 115).
+    proveri('таблицата и диаграмата стоят и в подтаб Отчет · двете',
+      await p.$$eval('.telo > .redom > [data-smetki-gant]', (e) => e.length), 2);
+    proveri('и диаграмата е истинска · с оста на Ганта',
+      Boolean(await p.$('.telo > .redom svg.diagrama:not(.stalbove)')), true);
+    proveri('и са ПРЕДИ Отчета · над него, не под него',
+      await p.$$eval('.telo > *', (e) => {
+        const redom = e.findIndex((x) => x.classList.contains('redom'));
+        const dyal = e.findIndex((x) => (x as HTMLElement).dataset['sektsiya'] === 'otchet-dyal');
+        return redom >= 0 && dyal >= 0 && redom < dyal;
+      }), true);
+    proveri('без разбивките и без формата за дело · те са работа на главния',
+      await p.$$eval('[data-sektsiya=smetki-razbivki], #d-forma-delo', (e) => e.length), 0);
+
 
     // ══ 115 · ОТМЕТКАТА ПРАВИ РЕД (ADR-161) ══
     //
@@ -998,14 +1038,20 @@ export async function blok7(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и всеки носи формулата си',
       await p.$$eval('.red.koef-red .koef-formula', (r) => r.every((x) => x.textContent.includes('='))), true);
 
-    // МЕСЕЧНИТЕ се появяват САМО при стъпка месец
+    // МЕСЕЧНИТЕ НЕ ИЗЧЕЗВАТ при друга стъпка (резен 116 · И135 · ADR-162).
+    // Негово: „Махаш мои коефициенти, махни го глупаво е." Дотук при година
+    // събираемостта я НЯМАШЕ и екранът „казваше защо" — последната дума бие.
     proveri('при месец събираемостта я ИМА',
       Boolean(await p.$('.red.koef-red[data-koef="sabiraemost"]')), true);
+    proveri('и при месец бележка за месечна природа НЯМА',
+      await p.$$eval('.red.koef-red[data-koef="sabiraemost"] [data-mesechen-po-priroda]', (e) => e.length), 0);
     await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'godina'));
-    proveri('при година събираемостта я НЯМА',
-      await p.$('.red.koef-red[data-koef="sabiraemost"]'), null);
-    proveri('и екранът КАЗВА защо',
-      (await p.evaluate(() => document.body.textContent)).includes('нямат смисъл извън месец'), true);
+    proveri('при година събираемостта ПАК Я ИМА',
+      Boolean(await p.$('.red.koef-red[data-koef="sabiraemost"]')), true);
+    proveri('а месечната ѝ природа се КАЗВА до числото (правило 15)',
+      (await tekstNa(p, '.red.koef-red[data-koef="sabiraemost"] [data-mesechen-po-priroda]')).includes('месечен по природа'), true);
+    proveri('и екранът брои месечните по природа · две',
+      await p.$eval('[data-mesechnite]', (e) => (e as HTMLElement).dataset['mesechnite']), '2');
     await deystvieSPrerisuvane(p, () => p.selectOption('#koef-stapka', 'mesets'));
 
     // ПРИРАВНЯВАНЕТО · трите отговора, видими на екрана

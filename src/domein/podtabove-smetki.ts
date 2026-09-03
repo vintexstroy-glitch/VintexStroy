@@ -69,6 +69,7 @@ const KADE: Readonly<Record<string, KlyuchPodtabSmetki>> = Object.freeze({
   'smetki-kalkulator': 'razhod',
 
   // ── ОТЧЕТ · коефициентите, гнездата, полетата с формула ──
+  'otchet-dela': 'otchet',
   'otchet-dyal': 'otchet',
   'smetki-otcheti': 'otchet',
   'smetki-poleta-formula': 'otchet',

@@ -20,8 +20,10 @@ import {
 
 describe('1 · съставът на дяла', () => {
   it('е ШЕСТ секции, и точно тези · Прогнозата първа', () => {
-    expect(SEKTSIITE_NA_OTCHETA).toHaveLength(6);
+    // СЕДЕМ от резен 116: таблицата и диаграмата стоят НАД Отчета (И134).
+    expect(SEKTSIITE_NA_OTCHETA).toHaveLength(7);
     expect([...SEKTSIITE_NA_OTCHETA]).toEqual([
+      'otchet-dela',
       'smetki-otcheti',
       'koef-sastoyanie',
       'koef-svoy',

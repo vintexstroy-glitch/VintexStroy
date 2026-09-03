@@ -408,6 +408,7 @@ export function narisuvaySmetki(o: Ogledalo, dnes: string): string {
       <p class="drebno">Данъчното събитие е падежът, не денят на парите — затова редът ДДС не мърда, когато влезе плащане.</p>
     </section>` : ''}
 
+    ${tuk('otchet-dela') ? blokDelata(o, dnes, 'otchet') : ''}
     ${tuk('otchet-dyal') ? blokNaDyalaOtchet() : ''}
     ${tuk('smetki-otcheti') ? blokNaOtchetite(o, mesets, dnes) : ''}
     ${tuk('koef-izbor') ? narisuvayKoefitsientite(o, dnes) : ''}
@@ -873,7 +874,15 @@ function blokNaRazbivkite(
     </section>`;
 }
 
-function blokDelata(o: Ogledalo, dnes: string): string {
+/**
+ * ДЕЛАТА · таблицата и диаграмата · на ДВЕ места в Сметки (резен 116 · И134):
+ * в главния подтаб с разбивките и формата за дело, и в Отчет — само двете, а
+ * ПОД тях Отчетът: „за избрания период има секция Отчети под таблицата и
+ * диаграмата, които са една до друга както в МС Проджект". Един рисувач,
+ * два изгледа: копие щеше да са две таблици, които се разминават на първата
+ * поправка (правило 17).
+ */
+function blokDelata(o: Ogledalo, dnes: string, izgled: 'smetki' | 'otchet' = 'smetki'): string {
   const dela = podredi(zhivite([...o.dela.values()]), dnes);
   if (dela.length === 0) return '';
   const r = reshetka(dela, 'mesets', dnes);
@@ -899,10 +908,10 @@ function blokDelata(o: Ogledalo, dnes: string): string {
   // И95: „с Приходи и Разходи вкарани… с опция да ги изключваш пускаш и да
   // създаваш както като в Управление." Цифрите носят ключ; формата е СЪЩАТА.
   return `
-    <section data-sektsiya="smetki-dela">
+    <section data-sektsiya="${izgled === 'otchet' ? 'otchet-dela' : 'smetki-dela'}">
       <div class="dyalglava">
-        <h2>Делата · копието от Управление</h2>
-        <span>същата таблица · със същата форма за ново дело (И95)</span>
+        <h2>${izgled === 'otchet' ? 'Таблицата и диаграмата · над Отчета' : 'Делата · копието от Управление'}</h2>
+        <span>${izgled === 'otchet' ? 'същите като в главния подтаб · Отчетът за периода стои под тях (И134)' : 'същата таблица · със същата форма за ново дело (И95)'}</span>
       </div>
       <label class="vazm">
         <input type="checkbox" id="klyuch-tsifrite"${sTsifrite ? ' checked' : ''}>
@@ -935,12 +944,12 @@ function blokDelata(o: Ogledalo, dnes: string): string {
         }
       </div>
     </section>
-    ${blokNaRazbivkite(o, mesetsiteVObhvata(parvata.ot.slice(0, 7), poslednata.do.slice(0, 7)), 'vsichki')}
+    ${izgled === 'otchet' ? '' : blokNaRazbivkite(o, mesetsiteVObhvata(parvata.ot.slice(0, 7), poslednata.do.slice(0, 7)), 'vsichki')}
     <div class="redom${kolkoRedom === 2 ? ' dve' : ''}" data-smetki-redom="${kolkoRedom}">
       ${vizhdanoTuk.tablitsa ? `<div data-sektsiya="smetki-dela-tablitsa" data-smetki-gant="tablitsa">${tablitsataSOcveteniPoleta(dela, r, sumi, dnes, false, sTsifrite)}</div>` : ''}
       ${vizhdanoTuk.diagrama ? `<div data-sektsiya="smetki-dela-diagrama" data-smetki-gant="diagrama">${narisuvayDiagrama(dela, r, dnes, sumi, temataTuk)}</div>` : ''}
     </div>
-    ${formaDelo(o, dnes)}`;
+    ${izgled === 'otchet' ? '' : formaDelo(o, dnes)}`;
 }
 
 function poleNaOtcheta(p: Pole): string {

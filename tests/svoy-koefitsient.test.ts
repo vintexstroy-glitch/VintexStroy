@@ -17,6 +17,9 @@ import {
   sveriSvoite,
   VELICHINI,
   type SvoyKoefitsient,
+  PREDSTAVKA_SVOY,
+  katoKoefitsient,
+  smetniKatoKoefitsient,
 } from '../src/domein/svoy-koefitsient.js';
 import type { DanniZaPerioda } from '../src/domein/koefitsienti.js';
 import { mesetsSChisla, stend } from './pomoshtni.js';
@@ -262,5 +265,62 @@ describe('сверката вход↔изход · и нулата се зап�
 
   it('празният вход също дава нула, а не липса', () => {
     expect(sveriSvoite([])).toEqual({ vhod: 0, zhivi: 0, mahnati: 0, razlika: 0 });
+  });
+});
+
+describe('своят като един от всичките (И135 · ADR-162)', () => {
+  const marzh = {
+    klyuch: 'марж на кеша',
+    ime: 'Марж на кеша',
+    gore: 'prihod_st' as const,
+    dolu: 'razhod_st' as const,
+    deystvie: 'delenie' as const,
+    kakvo: '',
+    mahnat: false,
+  };
+
+  it('носи представка, за да не се сблъска с вграден ключ', () => {
+    expect(katoKoefitsient(marzh).klyuch).toBe(`${PREDSTAVKA_SVOY}марж на кеша`);
+    expect(PREDSTAVKA_SVOY).toBe('svoy:');
+  });
+
+  it('видът се СМЯТА от величините и действието · отношение на потоци', () => {
+    const k = katoKoefitsient(marzh);
+    expect(k.vid).toBe('otnoshenie-potoci');
+    expect(k.kogato).toBe('period');
+    expect(k.samoMesechen).toBe(false);
+    expect(k.kakvo).toBe('свой коефициент');
+    expect(k.formula).toContain('Марж на кеша');
+  });
+
+  it('разлика от два запаса е сума от запаси · снимка в един миг', () => {
+    const k = katoKoefitsient({
+      ...marzh,
+      klyuch: 'чисти пари',
+      ime: 'Чисти пари',
+      gore: 'sredstva_st',
+      dolu: 'zadalzheniya_st',
+      deystvie: 'razlika',
+    });
+    expect(k.vid).toBe('suma-zapas');
+    expect(k.kogato).toBe('sastoyanie');
+  });
+
+  it('смята се като вграден · параметрите са двете величини, поименно', () => {
+    const d = { prihod_st: 200_00, razhod_st: 50_00 } as Parameters<typeof smetniKatoKoefitsient>[1];
+    const s = smetniKatoKoefitsient(marzh, d);
+    expect(s.koefitsient.klyuch).toBe('svoy:марж на кеша');
+    expect(s.parametri.map((x) => x.stoynost)).toEqual([200_00, 50_00]);
+    expect(s.parametri.every((x) => x.ime.length > 0)).toBe(true);
+    // 200 ÷ 50 = 4,00 пъти → в стотни: 400.
+    expect(s.stoynost).toBe(400);
+    expect(s.zashto).toBe('');
+  });
+
+  it('делене на нула няма стойност и КАЗВА защо', () => {
+    const d = { prihod_st: 200_00, razhod_st: 0 } as Parameters<typeof smetniKatoKoefitsient>[1];
+    const s = smetniKatoKoefitsient(marzh, d);
+    expect(s.stoynost).toBeUndefined();
+    expect(s.zashto).not.toBe('');
   });
 });

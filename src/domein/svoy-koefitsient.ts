@@ -32,7 +32,7 @@
  * върнатият коефициент не е нов, а същият.
  */
 
-import type { DanniZaPerioda, Kogato, Merka } from './koefitsienti.js';
+import type { DanniZaPerioda, Koefitsient, Kogato, Merka, SmetnatKoefitsient, Vid } from './koefitsienti.js';
 
 export class GreshkaSvoyKoefitsient extends Error {
   override readonly name = 'GreshkaSvoyKoefitsient';
@@ -241,5 +241,57 @@ export function sveriSvoite(vsichki: readonly SvoyKoefitsient[]): SverkaNaSvoite
     zhivi,
     mahnati,
     razlika: vsichki.length - (zhivi + mahnati),
+  });
+}
+
+/**
+ * СВОЯТ КОЕФИЦИЕНТ КАТО ЕДИН ОТ ВСИЧКИТЕ (резен 116 · ADR-162).
+ *
+ * Негово, 03.09 (И135): „Махаш мои коефициенти, махни го глупаво е." Дотук
+ * своят живееше само в картата „Състояние", без диаграма, без ред в таблицата
+ * за периода и без място в падащото меню. Тук той се превежда в същия вид, в
+ * който екранът чете вградените, за да мине през СЪЩИЯ рисувач — не през втори.
+ *
+ * Ключът носи представка, за да не се сблъска с вграден: „марж" може да е и
+ * негово име. Видът се СМЯТА от величините и действието (както времето):
+ * отношение на потоци е отношение на потоци, независимо кой го е поискал.
+ */
+export const PREDSTAVKA_SVOY = 'svoy:';
+
+export function katoKoefitsient(k: SvoyKoefitsient): Koefitsient {
+  const kogato = kogatoSeSmyata(k);
+  const eOtnoshenie = k.deystvie === 'delenie' || k.deystvie === 'dyal';
+  const vid: Vid = eOtnoshenie
+    ? kogato === 'period'
+      ? 'otnoshenie-potoci'
+      : 'otnoshenie-zapasi'
+    : kogato === 'period'
+      ? 'suma-potok'
+      : 'suma-zapas';
+  return Object.freeze({
+    klyuch: PREDSTAVKA_SVOY + k.klyuch,
+    ime: k.ime,
+    formula: formulata(k),
+    vid,
+    merka: MERKATA_NA_DEYSTVIETO[k.deystvie],
+    samoMesechen: false,
+    kogato,
+    kakvo: k.kakvo === '' ? 'свой коефициент' : k.kakvo,
+    obichayno: '',
+  });
+}
+
+/** Смята своя и го връща в дрехата на вграден · параметрите са двете величини. */
+export function smetniKatoKoefitsient(k: SvoyKoefitsient, d: DanniZaPerioda): SmetnatKoefitsient {
+  const s = smetni(k, d);
+  const parametri = Object.freeze([
+    Object.freeze({ ime: IMENA_NA_VELICHINITE[k.gore], stoynost: d[k.gore], merka: 'pari' as const }),
+    Object.freeze({ ime: IMENA_NA_VELICHINITE[k.dolu], stoynost: d[k.dolu], merka: 'pari' as const }),
+  ]);
+  return Object.freeze({
+    koefitsient: katoKoefitsient(k),
+    stoynost: s.zashto === '' ? s.stoynost : undefined,
+    parametri,
+    zashto: s.zashto,
   });
 }
