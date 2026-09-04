@@ -56,7 +56,9 @@ import {
   prochetiTsenovaLista,
   type KoyaTsena,
 } from '../src/kalkulator/tsenova-lista.js';
-import { imotatNaObekta, kartaNaImotite, kartaNaNaemite } from '../src/kalkulator/svarzvane.js';
+import { imotatNaObekta, kartaNaImotite, kartaNaNaemite, klyuchNiz } from '../src/kalkulator/svarzvane.js';
+import { svedenotoMyasto } from '../src/domein/mesta.js';
+import { aktiviteOtZhurnala, mestataNaAktivite } from '../src/kalkulator/aktivi-ot-zhurnala.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import {
   nastroykiteNaKalkulatora,
@@ -71,6 +73,8 @@ import type { Konteks } from './ekranite.js';
 /** Прочетеното живее, докато екранът стои отворен — в Журнала влиза избор, не цени. */
 let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
+/** ред → МЯСТО · пълни се, когато редовете идват от Журнала (резен 107). */
+let mestataNaRedovete: ReadonlyMap<string, string> = new Map();
 /** Последният прочит на „ЦЕНИ МД" · носи цените и белега ПРОДАДЕН — за
  *  вписването в Имоти и делата (И92). */
 let otMD: ProchetenoTseniMD | null = null;
@@ -135,6 +139,28 @@ export function sboratZaKapitala(): number | undefined {
  * нулата се казва. Тя отговаря на въпроса „остаряла ли е стойността в
  * книгата", без да пипа нито едно число.
  */
+/**
+ * ИМЕНАТА НА АКТИВИТЕ · за падащото меню „един Имот от книгата".
+ *
+ * Негово, 12.08 *(р84·[30])*, дословно: „С падащо меню отстрани да избираш от
+ * списъка на имотите с които оперира програмата.или бутон добави от баличните
+ * имоти като а"
+ *
+ * Тоест ДВА входа към едно и също: цялото наведнъж и по едно. Списъкът е
+ * същият, който смята `aktiviteOtZhurnala` — един дом за въпроса „кое е актив"
+ * (правило 17).
+ */
+function imenaNaAktivite(o: Ogledalo): readonly string[] {
+  return aktiviteOtZhurnala(
+    [...o.imoti.values()].map((i) => ({
+      adres: i.adres,
+      edinitsa: i.edinitsa,
+      ploshtad_kvsm: i.ploshtad_kvsm,
+    })),
+    [...o.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm })),
+  ).aktivi.map((a) => a.red.obekt);
+}
+
 function blokNaSravnenieto(o: Ogledalo): string {
   const sVpisana = [...o.mesta.values()].filter((m) => m.stoynost_st > 0);
   const vpisano_st = sVpisana.reduce((sbor, m) => sbor + m.stoynost_st, 0);
@@ -143,17 +169,69 @@ function blokNaSravnenieto(o: Ogledalo): string {
   // беше поправен по същата причина, и обяснението стои над него.
   const smetnata_st = smetnato?.saglasuvana_tochno_st ?? 0;
   const razlika_st = smetnata_st - vpisano_st;
+
+  /**
+   * РАЗБИВКАТА ПО ИМОТ · възможна чак когато редовете идват от Журнала
+   * (резен 107 · ADR-169).
+   *
+   * Всеки ред знае мястото си само тогава: файлът носи имена на обекти, а
+   * връзката „кой обект под кой Имот" живее в книгата. Дойдат ли редовете
+   * оттам, сметката се групира по Имот и сравнението става ред по ред —
+   * точно онова, което ADR-168 отложи и КАЗА, че отлага.
+   */
+  const poMyasto = new Map<string, number>();
+  for (const r of smetnato?.redove ?? []) {
+    if (r.prodaden) continue;
+    const myasto = mestataNaRedovete.get(r.obekt.trim());
+    if (myasto === undefined) continue;
+    // Ключът е СВЕДЕНОТО име · „Малинова" и „малинова" са едно място.
+    poMyasto.set(myasto, (poMyasto.get(myasto) ?? 0) + r.saglasuvana_tochno_st);
+  }
+  /**
+   * РЕДОВЕТЕ НА РАЗБИВКАТА · всичко сметнато си намира дом, или се КАЗВА.
+   *
+   * Три случая, и трите се виждат:
+   *
+   *   · Имот, който носи стойност в книгата — вписано срещу сметнато;
+   *   · Имот БЕЗ стойност в книгата — негова дума (р57·[142]): сграда с
+   *     подобекти „няма собствен стойност… просто остава празно полето". Тя
+   *     влиза с вписано НУЛА: инак най-интересният случай изчезва от екрана;
+   *   · сметнато, чийто Имот изобщо НЕ е вписан (И132: „Няма такива") — събира
+   *     се в свой ред накрая, вместо да потъне в горния сбор.
+   *
+   * Оттам излиза и сверката: сборът на редовете е равен на сметнатото общо.
+   */
+  const vsichkiMesta = [...o.mesta.values()];
+  const namereni = new Set<string>();
+  const poImot = vsichkiMesta
+    .map((m) => {
+      const klyuch = svedenotoMyasto(m.ime);
+      const smetnato_st = poMyasto.get(klyuch) ?? 0;
+      if (smetnato_st > 0) namereni.add(klyuch);
+      return { ime: m.ime, vpisano_st: m.stoynost_st, smetnato_st, vpisan: true };
+    })
+    .filter((r) => r.smetnato_st > 0 || r.vpisano_st > 0);
+  let bezImot_st = 0;
+  for (const [klyuch, suma] of poMyasto) {
+    if (!namereni.has(klyuch)) bezImot_st += suma;
+  }
+  if (bezImot_st > 0) {
+    poImot.push({ ime: '— без вписан Имот —', vpisano_st: 0, smetnato_st: bezImot_st, vpisan: false });
+  }
+  const sboratNaRedovete_st = poImot.reduce((sbor, r) => sbor + r.smetnato_st, 0);
+  const razlikaNaRazbivkata_st = smetnata_st - sboratNaRedovete_st;
+
   return `
     <section class="karta" data-sektsiya="stoynost-sravnenie">
       <div class="dyalglava">
         <h2>Оценката срещу книгата</h2>
         <span data-smetnata-stoynost="${smetnata_st}">${
           smetnata_st === 0
-            ? 'няма сметнато · прочети площообразуване или ценова листа'
+            ? 'няма сметнато · прочети площообразуване, ценова листа или активите от Журнала'
             : `съгласуваната оценка е ${pishi(smetnata_st)}`
         }</span>
       </div>
-      <div class="tablitsa" data-tablitsa="stoynost-sravnenie">
+      <div class="tablitsa" data-tablitsa="stoynost-sravnenie" data-ime="Оценката срещу книгата">
         <div class="red glava" translate="no">
           <span>Какво</span><span class="suma">Число</span>
         </div>
@@ -170,18 +248,47 @@ function blokNaSravnenieto(o: Ogledalo): string {
           <span class="suma${razlika_st === 0 ? '' : ' zle'}" translate="no">${sZnak(razlika_st)}</span>
         </div>
       </div>
-      <p class="drebno"><b>Един ред, не по Имот — и това се КАЗВА</b> (правило 15).
-      Калкулаторът смята по ОБЕКТИ, а обектът в Огледалото не носи връзка към
-      своя Имот: разбивка по Имоти щеше да покаже едно и също число на всеки
-      ред и да нарече това сверка. Връзката чака резен 107 („Имот без Обект и
-      Обект с Имот могат да се изберат в Калкулатора", И129 т.4).</p>
+      ${
+        poImot.length === 0
+          ? `<p class="drebno" data-po-imot="0">Разбивка по Имот има само когато
+             редовете идват от <b>Журнала</b>: файлът носи ИМЕНА на обекти, а
+             под кой Имот стои всеки от тях знае книгата. Натисни „Добави от
+             наличните имоти" горе.</p>`
+          : `<div class="tablitsa" data-tablitsa="stoynost-po-imot" data-ime="По Имот" data-po-imot="${poImot.length}">
+              <div class="red glava" translate="no">
+                <span>Имот</span><span class="suma">Вписано</span>
+                <span class="suma">Сметнато</span><span class="suma">Разлика</span>
+              </div>
+              ${poImot
+                .map((r) => {
+                  const razlika = r.smetnato_st - r.vpisano_st;
+                  return `<div class="red" data-imot-sravnenie="${ekraniraj(r.ime)}" data-imot-razlika="${razlika}">
+                    <span translate="no">${ekraniraj(r.ime)}${
+                      r.vpisan && r.vpisano_st === 0
+                        ? '<span class="drebno"> · книгата мълчи</span>'
+                        : ''
+                    }</span>
+                    <span class="suma" translate="no">${pishi(r.vpisano_st)}</span>
+                    <span class="suma" translate="no">${pishi(r.smetnato_st)}</span>
+                    <span class="suma${razlika === 0 ? '' : ' zle'}" translate="no">${sZnak(razlika)}</span>
+                  </div>`;
+                })
+                .join('')}
+              <div class="red sbor" data-razbivka-sverka="${razlikaNaRazbivkata_st}" translate="no">
+                <span><b>Сверка</b> · сборът на редовете срещу сметнатото</span>
+                <span class="suma"></span>
+                <span class="suma">${pishi(sboratNaRedovete_st)}</span>
+                <span class="suma${razlikaNaRazbivkata_st === 0 ? '' : ' zle'}">${sZnak(razlikaNaRazbivkata_st)}</span>
+              </div>
+            </div>`
+      }
       <p class="drebno"><b>Оттук не се редактира</b> — негово, 09.08: „няма
       редакция от там, а само изчисляане на стойност на имотите като оценка на
       всички наши активи". Стойността на Имота се вписва във формата му, в
       Имоти; тук се вижда КОЛКО се разминава с днешната оценка.</p>
       <p class="drebno">Сравнява се СЪГЛАСУВАНАТА стойност — трите подхода,
       претеглени, и в ТОЧНОТО ѝ число. „А · по площ" е цена за ПРОДАЖБА, не
-      оценка на актива (ADR-016).</p>
+      оценка на актива (ADR-016). Продаденото не влиза в нито един ред.</p>
     </section>`;
 }
 
@@ -263,12 +370,22 @@ export function narisuvayStoynost(o: Ogledalo): string {
 
     <section data-sektsiya="tsenova-lista">
       <div class="dyalglava">
-        <h2>Двата пътя</h2>
+        <h2>Трите пътя</h2>
         <span>посоката е ЕДНА · бутон, който чете, няма път към писане</span>
       </div>
       <div class="deystviya">
         <button type="button" class="glaven" id="cheti-ploshti">Чети от Площообразуване</button>
         <button type="button" class="vtorichen" id="cheti-tseni">Чети Ценова листа</button>
+        <button type="button" class="vtorichen" id="cheti-aktivi">Добави от наличните имоти</button>
+        <label class="pole tyasno">
+          <span>Или един актив от книгата</span>
+          <select translate="no" id="aktiv-edin">
+            <option value="">— избери —</option>
+            ${imenaNaAktivite(o)
+              .map((x) => `<option value="${ekraniraj(x)}">${ekraniraj(x)}</option>`)
+              .join('')}
+          </select>
+        </label>
         <label class="pole tyasno">
           <span>Кои цени се пускат</span>
           <select translate="no" id="koya-tsena">
@@ -643,6 +760,104 @@ export function zakachiStoynost(
   });
   koren.querySelector<HTMLButtonElement>('#cheti-tseni')?.addEventListener('click', () => {
     poleto('fayl-tseni')?.click();
+  });
+
+  /**
+   * ТРЕТИЯТ ПЪТ · АКТИВИТЕ ОТ ЖУРНАЛА (резен 107 · ADR-169).
+   *
+   * Негово, 02.09 (И129 т.4): „Имот без ОБект и ОБект с Имот могат да се
+   * изберат в Клакулатора и това са основните наши активи."
+   *
+   * Дотук Калкулаторът смяташе САМО каквото току-що е прочетено от файл — тоест
+   * оценка се правеше за изнесеното отнякъде, не за вписаното в книгата. Тук
+   * входът е самият Журнал: обектите с площ и местата, под които няма обект.
+   *
+   * ЧЕТЕ и нищо повече (правило 18 · и негово от 09.08: „няма редакция от
+   * там"). Сверката вход↔изход се казва, включително колко актива са ОСТАНАЛИ
+   * ВЪН, защото нямат квадратура — липсата се вижда, вместо да се преглътне.
+   */
+  /**
+   * ТРЕТИЯТ ПЪТ · АКТИВИТЕ ОТ ЖУРНАЛА (резен 107 · ADR-169).
+   *
+   * Негово, 02.09 (И129 т.4): „Имот без ОБект и ОБект с Имот могат да се
+   * изберат  в Клакулатора и това са основните наши активи." И по-рано, 12.08
+   * (р84·[30]), самата форма: „С падащо меню отстрани да избираш от списъка на
+   * имотите с които оперира програмата.или бутон добави от баличните имоти
+   * като а"
+   *
+   * Затова входовете са ДВА и двата ДОБАВЯТ: бутонът слага всичко налично,
+   * менюто — един актив. Добавя, не заменя — „добави нов" е негова дума. Един и
+   * същ актив не влиза два пъти: съвпадението се брои по СМИСЪЛ и се КАЗВА.
+   *
+   * ЧЕТЕ и нищо повече (правило 18 · и негово от 09.08: „няма редакция от
+   * там"). Сверката вход↔изход се казва, включително колко актива са останали
+   * ВЪН, защото нямат квадратура.
+   */
+  const dobaviAktivi = async (samo?: string): Promise<void> => {
+    try {
+      const og = await k.deystviya.ogledalo();
+      const r = aktiviteOtZhurnala(
+        [...og.imoti.values()].map((i) => ({
+          adres: i.adres,
+          edinitsa: i.edinitsa,
+          ploshtad_kvsm: i.ploshtad_kvsm,
+        })),
+        [...og.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm })),
+      );
+      const izbrani = samo === undefined ? r.aktivi : r.aktivi.filter((a) => a.red.obekt === samo);
+      if (izbrani.length === 0) {
+        throw new Error(
+          samo === undefined
+            ? 'В Журнала няма актив с площ. Обектът иска площ, а Имотът без обекти — квадратура; без число няма какво да се оцени.'
+            : `„${samo}" вече го няма в книгата или е без квадратура.`,
+        );
+      }
+      /**
+       * ДУБЛИКАТЪТ СЕ ПОЗНАВА ПО СМИСЪЛ, не по буква (`klyuchNiz`).
+       *
+       * „АП. № 1" в книгата и „Апартамент 1" във файла са ЕДИН обект — цялата
+       * причина `svarzvane.ts` да съществува. Де-дуп по дословен низ би ги
+       * броил два пъти и оценката щеше да е с един апартамент по-висока.
+       * Име без номер няма ключ по смисъл; тогава важи дословното.
+       */
+      const veche = new Set(
+        obekti.map((x) => klyuchNiz(x.obekt) || x.obekt.trim().toLocaleLowerCase('bg-BG')),
+      );
+      const novi = izbrani.filter(
+        (a) => !veche.has(klyuchNiz(a.red.obekt) || a.red.obekt.trim().toLocaleLowerCase('bg-BG')),
+      );
+      obekti = Object.freeze([...obekti, ...novi.map((a) => a.red)]);
+      const karta = new Map(mestataNaRedovete);
+      for (const [ime, myasto] of mestataNaAktivite(izbrani)) karta.set(ime, myasto);
+      mestataNaRedovete = karta;
+      await vzemiNaemite();
+      presmetni();
+      const obekta = novi.filter((a) => a.vid === 'obekt').length;
+      // СВЕРКА ВХОД↔ИЗХОД, която може да падне (правило 7): всеки кандидат от
+      // книгата или е станал актив, или е останал вън без квадратура. Дотук тук
+      // стоеше `sverkaNaPartida`, която мери дължината на масива, подаден на
+      // самата нея — по пътя от Журнала това е тавтология, не сверка.
+      const razlika = r.kandidati - r.aktivi.length - r.bezPlosht;
+      vest =
+        `От Журнала: ${novi.length} нови · ${obekta} обекта с Имот и ${novi.length - obekta} Имота без Обект` +
+        (izbrani.length - novi.length > 0 ? ` · ${izbrani.length - novi.length} вече бяха тук` : '') +
+        (samo === undefined && r.bezPlosht > 0 ? ` · ${r.bezPlosht} без квадратура остават ВЪН` : '') +
+        ` · сверка вход↔изход: ${r.kandidati} кандидата → ${r.aktivi.length} актива и ${r.bezPlosht} вън, разлика ${razlika}`;
+      greshka = '';
+    } catch (err) {
+      greshka = dumiZaGreshka(err);
+    }
+    await prerisuvay();
+  };
+
+  koren.querySelector<HTMLButtonElement>('#cheti-aktivi')?.addEventListener('click', async () => {
+    await dobaviAktivi();
+  });
+
+  koren.querySelector<HTMLSelectElement>('#aktiv-edin')?.addEventListener('change', async (e) => {
+    const ime = (e.target as HTMLSelectElement).value;
+    if (ime === '') return;
+    await dobaviAktivi(ime);
   });
 
   poleto('fayl-ploshti')?.addEventListener('change', async (e) => {
