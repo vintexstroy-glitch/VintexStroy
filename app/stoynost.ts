@@ -58,7 +58,12 @@ import {
 } from '../src/kalkulator/tsenova-lista.js';
 import { imotatNaObekta, kartaNaImotite, kartaNaNaemite, klyuchNiz } from '../src/kalkulator/svarzvane.js';
 import { svedenotoMyasto } from '../src/domein/mesta.js';
-import { aktiviteOtZhurnala, mestataNaAktivite } from '../src/kalkulator/aktivi-ot-zhurnala.js';
+import {
+  aktiviteOtZhurnala,
+  mestataNaAktivite,
+  zemniteRedove,
+} from '../src/kalkulator/aktivi-ot-zhurnala.js';
+import { zemniteSastoyaniya } from '../src/domein/sastoyaniya-na-imot.js';
 import { PRAZEN_FILTAR, filtriray, glaviNaTablitsata, grupiranaTablitsa, poleZaTarsene, redZaSkritoto, type KolonaSFiltar } from './filtri.js';
 import {
   nastroykiteNaKalkulatora,
@@ -75,6 +80,15 @@ let obekti: readonly ProchetenObekt[] = [];
 let otLista: ReadonlyMap<string, OtTsenovaLista> = new Map();
 /** ред → МЯСТО · пълни се, когато редовете идват от Журнала (резен 107). */
 let mestataNaRedovete: ReadonlyMap<string, string> = new Map();
+/**
+ * КОИ РЕДОВЕ СА ЗЕМЯ (резен 111 · ADR-170) · „земя е Имот с различен Статут".
+ *
+ * Пълни се от Журнала заедно с активите: състоянието на Имота се сверява с
+ * отметнатите в Настройки. Ред от ФАЙЛ няма състояние и никога не е земя —
+ * файлът не носи статут, а гадаене по име би оценило „Парцел 3" като земя,
+ * без никой да е казал, че е.
+ */
+let zemniRedove: ReadonlySet<string> = new Set();
 /** Последният прочит на „ЦЕНИ МД" · носи цените и белега ПРОДАДЕН — за
  *  вписването в Имоти и делата (И92). */
 let otMD: ProchetenoTseniMD | null = null;
@@ -157,7 +171,7 @@ function imenaNaAktivite(o: Ogledalo): readonly string[] {
       edinitsa: i.edinitsa,
       ploshtad_kvsm: i.ploshtad_kvsm,
     })),
-    [...o.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm })),
+    [...o.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm, sastoyanie: m.sastoyanie })),
   ).aktivi.map((a) => a.red.obekt);
 }
 
@@ -671,6 +685,7 @@ export function zakachiStoynost(
       matritsaOtNastroyki(nastroykiteNaKalkulatora()),
       naemiOtZhurnala,
       prodadeniOtZhurnala,
+      zemniRedove,
     );
     const parvi = smetnato.redove.find((r) => !r.prodaden) ?? smetnato.redove[0];
     if (parvi) {
@@ -802,7 +817,7 @@ export function zakachiStoynost(
           edinitsa: i.edinitsa,
           ploshtad_kvsm: i.ploshtad_kvsm,
         })),
-        [...og.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm })),
+        [...og.mesta.values()].map((m) => ({ ime: m.ime, kvadratura_kvsm: m.kvadratura_kvsm, sastoyanie: m.sastoyanie })),
       );
       const izbrani = samo === undefined ? r.aktivi : r.aktivi.filter((a) => a.red.obekt === samo);
       if (izbrani.length === 0) {
@@ -830,6 +845,10 @@ export function zakachiStoynost(
       const karta = new Map(mestataNaRedovete);
       for (const [ime, myasto] of mestataNaAktivite(izbrani)) karta.set(ime, myasto);
       mestataNaRedovete = karta;
+      // ЗЕМЯТА · състоянието на Имота, сверено с отметнатите в Настройки.
+      const zemni = new Set(zemniRedove);
+      for (const ime of zemniteRedove(izbrani, zemniteSastoyaniya(og))) zemni.add(ime);
+      zemniRedove = zemni;
       await vzemiNaemite();
       presmetni();
       const obekta = novi.filter((a) => a.vid === 'obekt').length;

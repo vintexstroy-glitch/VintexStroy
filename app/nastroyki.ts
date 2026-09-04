@@ -1305,17 +1305,31 @@ function blokNaSastoyaniyataNaImota(o: Ogledalo): string {
         <div class="red glava etapred" translate="no">
           <span class="kletka">Състояние</span>
           <span class="kletka">Откъде</span>
+          <span class="kletka">Земя</span>
         </div>
         ${spisak
           .map(
             (s) => `
-        <div class="red etapred" translate="no" data-sastoyanie-imot="${ekraniraj(s.klyuch)}">
+        <div class="red etapred" translate="no" data-sastoyanie-imot="${ekraniraj(s.klyuch)}" data-zemya="${s.zemya ? 'da' : 'ne'}">
           <span class="kletka">${ekraniraj(s.klyuch)}</span>
           <span class="kletka">${s.bazov ? 'от начало' : 'добавено'}</span>
+          <span class="kletka"><label class="pole">
+            <input type="checkbox" data-zemya-za="${ekraniraj(s.klyuch)}"${s.zemya ? ' checked' : ''}>
+            <span class="drebno">земя</span>
+          </label></span>
         </div>`,
           )
           .join('')}
       </div>
+
+      <p class="drebno"><b>Отметката „земя" мени СМЕТКАТА, не надписа.</b>
+      Негово, 04.09: „<b>земя е Имот с различен Статут. Ще се добавят и трият
+      статутите</b>" — и на въпроса как се смята такъв Имот: „<b>Само земята,
+      без сграда и без наем</b>." Отметнатото състояние прави Имота земя за
+      Калкулатора: разходният подход дава само земята (без строителна стойност
+      и без овехтяване), а доходният отпада, защото празната земя няма очакван
+      наем — записан наем от Журнала обаче се ЗАЧИТА. Имената на състоянията са
+      твои и се добавят горе; кодът не ги гадае.</p>
 
       <p class="drebno"><b>Началните шест не се презаписват.</b> „Изпълнен" не е
       седмо състояние — то е краят на Строителство или на Ремонт, тоест ДЕЛО.</p>
@@ -1773,6 +1787,36 @@ export function zakachiNastroyki(
       izhod.textContent = dumiZaGreshka(err);
     }
   });
+
+  /**
+   * ОТМЕТКАТА „ЗЕМЯ" · един слушател за всички редове (резен 111 · ADR-170).
+   *
+   * Пише в Журнала, защото върху нея СМЯТА Калкулаторът: това е решение на
+   * Стопанина, не поглед. Махането е същото събитие с `zemya: false` —
+   * последната дума бие, Журналът не се пипа (правило 1).
+   */
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-zemya-za]')) {
+    kutiya.addEventListener('change', async () => {
+      const izhod = koren.querySelector<HTMLElement>('#greshka-sastoyanie-imot');
+      if (izhod) izhod.textContent = '';
+      const klyuch = kutiya.dataset['zemyaZa'] ?? '';
+      try {
+        await k.deystviya.otbelezhiSastoyanieKatoZemya(
+          { klyuch, zemya: kutiya.checked },
+          { opId: `sastoyanie-zemya:${crypto.randomUUID()}` },
+        );
+        k.vest(
+          'dobre',
+          kutiya.checked
+            ? `„${klyuch}" вече значи ЗЕМЯ · Калкулаторът смята такъв Имот само по земята.`
+            : `„${klyuch}" вече не е земя · Имотът се смята като застроен.`,
+        );
+      } catch (err) {
+        if (izhod) izhod.textContent = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   const formaKontragent = koren.querySelector<HTMLFormElement>('#forma-kontragent');
   formaKontragent?.addEventListener('submit', async (e) => {

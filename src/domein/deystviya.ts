@@ -16,6 +16,8 @@ import { praviTsikal, proveriOtsenkata, SASTOYANIYA as SASTOYANIYA_NA_DELO, ZAVA
 import { proveriChasa } from './kontakti.js';
 import { proveriImota, proveriObekta, sashtnostNaMyastoto } from './mesta.js';
 import {
+  BAZOVI_SASTOYANIYA_NA_IMOT,
+  GreshkaSastoyanieNaImot,
   proveriSastoyanieNaImot,
   sashtnostNaSastoyanie,
   sastoyaniyataNaImota,
@@ -184,6 +186,7 @@ import type {
   PayloadGodinaZatvorena,
   PayloadMyastoZapisano,
   PayloadSastoyanieNaImotZapisano,
+  PayloadSastoyanieOtbelyazanoKatoZemya,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -503,6 +506,41 @@ export class Deystviya {
       VID.sastoyanieNaImot,
       sashtnostNaSastoyanie(klyuch),
       { klyuch },
+      z,
+    );
+  }
+
+  /**
+   * ОТБЕЛЯЗВА СЪСТОЯНИЕ КАТО ЗЕМЯ · и го маха със същото действие
+   * (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „земя е Имот с различен Статут. Ще се добавят и трият
+   * статутите." Имената им са НЕГОВИ и идват от Настройки; кодът пази само
+   * отметката — кое състояние значи земя.
+   *
+   * ЕДНА проверка тук: състоянието трябва да СЪЩЕСТВУВА. Отметка върху дума,
+   * която я няма в менюто, е тиха настройка за нищо — а върху нея смята
+   * Калкулаторът.
+   */
+  async otbelezhiSastoyanieKatoZemya(
+    danni: PayloadSastoyanieOtbelyazanoKatoZemya,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const klyuch = danni.klyuch.trim();
+    const o = await this.ogledalo();
+    const ima =
+      (BAZOVI_SASTOYANIYA_NA_IMOT as readonly string[]).includes(klyuch) ||
+      o.sastoyaniyaNaImotite.has(klyuch);
+    if (!ima) {
+      throw new GreshkaSastoyanieNaImot(
+        `Няма състояние „${klyuch}". Отметка върху дума извън менюто не мени нищо.`,
+      );
+    }
+    return this.#pusni(
+      'СъстояниеОтбелязаноКатоЗемя',
+      VID.sastoyanieNaImot,
+      sashtnostNaSastoyanie(klyuch),
+      { klyuch, zemya: danni.zemya },
       z,
     );
   }

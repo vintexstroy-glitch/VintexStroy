@@ -313,6 +313,17 @@ export function tsenaPoRazhod(n: {
   readonly obshta_kvsm: number;
   readonly vid: VidObekt;
   readonly matritsa?: Matritsa;
+  /**
+   * САМО ЗЕМЯ · Имот със статут „земя" (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „земя е Имот с различен Статут", и на въпроса как се смята:
+   * **„Само земята, без сграда и без наем."** Тогава строителната стойност и
+   * овехтяването отпадат — няма сграда, която да остарява, — и подходът връща
+   * земята за квадрат по площта. Липсваща земя пак е сентинел за „не е
+   * дадено" и връща нула, за да отпадне подходът, вместо да излъже с половин
+   * сметка.
+   */
+  readonly samoZemya?: boolean;
 }): number {
   const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   const zemya_st_kvm = m.zemya_st_kvm[n.vid];
@@ -346,6 +357,13 @@ export function tsenaPoRazhod(n: {
    * нула" на друго. Оттук нататък значи първото навсякъде, а `saglasuvana`
    * изхвърля подхода и го НАЗОВАВА в „отпаднали" (правило 15).
    */
+  if (n.samoZemya === true) {
+    if (zemya_st_kvm === 0) return 0;
+    // площ(кв.см) × земя(цент/м²) ÷ 10 000 кв.см/м² · закръгляне към най-близкото
+    return Number(
+      (BigInt(n.obshta_kvsm) * BigInt(zemya_st_kvm) * 2n + 10_000n) / (10_000n * 2n),
+    );
+  }
   if (zemya_st_kvm === 0 || stroitelna_st_kvm === 0) return 0;
 
   // ОСТАНАЛОТО от сградата, в б.т. Възраст над живота дава нула, не отрицателно:

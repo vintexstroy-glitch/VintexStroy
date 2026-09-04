@@ -41,6 +41,14 @@ export interface AktivOtZhurnala {
   readonly myasto: string;
   /** „obekt" · „myasto" — кой от двата вида актив е */
   readonly vid: 'obekt' | 'myasto';
+  /**
+   * СЪСТОЯНИЕТО на Имота · оттам се знае дали активът е ЗЕМЯ.
+   *
+   * Негово, 04.09: „земя е Имот с различен Статут." Обектът НЕ носи свое
+   * състояние — той наследява онова на Имота си, защото земя се говори за
+   * ИМОТА, не за единицата в него.
+   */
+  readonly sastoyanie: string;
 }
 
 export interface AktiviteOtZhurnala {
@@ -68,6 +76,8 @@ interface ObektZaAktiv {
 interface MyastoZaAktiv {
   readonly ime: string;
   readonly kvadratura_kvsm: number;
+  /** състоянието на Имота · празно значи „още не е казано" */
+  readonly sastoyanie: string;
 }
 
 /**
@@ -95,6 +105,8 @@ export function aktiviteOtZhurnala(
   let kandidati = 0;
 
   const sObekti = new Set(obekti.map((o) => svedeno(o.adres)));
+  // Състоянието на всеки Имот · обектът го наследява от мястото си.
+  const sastoyanieNaMyastoto = new Map(mesta.map((m) => [svedeno(m.ime), m.sastoyanie]));
 
   for (const o of obekti) {
     kandidati += 1;
@@ -105,6 +117,7 @@ export function aktiviteOtZhurnala(
     aktivi.push({
       vid: 'obekt',
       myasto: o.adres,
+      sastoyanie: sastoyanieNaMyastoto.get(svedeno(o.adres)) ?? '',
       red: {
         obekt: o.edinitsa,
         vid: vidPoIme(o.edinitsa),
@@ -129,6 +142,7 @@ export function aktiviteOtZhurnala(
     aktivi.push({
       vid: 'myasto',
       myasto: m.ime,
+      sastoyanie: m.sastoyanie,
       red: {
         obekt: m.ime,
         // Мястото не е апартамент, гараж или склад — то е „друго" и се смята
@@ -153,6 +167,25 @@ export function aktiviteOtZhurnala(
  * по Имоти. Без тази карта сравнението „оценка срещу книга" можеше да покаже
  * само един общ ред (ADR-168) — и го КАЗВАШЕ.
  */
+/**
+ * КОИ РЕДОВЕ СА ЗЕМЯ · имената им, готови за сметача.
+ *
+ * Активът е земя, когато СЪСТОЯНИЕТО на Имота му е отметнато като земя в
+ * Настройки (`zemniteSastoyaniya`). Обектът наследява състоянието на Имота си:
+ * апартамент в сграда със статут „земя" няма смисъл, но правилото е едно и се
+ * чете на едно място, вместо да се решава два пъти.
+ */
+export function zemniteRedove(
+  aktivi: readonly AktivOtZhurnala[],
+  zemniSastoyaniya: ReadonlySet<string>,
+): ReadonlySet<string> {
+  const izhod = new Set<string>();
+  for (const a of aktivi) {
+    if (a.sastoyanie !== '' && zemniSastoyaniya.has(a.sastoyanie)) izhod.add(a.red.obekt.trim());
+  }
+  return izhod;
+}
+
 export function mestataNaAktivite(
   aktivi: readonly AktivOtZhurnala[],
 ): ReadonlyMap<string, string> {

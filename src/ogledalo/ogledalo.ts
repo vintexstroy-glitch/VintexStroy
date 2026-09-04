@@ -120,6 +120,7 @@ import type {
   PayloadGodinaZatvorena,
   PayloadMyastoZapisano,
   PayloadSastoyanieNaImotZapisano,
+  PayloadSastoyanieOtbelyazanoKatoZemya,
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
@@ -372,6 +373,13 @@ export interface Ogledalo {
    * при етапите на продажбата.
    */
   readonly sastoyaniyaNaImotite: ReadonlyMap<string, PayloadSastoyanieNaImotZapisano>;
+  /**
+   * КОИ СЪСТОЯНИЯ ЗНАЧАТ ЗЕМЯ (резен 111 · ADR-170).
+   *
+   * „земя е Имот с различен Статут" — отметка върху номенклатурата, не нов вид
+   * обект. Върху нея СМЯТА Калкулаторът: земя се оценява само по земята.
+   */
+  readonly zemniSastoyaniya: ReadonlySet<string>;
 
   /**
    * КРЕДИТИТЕ · договорните данни (резен 19 · ADR-079).
@@ -860,6 +868,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
   const sastoyaniyaNaImotite = new Map<string, PayloadSastoyanieNaImotZapisano>();
+  /** кои състояния значат ЗЕМЯ · отметка от Настройки (резен 111 · ADR-170) */
+  const zemniSastoyaniya = new Set<string>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
   const pogasitelniPlanove = new Map<string, readonly VnoskaOtDogovora[]>();
@@ -1604,6 +1614,15 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
         break;
       }
 
+      case 'СъстояниеОтбелязаноКатоЗемя': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · отметката ляга и върху базово състояние,
+        // затова живее в СВОЯ карта, а не в записа на номенклатурата.
+        const p = s.payload as unknown as PayloadSastoyanieOtbelyazanoKatoZemya;
+        if (p.zemya) zemniSastoyaniya.add(p.klyuch);
+        else zemniSastoyaniya.delete(p.klyuch);
+        break;
+      }
+
       case 'КонтактЗаписан': {
         // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на телефона е ново събитие върху
         // същата същност, не втори човек (дословно както при мястото).
@@ -1945,6 +1964,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     dvizheniyaNaProdazhbi,
     etapiNaProdazhbite,
     sastoyaniyaNaImotite,
+    zemniSastoyaniya,
     krediti,
     plashtaniyaPoKrediti,
     pogasitelniPlanove,

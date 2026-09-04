@@ -188,6 +188,18 @@ export function stoynostNaSastoyanie(
    * Журналът — направените оттук нататък.
    */
   prodadeniOtZhurnala: ReadonlySet<string> = new Set(),
+  /**
+   * КОИ РЕДОВЕ СА ЗЕМЯ · Имот със статут „земя" (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „**земя е Имот с различен Статут**", и как се смята:
+   * „Само земята, без сграда и без наем."
+   *
+   * Тогава: В дава САМО земята (без строителна стойност и без овехтяване), а
+   * Б отпада — празната земя няма очакван наем по площ, а измисленият наем би
+   * родил доходна стойност от нищото. Действителен наем от Журнала обаче се
+   * ЗАЧИТА: наета земя си е наета, и фактът бие правилото.
+   */
+  zemniRedove: ReadonlySet<string> = new Set(),
 ): StoynostNaSastoyanie {
   const redove: RedNaStoynost[] = [];
   let obshto_tochno_st = 0;
@@ -214,11 +226,14 @@ export function stoynostNaSastoyanie(
 
     // ── Б · ПО СЪСТОЯНИЕ · оценката ──────────────────────────────────────
     // Действителният наем БИЕ очаквания: факт над предположение.
+    const zemya = zemniRedove.has(o.obekt.trim());
     const otZhurnala = deystvitelenNaem_st(o.obekt, naemiOtZhurnala);
     const naem_mesechen_st =
       otZhurnala !== undefined && otZhurnala > 0
         ? otZhurnala
-        : ochakvanNaem_st(o.obshta_kvsm, o.vid, matritsa);
+        : zemya
+          ? 0
+          : ochakvanNaem_st(o.obshta_kvsm, o.vid, matritsa);
     const naemOt: 'zhurnal' | 'matritsa' =
       otZhurnala !== undefined && otZhurnala > 0 ? 'zhurnal' : 'matritsa';
     const sastoyanie_t_st = tsenaPoSastoyanie({
@@ -233,6 +248,7 @@ export function stoynostNaSastoyanie(
       obshta_kvsm: o.obshta_kvsm,
       vid: o.vid,
       ...(matritsa ? { matritsa } : {}),
+      ...(zemya ? { samoZemya: true } : {}),
     });
     const razhod_st = tsenaNagore(razhod_tochno_st);
 

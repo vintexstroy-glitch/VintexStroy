@@ -1225,4 +1225,64 @@ export async function blok13(ctx: KonteksNaProhoda): Promise<void> {
   await dobaviImotBezObekt(p, 'Обеля', { sastoyanie: 'в ремонт' });
   proveri('състоянието стои на реда на имота',
     (await tekstNa(p, '[data-tablitsa=imotite] [data-imot="Обеля"]')).includes('в ремонт'), true);
+
+  // ═══ 111 · ЗЕМЯТА Е СТАТУТ · и статутът е ПРОМЕНЛИВ (ADR-170) ═══════════
+  //
+  // Негово, 04.09: „земя е Имот с различен Статут. Ще се добавят и трият
+  // статутите" · „Статуса е променлив… Статус има номенклатура която си
+  // правиш." Затова кодът НЕ слага статути: тук се добавя ЕДИН с негово име,
+  // отмята се като земя, и се мери какво прави това с числото.
+  const proveri111 = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri('111 · статутът се добавя и се ОТМЯТА като земя', kakvo, vidyano, ochakvano);
+
+  // ОБРАТНО В НАСТРОЙКИ · последният ред остави екрана на Имоти. Двете стъпки
+  // са същите като горе: падащият ред се отваря, ако е затворен, и чак после
+  // темата се избира (ADR-078 §12 · безусловен клик го ЗАТВАРЯ).
+  await naEkran(p, 'nastroyki', '[data-podtabove-na=nastroyki]');
+  await dokatoStane(
+    p,
+    async () => {
+      if (await skrit()) await p.click('#nastroyki-vhod');
+    },
+    async () => !(await skrit()),
+    'падащият ред на Настройки се отваря пак',
+  );
+  await p.click('#nastroyki-red [data-tema="sastoyaniya-imot"]');
+  await p.waitForSelector('#forma-sastoyanie-imot');
+  await dokatoStane(
+    p,
+    async () => {
+      await p.fill('#sastoyanie-imot-ime', 'Земеделска земя');
+      await p.click('#forma-sastoyanie-imot button[type=submit]');
+    },
+    () => p.$$eval('[data-sastoyanie-imot="Земеделска земя"]', (e) => e.length > 0),
+    'новото състояние „Земеделска земя" се появява',
+  );
+  proveri111('по подразбиране НЕ е земя · кодът не гадае по име',
+    await p.$eval('[data-sastoyanie-imot="Земеделска земя"]', (e) =>
+      (e as HTMLElement).dataset['zemya']), 'ne');
+  await sSabitie(p, () => p.click('[data-zemya-za="Земеделска земя"]'));
+  proveri111('отметката е ЕДНО събитие и остава',
+    await p.$eval('[data-sastoyanie-imot="Земеделска земя"]', (e) =>
+      (e as HTMLElement).dataset['zemya']), 'da');
+
+  const proveriZemyata = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
+    broyach.proveri('111 · Имот с този статут се смята САМО по земята', kakvo, vidyano, ochakvano);
+  await naEkran(p, 'imoti', '#forma-imot');
+  await dobaviImotBezObekt(p, 'Нива 7', {
+    kvadratura: '5 000,00',
+    sastoyanie: 'Земеделска земя',
+  });
+  await naEkran(p, 'stoynost', '#cheti-ploshti');
+  await deystvieSPrerisuvane(p, () => p.click('#cheti-aktivi'));
+  const redatNaNivata = async (): Promise<string> =>
+    await p.$$eval('.red.stoynost', (e) => {
+      const red = e.find((x) => (x.textContent ?? '').includes('Нива 7'));
+      return red?.textContent ?? '';
+    });
+  proveriZemyata('нивата влезе като актив от Журнала', (await redatNaNivata()) !== '', true);
+  // ДОХОДНИЯТ подход отпада · празната земя няма ОЧАКВАН наем, и редът го
+  // показва с нула, вместо с измислено число.
+  proveriZemyata('доходният подход за земята е НУЛА · няма измислен наем',
+    (await redatNaNivata()).includes('0,00'), true);
 }

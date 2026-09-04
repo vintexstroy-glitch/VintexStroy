@@ -52,6 +52,14 @@ export interface SastoyanieNaImot {
   readonly klyuch: string;
   /** негово ли е от начало, или е добавено от Стопанина */
   readonly bazov: boolean;
+  /**
+   * ТОВА СЪСТОЯНИЕ ЗНАЧИ ЛИ ЗЕМЯ (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „**земя е Имот с различен Статут. Ще се добавят и трият
+   * статутите**." Имената на трите са НЕГОВИ и се добавят от Настройки; кодът
+   * не ги гадае — той пази само отметката и смята по нея.
+   */
+  readonly zemya: boolean;
 }
 
 export class GreshkaSastoyanieNaImot extends Error {
@@ -73,17 +81,29 @@ export function sashtnostNaSastoyanie(klyuch: string): string {
  * отвън (правило 1).
  */
 export function sastoyaniyataNaImota(o: Ogledalo): readonly SastoyanieNaImot[] {
+  const zemni = o.zemniSastoyaniya;
   const bazovi: SastoyanieNaImot[] = BAZOVI_SASTOYANIYA_NA_IMOT.map((k) => ({
     klyuch: k,
     bazov: true,
+    zemya: zemni.has(k),
   }));
   const dobaveni: SastoyanieNaImot[] = [];
   for (const s of o.sastoyaniyaNaImotite.values()) {
     if (bazovi.some((b) => b.klyuch === s.klyuch)) continue;
     if (dobaveni.some((d) => d.klyuch === s.klyuch)) continue;
-    dobaveni.push({ klyuch: s.klyuch, bazov: false });
+    dobaveni.push({ klyuch: s.klyuch, bazov: false, zemya: zemni.has(s.klyuch) });
   }
   return Object.freeze([...bazovi, ...dobaveni]);
+}
+
+/**
+ * СЪСТОЯНИЯТА, КОИТО ЗНАЧАТ ЗЕМЯ · един дом за въпроса (правило 17).
+ *
+ * Викат го Калкулаторът (как се смята активът) и Настройки (коя отметка стои
+ * сложена). Две сметки за едно и също щяха да се разминат при първата поправка.
+ */
+export function zemniteSastoyaniya(o: Ogledalo): ReadonlySet<string> {
+  return new Set(sastoyaniyataNaImota(o).filter((s) => s.zemya).map((s) => s.klyuch));
 }
 
 /**

@@ -15,9 +15,10 @@ const OBEKTI = [
 ];
 
 const MESTA = [
-  { ime: 'Малинова', kvadratura_kvsm: 1_240_50_00 },
-  { ime: 'Гара Яна', kvadratura_kvsm: 3_000_00_00 },
-  { ime: 'Витоша', kvadratura_kvsm: 0 },
+  { ime: 'Малинова', kvadratura_kvsm: 1_240_50_00, sastoyanie: 'Строителство' },
+  // „земя е Имот с различен Статут" (04.09) · името на статута е НЕГОВО
+  { ime: 'Гара Яна', kvadratura_kvsm: 3_000_00_00, sastoyanie: 'Земя' },
+  { ime: 'Витоша', kvadratura_kvsm: 0, sastoyanie: '' },
 ];
 
 describe('активите от Журнала · двата вида', () => {
@@ -49,7 +50,7 @@ describe('активите от Журнала · двата вида', () => {
   it('и сравнението е по СВЕДЕНО име · „малинова" е същото място', () => {
     const r = aktiviteOtZhurnala(
       [{ adres: 'малинова ', edinitsa: 'АП. № 1', ploshtad_kvsm: 100 }],
-      [{ ime: 'Малинова', kvadratura_kvsm: 500 }],
+      [{ ime: 'Малинова', kvadratura_kvsm: 500, sastoyanie: '' }],
     );
     expect(r.aktivi).toHaveLength(1);
     expect(r.aktivi[0]?.vid).toBe('obekt');

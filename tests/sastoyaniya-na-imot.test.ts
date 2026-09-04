@@ -24,6 +24,7 @@ import {
   proveriSastoyanieNaImot,
   sashtnostNaSastoyanie,
   sastoyaniyataNaImota,
+  zemniteSastoyaniya,
 } from '../src/domein/sastoyaniya-na-imot.js';
 import { SHA } from './pomoshtni.js';
 
@@ -66,6 +67,47 @@ describe('шестте начални', () => {
   });
 });
 
+describe('отметката ЗЕМЯ · „земя е Имот с различен Статут" (резен 111 · ADR-170)', () => {
+  it('по подразбиране НИТО ЕДНО състояние не е земя', async () => {
+    const { dnevnik } = stend();
+    const o = await ogledaloto(dnevnik);
+    expect(sastoyaniyataNaImota(o).every((s) => !s.zemya)).toBe(true);
+    expect(zemniteSastoyaniya(o).size).toBe(0);
+  });
+
+  it('отметката ляга и върху БАЗОВО състояние · те живеят в кода, не в запис', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.otbelezhiSastoyanieKatoZemya(
+      { klyuch: 'Собствено ползване', zemya: true },
+      { opId: 'op-z1' },
+    );
+    const o = await ogledaloto(dnevnik);
+    expect([...zemniteSastoyaniya(o)]).toEqual(['Собствено ползване']);
+    expect(sastoyaniyataNaImota(o).find((s) => s.klyuch === 'Собствено ползване')?.zemya).toBe(true);
+  });
+
+  it('и върху ДОБАВЕНО · имената са негови, кодът не ги гадае', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.zapishiSastoyanieNaImot({ klyuch: 'Земя' }, { opId: 'op-z2' });
+    await deystviya.otbelezhiSastoyanieKatoZemya({ klyuch: 'Земя', zemya: true }, { opId: 'op-z3' });
+    expect([...zemniteSastoyaniya(await ogledaloto(dnevnik))]).toEqual(['Земя']);
+  });
+
+  it('маха се със СЪЩОТО събитие · последната дума бие, Журналът не се пипа', async () => {
+    const { dnevnik, deystviya } = stend();
+    await deystviya.otbelezhiSastoyanieKatoZemya({ klyuch: 'Наем', zemya: true }, { opId: 'op-z4' });
+    await deystviya.otbelezhiSastoyanieKatoZemya({ klyuch: 'Наем', zemya: false }, { opId: 'op-z5' });
+    expect(zemniteSastoyaniya(await ogledaloto(dnevnik)).size).toBe(0);
+  });
+
+  it('отметка върху дума ИЗВЪН менюто се отказва с думи', async () => {
+    const { deystviya } = stend();
+    await expect(
+      deystviya.otbelezhiSastoyanieKatoZemya({ klyuch: 'Ливада', zemya: true }, { opId: 'op-z6' }),
+    ).rejects.toThrow(/Няма състояние/);
+  });
+});
+
 describe('растежът', () => {
   it('новото се ДОБАВЯ · след шестте, и се знае, че е добавено', async () => {
     const { dnevnik, deystviya } = stend();
@@ -73,7 +115,7 @@ describe('растежът', () => {
 
     const spisak = sastoyaniyataNaImota(await ogledaloto(dnevnik));
     expect(spisak).toHaveLength(BAZOVI_SASTOYANIYA_NA_IMOT.length + 1);
-    expect(spisak.at(-1)).toEqual({ klyuch: 'в ремонт по проект', bazov: false });
+    expect(spisak.at(-1)).toEqual({ klyuch: 'в ремонт по проект', bazov: false, zemya: false });
     // Шестте не мърдат от мястото си.
     expect(spisak[0]!.klyuch).toBe('Строителство');
   });
