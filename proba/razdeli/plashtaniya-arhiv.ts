@@ -45,7 +45,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),
-    'Дата · Място · Обект · Страна · Вид · Начин · Сметка · Бележка · Заплата · Дни · ' +
+    'Дата · Имот · Обект · Страна · Вид · Начин · Сметка · Бележка · Заплата · Дни · ' +
       'Фактура № · Сверка · Сума € · Категория',
   );
   proveri(

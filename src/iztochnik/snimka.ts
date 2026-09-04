@@ -36,7 +36,7 @@ export interface Izvor {
   readonly otpechatak: string;
 }
 
-/** Един прочетен ред, вече сведен до цели стотинки и ISO дати. */
+/** Един прочетен ред, вече сведен до цели центове и ISO дати. */
 export interface RedOtSnimka {
   /** стабилен ключ за сравнение — вади се от съдържанието, не от реда */
   readonly klyuch: string;

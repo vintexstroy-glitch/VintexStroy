@@ -42,7 +42,7 @@ import { podgotviVnos } from '../src/domein/vnos-na-redove.js';
 import type { PayloadTablitsaOtFaylSazdadena } from '../src/domein/sabitiya.js';
 import type { RedNaTablitsa } from '../src/domein/redove-na-tablitsa.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
-import { kakvoPishe, otSuma, stotinki } from '../src/yadro/pari.js';
+import { kakvoPishe, otSuma, tsentove } from '../src/yadro/pari.js';
 import { redoveVObshtataGlava, sborNaObshtaKolona } from '../src/domein/obshta-glava.js';
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import {
@@ -62,7 +62,7 @@ let formulite: ReadonlyMap<number, string> = new Map();
 /**
  * ВИДЪТ, ПОПРАВЕН С РЪКА · последната дума е на човека, не на разпознавача.
  *
- * В неговия файл цените са ГОЛИ ЧИСЛА („147800"), без знак и без стотинки —
+ * В неговия файл цените са ГОЛИ ЧИСЛА („147800"), без знак и без центове —
  * разпознавачът ги чете като „число" и те не влизат в нито един сбор пари.
  * Позна ли се грешно, поправката трябва да е тук, ПРЕДИ записа: сменен вид
  * след това би преоценил вече записани числа.
@@ -175,7 +175,7 @@ function ednoSemeystvoKatoTablitsa(
   const parichni = new Set(nomera.filter((k) => ch.redove.some((r) => r.pari_st[k] !== undefined)));
   const kletka = (r: (typeof ch.redove)[number], k: string): string => {
     const st = r.pari_st[k];
-    if (st !== undefined) return ekraniraj(kakvoPishe(stotinki(st)));
+    if (st !== undefined) return ekraniraj(kakvoPishe(tsentove(st)));
     const n = r.chisla[k];
     if (n !== undefined) return ekraniraj(String(n));
     return ekraniraj(r.tekst[k] ?? '—');
@@ -201,7 +201,7 @@ function ednoSemeystvoKatoTablitsa(
               ? `<div class="red opis sumi" translate="no"><span><b>Сбор</b></span><span></span>${nomera
                   .map((k) =>
                     parichni.has(k)
-                      ? `<span data-obsht-sbor="${k}"><b>${ekraniraj(kakvoPishe(stotinki(sborNaObshtaKolona(ch.redove, k))))}</b></span>`
+                      ? `<span data-obsht-sbor="${k}"><b>${ekraniraj(kakvoPishe(tsentove(sborNaObshtaKolona(ch.redove, k))))}</b></span>`
                       : '<span></span>',
                   )
                   .join('')}</div>`
@@ -272,7 +272,7 @@ function blokNaSazdadenite(o: Ogledalo): string {
     const vid = vidaNaKolonata(t, k);
     if (vid === 'evro') {
       const st = r.pari_st[k];
-      return st === undefined ? '—' : ekraniraj(kakvoPishe(stotinki(st)));
+      return st === undefined ? '—' : ekraniraj(kakvoPishe(tsentove(st)));
     }
     if (vid === 'protsent' || vid === 'chislo') {
       const n = r.chisla[k];
@@ -345,7 +345,7 @@ function blokNaSazdadenite(o: Ogledalo): string {
             ? `<div class="red opis sumi" translate="no"><span><b>Сбор</b></span>${nomera
                 .map((k) =>
                   vidaNaKolonata(t, k) === 'evro' && !zatvorenaE(t, k)
-                    ? `<span data-sbor-kolona="${k}"><b>${ekraniraj(kakvoPishe(stotinki(sborNaKolona(redove, k))))}</b></span>`
+                    ? `<span data-sbor-kolona="${k}"><b>${ekraniraj(kakvoPishe(tsentove(sborNaKolona(redove, k))))}</b></span>`
                     : '<span></span>',
                 )
                 .join('')}<span></span></div>`
@@ -520,7 +520,7 @@ function blokNaRazreza(
       <div class="red opis" translate="no" data-grupa="${ekraniraj(g.stoynost)}">
         <span><b>${g.stoynost === '' ? '<span class="znachka tiha">(празно)</span>' : ekraniraj(g.stoynost)}</b></span>
         <span>${g.broy}</span>
-        ${pari.map((k) => `<span>${ekraniraj(kakvoPishe(stotinki(g.sbor_st[k] ?? 0)))}</span>`).join('')}
+        ${pari.map((k) => `<span>${ekraniraj(kakvoPishe(tsentove(g.sbor_st[k] ?? 0)))}</span>`).join('')}
       </div>`,
         )
         .join('')}
@@ -610,7 +610,7 @@ function blokNaRollup(
       <div class="red opis" translate="no" data-rollup-red="${ekraniraj(r.red)}">
         <span><b>${ekraniraj(r.red)}</b></span>
         <span>${r.izvorni.length}</span>
-        <span data-rollup-sbor="${r.sbor_st}">${ekraniraj(kakvoPishe(stotinki(r.sbor_st)))}</span>
+        <span data-rollup-sbor="${r.sbor_st}">${ekraniraj(kakvoPishe(tsentove(r.sbor_st)))}</span>
       </div>`,
               )
               .join('')
@@ -619,9 +619,9 @@ function blokNaRollup(
     </div>
     <p class="drebno" id="sverka-rollup">Живи в извора: <b>${sverka.zhiviVIzvora}</b> · влезли:
     <b>${sverka.vlezli}</b> · незакачени: <b>${sverka.nezakacheni}</b> · по парите изворът е
-    <b>${ekraniraj(kakvoPishe(stotinki(sverka.sborIzvora_st)))}</b>, влезлите —
-    <b>${ekraniraj(kakvoPishe(stotinki(sverka.sborVlezli_st)))}</b>, разлика
-    <b data-rollup-razlika="${sverka.razlika_st}">${ekraniraj(kakvoPishe(stotinki(sverka.razlika_st)))}</b>
+    <b>${ekraniraj(kakvoPishe(tsentove(sverka.sborIzvora_st)))}</b>, влезлите —
+    <b>${ekraniraj(kakvoPishe(tsentove(sverka.sborVlezli_st)))}</b>, разлика
+    <b data-rollup-razlika="${sverka.razlika_st}">${ekraniraj(kakvoPishe(tsentove(sverka.razlika_st)))}</b>
     · закачки към махнати: <b>${sverka.kamMahnati}</b>. Двете страни се смятат по РАЗЛИЧЕН
     път; изворен ред, закачен за два реда, влиза в сбора на ВСЕКИ, а в сверката се брои
     ВЕДНЪЖ — затова тя гледа различните.</p>`;
@@ -762,7 +762,7 @@ export function zakachiTablitsaOtFayl(
         if (surovo === '') continue;
         const vid = vidaNaKolonata(t, k2);
         // ПАРИТЕ минават през четеца на суми — той знае и запетаята, и точката,
-        // и връща ЦЕЛИ стотинки. Ръчно `Number()*100` дава 12.340000000000002.
+        // и връща ЦЕЛИ центове. Ръчно `Number()*100` дава 12.340000000000002.
         if (vid === 'evro') pari_st[k2] = otSuma(surovo);
         else if (vid === 'protsent' || vid === 'chislo') {
           const n = Number(surovo.replace(',', '.'));

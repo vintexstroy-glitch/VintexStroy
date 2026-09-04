@@ -11,7 +11,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import {
@@ -92,7 +92,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Домакинство',
-      naem_st: stotinki(500_00),
+      naem_st: tsentove(500_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -106,7 +106,7 @@ async function nasadi(d: Deystviya): Promise<void> {
     {
       imotId: 'I-1',
       naemetel: 'Стройпласт ЕООД',
-      naem_st: stotinki(1200_00),
+      naem_st: tsentove(1200_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -127,13 +127,13 @@ describe('салдото на един джоб · „Вкарва само в �
   it('трезорът се записва през Вратата и повторният запис ПОПРАВЯ', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(10_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-1' },
     );
     expect(saldoNa(await deystviya.ogledalo(), 'trezor')).toBe(10_000_00);
 
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(12_500_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(12_500_00), ot: '2026-08-01' },
       { opId: 'op-saldo-2' },
     );
     const o = await deystviya.ogledalo();
@@ -145,7 +145,7 @@ describe('салдото на един джоб · „Вкарва само в �
     const { deystviya } = stend();
     await expect(
       deystviya.zapishiSaldo(
-        { kade: 'banka', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+        { kade: 'banka', saldo_st: tsentove(10_000_00), ot: '2026-08-01' },
         { opId: 'op-saldo-banka' },
       ),
     ).rejects.toThrowError(/само в трезора/);
@@ -162,7 +162,7 @@ describe('салдото на един джоб · „Вкарва само в �
   it('приема отрицателно салдо — овърдрафтът е дълг, не грешка', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(-2_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(-2_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-minus' },
     );
     expect(saldoNa(await deystviya.ogledalo(), 'trezor')).toBe(-2_000_00);
@@ -183,7 +183,7 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(500_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
     );
 
@@ -191,7 +191,7 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
     const vzemaneId = [...o1.vzemaniya.values()].find((v) => v.naemId === 'N-1')!.id;
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(300_00), nachin: 'банка', data: '2026-08-10' },
+      { vzemaneId, suma_st: tsentove(300_00), nachin: 'банка', data: '2026-08-10' },
       { opId: 'op-p-1' },
     );
     await deystviya.zapishiRazhod(
@@ -200,7 +200,7 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'седмична заплата',
-        suma_st: stotinki(800_00),
+        suma_st: tsentove(800_00),
         sektor: 'zaplati',
         nachin: 'в брой',
         data: '2026-08-12',
@@ -234,7 +234,7 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
         razlika_st: 0,
         izvori: ['проба'],
         propusnati: 0,
-        saldoKray_st: stotinki(7_000_00),
+        saldoKray_st: tsentove(7_000_00),
       },
       { opId: 'op-sverka-kotva' },
     );
@@ -243,13 +243,13 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
     // Плащане СЛЕД котвения месец → влиза в изчислението.
     await deystviya.priemiPlashtane(
       'P-2',
-      { vzemaneId, suma_st: stotinki(300_00), nachin: 'карта', data: '2026-09-10' },
+      { vzemaneId, suma_st: tsentove(300_00), nachin: 'карта', data: '2026-09-10' },
       { opId: 'op-p-2' },
     );
     // Плащане ПРЕДИ края на котвения месец → извлечението ВЕЧЕ го носи.
     await deystviya.priemiPlashtane(
       'P-3',
-      { vzemaneId, suma_st: stotinki(111_00), nachin: 'банка', data: '2026-08-05' },
+      { vzemaneId, suma_st: tsentove(111_00), nachin: 'банка', data: '2026-08-05' },
       { opId: 'op-p-3' },
     );
     const o = await deystviya.ogledalo();
@@ -271,7 +271,7 @@ describe('ЛИКВИДНОСТ · по джоб (резен 71)', () => {
   it('НЕ се нулира на първо число — състояние е, не оборот', async () => {
     const { deystviya } = stend();
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(1_000_00), ot: '2026-01-01' },
+      { kade: 'trezor', saldo_st: tsentove(1_000_00), ot: '2026-01-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -309,7 +309,7 @@ describe('ВЗЕМАНИЯ · два вида, които не се сливат
     const vzemaneId = [...o1.vzemaniya.values()].find((v) => v.naemId === 'N-2')!.id;
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(1200_00), nachin: 'банка', data: '2026-08-10' },
+      { vzemaneId, suma_st: tsentove(1200_00), nachin: 'банка', data: '2026-08-10' },
       { opId: 'op-p' },
     );
     expect(vzemaniya(await deystviya.ogledalo()).sbor_st).toBe(500_00);
@@ -326,7 +326,7 @@ describe('СРЕДСТВА · и защо не е Капитал', () => {
         potok: 'fakturi',
         dostavchik: 'Стройко ЕООД',
         opis: 'материали',
-        suma_st: stotinki(600_00),
+        suma_st: tsentove(600_00),
         sektor: 'materiali',
         nachin: 'банка',
         data: '2026-08-12',
@@ -347,7 +347,7 @@ describe('СРЕДСТВА · и защо не е Капитал', () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(10_000_00), ot: '2026-08-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -367,7 +367,7 @@ describe('КАПИТАЛ · Активи минус задължения', () =>
     await nasadi(deystviya);
     // Наличните са в ЕДИН запис на трезора — банково ръчно салдо няма (И124 т.9).
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(10_500_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(10_500_00), ot: '2026-08-01' },
       { opId: 'op-s-t' },
     );
     await sKredit(deystviya);
@@ -444,7 +444,7 @@ describe('цифрите за календара · числото е готов
     const vzemaneId = [...o1.vzemaniya.values()].find((v) => v.naemId === 'N-1')!.id;
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(500_00), nachin: 'банка', data: '2026-08-10' },
+      { vzemaneId, suma_st: tsentove(500_00), nachin: 'банка', data: '2026-08-10' },
       { opId: 'op-p' },
     );
     await deystviya.zapishiRazhod(
@@ -453,7 +453,7 @@ describe('цифрите за календара · числото е готов
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'заплата',
-        suma_st: stotinki(500_00),
+        suma_st: tsentove(500_00),
         sektor: 'zaplati',
         nachin: 'в брой',
         data: '2026-08-10',
@@ -486,7 +486,7 @@ describe('цифрите за календара · числото е готов
           potok: 'fakturi',
           dostavchik: 'Стройко',
           opis: 'материали',
-          suma_st: stotinki(100_00),
+          suma_st: tsentove(100_00),
           sektor: 'materiali',
           nachin: 'банка',
           data,
@@ -506,7 +506,7 @@ describe('сверката вход↔изход на Капитала (прав
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(10_000_00), ot: '2026-08-01' },
       { opId: 'op-s' },
     );
     const o = await deystviya.ogledalo();
@@ -562,7 +562,7 @@ describe('вторият път брои САМ', () => {
     const { deystviya } = stend();
     await nasadi(deystviya);
     await deystviya.zapishiSaldo(
-      { kade: 'trezor', saldo_st: stotinki(10_000_00), ot: '2026-08-01' },
+      { kade: 'trezor', saldo_st: tsentove(10_000_00), ot: '2026-08-01' },
       { opId: 'op-saldo-b' },
     );
     const o = await deystviya.ogledalo();
@@ -604,7 +604,7 @@ describe('сумите за обхват от дни', () => {
       'R-yuli',
       {
         potok: 'stroitelstvo', dostavchik: 'Материали ООД', opis: 'цимент',
-        suma_st: stotinki(600_00), sektor: 'razhod-materiali',
+        suma_st: tsentove(600_00), sektor: 'razhod-materiali',
         nachin: 'банка', data: '2026-07-15', dokument: '',
       },
       { opId: 'op-r-yuli' },
@@ -635,10 +635,10 @@ async function sSdelka(d: Deystviya): Promise<void> {
       imotId: 'I-1',
       kupuvach: 'Иван Петров',
       telefon: '0888123456',
-      tsena_st: stotinki(25_000_00),
-      prodazhba_st: stotinki(24_000_00),
-      smr_st: stotinki(14_000_00),
-      pd_st: stotinki(10_000_00),
+      tsena_st: tsentove(25_000_00),
+      prodazhba_st: tsentove(24_000_00),
+      smr_st: tsentove(14_000_00),
+      pd_st: tsentove(10_000_00),
       sastoyanie: 'tekushta',
     },
     { opId: 'op-sdelka' },
@@ -648,7 +648,7 @@ async function sSdelka(d: Deystviya): Promise<void> {
       dvizhenieId: 'PRD-1',
       prodazhbaId: 'PR-1',
       vid: 'Капаро',
-      suma_st: stotinki(5_000_00),
+      suma_st: tsentove(5_000_00),
       data: '2026-08-10',
       belezhka: 'капаро',
       nachin: 'банка',
@@ -679,7 +679,7 @@ describe('ВЗЕМАНИЯ · вторият ред вече има източн
         dvizhenieId: 'PRD-2',
         prodazhbaId: 'PR-1',
         vid: 'НС',
-        suma_st: stotinki(25_000_00),
+        suma_st: tsentove(25_000_00),
         data: '2026-08-20',
         belezhka: 'преведено с повече',
         nachin: 'банка',

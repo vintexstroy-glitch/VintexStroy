@@ -101,7 +101,7 @@ export function vidatNaRazhoda(r: Pick<Razhod, 'potok' | 'nachin'>): VidPlashtan
  */
 export const KOLONI_PLASHTANIYA_ARHIV: readonly string[] = Object.freeze([
   'Дата',
-  'Място',
+  'Имот',
   'Обект',
   'Страна',
   'Вид',
@@ -143,8 +143,8 @@ export const PARICHNI_PLASHTANIYA: readonly string[] = Object.freeze(['Запл�
  */
 const PRAZNI_ZA_VIDA: Readonly<Record<VidPlashtane, readonly string[]>> = Object.freeze({
   zaplata: Object.freeze(['Фактура №']),
-  'faktura-kesh': Object.freeze(['Място', 'Обект', 'Заплата', 'Дни']),
-  'faktura-karta': Object.freeze(['Място', 'Обект', 'Заплата', 'Дни']),
+  'faktura-kesh': Object.freeze(['Имот', 'Обект', 'Заплата', 'Дни']),
+  'faktura-karta': Object.freeze(['Имот', 'Обект', 'Заплата', 'Дни']),
 });
 
 /**
@@ -203,7 +203,7 @@ export function kletkata(r: RedNaPlashtane, kolona: string): string | number | '
   switch (kolona) {
     case 'Дата':
       return r.data;
-    case 'Място':
+    case 'Имот':
       return r.myasto;
     case 'Обект':
       return r.obekt;

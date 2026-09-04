@@ -19,7 +19,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import { smetki } from '../src/domein/smetki.js';
@@ -50,7 +50,7 @@ const RAZHOD = {
   potok: 'fakturi',
   dostavchik: 'Баумит ЕООД',
   opis: 'вар и цимент',
-  suma_st: stotinki(240_00),
+  suma_st: tsentove(240_00),
   sektor: 'pokupki-materiali',
   nachin: 'банка' as const,
   data: '2026-08-12',
@@ -233,7 +233,7 @@ describe('описанието и сумата идват от ЕДИН дом',
         ime: 'Иван Петров',
         dlazhnost: 'зидар',
         obekt: 'бл. 3',
-        dnevna_st: stotinki(120_00),
+        dnevna_st: tsentove(120_00),
         dni: 5,
       },
       { opId: 'op-z' },
@@ -244,13 +244,13 @@ describe('описанието и сумата идват от ЕДИН дом',
         ime: 'Ипотека',
         vid: 'ipoteka',
         proektId: '',
-        ostatak_st: stotinki(100_000_00),
+        ostatak_st: tsentove(100_000_00),
         ot: '2026-01-01',
         lihva_bp: 345,
-        vnoska_st: stotinki(612_34),
+        vnoska_st: tsentove(612_34),
         den: 15,
         otgovornik: 'vintexstroy@gmail.com',
-        obezpechenie_st: stotinki(200_000_00),
+        obezpechenie_st: tsentove(200_000_00),
       },
       { opId: 'op-k' },
     );

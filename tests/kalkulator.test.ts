@@ -528,7 +528,7 @@ describe('В · разходният подход', () => {
     const stara = tsenaPoRazhod({ obshta_kvsm: STO_KVM, vid: 'apartament', matritsa: sVazrast(50) });
     // Цялата строителна част: 100 м² × 900 € = 90 000 €
     expect(nova - stara).toBe(90_000_00);
-    // А останалото Е земята, до последната стотинка.
+    // А останалото Е земята, до последния цент.
     expect(stara).toBe(10_000_00);
   });
 
@@ -731,5 +731,74 @@ describe('пиновете · главата и думата се твърдят
 
   it('продаденото се пише дословно „ПРОДАДЕН"', () => {
     expect(PRODADEN).toBe('ПРОДАДЕН');
+  });
+});
+
+describe('ЗЕМЯТА · „само земята, без сграда и без наем" (резен 111 · ADR-170)', () => {
+  /**
+   * Негово, 04.09: „земя е Имот с различен Статут. Ще се добавят и трият
+   * статутите", и на въпроса как се смята такъв Имот: „Само земята, без сграда
+   * и без наем."
+   */
+  const PARTSEL = {
+    obekt: 'Гара Яна',
+    vid: 'drug' as const,
+    etazh: '',
+    kota: '',
+    chista_kvsm: 1_000_00_00,
+    obshta_kvsm: 1_000_00_00,
+    dvor_kvsm: 0,
+  };
+
+  it('В · разходният дава САМО земята · строителството и овехтяването отпадат', () => {
+    const kato_zemya = tsenaPoRazhod({ obshta_kvsm: 1_000_00_00, vid: 'drug', samoZemya: true });
+    const kato_sgrada = tsenaPoRazhod({ obshta_kvsm: 1_000_00_00, vid: 'drug' });
+    expect(kato_zemya).toBeGreaterThan(0);
+    expect(kato_zemya).toBeLessThan(kato_sgrada);
+  });
+
+  it('Б · доходният ОТПАДА · празната земя няма ОЧАКВАН наем', () => {
+    const bezZemya = stoynostNaSastoyanie([PARTSEL], new Map());
+    const kato_zemya = stoynostNaSastoyanie(
+      [PARTSEL],
+      new Map(),
+      undefined,
+      new Map(),
+      new Set(),
+      new Set(['Гара Яна']),
+    );
+    expect(bezZemya.redove[0]?.sastoyanie_tochno_st).toBeGreaterThan(0);
+    expect(kato_zemya.redove[0]?.sastoyanie_tochno_st).toBe(0);
+    expect(kato_zemya.redove[0]?.naem_mesechen_st).toBe(0);
+    // Отпадналият подход се НАЗОВАВА, вместо теглото му да се изяде мълчаливо.
+    expect(kato_zemya.redove[0]?.otpadnali.length).toBeGreaterThan(0);
+  });
+
+  it('но ЗАПИСАН наем от Журнала се ЗАЧИТА · фактът бие правилото', () => {
+    // Свързването е по ВИД + НОМЕР (`svarzvane.ts`), затова редът трябва да
+    // носи номер в името си — както го носят обектите в книгата.
+    const NIVA = { ...PARTSEL, obekt: 'Нива 7' };
+    const sNaem = stoynostNaSastoyanie(
+      [NIVA],
+      new Map(),
+      undefined,
+      new Map([['drug#7', 500_00]]),
+      new Set(),
+      new Set(['Нива 7']),
+    );
+    expect(sNaem.redove[0]?.naemOt).toBe('zhurnal');
+    expect(sNaem.redove[0]?.sastoyanie_tochno_st).toBeGreaterThan(0);
+  });
+
+  it('А · пазарният по база ОСТАВА · земята пак има цена за квадрат', () => {
+    const kato_zemya = stoynostNaSastoyanie(
+      [PARTSEL],
+      new Map(),
+      undefined,
+      new Map(),
+      new Set(),
+      new Set(['Гара Яна']),
+    );
+    expect(kato_zemya.redove[0]?.tsena_tochno_st).toBeGreaterThan(0);
   });
 });

@@ -33,7 +33,7 @@
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Samolichnost, Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import { IMENA_NA_ROLITE } from '../src/yadro/samolichnost.js';
-import { napraviSluzhitel, podredeni } from '../src/domein/sluzhiteli.js';
+import { napraviSluzhitel } from '../src/domein/sluzhiteli.js';
 import { vDnevniyaRed } from '../src/domein/dela.js';
 import { svediImeyl } from '../src/domein/akaunt.js';
 import {
@@ -52,83 +52,33 @@ import {
   type OtgovorOtKalendara,
 } from '../src/domein/kalendar.js';
 import { mozhe, type Izbor } from '../src/domein/planove.js';
-import {
-  IMENA_NA_PRAVATA,
-  IMENA_NA_VIDOVETE,
-  klyuchNaPravo,
-  napraviPrava,
-  OBYASNENIYA_NA_PRAVATA,
-  PRAVA_NA_KOLONA,
-  pravoNaKolona,
-  sPromenenoPravo,
-  stesniVsichki,
-  vidNaKolona,
-  zashtoNeDeystva,
-  type PravaZaModel,
-  type PravoNaKolona,
-} from '../src/domein/kolonno.js';
-import {
-  bezTab,
-  grupiraniPoTabove,
-  IME_BEZ_TAB,
-  type PunktNaMenyuto,
-  type TablitsaSHedar,
-} from '../src/domein/hedari-po-tabove.js';
-import { eVgradena, tablitsiteNaProgramata } from './tablitsite.js';
+import { horataVProgramata } from './pravata.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
-import { ekraniraj } from './obshto.js';
-import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
+import { dnesKato, ekraniraj } from './obshto.js';
+import { chetiEkranno, zabraviEkranno, zapomniEkranno } from './pamet-ekran.js';
+import {
+  IMENA_NA_TAKTOVETE,
+  kartaNaSluzhitelya,
+  sasedenProzorets,
+  sveriKartata,
+  TAKTOVE_NA_KARTATA,
+  type TaktNaKartata,
+} from '../src/domein/karta-na-sluzhitelya.js';
 import type { Konteks } from './ekranite.js';
 
 /** Кого гледам · поглед върху екрана, помни се (ADR-022). */
 let izbran = chetiEkranno('sluzhiteli.izbran', '');
 let greshka = '';
 
-/**
- * РЕДЪТ НА МЕНЮТО, какъвто човекът го е ВИДЯЛ при последното рисуване.
- *
- * Слушателят на „цяло меню" трябва да знае кои таблици стоят под кой таб. Може
- * да ги прочете от разметката — но тогава ще действа по онова, което DOM-ът
- * казва, а не по онова, което кодът е показал. Затова редът се оставя тук при
- * рисуването и слушателят смята групите ПАК, от същия регистър.
- *
- * Не е втори дом на факта: домът на реда е `podredeniPunktove` (ADR-066); това
- * е следата от последното му четене.
- */
-let redNaMenyuto: readonly PunktNaMenyuto[] = [];
-
 export function narisuvaySluzhiteli(
   o: Ogledalo,
   kojSam: Samolichnost,
   dnes: string,
   izbor: Izbor,
-  /**
-   * РЕДЪТ НА МЕНЮТО · подава се, не се смята пак тук (правило 17).
-   *
-   * Смятането му пита и плана, и ролята, и записания ред, и личното
-   * пренареждане (ADR-066). Втора негова сметка щеше да е второ място, което
-   * се разминава — а разминаването тук значи хедър, който в лентата стои под
-   * един таб, а в матрицата под друг.
-   */
-  redNaLentata: readonly PunktNaMenyuto[] = [],
-  /** влезлият · Стопанинът ли е (ADR-043 · ролята се СМЯТА от Журнала) */
-  negoviyat = true,
 ): string {
-  redNaMenyuto = redNaLentata;
   const az = svediImeyl(kojSam.imeyl);
-  /**
-   * СТОПАНИНЪТ СТОИ В СПИСЪКА · той също върши дела и също иска лист.
-   *
-   * Не е „служител" и не се вписва като такъв — той е ПЪРВОТО събитие в Журнала
-   * (ADR-043). Затова се добавя тук поименно, с ролята си, вместо да се крие в
-   * картата на служителите: скрит там, той щеше да прилича на вписан човек.
-   */
-  const hora = [
-    ...(o.stopanin === ''
-      ? []
-      : [{ imeyl: o.stopanin, ime: 'Стопанинът', rolya: 'sobstvenik' as const }]),
-    ...podredeni(o.sluzhiteli.values()).filter((h) => h.imeyl !== o.stopanin),
-  ];
+  // ХОРАТА · Стопанинът първи, после вписаните — един дом с правата (pravata.ts).
+  const hora = horataVProgramata(o);
   // Ако запомненият човек го няма (махнат, друг Журнал), пада на СЕБЕ СИ; ако и
   // ти не си в списъка — на ПЪРВИЯ. Празен екран, който не казва защо е празен,
   // е по-лош от чужд лист.
@@ -193,16 +143,16 @@ export function narisuvaySluzhiteli(
 
     ${hora.length === 0 ? '' : formaZaPrashtane(o, hora, kogo, dnes, mozhe(izbor, 'kalendar'))}
     ${hora.length === 0 ? '' : listatNa(o, kogo, az)}
-    ${sektsiyaNaPravata(o, hora, kogo, izbor, negoviyat)}`;
+    ${hora.length === 0 ? '' : kartataNa(o, kogo, dnes)}`;
 }
 
 /**
- * ВПИСВАНЕТО НА ЧОВЕК · дойде от Настройки заедно с правата (И103).
+ * ВПИСВАНЕТО НА ЧОВЕК · тук, при хората.
  *
- * Дотук списъкът беше тук, а формата — там, и празният екран сочеше към друг
- * екран. „От там се дават" е негово за ПРАВАТА; вписването тръгна след тях,
- * защото е същото изречение: кого добавяш · каква роля му даваш · коя колона
- * му скриваш. Разделени, първите две живееха далеч от третата.
+ * Дойде от Настройки заедно с правата (И103 · резен 14): кого добавяш · каква
+ * роля му даваш. Третото — коя колона му скриваш — се върна в Настройки на
+ * 02.09 (И129 т.2 · резен 97 · ADR-156): „в Главни настойки… с 2 падащи
+ * менюта". Тук се РАБОТИ с хора; какво виждат, се НАСТРОЙВА.
  */
 function formaZaVpisvane(izbor: Izbor): string {
   return `
@@ -230,223 +180,6 @@ function formaZaVpisvane(izbor: Izbor): string {
           <span id="greshka-sluzhitel" class="greshka"></span>
         </div>
       </form>`;
-}
-
-/**
- * КОЙ КАКВО ВИЖДА · матрицата, подредена ПО ТАБОВЕТЕ НА МЕНЮТО (И103).
- *
- * Негово: „ОТ ТАМ се дават и хедърите на всички таблици." „Там" е този таб —
- * затова секцията излезе от Настройки и дойде тук. Домът на факта не се
- * раздвоява: темата в Настройки смени адреса си с един ред и води насам, точно
- * както SAF-T смени своя.
- *
- * ТРИТЕ ОБХВАТА са една и съща дума, приложена на три ширини: цяло меню · цяла
- * таблица · една колона. Не са три механизма — записът винаги е право на
- * двойката (служител, таблица), а по-широкият обхват просто пише повече от тях.
- */
-function sektsiyaNaPravata(
-  o: Ogledalo,
-  hora: readonly { readonly imeyl: string; readonly ime: string; readonly rolya: RolyaNaChovek }[],
-  kogo: string,
-  izbor: Izbor,
-  negoviyat: boolean,
-): string {
-  const tablitsi = tablitsiteNaProgramata(o);
-  const grupi = grupiraniPoTabove(tablitsi, redNaMenyuto);
-  const chakat = bezTab(tablitsi, redNaMenyuto);
-
-  const glava = `
-      <div class="dyalglava">
-        <h2>Кой какво вижда</h2>
-        <span>колонно право · три думи, и всяка само СТЕСНЯВА</span>
-      </div>`;
-
-  if (hora.length === 0) {
-    return `
-    <section data-sektsiya="pravata" class="karta">
-      ${glava}
-      <p class="prazno" data-pravata-otkaz>Още няма на кого да се раздават права.<br>
-      Вписва се човек по-горе; достъпът се дава при доставчика, не оттук (правило 14).</p>
-    </section>`;
-  }
-
-  // И57, дословно: „Вижда и скрито са редактор САМО ЗА ГЛАВНИЯ АКАУНТ."
-  // Отказът се КАЗВА (правило 15), а не се показва празна секция.
-  if (!negoviyat) {
-    return `
-    <section data-sektsiya="pravata" class="karta">
-      ${glava}
-      <p class="prazno" data-pravata-otkaz>Правата ги раздава <b>само Стопанинът</b>.<br>
-      Тук ще виждаш кой какво вижда, когато той ти даде екрана — но раздаването
-      не е втора врата към достъпа (правило 14).</p>
-    </section>`;
-  }
-
-  if (!mozhe(izbor, 'kolonno-pravo')) {
-    return `
-    <section data-sektsiya="pravata" class="karta">
-      ${glava}
-      <p class="drebno" data-pravata-otkaz><b>Колонното право е изключено</b> от Таблото. Вече скритите
-      колони СТОЯТ записани в Журнала и важат — изключването маха матрицата, не
-      решенията (правило 15: „изключено ≠ липсващо").</p>
-    </section>`;
-  }
-
-  return `
-    <section data-sektsiya="pravata" class="karta">
-      ${glava}
-      <label class="pole">
-        <span>Служител</span>
-        <select translate="no" id="izbor-pravo-chovek">
-          ${hora
-            .map(
-              (h) =>
-                `<option value="${ekraniraj(h.imeyl)}"${h.imeyl === kogo ? ' selected' : ''}>${ekraniraj(
-                  h.ime,
-                )} · ${ekraniraj(h.imeyl)}</option>`,
-            )
-            .join('')}
-        </select>
-      </label>
-      <p class="drebno">Хедъри: <b data-broy-hedari>${tablitsi.length}</b> в
-      <b data-broy-grupi>${grupi.length}</b> групи${
-        chakat > 0 ? ` · <b data-bez-tab>${chakat}</b> ${ekraniraj(IME_BEZ_TAB)}` : ''
-      }. Табът на вносния хедър се дава в Настройки · Редактор на хедъри.</p>
-      ${grupi
-        .map((g) =>
-          grupataNaHedarite(
-            o,
-            kogo,
-            // РОЛЯТА на ИЗБРАНИЯ · тя е ТАВАН и се казва в клетката. Литерал тук
-            // би дал на пазача отговора, който иска (ADR-050): наблюдател, на
-            // когото пише „редактира", е точно надписът, който правило 15 гони.
-            hora.find((h) => h.imeyl === kogo)?.rolya ?? 'nablyudatel',
-            g.ekran,
-            g.ime,
-            g.tablitsi,
-          ),
-        )
-        .join('')}
-      <p class="drebno" data-granitsa-upravlenie>Таблицата на <b>Управление</b> още не влиза тук:
-      тя не е построена върху колонния описател и имената на колоните ѝ нямаше да
-      се прочетат, а да се препишат. Преписано име се разминава — дългът стои с
-      адреса си в <code>docs/10</code>.</p>
-      <p class="drebno">Скритата колона пак се смята: сборовете ѝ остават в Сметки и в
-      Управление. Скриването пипа екрана, не числата.</p>
-    </section>`;
-}
-
-/** Една група · заглавието ѝ ЗАЛЕПВА при скрол, и то е надпис, не бутон. */
-function grupataNaHedarite(
-  o: Ogledalo,
-  kogo: string,
-  rolya: RolyaNaChovek,
-  ekran: string,
-  ime: string,
-  tablitsi: readonly TablitsaSHedar[],
-): string {
-  return `
-      <div class="grupa-hedari" data-grupa-hedari="${ekraniraj(ekran)}">
-        <div class="hedari-zaglavie" role="presentation">
-          <span translate="no">${ekraniraj(ime)}</span>
-          ${lostatNaObhvata('menyu', ekran, kogo, `цяло меню · ${tablitsi.length} таблици`)}
-        </div>
-        ${tablitsi.map((t) => hedaraNa(o, kogo, rolya, t)).join('')}
-      </div>`;
-}
-
-/**
- * ЛОСТЪТ НА ОБХВАТА · падащо меню с трите думи и празно НАЧАЛО.
- *
- * Празната първа стойност не е украса: без нея менюто щеше да показва „редактира"
- * като избрано и всяко случайно пипване щеше да ИЗТРИЕ вече раздадени стеснения.
- * Тук изборът е ДЕЙСТВИЕ, не състояние — състоянието е в клетките отдолу.
- */
-function lostatNaObhvata(
-  vid: 'menyu' | 'tablitsa',
-  klyuch: string,
-  komu: string,
-  nadpis: string,
-): string {
-  return `<label class="obhvat">
-            <span class="drebno">${ekraniraj(nadpis)}</span>
-            <select translate="no" data-obhvat="${vid}" data-klyuch="${ekraniraj(
-              klyuch,
-            )}" data-komu="${ekraniraj(komu)}">
-              <option value="">— наведнъж —</option>
-              ${PRAVA_NA_KOLONA.map(
-                (v) => `<option value="${v}">${IMENA_NA_PRAVATA[v]}</option>`,
-              ).join('')}
-            </select>
-          </label>`;
-}
-
-function hedaraNa(o: Ogledalo, kogo: string, rolya: RolyaNaChovek, t: TablitsaSHedar): string {
-  const prava = o.prava.get(klyuchNaPravo(kogo, t.klyuch));
-  return `
-        <div class="hedar" translate="no" data-hedar-red="${ekraniraj(t.klyuch)}">
-          <div class="hedar-glava">
-            <b>${ekraniraj(t.ime)}</b>
-            <span class="drebno" data-otkade>${
-              // ЗАЩО ЕДНАТА НЕ СЕ МЕСТИ · вградената се ражда в кода и табът ѝ е
-              // закован; вносната го получава в Редактора. Изборът, който го
-              // няма, се КАЗВА (правило 15), не се премълчава с липсващ лост.
-              eVgradena(t.klyuch)
-                ? 'вградена · табът ѝ е закован'
-                : 'вносен хедър · табът се дава в Настройки'
-            }</span>
-            ${lostatNaObhvata('tablitsa', t.klyuch, kogo, `цялата таблица · ${t.glavi.length} колони`)}
-          </div>
-          <div class="skritred">
-            ${t.glavi.map((ime, k) => kletkaNaPravo(kogo, rolya, prava, t, ime, k)).join('')}
-          </div>
-        </div>`;
-}
-
-function kletkaNaPravo(
-  kogo: string,
-  rolya: RolyaNaChovek,
-  prava: PravaZaModel | undefined,
-  t: TablitsaSHedar,
-  ime: string,
-  kolona: number,
-): string {
-  const vid = vidNaKolona(t, kolona);
-  const pravo = pravoNaKolona(prava, kolona);
-  // ТРИТЕ ТАВАНА се срещат и важи най-тясното. Ако изборът не действа — защото
-  // ролята вече стеснява, или защото колоната е СМЕТКА — това се КАЗВА, а не се
-  // преглъща (правило 15). Мълчаливото игнориране прави падащото меню надпис.
-  const neDeystva = zashtoNeDeystva({ rolya, vid, pravo });
-  return `
-            <label class="pravo pravo-${pravo}">
-              <span>${ekraniraj(ime || `колона ${kolona + 1}`)}</span>
-              <select translate="no"
-                data-pravo="${ekraniraj(kogo)}"
-                data-hedar="${ekraniraj(t.klyuch)}"
-                data-kolona="${kolona}">
-                ${PRAVA_NA_KOLONA.map(
-                  (v) =>
-                    `<option value="${v}"${v === pravo ? ' selected' : ''}>${
-                      IMENA_NA_PRAVATA[v]
-                    } · ${OBYASNENIYA_NA_PRAVATA[v]}</option>`,
-                ).join('')}
-              </select>
-              <span class="drebno">${IMENA_NA_VIDOVETE[vid]}${
-                neDeystva ? ` · <b data-ne-deystva>${ekraniraj(neDeystva)}</b>` : ''
-              }</span>
-            </label>`;
-}
-
-/**
- * КАКВО СЕ КАЗВА СЛЕД ИЗБОРА · по дума, не по номер.
- *
- * Отделна функция, не три реда в слушателя: тя носи обещанието, което човек
- * чува след натискане — че скритата колона ПАК СЕ СМЯТА.
- */
-function dumiZaIzbora(novo: PravoNaKolona, imeyl: string): string {
-  if (novo === 'skrito') return `Колоната е скрита за ${imeyl}. Сборът ѝ остава.`;
-  if (novo === 'vizhda') return `${imeyl} ще я ГЛЕДА, но няма да я пипа.`;
-  return `Колоната вече не е стеснена за ${imeyl} — решават ролята и видът ѝ.`;
 }
 
 /**
@@ -507,11 +240,11 @@ function formaZaPrashtane(
               <div class="poleta tesni">
                 <div class="pole">
                   <label for="z-chas">Час от</label>
-                  <input type="time" id="z-chas" name="chas">
+                  <input translate="no" type="time" id="z-chas" name="chas">
                 </div>
                 <div class="pole">
                   <label for="z-do-chas">Час до</label>
-                  <input type="time" id="z-do-chas" name="doChas">
+                  <input translate="no" type="time" id="z-do-chas" name="doChas">
                 </div>
               </div>
               <div class="pole">
@@ -694,11 +427,176 @@ async function pratiPokanata(
   }
 }
 
+/**
+ * КАРТАТА НА СЛУЖИТЕЛЯ · седмица или месец (резен 113 · ADR-159).
+ *
+ * Негово, 03.09: „да виждаш и задачите които са активни и **там ги разпределяш**
+ * като прави картата на всеки служител за седмица или за месец."
+ *
+ * ═══ РАЗПРЕДЕЛЯНЕТО Е ЗАПИС, НЕ ПОГЛЕД ═══
+ *
+ * Преместването на задача е ВТОРО изпращане със СЪЩИЯ номер — механизмът вече
+ * съществува („Повторният запис на същия `zadachaId` ПОПРАВЯ задачата"), и
+ * затова тук не се ражда нов вид събитие. Поканата и бележката пътуват
+ * непокътнати: инак Журналът щеше да твърди, че покана не е тръгвала.
+ *
+ * ═══ ДЕЛОТО НЕ СЕ МЕСТИ ═══
+ *
+ * Срокът на ДЕЛОТО си остава негов; тук се мести КОГА този човек ще го свърши.
+ * Двете се разминават нарочно — и екранът го казва, вместо да го премълчи.
+ */
+function kartataNa(o: Ogledalo, kogo: string, dnes: string): string {
+  const takt = chetiEkranno<TaktNaKartata>('sluzhiteli.takt', 'sedmitsa');
+  const den = chetiEkranno('sluzhiteli.den', dnes);
+  const imenaNaDelata = new Map([...o.dela.values()].map((d) => [d.id, d.ime]));
+  const karta = kartaNaSluzhitelya({
+    izprateni: o.izprateniZadachi,
+    otgovori: o.otgovoriNaZadachi,
+    imenaNaDelata,
+    imeyl: kogo,
+    takt,
+    den,
+  });
+  const sv = sveriKartata(karta, dnes);
+  const parviyat = karta.dni[0]!.den;
+  const posledniyat = karta.dni[karta.dni.length - 1]!.den;
+
+  return `
+    <section data-sektsiya="sluzhiteli-karta" class="karta">
+      <div class="dyalglava">
+        <h2>Картата на ${ekraniraj(o.sluzhiteli.get(kogo)?.ime ?? (kogo === o.stopanin ? 'Стопанина' : kogo))}</h2>
+        <span>активните задачи по дни · разпределят се тук</span>
+      </div>
+
+      <div class="deystviya">
+        ${TAKTOVE_NA_KARTATA.map(
+          (t) => `<button type="button" class="vtorichen${t === takt ? ' tuk' : ''}"
+            data-karta-takt="${t}" aria-pressed="${t === takt ? 'true' : 'false'}">${
+              IMENA_NA_TAKTOVETE[t]
+            }</button>`,
+        ).join('')}
+        <button type="button" class="vtorichen malak" data-karta-nazad aria-label="Назад">‹</button>
+        <button type="button" class="vtorichen malak" data-karta-dnes>днес</button>
+        <button type="button" class="vtorichen malak" data-karta-napred aria-label="Напред">›</button>
+        <span class="drebno" data-karta-prozorets translate="no">${ekraniraj(parviyat)} … ${ekraniraj(posledniyat)}</span>
+      </div>
+
+      <div class="karta-mrezha" data-karta-dni="${karta.dni.length}" data-karta-aktivni="${karta.aktivni}">
+        ${karta.dni
+          .map(
+            (d) => `
+        <div class="karta-den${d.den === dnes ? ' dnes' : ''}" data-karta-den="${ekraniraj(d.den)}">
+          <b translate="no">${ekraniraj(d.den.slice(8))}</b>
+          ${d.zadachi
+            .map(
+              (z) => `
+          <div class="karta-zadacha ${ekraniraj(z.sastoyanie)}" data-karta-zadacha="${ekraniraj(z.zadachaId)}"
+               translate="no" title="${ekraniraj(z.delo)} · ${ekraniraj(z.ot)} … ${ekraniraj(z.do)}">
+            <span>${ekraniraj(z.delo || z.deloId)}</span>
+            <span class="drebno">${z.chas === '' ? 'цял ден' : `${ekraniraj(z.chas)}–${ekraniraj(z.doChas)}`}</span>
+            ${
+              z.nachalo
+                ? `<select class="premesti" data-premesti="${ekraniraj(z.zadachaId)}" aria-label="Премести на ден">
+                <option value="">премести…</option>
+                ${karta.dni
+                  .map(
+                    (x) =>
+                      `<option value="${ekraniraj(x.den)}">${ekraniraj(x.den.slice(8))}.${ekraniraj(
+                        x.den.slice(5, 7),
+                      )}</option>`,
+                  )
+                  .join('')}
+              </select>`
+                : '<span class="drebno">продължава</span>'
+            }
+          </div>`,
+            )
+            .join('')}
+        </div>`,
+          )
+          .join('')}
+      </div>
+
+      <p class="drebno" data-karta-sverka>Сверка вход↔изход: ${sv.vhod} активни → ${sv.izhod} положени,
+      разлика ${sv.razlika}.${
+        karta.otkazani > 0
+          ? ` Отказаните (${karta.otkazani}) НЕ се разпределят — те стоят в листа му.`
+          : ''
+      }</p>
+      <p class="drebno">Тук стои <b>поетото</b> — изпратената задача. Дело с неговото име, но
+      без изпращане, не влиза: отговорникът е ИМЕ, а служителят е имейл, и свързването им
+      по прилика би сложило чужда работа на нечий ден. Преместването пише <b>второ
+      изпращане</b> със същия номер (поправка, не втора задача) и <b>не мести срока на
+      делото</b> — той си остава негов.</p>
+    </section>`;
+}
+
 export function zakachiSluzhitelite(
   koren: HTMLElement,
   k: Konteks,
   prerisuvay: () => Promise<void>,
 ): void {
+  /**
+   * КАРТАТА · тактът, прозорецът и преместването (резен 113 · ADR-159).
+   *
+   * Тактът и денят са ПОГЛЕД (памет на устройството); преместването е ЗАПИС —
+   * второ изпращане със същия номер. Двете не се смесват: първите две не
+   * пипат Журнала, третото минава през Вратата като всяко друго решение.
+   */
+  for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-karta-takt]')) {
+    b.addEventListener('click', async () => {
+      zapomniEkranno('sluzhiteli.takt', b.dataset['kartaTakt'] ?? 'sedmitsa');
+      await prerisuvay();
+    });
+  }
+  for (const [znak, napred] of [['[data-karta-nazad]', -1], ['[data-karta-napred]', 1]] as const) {
+    koren.querySelector<HTMLButtonElement>(znak)?.addEventListener('click', async () => {
+      const takt = chetiEkranno<TaktNaKartata>('sluzhiteli.takt', 'sedmitsa');
+      zapomniEkranno(
+        'sluzhiteli.den',
+        sasedenProzorets(takt, chetiEkranno('sluzhiteli.den', dnesKato()), napred),
+      );
+      await prerisuvay();
+    });
+  }
+  koren.querySelector<HTMLButtonElement>('[data-karta-dnes]')?.addEventListener('click', async () => {
+    zabraviEkranno('sluzhiteli.den');
+    await prerisuvay();
+  });
+
+  for (const menyu of koren.querySelectorAll<HTMLSelectElement>('[data-premesti]')) {
+    menyu.addEventListener('change', async () => {
+      const noviyat = menyu.value;
+      if (noviyat === '') return;
+      menyu.disabled = true;
+      try {
+        const o = await k.deystviya.ogledalo();
+        const stara = o.izprateniZadachi.get(menyu.dataset['premesti'] ?? '');
+        if (!stara) throw new Error('Задачата изчезна, докато картата стоеше отворена.');
+        // ДЪЛЖИНАТА ПЪТУВА С НЕЯ · тридневна задача остава тридневна, само
+        // почва другаде. Инак „преместване" би значело и „скъсяване".
+        const dni = Math.round(
+          (Date.parse(`${stara.do}T00:00:00Z`) - Date.parse(`${stara.ot}T00:00:00Z`)) / 86_400_000,
+        );
+        await k.deystviya.pratiZadacha(
+          {
+            ...stara,
+            ot: noviyat,
+            do: new Date(Date.parse(`${noviyat}T00:00:00Z`) + dni * 86_400_000)
+              .toISOString()
+              .slice(0, 10),
+            kogato: new Date().toISOString(),
+          },
+          { opId: crypto.randomUUID() },
+        );
+        k.vest('dobre', `Задачата е преместена на ${noviyat}. Срокът на делото не е пипан.`);
+      } catch (err) {
+        k.vest('zle', dumiZaGreshka(err));
+      }
+      await prerisuvay();
+    });
+  }
+
   for (const red of koren.querySelectorAll<HTMLElement>('[data-chovek]')) {
     red.addEventListener('click', async () => {
       izbran = red.dataset.chovek ?? '';
@@ -728,80 +626,6 @@ export function zakachiSluzhitelite(
       kazhi.textContent = dumiZaGreshka(err);
     }
   });
-
-  // ── колонното право · трите обхвата (И103) ──────────────────────────────
-  koren
-    .querySelector<HTMLSelectElement>('#izbor-pravo-chovek')
-    ?.addEventListener('change', async (e) => {
-      izbran = (e.target as HTMLSelectElement).value;
-      zapomniEkranno('sluzhiteli.izbran', izbran);
-      await prerisuvay();
-    });
-
-  for (const menyu of koren.querySelectorAll<HTMLSelectElement>('select[data-pravo]')) {
-    menyu.addEventListener('change', async () => {
-      const imeyl = menyu.dataset['pravo']!;
-      const model = menyu.dataset['hedar']!;
-      const kolona = Number(menyu.dataset['kolona']);
-      const novo = menyu.value as PravoNaKolona;
-      menyu.disabled = true;
-      try {
-        const og = await k.deystviya.ogledalo();
-        const sega = og.prava.get(klyuchNaPravo(imeyl, model)) ?? napraviPrava({ imeyl, model });
-        // Ключът носи ДЕЙСТВИЕТО: скрий → върни → скрий не бива да се загуби.
-        await k.deystviya.zapishiPravo(sPromenenoPravo(sega, kolona, novo), {
-          opId: `pravo:${crypto.randomUUID()}`,
-        });
-        k.vest('dobre', dumiZaIzbora(novo, imeyl));
-      } catch (err) {
-        greshka = dumiZaGreshka(err);
-      }
-      await prerisuvay();
-    });
-  }
-
-  /**
-   * ЦЯЛА ТАБЛИЦА И ЦЯЛО МЕНЮ · един и същ слушател, две ширини.
-   *
-   * Записът е ЕДИН НА ТАБЛИЦА, защото правото е на двойката (служител, хедър).
-   * Цял таб значи N записа — и това се КАЗВА с число, преди да се сметне за
-   * едно действие: човек трябва да знае колко реда влизат в Журнала му.
-   */
-  for (const lost of koren.querySelectorAll<HTMLSelectElement>('select[data-obhvat]')) {
-    lost.addEventListener('change', async () => {
-      if (lost.value === '') return;
-      const novo = lost.value as PravoNaKolona;
-      const shirok = lost.dataset['obhvat'] === 'menyu';
-      const klyuch = lost.dataset['klyuch']!;
-      const komu = lost.dataset['komu']!;
-      lost.disabled = true;
-      try {
-        const og = await k.deystviya.ogledalo();
-        const vsichki = tablitsiteNaProgramata(og);
-        const zasegnati = shirok
-          ? grupiraniPoTabove(vsichki, redNaMenyuto).find((g) => g.ekran === klyuch)?.tablitsi ?? []
-          : vsichki.filter((t) => t.klyuch === klyuch);
-        if (zasegnati.length === 0) throw new Error('Тази група вече я няма — отвори екрана наново.');
-        for (const t of zasegnati) {
-          const sega =
-            og.prava.get(klyuchNaPravo(komu, t.klyuch)) ??
-            napraviPrava({ imeyl: komu, model: t.klyuch });
-          await k.deystviya.zapishiPravo(stesniVsichki(sega, t.glavi.length, novo), {
-            opId: `pravo:${crypto.randomUUID()}`,
-          });
-        }
-        k.vest(
-          'dobre',
-          `„${IMENA_NA_PRAVATA[novo]}" за ${zasegnati.length} ${
-            zasegnati.length === 1 ? 'таблица' : 'таблици'
-          } · ${zasegnati.length} записа в Журнала. Скритото пак се смята.`,
-        );
-      } catch (err) {
-        greshka = dumiZaGreshka(err);
-      }
-      await prerisuvay();
-    });
-  }
 
   const forma = koren.querySelector<HTMLFormElement>('#forma-zadacha');
   forma?.addEventListener('submit', async (e) => {

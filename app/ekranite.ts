@@ -17,7 +17,7 @@
 import { narisuvayImoti, zakachiFormite } from './imoti.js';
 import { narisuvayStoynost, zakachiStoynost } from './stoynost.js';
 import { narisuvayGant, zakachiGant } from './gant.js';
-import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
+import { narisuvayGolyamoDelo, zakachiGolyamoDelo } from './golyamo-delo.js';
 import { narisuvayPari, zakachiPari } from './pari.js';
 import { narisuvaySmetki, zakachiSmetki } from './smetki.js';
 import { moyatRed, podredeniPunktove, skritiPunktove } from './lenta.js';
@@ -45,12 +45,12 @@ export type KoyEkran =
   | 'pari'
   | 'stoynost'
   | 'gant'
+  | 'golyamodelo'
   | 'smetki'
   | 'nastroyki'
   | 'ii'
   | 'tabove'
   | 'lichno'
-  | 'sluzhiteli'
   | 'kontakti'
   | 'prodazhbi'
   | 'plashtaniya'
@@ -78,7 +78,7 @@ export type KoyEkran =
  * | Пари | не | ежедневната работа на редактора; сумите се крият по КОЛОНА |
  * | Управление | не | скрит пункт значи човек, който не вижда какво му е възложено |
  * | **Табове** | ДА · собственик | негова дума (И101): табове, таблици и диаграми се създават и СВЪРЗВАТ само от Стопанина |
- * | **Лично** | не | зависи само от СОБСТВЕНИЯ превключвател, не от чужд достъп |
+ * | **Лично** | не · но САМО ЗА СЛУЖИТЕЛ | зависи от СОБСТВЕНИЯ превключвател, не от чужд достъп; Стопанинът няма личен таб (ADR-154) |
  * | **Табло** | НИКОГА | там се връща изключеното и там стои ключът на личното — не бива да може да се самозаключи |
  *
  * НЕ СЕ СЛИВА с `mozhe()`: правило 15 казва, че правото (планът) и отметката
@@ -217,6 +217,12 @@ interface OpisNaEkran {
   readonly iska?: Vazmozhnost;
   /** каква РОЛЯ иска · липсва значи „всяка" */
   readonly iskaRolya?: Rolya;
+  /**
+   * САМО ЗА СЛУЖИТЕЛ · главният имейл не го вижда (ADR-154 · И131 т.1:
+   * „Стопанина ням,а опция за личен."). Границата е на екрана — лентата и
+   * Таблото; Вратата не се пипа. Днес го носи само Лично.
+   */
+  readonly samoZaSluzhitel?: true;
   readonly narisuvay: (r: ZaRisuvane) => string;
   readonly zakachi: (z: ZaZakachane) => void;
 }
@@ -230,15 +236,19 @@ interface OpisNaEkran {
  *
  *   · ТАБЛОТО е първо — неговият файл почва с двете ТАБЛА (р48·[37]), а
  *     Таблото е и пътят обратно (ADR-066);
- *   · РАБОТНИЯТ блок — Имоти (наемите), Пари, Баланс, Управление, Продажби;
+ *   · РАБОТНИЯТ блок — Имоти (наемите), Пари, Сметки, Управление, Продажби;
  *     „Плащания Архив сложен СЛЕД Продажби Архив" е дословно негово (р52·[288]);
  *   · ВТОРИЯТ РЕД, пак дословно (р52·[206]): „втория да почва с Преписки,
  *     контакти, продажби архив, цени и настройки" — Контактите (преписките са
  *     секция в тях), Стойност на Състояние (наследникът на таб Цени) и
  *     Настройки НАКРАЯ;
- *   · неказаните къде да седят (Служители · Табове · ИИ · Лично) стоят при
- *     системните, най-близо до Настройки — „всичко което не съм казал къде да
- *     седи го дръж в настройки" (И121 т.6).
+ *   · неказаните къде да седят (Табове · ИИ · Лично) стоят при системните,
+ *     най-близо до Настройки — „Всичко което не съ казал къде да седи го дръж
+ *     в настройки" (И121 т.6). Служители вече не е пункт: подтаб на Настройки
+ *     (резен 112 · ADR-158).
+ *   · ДВЕТЕ ГРУПИ (резен 118 · ADR-163): работата е всичко ПРЕДИ Контакти,
+ *     второстепенните — от Контакти до Настройки. Границата е пин с ръка в
+ *     `src/domein/lenta.ts` (`PARVIYAT_VAV_VTORATA`), не се извежда оттук.
  *
  * Това е НАЧАЛНИЯТ ред (долният слой на ADR-066): Стопанинът го пренарежда
  * със събитие, всеки — за себе си отгоре. Тестът пази, че списъкът и
@@ -250,11 +260,11 @@ export const REDAT_NA_LENTATA: readonly KoyEkran[] = Object.freeze([
   'pari',
   'smetki',
   'gant',
+  'golyamodelo',
   'prodazhbi',
   'plashtaniya',
   'kontakti',
   'stoynost',
-  'sluzhiteli',
   'tabove',
   'ii',
   'lichno',
@@ -278,11 +288,13 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     zakachi: (z) => zakachiPari(z.koren, z.k, z.prerisuvay),
   },
   smetki: {
-    // „Името е не Сметки а Баланс който включва Приход и Разход и всички
-    // разпивки" (И124 т.11 · ADR-120 §6). Ключът `smetki` остава — той е
-    // кодов адрес (памети, права, пътища), не име на екрана.
-    ime: 'Баланс',
-    podnaslov: 'Приход и Разход и всички разбивки · цените са с ДДС',
+    // ИМЕТО СЕ ВРЪЩА НА „СМЕТКИ" (резен 115 · И136): „Табовете в СМетки са
+    // главния Сметки и подтабове: Приход, Разход, Отчвт, Баланс." Тоест
+    // „Баланс" вече не е името на екрана, а на ЕДИН от петте му подтаба —
+    // последната дума бие (правило 28) и надживява ADR-120 §6 · И124 т.11.
+    // Ключът `smetki` не е мърдал: той е кодов адрес, не име.
+    ime: 'Сметки',
+    podnaslov: 'Приход · Разход · Отчет · Баланс · цените са с ДДС',
     ikona: 'ekran-smetki',
     iska: 'smetki-dds',
     iskaRolya: 'redaktor',
@@ -324,6 +336,8 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
         punktoveNaMenyuto(r),
         r.dnes,
         r.dostapniEkrani,
+        // ХОРАТА живеят в подтаб на Настройки от резен 112 (ADR-158).
+        r.kojSam,
       ),
     zakachi: (z) => zakachiNastroyki(z.koren, z.k, z.prerisuvay, z.dnes),
   },
@@ -332,33 +346,25 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     podnaslov: 'Калкулаторът · няма редакция оттам, а само изчисляване',
     ikona: 'ekran-stoynost',
     iskaRolya: 'sobstvenik',
-    narisuvay: () => narisuvayStoynost(),
+    narisuvay: (r) => narisuvayStoynost(r.ogledalo),
     zakachi: (z) => zakachiStoynost(z.koren, z.k, z.prerisuvay),
-  },
-  sluzhiteli: {
-    ime: 'Служители',
-    podnaslov: 'кой е вписан · праща се задача и той я ПРИЕМА в програмата',
-    ikona: 'ekran-sluzhiteli',
-    narisuvay: (r) =>
-      narisuvaySluzhiteli(
-        r.ogledalo,
-        r.kojSam,
-        r.dnes,
-        r.izbor,
-        // Матрицата на правата подрежда хедърите по реда на менюто (И103).
-        punktoveNaMenyuto(r),
-        // ПРАВАТА ГИ РАЗДАВА САМО СТОПАНИНЪТ (И57) · ролята се СМЯТА от
-        // Журнала, не се твърди от самоличността (ADR-043).
-        rolyataNa(r.kojSam.imeyl, r.ogledalo) === 'sobstvenik',
-      ),
-    zakachi: (z) => zakachiSluzhitelite(z.koren, z.k, z.prerisuvay),
   },
   gant: {
     ime: 'Управление',
-    podnaslov: 'Управление на Времевия Ред в Делата · три колони с филтри, не три нива',
+    podnaslov: 'Управление на Времевия Ред в Делата · Имот · Обект · Дело — три колони с филтри',
     ikona: 'ekran-gant',
     narisuvay: (r) => narisuvayGant(r.ogledalo, r.dnes),
     zakachi: (z) => zakachiGant(z.koren, z.k, z.prerisuvay),
+  },
+  golyamodelo: {
+    ime: 'Голямо дело',
+    podnaslov: 'линейният график и КСС · входът е ЕДИН, показването е на две места',
+    ikona: 'ekran-gant',
+    // БЕЗ `iskaRolya`: наблюдателят не вижда бутоните (те са в `zakachi`), но
+    // прочетеното е ПОГЛЕД. Пунктът се появява само когато има голямо дело —
+    // сметката е в `main.ts` (`dostapniteEkrani`), защото иска Огледалото.
+    narisuvay: (r) => narisuvayGolyamoDelo(r.ogledalo, r.dnes),
+    zakachi: (z) => zakachiGolyamoDelo(z.koren, z.k, z.prerisuvay, z.dnes),
   },
   ii: {
     ime: 'ИИ',
@@ -409,6 +415,7 @@ export const EKRANI: Record<KoyEkran, OpisNaEkran> = {
     ime: 'Лично',
     podnaslov: 'същата таблица за собствени нужди · ОТДЕЛЕН Журнал, който никога не се смесва',
     ikona: 'lichno',
+    samoZaSluzhitel: true,
     narisuvay: (r) =>
       r.lichnoOgledalo && r.lichnoOgledalo.lichnoVklyucheno
         ? narisuvayLichno(r.lichnoOgledalo, r.ogledalo, r.dnes, r.lichenAkaunt, r.broyLichni)

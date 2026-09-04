@@ -1,6 +1,9 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, broySabitiya, denOtDnes, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, napishiSigurno, napishiVPoleto, natisni, ostatak, plochka, redove, sSabitie, sSabitiya, tekstNa, zapishiDelo, dobaviImotBezObekt } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
+import { writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { fileURLToPath } from 'node:url';
 
 /** 27 · удобството | 28 · клавиатурата | 29 · статус-лентата | 30 · груповото и черновата | 31 · клипбордният мост | 32 · филтрите навсякъде | 33 · групирането | 34 · скритата колона | 35 · редакцията в клетката | 36 · груповото въвеждане | 37 · скоростта */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -101,10 +104,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
 
     // а във ФОРМА картата мълчи: стрелката в поле не мести клетки
     await p.click('.red.naem .kletka');
-    await p.click('#imot-adres');
+    await p.click('#imot-ime');
     await p.keyboard.press('ArrowDown');
     proveri('в поле картата мълчи',
-      await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-adres');
+      await p.evaluate(() => document.activeElement?.id ?? ''), 'imot-ime');
 
     // ══ 29 · обхватът и статус-лентата · Брой · Сбор · Средно ═══════════
     razdel = '29 · статус-лентата';
@@ -123,13 +126,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // Shift+стрелка опъва обхват по колоната със сумите; лентата смята.
     const sumiPoKletki = await p.$$eval('.red.naem .suma[data-st]', (r) =>
       r.map((x) => Number(x.dataset.st)));
-    proveri('евро-клетките носят стотинките си (data-st)', sumiPoKletki.length > 1, true);
+    proveri('евро-клетките носят центовете си (data-st)', sumiPoKletki.length > 1, true);
     await p.click('.red.naem .suma');
     proveri('една клетка не вдига лентата', await statusnaLenta(), null);
     await p.keyboard.press('Shift+ArrowDown');
     const naLentata = await statusnaLenta();
     proveri('Shift+стрелка опъва обхват и лентата се показва', naLentata !== null, true);
-    proveri('сборът е от стотинките на клетките, не от текста',
+    proveri('сборът е от центовете на клетките, не от текста',
       chisloto(naLentata ?? '', 'Сбор:'), ((sumiPoKletki[0] as any) + (sumiPoKletki[1] as any)) / 100);
     proveri('и средното се показва', (naLentata ?? '').includes('Средно'), true);
 
@@ -182,13 +185,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('лентата пада със селекцията', await statusnaLenta(), null);
 
     // ЧЕРНОВАТА: прерисуването я убива, Ctrl+Z я връща — до Вратата, не след нея
-    await p.fill('#imot-adres', 'Черновата живее');
+    await p.fill('#imot-ime', 'Черновата живее');
     await deystvieSPrerisuvane(p, () => p.click('[data-podredi="naemi:naem"]'));
     proveri('прерисуването уби черновата',
-      await p.$eval('#imot-adres', (e) => (e as any).value), '');
+      await p.$eval('#imot-ime', (e) => (e as any).value), '');
     await p.keyboard.press('Control+z');
     proveri('Ctrl+Z я връща в полето',
-      await p.$eval('#imot-adres', (e) => (e as any).value), 'Черновата живее');
+      await p.$eval('#imot-ime', (e) => (e as any).value), 'Черновата живее');
     proveri('и НЕ пише в Журнала — границата е Вратата',
       await broySabitiya(p), predaSborove + 2);
 
@@ -197,7 +200,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // иначе второ „Запиши" прави дубликат в Журнала.
     await dobaviImot(p, 'Записаният имот', 'ап. 9');
     await p.keyboard.press('Control+z');
-    const sledZapis = await p.$eval('#imot-adres', (e) => (e as any).value);
+    const sledZapis = await p.$eval('#imot-ime', (e) => (e as any).value);
     proveri('Ctrl+Z след Запиши НЕ връща записаното',
       sledZapis === 'Записаният имот', false);
     // подредбата се прибира на изходния ред — два клика довършват цикъла
@@ -214,10 +217,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.keyboard.press('Control+c');
     await p.waitForFunction(() =>
       document.querySelector('.status-lenta')?.textContent?.includes('Копирано'));
+    // КРАЯТ НА РЕДА В КЛИПБОРДА · на Windows Chrome връща `\r\n` (ADR-152 §6):
+    // цепене по `\n` оставяше `\r` на първия ред и „чисти числа" падаше без
+    // приложението да е сгрешило — Excel приема и двете.
     const vKlipborda = await p.evaluate(() => navigator.clipboard.readText());
-    proveri('копирани са два реда', vKlipborda.split('\n').length, 2);
+    const redoveVKlipborda = vKlipborda.split(/\r?\n/);
+    proveri('копирани са два реда', redoveVKlipborda.length, 2);
     proveri('парите тръгват като ЧИСТИ числа — Excel смята по тях',
-      vKlipborda.split('\n').every((r) => /^\d+,\d\d$/.test(r)), true);
+      redoveVKlipborda.every((r) => /^\d+,\d\d$/.test(r)), true);
     proveri('и лентата казва „Копирано"',
       ((await statusnaLenta()) ?? '').includes('Копирано · 2 реда'), true);
     await p.keyboard.press('Escape');
@@ -337,7 +344,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       }
       return { sbor, pokazano: (g as any).querySelector('.sborove')?.textContent ?? '' };
     });
-    proveri('сборът на групата е сборът на редовете ѝ, стотинка по стотинка',
+    proveri('сборът на групата е сборът на редовете ѝ, цент по цент',
       Number(sverkaNaGrupa.pokazano.replace(/[^\d,-]/g, '').replace(',', '.')),
       sverkaNaGrupa.sbor / 100);
 
@@ -555,7 +562,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ── РАЗМЕСТВАНЕТО СТАВА ОТ НАСТРОЙКИ ─────────────────────────────────
     const predSabitiya = await broySabitiya(p);
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     proveri('Настройки знае секциите на екрана, който вече е отварян',
       (await p.$$eval('[data-podredba-ekran=smetki] [data-sektsiya-red]', (e) => e.length)) > 1,
       true);
@@ -598,11 +605,14 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
  *
  * ═══ ЗАЩО ТОЧНО ТУК В РЕДА ═══
  *
- * Пунктът „Лично" го има в лентата само докато Личното е ПУСНАТО — §53 го
- * прибира и екранът изчезва. Затова блокът стои веднага след пускането му:
- * това е единственият миг, в който лентата предлага и десетте. И понеже е
- * вмъкнат по средата на прохода, накрая се ВРЪЩА на екрана, от който е
- * тръгнал — блок, който мести състояние под следващия, е по-скъп от липсващ.
+ * Дотук блокът стоеше веднага след пускането на Личното — единственият миг,
+ * в който лентата предлагаше и него. От резен 98 (ADR-154) Личното е на
+ * СЛУЖИТЕЛЯ, играе се в КРАЯ на прохода (смяната на човека презарежда
+ * страницата) и §53 му брои секциите сам; тук се броят деветте на Стопанина
+ * (Служители излезе от лентата с резен 112).
+ * И понеже блокът е вмъкнат по средата на прохода, накрая се ВРЪЩА на
+ * екрана, от който е тръгнал — блок, който мести състояние под следващия, е
+ * по-скъп от липсващ.
  *
  * ═══ ЗАЩО НЕ СЕ ЧАКА ПОЛЕ ═══
  *
@@ -637,10 +647,14 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       await p.keyboard.press('Escape');
     };
 
-    // ЕДИНАЙСЕТ, не десет · `sluzhiteli` (резен 14а) липсваше тук и §68
-    // минаваше зелен, без да го е отварял нито веднъж.
+    // ДЕСЕТ · `sluzhiteli` (резен 14а) липсваше тук и §68 минаваше зелен, без
+    // да го е отварял нито веднъж. „Лично" излезе от списъка с резен 98
+    // (ADR-154): екранът е на СЛУЖИТЕЛЯ, Стопанинът няма пункт — секциите му се
+    // броят в §53, докато служителят го е пуснал.
+    // ДЕВЕТ · „Служители" излезе от лентата с резен 112 (ADR-158): екранът
+    // живее като ПОДТАБ на Настройки, значи не е пункт и не се обхожда тук.
     const ekranite = ['imoti', 'pari', 'stoynost', 'gant', 'smetki',
-      'nastroyki', 'ii', 'tabove', 'lichno', 'sluzhiteli', 'tablo'] as const;
+      'nastroyki', 'ii', 'tabove', 'tablo'] as const;
     const nachalniyat = await koyEkranE();
 
     let bezMarker = 0;
@@ -660,7 +674,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       udvoeni += klyuchove.length - new Set(klyuchove).size;
     }
 
-    proveri('и единайсетте екрана се отварят от лентата в този миг', obhodeni, ekranite.length);
+    proveri('и деветте екрана се отварят от лентата', obhodeni, ekranite.length);
     proveri('и заедно носят секции за местене', vsichki > 40, true);
     proveri('НИТО ЕДНА не се ключува по заглавието си', bezMarker, 0);
     // Два еднакви ключа на един екран значат възел, прибавен два пъти при
@@ -782,6 +796,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$eval('.navred .navime', (e) => (e as HTMLElement).checkVisibility()), false);
     proveri('но го носи цяло за четеца на екран',
       (await p.$eval('.navred .navime', (e) => e.textContent!.trim())).length > 0, true);
+    // РАЗДЕЛИТЕЛЯТ НА ГРУПИТЕ (резен 118): надписът пада със свиването, линията
+    // остава — знак без текст се побира в 52 px.
+    proveri('свита, лентата крие надписа на разделителя',
+      await p.$eval('.nav > [data-lenta-razdel] .navime', (e) => (e as HTMLElement).checkVisibility()), false);
+    proveri('но самият разделител стои като линия',
+      await p.$eval('.nav > [data-lenta-razdel]', (e) => (e as HTMLElement).checkVisibility()), true);
 
     razdel = '73 · Лентата · застопоряването се помни';
     await naEkran(p, 'pari', '#forma-nachisli');
@@ -842,8 +862,34 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('лентата е чиста от стрелки',
       await p.$$eval('[data-mesti]', (e) => e.length), 0);
 
+    // ══ 118 · ДВЕТЕ ГРУПИ · разделител между работата и второстепенните (ADR-163) ══
+    //
+    // Негово, 08.08: „Бутоните за табовете да са на два реда, втория да почва
+    // с Преписки, контакти…" — прието на 02.09 („5 ок") като две ВИДИМИ групи.
+    razdel = '118 · Лентата на две групи';
+    proveri('разделителят е ЕДИН и стои ВЪТРЕ в единствения nav',
+      await p.$$eval('.nav > [data-lenta-razdel]', (e) => e.length), 1);
+    proveri('и не е пункт · няма data-ekran и не е .navred',
+      await p.$eval('.nav > [data-lenta-razdel]',
+        (e) => !e.hasAttribute('data-ekran') && !e.classList.contains('navred')), true);
+    proveri('носи надписа си за четеца и за окото',
+      await p.$eval('.nav > [data-lenta-razdel] .navime', (e) => e.textContent!.trim()), 'второстепенните');
+    const okoloRazdela = await p.$eval('.nav > [data-lenta-razdel]', (e) => ({
+      predi: (e.previousElementSibling as HTMLElement | null)?.dataset['ekran']
+        ?? (e.previousElementSibling?.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'],
+      sled: (e.nextElementSibling as HTMLElement | null)?.dataset['ekran']
+        ?? (e.nextElementSibling?.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'],
+    }));
+    proveri('стои между последния на работата и първия на второстепенните',
+      `${okoloRazdela.predi} | ${okoloRazdela.sled}`, 'plashtaniya | kontakti');
+    proveri('Таблото е в първата група, Настройки — във втората · никоя не е празна',
+      await p.$$eval('.nav > *', (e) => {
+        const kl = e.map((x) => (x as HTMLElement).dataset['ekran'] ?? (x.querySelector('[data-ekran]') as HTMLElement | null)?.dataset['ekran'] ?? (x.hasAttribute('data-lenta-razdel') ? '|' : ''));
+        return kl.indexOf('tablo') < kl.indexOf('|') && kl.indexOf('|') < kl.indexOf('nastroyki');
+      }), true);
+
     const predMestene = await broySabitiya(p);
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     proveri('Настройки изрежда ВСИЧКИ пунктове на лентата',
       await p.$$eval('[data-lentapunkt]', (e) => e.length), punktovePredi.length);
     // ПЪРВИЯТ няма „нагоре", ПОСЛЕДНИЯТ няма „надолу" — бутон към нищото учи
@@ -853,6 +899,17 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('първият ред няма ДЕЙСТВАЩА стрелка нагоре',
       (await p.$$eval('[data-lentapunkt] [data-posoka=gore]',
         (e) => e.map((x) => (x as HTMLButtonElement).disabled)))[0], true);
+    // ГРАНИЦАТА НА ГРУПАТА Е РЪБ (резен 118): последният на работата няма
+    // „надолу", първият на второстепенните няма „нагоре" — „личният ред
+    // продължава да мести вътре в групата". Дотук ръбът беше само на целия списък.
+    proveri('в картата стои разделителят на двете групи',
+      await p.$$eval('[data-tablitsa=red-na-lentata] [data-lenta-razdel]', (e) => e.length), 1);
+    proveri('последният на работата няма ДЕЙСТВАЩА стрелка надолу',
+      await p.$eval('[data-lentapunkt=plashtaniya] [data-posoka=dolu]', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('първият на второстепенните няма ДЕЙСТВАЩА стрелка нагоре',
+      await p.$eval('[data-lentapunkt=kontakti] [data-posoka=gore]', (e) => (e as HTMLButtonElement).disabled), true);
+    proveri('а нагоре от последния на работата се може',
+      await p.$eval('[data-lentapunkt=plashtaniya] [data-posoka=gore]', (e) => (e as HTMLButtonElement).disabled), false);
     await deystvieSPrerisuvane(p, () =>
       p.click(`[data-podredi=lenta][data-klyuch="${punktovePredi[1]}"][data-posoka=gore]`));
 
@@ -979,8 +1036,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     };
     await napraviDelo('Сграда А', '', '2026-08-01', '2026-08-31');
     await napraviDelo('Груб строеж', 'Сграда А', '2026-08-05', '2026-09-30');
-    await napraviDelo('Кофраж', 'Груб строеж', '2026-08-10', '2026-08-20');
-    await napraviDelo('Кофраж етаж 1', 'Кофраж', '2026-08-12', '2026-08-15');
+    // ИМЕТО Е УНИКАЛНО нарочно: §24 вече има „Кофраж" (Малинова · бл. 1), а
+    // родителят се избира ПО ИМЕ и първото съвпадение печели. Дотук старият
+    // §53 пренасяше точно него в личното на Стопанина и двусмислието беше
+    // скрито; от резен 98 Личното е на служителя и се играе в края (ADR-154).
+    await napraviDelo('Кофраж на сградата', 'Груб строеж', '2026-08-10', '2026-08-20');
+    await napraviDelo('Кофраж етаж 1', 'Кофраж на сградата', '2026-08-12', '2026-08-15');
 
     interface RedNaDarvo {
       readonly stepen: number;
@@ -1037,7 +1098,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     const stepenNaReda = async (ime: string): Promise<number> =>
       p.$eval(`.gant-delo:has(b:text-is("${ime}"))`,
         (e) => Number((e as HTMLElement).dataset['stepen']));
-    const stepenPredi = await stepenNaReda('Кофраж');
+    const stepenPredi = await stepenNaReda('Кофраж на сградата');
     const chakayStepen = async (ime: string, n: number): Promise<void> => {
       await p.waitForFunction(
         ([i, k]) => Number(([...document.querySelectorAll('.gant-delo')]
@@ -1046,10 +1107,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
         [ime, n] as [string, number],
       );
     };
-    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Кофраж")) [data-navan]'));
-    await chakayStepen('Кофраж', stepenPredi - 1);
+    await sSabitie(p, () => p.click('.gant-delo:has(b:text-is("Кофраж на сградата")) [data-navan]'));
+    await chakayStepen('Кофраж на сградата', stepenPredi - 1);
     proveri('НАВЪН вдига делото с ЕДНА степен',
-      await stepenNaReda('Кофраж'), stepenPredi - 1);
+      await stepenNaReda('Кофраж на сградата'), stepenPredi - 1);
     proveri('и детето му го следва · дървото не се къса',
       await stepenNaReda('Кофраж етаж 1'), stepenPredi);
 
@@ -1160,7 +1221,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // някой хедъри имат индивидуални колони за себе си."
     //
     // Сметки има ЧЕТИРИНАЙСЕТ секции и е екранът, на който това има смисъл.
-    await naEkran(p, 'smetki', '#forma-razhod');
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
     const otpechatatsi = async (): Promise<string[]> =>
       // ОБХВАТ: ЦЯЛАТА СТРАНИЦА · нарочно. Тук се взима отпечатък на ВСИЧКИ
     // секции, за да се сравни преди/след — стеснен, селекторът би мерил друго.
@@ -1516,7 +1577,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('подразбраното е БЕЗ разбивка · един ред сборове',
       await p.$$eval('.gant-red.sumi', (e) => e.length), 1);
 
-    /** Сборът на всички числа в редовете със сборове · в стотинки, от текста. */
+    /** Сборът на всички числа в редовете със сборове · в центове, от текста. */
     const sborNaEkrana = async (): Promise<number> =>
       p.$$eval('.gant-red.sumi .gant-suma', (kletki) =>
         kletki.reduce((s, k) => {
@@ -1545,6 +1606,18 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '81 · Разбивката · парите В ПОЛЕТО на диаграмата';
     // Негов въпрос: „…а в самата диаграма да се РАЗПРЕДЕЛИ В ПОЛЕТО от нея и
     // пресято спрямо такта."
+    //
+    // ОТ РЕЗЕН 114 парите са ТЕМА (ADR-160). Управление се отваря на „Текст" —
+    // там делата са работата, — значи преди да се броят ленти, темата се сменя.
+    proveri('Управление се отваря на ТЕКСТ · „едната кореспондира с Управление"',
+      await p.$eval('[data-tema-diagrama]', (e) => (e as HTMLElement).dataset['temaDiagrama']), 'tekst');
+    proveri('и на тази тема парични ленти НЯМА · осата носи делата',
+      await p.$$eval('.diagrama-parichna', (e) => e.length), 0);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#tema-diagrama', 'pari'));
+    proveri('темата „Пари" сменя КАКВО стои върху същата ос',
+      await p.$eval('[data-tema-diagrama]', (e) => (e as HTMLElement).dataset['temaDiagrama']), 'pari');
+    proveri('и делата вече не се редят там · един предмет наведнъж',
+      await p.$$eval('.diagrama .diagrama-red', (e) => e.length), 0);
     const lentiVPoleto = await p.$$eval('.diagrama-parichna', (e) => e.length);
     const redoveNaSumite = await p.$$eval('.gant-red.sumi', (e) => e.length);
     console.log(`\n  ПАРИТЕ В ПОЛЕТО: ${lentiVPoleto} ленти в диаграмата\n`);
@@ -1583,13 +1656,16 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('изборът преживява смяна на екран',
       await p.$eval('#f-razrez', (e) => (e as HTMLSelectElement).value), 'nachin');
     await deystvieSPrerisuvane(p, () => p.selectOption('#f-razrez', 'bez'));
+    // ТЕМАТА СЕ ВРЪЩА · блок, който мести състояние под следващия, е по-скъп
+    // от липсващ (същото правило като при §68 и §69).
+    await deystvieSPrerisuvane(p, () => p.selectOption('#tema-diagrama', 'tekst'));
     await naEkran(p, 'imoti', '#forma-imot');
 
     razdel = '82 · Служителите · задачата се праща и се ПРИЕМА в програмата';
     // Негови думи, 27.08 (И110): „Да има служители таб и там да се избират от
     // падащо меню и да се пращат задачите ЗА ПРИЕМАНЕ… но в листа на всеки
     // служител СИ СЕДИ." И от 08.08 (р57·[160]): „копче за всяко дело… РЪЧНО."
-    await naEkran(p, 'sluzhiteli', '[data-sektsiya="sluzhiteli-horata"]');
+    await naPodtab(p, 'hora', '[data-sektsiya="sluzhiteli-horata"]');
     // КОГО ГЛЕДАМ е ЕДИН избор за целия екран — и листът, и правата четат него
     // (ADR-022). §20 остави избран Бамстера; тук се гледа СВОЯТ лист, значи
     // изборът се връща на себе си, точно както би направил човек.
@@ -1633,6 +1709,63 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('сгрешена сума'), true);
 
+    // ══ 149 · КАРТАТА НА СЛУЖИТЕЛЯ · седмица и месец (резен 113 · ADR-159) ══
+    //
+    // Негово, 03.09 (И133): „да виждаш и задачите които са активни и ТАМ ГИ
+    // РАЗПРЕДЕЛЯШ като прави картата на всеки служител за седмица или за месец."
+    razdel = '149 · картата на служителя';
+    proveri('картата стои под листа му',
+      await p.$$eval('[data-sektsiya=sluzhiteli-karta]', (e) => e.length), 1);
+    proveri('седмицата е СЕДЕМ дни · понеделник пръв',
+      await p.$eval('[data-karta-dni]', (e) => (e as HTMLElement).dataset['kartaDni']), '7');
+    const aktivniVKartata = Number(
+      await p.$eval('[data-karta-aktivni]', (e) => (e as HTMLElement).dataset['kartaAktivni']),
+    );
+    proveri('и активните задачи са в нея · отказаната не се разпределя',
+      aktivniVKartata >= 1, true);
+    proveri('сверката се КАЗВА, дори когато е нула',
+      (await tekstNa(p, '[data-karta-sverka]')).includes('разлика 0'), true);
+    proveri('и КАЗВА, че брои поетото, не делата по име',
+      (await tekstNa(p, '[data-sektsiya=sluzhiteli-karta]')).includes('поетото'), true);
+
+    // МЕСЕЦЪТ · вторият такт, същата мрежа
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-takt=mesets]'));
+    proveri('месецът реди календарните си дни',
+      (await p.$eval('[data-karta-dni]', (e) => Number((e as HTMLElement).dataset['kartaDni']))) >= 28, true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-takt=sedmitsa]'));
+    proveri('и се връща на седмица', await p.$eval('[data-karta-dni]', (e) => (e as HTMLElement).dataset['kartaDni']), '7');
+
+    // ПРОЗОРЕЦЪТ СЕ МЕСТИ · и „днес" го връща
+    const prozoretsPredi = await tekstNa(p, '[data-karta-prozorets]');
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-napred]'));
+    proveri('напред сменя прозореца',
+      (await tekstNa(p, '[data-karta-prozorets]')) !== prozoretsPredi, true);
+    // ДЪЛГАТА ЗАДАЧА ПРЕСИЧА СЕДМИЦИ · това е вярно, не дефект: делото от
+    // §24 тече десет дни. Инвариантът, който важи във ВСЕКИ прозорец, е
+    // сверката — активните да са равни на положените.
+    proveri('и в другия прозорец сверката пак затваря',
+      (await tekstNa(p, '[data-karta-sverka]')).includes('разлика 0'), true);
+    await deystvieSPrerisuvane(p, () => p.click('[data-karta-dnes]'));
+    proveri('„днес" връща прозореца на днешния',
+      await tekstNa(p, '[data-karta-prozorets]'), prozoretsPredi);
+
+    // ══ РАЗПРЕДЕЛЯНЕТО · ВТОРО изпращане със същия номер, не втора задача ══
+    const zadachiPrediPremestvane = await p.$$eval(
+      '[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length);
+    const dnite = await p.$$eval('[data-karta-den]', (e) =>
+      e.map((x) => x.getAttribute('data-karta-den') ?? ''));
+    const kadeBeshe = await p.$eval('[data-karta-zadacha]', (e) =>
+      (e.closest('[data-karta-den]') as HTMLElement | null)?.dataset['kartaDen'] ?? '');
+    const drugDen = dnite.find((d) => d !== kadeBeshe) ?? '';
+    await sSabitie(p, () => p.selectOption('[data-premesti]', drugDen));
+    proveri('преместването е ЕДНО събитие · поправка, не втора задача',
+      await p.$$eval('[data-sektsiya=sluzhiteli-listat] [data-zadacha]', (e) => e.length),
+      zadachiPrediPremestvane);
+    proveri('и задачата вече стои на другия ден',
+      await p.$$eval(`[data-karta-den="${drugDen}"] [data-karta-zadacha]`, (e) => e.length) >= 1, true);
+    proveri('а вестта казва, че срокът на ДЕЛОТО не е пипан',
+      (await tekstNa(p, '.vest')).includes('Срокът на делото не е пипан'), true);
+
     razdel = '83 · Поканата в календара · ПО ИЗБОР, и границата се КАЗВА';
     // Негови думи, 27.08 (И110): „по имейл ПО ИЗБОР и задължително в програмата…
     // но на Стопанина му показва приел ли е на календара или не."
@@ -1645,7 +1778,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('казва се какво НАПУСКА устройството',
       granitsata.includes('името на делото'), true);
     proveri('и какво НЕ напуска · поименно',
-      granitsata.includes('Мястото и Обектът') && granitsata.includes('наематели'), true);
+      granitsata.includes('Имотът и Обектът') && granitsata.includes('наематели'), true);
 
     // БЕЗ ОТМЕТКА · НУЛА МРЕЖА. Брои се самата ЗАЯВКА, не намерението: обещание
     // „по избор", проверено по надписа на екрана, е обещание, проверено по себе си.
@@ -1693,8 +1826,12 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('всяко дело носи копче за пращане',
       (await p.$$eval('[data-prati]', (e) => e.length)) >= 1, true);
     // Копчето минава през СЪЩАТА врата · пунктът в лентата, не втора форма.
+    // От резен 112 вратата е Настройки → подтаб ХОРА (ADR-158): пунктът на
+    // Служители го няма, но пътят е пак човешкият.
     await deystvieSPrerisuvane(p, () => p.click('[data-prati]'));
     await p.waitForSelector('[data-sektsiya="sluzhiteli-prashtane"]');
+    proveri('копчето отваря подтаба ХОРА, не чужд',
+      await p.$eval('[data-podtab=hora]', (e) => e.classList.contains('tuk')), true);
     proveri('копчето води до Служители с ИЗБРАНОТО дело',
       await p.$eval('#z-delo', (e) => (e as HTMLSelectElement).value !== ''), true);
     await naEkran(p, 'imoti', '#forma-imot');
@@ -1705,26 +1842,31 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // и подредени КАКТО СА ПО ТАБОВЕТЕ В МЕНЮТО и ОТДЕЛЕНИ ПРИ СКРОЛ… можеш по
     // ЦЯЛО МЕНЮ или по отделна ТАБЛИЦА и КОЛОНА от хедъра да дадеш достъп."
     razdel = '88 · хедърите по табовете · трите обхвата';
-    await naEkran(p, 'sluzhiteli', '[data-sektsiya="pravata"]');
+    await naPodtab(p, 'hora', '[data-sektsiya="pravata"]');
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-chovek', 'ivaylo85petkov@gmail.com'));
 
     // ВГРАДЕНИТЕ ТАБЛИЦИ СА ВЪТРЕ · дотук матрицата знаеше само вносните хедъри.
     // СЕДЕМ от резен 18б насам (Продажби); ОСЕМ от резен 48 — Управление влезе
     // с колонния си описател и с това падна последната граница в тази матрица;
-    // ДЕВЕТ от резен 82 — самият Журнал (сесиите) влезе като вградена.
-    const vgradeniVMatritsata = (await p.$$eval('[data-hedar-red]', (e) =>
-      e.map((x) => x.getAttribute('data-hedar-red') ?? ''))).filter((k) => k.startsWith('vgraden:'));
+    // ДЕВЕТ от резен 82 — самият Журнал (сесиите) влезе като вградена. От резен
+    // 97 (ADR-156) екранът показва ЕДИН хедър наведнъж — списъкът е в падащото.
+    const vgradeniVMatritsata = (await p.$$eval('#izbor-pravo-hedar option', (e) =>
+      e.map((x) => (x as HTMLOptionElement).value))).filter((k) => k.startsWith('vgraden:'));
     proveri('вградените таблици влизат в матрицата', vgradeniVMatritsata.length, 9);
     proveri('и УПРАВЛЕНИЕ е сред тях · границата падна',
       vgradeniVMatritsata.includes('vgraden:dela'), true);
     proveri('и вносният хедър стои до тях',
-      (await p.$$('[data-hedar-red="Банка ОББ"]')).length, 1);
+      (await p.$$('#izbor-pravo-hedar option[value="Банка ОББ"]')).length, 1);
 
     // ГРУПИТЕ СА ПО ТАБОВЕ и редът им е РЕДЪТ НА ЛЕНТАТА, не азбучен.
-    const grupi = await p.$$eval('[data-grupa-hedari]', (e) =>
-      e.map((x) => x.getAttribute('data-grupa-hedari') ?? ''));
+    const grupi = await p.$$eval('#izbor-pravo-hedar optgroup', (e) =>
+      e.map((x) => x.getAttribute('data-ekran') ?? ''));
     proveri('хедърите са ГРУПИРАНИ по табове', grupi.length >= 3, true);
     const vLentata = await p.$$eval('.nav > [data-ekran]', (e) =>
       e.map((x) => x.getAttribute('data-ekran') ?? ''));
+    // БЕЗ ТОВА проверката долу минава ВАКУУМНО: празна лента дава празен ред,
+    // а празният ред е равен на сортирания празен ред (резен 118 го намери).
+    proveri('лентата се чете · не е празна', vLentata.length > 0, true);
     // САМО ОНЕЗИ, КОИТО ГИ ИМА В ЛЕНТАТА · находка на резен 18в.
     //
     // Дотук се сравняваха ВСИЧКИ групи, а онези без пункт в лентата дават −1.
@@ -1746,14 +1888,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       Number(await tekstNa(p, '[data-bez-tab]')) >= 1, true);
     proveri('и стоят в ПОСЛЕДНАТА група', grupi.at(-1), '');
 
-    // ЗАЛЕПВАНЕТО ПАДА · „махни го навсякъде" (И127 т.2 · ADR-148). „Отделени
-    // при скрол" се чете РАЗДЕЛЕНИ — своя рамка и свое заглавие, не лепнати.
-    proveri('заглавието на групата НЕ лепне · тече с текста си',
-      await p.$eval('.hedari-zaglavie', (e) => getComputedStyle(e).position), 'static');
-    proveri('и е НАДПИС, не бутон · клавиатурата не спира на него',
-      await p.$eval('.hedari-zaglavie', (e) => e.getAttribute('role')), 'presentation');
-
     // ══ ЦЯЛАТА ТАБЛИЦА С ЕДНА ДУМА · вторият обхват ═══════════════════════
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'vgraden:imoti'));
     const IMOTI_RED = '[data-hedar-red="vgraden:imoti"]';
     const koloniNaImoti = await p.$$eval(`${IMOTI_RED} .pravo`, (e) => e.length);
     proveri('вградената таблица показва колоните си', koloniNaImoti > 1, true);
@@ -1765,37 +1901,42 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и казва колко записа е направила',
       (await tekstNa(p, '.vest')).includes('1 таблица'), true);
 
-    // ══ ЦЯЛО МЕНЮ · третият обхват · N таблици, N записа ══════════════════
-    // Табът „Имоти" носи ДВЕ вградени таблици — Имоти и Наеми. Едно действие,
-    // два записа, защото правото е на двойката (служител, хедър).
-    const tablitsiVImoti = await p.$$eval('[data-grupa-hedari=imoti] [data-hedar-red]', (e) => e.length);
+    // ══ ЦЯЛ ТАБ · третият обхват · N таблици, N записа ════════════════════
+    // Табът „Имоти" носи ДВЕ вградени таблици — Имоти и Наеми. Лостът стои под
+    // избрания хедър и казва колко таблици пипа. Едно действие, два записа,
+    // защото правото е на двойката (служител, хедър).
+    const tablitsiVImoti = await p.$$eval('#izbor-pravo-hedar optgroup[data-ekran=imoti] option', (e) => e.length);
     proveri('табът „Имоти" носи повече от една таблица', tablitsiVImoti >= 2, true);
-    const kolonivImoti = await p.$$eval('[data-grupa-hedari=imoti] .pravo', (e) => e.length);
+    proveri('и лостът „цял таб" стои под хедъра · само защото табът има повече от една',
+      await p.$$eval('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', (e) => e.length), 1);
     // ЧАКА СЕ ЕКРАНЪТ, не броят събития. `sSabitiya(N)` би паднало с TIMEOUT —
     // изход, който казва „нещо не стана", вместо „чакани 8 скрити, видени 5".
-    // Диагноза с число е по-евтина от диагноза с таймаут: счупих обхвата
-    // нарочно да пипа само първата таблица и точно това ме научи.
     await deystvieSPrerisuvane(p, () =>
-      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'skrito'));
-    proveri('„цяло меню" скрива всички колони на ВСИЧКИТЕ му таблици',
-      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), kolonivImoti);
+      p.selectOption('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', 'skrito'));
+    proveri('„цял таб" скрива всички колони на показания хедър',
+      await p.$$eval('.pravo.pravo-skrito', (e) => e.length), koloniNaImoti);
     proveri('и записите са по ЕДИН на таблица · право на таб няма',
       (await tekstNa(p, '.vest')).includes(`${tablitsiVImoti} таблици`), true);
 
     // ВРЪЩАНЕТО · „редактира" изпразва стеснението, не го пълни.
     await deystvieSPrerisuvane(p, () =>
-      p.selectOption('[data-grupa-hedari=imoti] select[data-obhvat=menyu]', 'redaktira'));
+      p.selectOption('[data-obhvat-tab=imoti] select[data-obhvat=menyu]', 'redaktira'));
     proveri('и се връща наведнъж · записват се само отклоненията',
-      await p.$$eval('[data-grupa-hedari=imoti] .pravo.pravo-skrito', (e) => e.length), 0);
+      await p.$$eval('.pravo.pravo-skrito', (e) => e.length), 0);
 
     // ЗАТВОРЕНАТА КОЛОНА НА ВГРАДЕНАТА · сметка не се редактира от никого.
     proveri('и вградената има затворени колони, и се казва защо',
       (await p.$$eval(`${IMOTI_RED} .pravo [data-ne-deystva]`, (e) =>
         e.map((x) => x.textContent ?? '').join(' '))).includes('СМЕТКА'), true);
 
-    // ГРАНИЦАТА · Управление още не влиза, и това се КАЗВА, не се премълчава.
-    proveri('границата стои с думи на екрана',
-      (await tekstNa(p, '[data-granitsa-upravlenie]')).includes('Управление'), true);
+    // УПРАВЛЕНИЕ ВЛИЗА (резен 48 · `vgraden:dela`). Екранът обявяваше граница,
+    // която отдавна беше паднала — застоял текст, намерен от сверката на 02.09
+    // (ADR-153). Проверката е обърната: Управление Е в матрицата — избира се и
+    // се рисува, — а надпис за граница НЯМА (правило 15).
+    await deystvieSPrerisuvane(p, () => p.selectOption('#izbor-pravo-hedar', 'vgraden:dela'));
+    proveri('Управление е в матрицата · и паднала граница не се обявява',
+      (await p.$$eval('[data-hedar-red="vgraden:dela"]', (e) => e.length)) === 1 &&
+        (await p.$$('[data-granitsa-upravlenie]')).length === 0, true);
 
     await naEkran(p, 'imoti', '#forma-imot');
 
@@ -1818,7 +1959,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
 
     razdel = '115 · Папката · лошият адрес не стига до Журнала';
     const prediLoshiya = await broySabitiya(p);
-    await p.fill('#imot-adres', 'Витоша');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'Витоша');
     await p.fill('#imot-edinitsa', 'МАГ. № 1');
     await p.fill('#imot-papka', 'javascript:alert(1)');
     // ОТКАЗЪТ НЕ ПРЕРИСУВА · той пише в полето за грешка и оставя формата, за
@@ -1828,16 +1970,19 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       (document.querySelector('#greshka-imot')?.textContent ?? '').length > 0);
     proveri('отказът се КАЗВА с думи',
       (await tekstNa(p, '#greshka-imot')).includes('не се приема'), true);
-    proveri('и НИЩО не влиза в Журнала', await broySabitiya(p), prediLoshiya);
+    proveri('и НИЩО не влиза в Журнала · нито имотът, нито обектът',
+      await broySabitiya(p), prediLoshiya);
 
     razdel = '115 · Папката · записва се · пътят е ДЕСНИЯТ БУТОН (И124 т.3)';
     await p.fill('#imot-papka', ADRES_NA_PAPKA);
-    await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
+    // ДВЕ събития: „Витоша" е НОВ имот и влиза заедно с обекта си (резен 99).
+    await sSabitiya(p, 2, () => p.click('#forma-imot button[type=submit]'));
     proveri('новият обект носи папка',
       await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
     // „Да има пътища за неща само от там": видимият линк в колоната ПАДНА
     // (резен 77 · ADR-134); колоната остава честен белег има/няма, а пътят
-    // е контекстното меню на реда — проверява се в §117ж.
+    // е контекстното меню на реда — менюто върху реда на Обекта се играе в
+    // §100 (дръжките на Обекта), в раздела на Управление.
     proveri('но линк в колоната ВЕЧЕ НЯМА · пътят е менюто на реда',
       await p.$$eval('.red.imot [data-papka] a', (e) => e.length), 0);
     proveri('и редът носи адреса за менюто',
@@ -1858,7 +2003,10 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.red.imot [data-papka][data-ima=da]', (e) => e.length), 1);
 
     razdel = '115 · Папката · „различни за различни обекти" се БРОИ';
-    await p.fill('#imot-adres', 'Витоша');
+    // ВТОРИЯТ обект на СЪЩИЯ имот · имотът вече е вписан, значи ЕДНО събитие.
+    await p.selectOption('#imot-imot', 'витоша');
+    await p.waitForFunction(() =>
+      (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === 'Витоша');
     await p.fill('#imot-edinitsa', 'МАГ. № 2');
     await p.fill('#imot-papka', ADRES_NA_PAPKA);
     await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
@@ -2131,62 +2279,165 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
       await p.$$eval('.diagrama-red title', (t) =>
         t.some((x) => (x.textContent ?? '').includes('09:30'))), true);
 
-    // ═══ 117е · НОВИЯТ ИМОТ РАЖДА ГОЛЯМОТО ДЕЛО (резен 69 · И124 т.1) ═══
+    // ═══ 117е · СЪСТОЯНИЕ „СТРОИТЕЛСТВО" РАЖДА ГОЛЯМОТО ДЕЛО (резен 69 · 104) ═══
     //
     // „При започване на нов Имот с нов Обекти строителството е голямо дело с
-    // мног дървесни разклонения като в МСПроджект." Машината ПРЕДЛАГА,
-    // записва ЧОВЕКЪТ (правило 18).
-    razdel = '117е · Новият адрес ражда ПРЕДЛОЖЕНИЕ, не записи';
+    // мног дървесни разклонения като в МСПроджект." (И124 т.1) · „Груповите
+    // дървета за обект който почва като статус Строителство за Имота… При
+    // вкарване на Голямо дело се вкарва с него и площообразуване на обкти"
+    // (И131 т.2). Машината ПРЕДЛАГА, записва ЧОВЕКЪТ (правило 18).
+    razdel = '117е · Състоянието „Строителство" ражда ПРЕДЛОЖЕНИЕ, не записи';
     await naEkran(p, 'imoti', '#forma-imot');
     const prediPredlozhenie = await broySabitiya(p);
-    await dobaviImot(p, 'Върба', 'вила 1');
+    // НОВ адрес БЕЗ Състояние · дотук предлагаше (резен 69); от резен 104
+    // спусъкът е Състоянието, не адресът (И131 т.2 надживя И124 т.1 по спусъка).
+    // Имотът е БЕЗ Обект: Състоянието е негово поле, а след първия Обект всеки
+    // запис иска Обект (И132) — Имот с Обект не може да смени Състоянието „сам".
+    await dobaviImotBezObekt(p, 'Върба');
+    proveri('новият адрес САМ не предлага дърво · спусъкът е Състоянието',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
+    proveri('и е ЕДНО събитие · Имотът', await broySabitiya(p), prediPredlozhenie + 1);
+    await dobaviImotBezObekt(p, 'Върба', { sastoyanie: 'Строителство' });
     await p.waitForSelector('[data-sektsiya=darvo-na-stroezha]');
-    proveri('предложението се появява при НОВ адрес',
+    proveri('Състояние „Строителство" ражда предложението',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 1);
-    proveri('и е само ЕДНО събитие · имотът, не дървото',
-      await broySabitiya(p), prediPredlozhenie + 1);
+    // ЕДНО събитие · Имотът със Състоянието си, но НИТО ЕДНО дело.
+    proveri('и е само ЕДНО събитие · Състоянието, не дървото',
+      await broySabitiya(p), prediPredlozhenie + 2);
     proveri('казва броя · 22 дела, броени от шаблона',
       (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('22 дела'), true);
     proveri('и казва, че записва ЧОВЕКЪТ (правило 18)',
       (await tekstNa(p, '[data-sektsiya=darvo-na-stroezha]')).includes('правило 18'), true);
+    proveri('и че площообразуването влиза с него · по избор',
+      await p.$eval('[data-darvo-ploshti]', (e) => (e as HTMLElement).dataset['darvoPloshti']), '0');
 
     razdel = '117е · „Не сега" не оставя следа';
     await deystvieSPrerisuvane(p, () => p.click('#darvo-ne-sega'));
     proveri('предложението изчезва',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
-    proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 1);
+    proveri('и НИЩО не е писано', await broySabitiya(p), prediPredlozhenie + 2);
 
-    razdel = '117е · СЪЩИЯТ адрес не предлага втори строеж';
-    await dobaviImot(p, 'Върба', 'вила 2');
-    proveri('вторият имот на адреса НЕ ражда предложение',
+    razdel = '117е · без „Строителство" няма предложение';
+    await dobaviImotBezObekt(p, 'Гълъбец', { sastoyanie: 'Наем' });
+    proveri('Имот в „Наем" НЕ ражда дърво',
       await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
 
-    razdel = '117е · „Създай дървото" · записва се ЦЯЛОТО, със сверка';
+    razdel = '117е · „Създай дървото" · с площообразуването, ЦЯЛОТО, със сверка';
     const prediDarvo = await broySabitiya(p);
-    await dobaviImot(p, 'Гълъбец', 'парцел А');
+    await dobaviImotBezObekt(p, 'Гълъбец', { sastoyanie: 'Строителство' });
     await p.waitForSelector('#darvo-sazdai');
+    // ПЛОЩООБРАЗУВАНЕТО ВЛИЗА С НЕГО (И131 т.2) · същият файл като в Калкулатора.
+    const ploshtiZaDarvoto = join(tmpdir(), 'ploshto-galabets.csv');
+    await writeFile(
+      ploshtiZaDarvoto,
+      [
+        'кота;етаж;№;обект;застроена площ, F1;общи части F2;F2;Общо F1+F2;прилежащ (придаден) двор',
+        'кота ±0,00;първи;1;Апартамент 1;40,00;2,48;5,22;45,22;',
+        ';;2;Апартамент 2;57,00;3,53;7,44;64,44;',
+        'кота +2,85;втори;3;Апартамент 3;54,80;3,39;7,15;61,95;',
+        ';;;;151,80;9,40;19,81;171,61;',
+      ].join('\n'),
+    );
+    await p.setInputFiles('#darvo-fayl-ploshti', ploshtiZaDarvoto);
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-darvo-ploshti]') as HTMLElement | null)?.dataset['darvoPloshti'] === '3');
+    proveri('четенето на площите НЕ пише · записва човекът', await broySabitiya(p), prediDarvo + 1);
     await deystvieSPrerisuvane(p, () => p.click('#darvo-sazdai'));
-    proveri('двайсет и двете дела са в Журнала',
-      await broySabitiya(p), prediDarvo + 1 + 22);
-    proveri('и сверката се КАЗВА · разлика 0',
-      (await p.$eval('.vest', (e) => (e as any).innerText)).includes('22 от 22 дела · разлика 0'), true);
+    proveri('двайсет и две дела И три обекта са в Журнала',
+      await broySabitiya(p), prediDarvo + 1 + 22 + 3);
+    const vestDarvo = await p.$eval('.vest', (e) => (e as any).innerText);
+    proveri('и сверката на делата се КАЗВА · разлика 0', vestDarvo.includes('22 от 22 дела · разлика 0'), true);
+    proveri('и сверката на обектите също', vestDarvo.includes('3 от 3 обекта') && vestDarvo.includes('разлика 0'), true);
+    proveri('Обектите са родени ПОД Имота · групата на строящия се Имот',
+      await p.$$eval('.red.imot', (e) =>
+        e.filter((x) => (x as HTMLElement).dataset['obektAdres'] === 'Гълъбец').length), 3);
+    // Строежът е започнал · второ „Строителство" НЕ предлага второ дърво. Имотът
+    // вече има Обекти, значи записът иска Обект (И132): четвърти апартамент, а
+    // Състоянието „Строителство" идва с избора на Имота (резен 99 · ADR-157).
+    await dobaviImot(p, 'Гълъбец', 'Апартамент 4');
+    proveri('с жив корен под Имота дърво повече не се предлага',
+      await p.$$eval('[data-sektsiya=darvo-na-stroezha]', (e) => e.length), 0);
     await naEkran(p, 'gant', '#d-forma-delo');
-    proveri('дървото стои под мястото си в Управление',
+    proveri('дървото стои под Имота си в Управление',
       await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 22);
     proveri('и разклоненията са ПОД корена · има поддела',
       await p.$$eval('.gant-delo.poddelo[data-grupa="Гълъбец"]', (e) => e.length) > 0, true);
+
+    // ═══ 110 · ГОЛЯМОТО ДЕЛО · линейният график и КСС (ADR-166) ═══
+    //
+    // „Дори Гоялмо Дело се появява като отделен таб при посикване и само там
+    // може да вкараш линеен график и да направиш Линейния график с тажлицата и
+    // диаграмата от модела на Гант. Тогава ще може да го има и в Управление и в
+    // Сметки. Там ще се прибира към ИМот на който принадлежи." (03.09)
+    razdel = '110 · табът се появява ПРИ ПОИСКВАНЕ · с голямото дело';
+    // Дървото на „Гълъбец" е записано по-горе, значи пунктът вече го има.
+    proveri('пунктът „Голямо дело" стои в лентата, щом има голямо дело',
+      await p.$$eval('[data-ekran=golyamodelo]', (e) => e.length), 1);
+    await naEkran(p, 'golyamodelo', '#gd-imot');
+    proveri('екранът предлага само Имотите със строеж',
+      await p.$eval('[data-imoti-s-darvo]', (e) => (e as HTMLElement).dataset['imotiSDarvo']), '1');
+    proveri('и още няма прочетен график · нула реда',
+      await p.$eval('[data-grafik-redove]', (e) => (e as HTMLElement).dataset['grafikRedove']), '0');
+
+    razdel = '110 · линейният график се ЧЕТЕ, но не се записва';
+    const prediGrafika = await broySabitiya(p);
+    await p.setInputFiles('#gd-fayl-grafik',
+      fileURLToPath(new URL('../../tests/mostri/lineen-grafik.pdf', import.meta.url)));
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-grafik-redove]') as HTMLElement | null)?.dataset['grafikRedove'] === '5');
+    proveri('петте реда се четат от ПДФ-а · с координати, не по вид',
+      await p.$eval('[data-grafik-redove]', (e) => (e as HTMLElement).dataset['grafikRedove']), '5');
+    proveri('и дървото им има ТРИ степени · отстъпът носи подделата',
+      await p.$eval('[data-grafik-stepeni]', (e) => (e as HTMLElement).dataset['grafikStepeni']), '3');
+    proveri('четенето НЕ пише · записва човекът (правило 18)', await broySabitiya(p), prediGrafika);
+    proveri('таблицата и диаграмата са от модела на Гант',
+      (await p.$$('[data-sektsiya=golyamo-delo-grafik] .gant')).length > 0 &&
+        (await p.$$('[data-sektsiya=golyamo-delo-grafik] svg')).length > 0, true);
+
+    razdel = '110 · записът слага делата ПОД голямото дело, със сверка';
+    await deystvieSPrerisuvane(p, () => p.click('#grafik-zapishi'));
+    proveri('петте дела са в Журнала', await broySabitiya(p), prediGrafika + 5);
+    const vestGrafik = await p.$eval('.vest', (e) => (e as HTMLElement).textContent ?? '');
+    proveri('и сверката вход↔изход се КАЗВА · разлика 0',
+      vestGrafik.includes('5 от 5 дела') && vestGrafik.includes('разлика 0'), true);
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('делата от графика се виждат в Управление, под Имота си',
+      await p.$$eval('.gant-delo[data-grupa="Гълъбец"]', (e) => e.length), 27);
+
+    razdel = '110 · КСС се чете и се показва в Сметки, без нито едно събитие';
+    await naEkran(p, 'golyamodelo', '#gd-imot');
+    const prediKSS = await broySabitiya(p);
+    await p.setInputFiles('#gd-fayl-kss',
+      fileURLToPath(new URL('../../tests/mostri/kss.pdf', import.meta.url)));
+    await p.waitForFunction(() =>
+      (document.querySelector('[data-kss-redove]') as HTMLElement | null)?.dataset['kssRedove'] === '5');
+    proveri('петте реда на сметката се четат',
+      await p.$eval('[data-kss-redove]', (e) => (e as HTMLElement).dataset['kssRedove']), '5');
+    proveri('сборът се сверява с реда „Общо:" на файла · разлика нула',
+      await p.$eval('[data-kss-razlika]', (e) => (e as HTMLElement).dataset['kssRazlika']), '0');
+    proveri('и всеки ред се връзва · количество × цена = стойност',
+      await p.$eval('[data-kss-nevarzani]', (e) => (e as HTMLElement).dataset['kssNevarzani']), '0');
+    proveri('четенето на КСС не пише нищо', await broySabitiya(p), prediKSS);
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
+    proveri('прочетената сметка се вижда и в Сметки · подтаб Разход',
+      await p.$eval('[data-kss-v-smetki]', (e) => (e as HTMLElement).dataset['kssVSmetki']), '5');
 
     // ═══ 117ж · БАЛАНСЪТ · периодът с КРАЙ (резен 70 · И124 т.11) ═══
     //
     // „В Перид при Сметки липсва възможност за въвеждане на края на раз
     // глеждания периода. … Името е не Сметки а Баланс който включва Приход и
     // Разход и всички разпивки."
-    razdel = '117ж · Балансът · името и краят на периода';
+    razdel = '117ж · Сметки · подтабът Баланс и краят на периода';
     await naEkran(p, 'smetki', '#forma-period');
-    proveri('екранът се казва БАЛАНС, не Сметки',
-      await p.$eval('.shapka h1', (e) => e.textContent!.trim()), 'Баланс');
-    proveri('и в лентата пунктът е Баланс',
-      (await p.$eval('.nav', (e) => (e as any).innerText)).includes('Баланс'), true);
+    // ОТ РЕЗЕН 115 (И136 · ADR-161): името се ВЪРНА на „Сметки", а „Баланс"
+    // стана ЕДИН от петте подтаба. Последната дума бие (правило 28) — затова
+    // тук се мери новото твърдение, а не се кърпи старото.
+    proveri('екранът се казва пак СМЕТКИ',
+      await p.$eval('.shapka h1', (e) => e.textContent!.trim()), 'Сметки');
+    proveri('и в лентата пунктът е Сметки',
+      (await p.$eval('.nav', (e) => (e as any).innerText)).includes('Сметки'), true);
+    proveri('а Баланс е ПОДТАБ вътре',
+      Boolean(await p.$('[data-podtabove-na=smetki] [data-podtab=balans]')), true);
     proveri('периодът има ОТ и ДО · краят е по избор',
       await p.$$eval('#forma-period input[type=month]', (e) => e.length), 2);
 
@@ -2240,7 +2491,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     // числа зависят от всичко, писано дотук.
 
     razdel = '118 · Календарът · седем колони, понеделник пръв';
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-kalendar]');
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-kalendar]');
     proveri('главата носи СЕДЕМ дни',
       await p.$$eval('.kalendar-glava span', (e) => e.length), 7);
     proveri('и първият е ПОНЕДЕЛНИК · българската норма',
@@ -2331,8 +2582,8 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '119 · Преписката · закача се за ИМОТ, ДЕЛО или ПОДДЕЛО';
     const gnezda = await p.$$eval('#prep-zakachena optgroup', (e) =>
       e.map((x) => x.getAttribute('label')));
-    proveri('менюто има ДВЕ гнезда · имоти и дела',
-      JSON.stringify(gnezda), JSON.stringify(['Имоти', 'Дела и поддела']));
+    proveri('менюто има ДВЕ гнезда · обекти и дела',
+      JSON.stringify(gnezda), JSON.stringify(['Обекти', 'Дела и поддела']));
     proveri('подделата се четат по НОМЕР · 1.1 казва степента',
       (await p.$$eval('#prep-zakachena optgroup:nth-of-type(2) option',
         (e) => e.map((x) => x.textContent))).some((t) => /^\d+\.\d+/.test(t ?? '')), true);
@@ -2371,7 +2622,7 @@ export async function blok5(ctx: KonteksNaProhoda): Promise<void> {
     //  между всички таблици нак вероятно." *(И90)*
 
     razdel = '120 · Полетата · изворите са МЕЖДУ ВСИЧКИ таблици';
-    await naEkran(p, 'smetki', '#forma-pole');
+    await naPodtabNa(p, 'smetki', 'otchet', '#forma-pole');
     const proizhod = await p.$$eval('#pf-lyavo optgroup', (e) => e.map((x) => x.getAttribute('label')));
     proveri('менюто е групирано по ТРИ произхода',
       JSON.stringify(proizhod), JSON.stringify(['Отчети', 'Коефициенти', 'Данни на периода']));

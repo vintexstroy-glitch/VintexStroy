@@ -42,6 +42,8 @@ import {
   poVreme,
   VIDOVE_REZULTAT,
   zaStapka,
+  belezhkaZaStapkata,
+  type DanniZaPerioda,
   type Koefitsient,
   type Merka,
   type SmetnatKoefitsient,
@@ -74,6 +76,9 @@ import {
   type DeystvieKoefitsient,
   type SvoyKoefitsient,
   type Velichina,
+  PREDSTAVKA_SVOY,
+  katoKoefitsient,
+  smetniKatoKoefitsient,
 } from '../src/domein/svoy-koefitsient.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 
@@ -127,25 +132,41 @@ export function narisuvayKoefitsientite(o: Ogledalo, dnes: string): string {
   const p = podrazbiranPeriod(dnes);
   const nachalo = ot || p.ot;
   const kraj = doo || p.do;
-  const nalichni = zaStapka(stapka === 'mesets' ? 'mesets' : 'drug');
+  /**
+   * ВСИЧКИТЕ, И НЕГОВИТЕ (резен 116 · ADR-162). Негово, 03.09 (И135): „Махаш
+   * мои коефициенти, махни го глупаво е." Списъкът не зависи от стъпката, а
+   * своите стоят до вградените — в менюто, в диаграмата и в таблицата — през
+   * СЪЩИЯ рисувач, преведени в неговия вид (`katoKoefitsient`).
+   */
+  const svoiTuk = zhivite(o);
+  const nalichni: readonly Koefitsient[] = [
+    ...zaStapka(stapka === 'mesets' ? 'mesets' : 'drug'),
+    ...svoiTuk.map(katoKoefitsient),
+  ];
+  const smetniTuk = (kk: Koefitsient, d: DanniZaPerioda): SmetnatKoefitsient => {
+    const svoy = kk.klyuch.startsWith(PREDSTAVKA_SVOY)
+      ? svoiTuk.find((x) => PREDSTAVKA_SVOY + x.klyuch === kk.klyuch)
+      : undefined;
+    return svoy ? smetniKatoKoefitsient(svoy, d) : smetniKoefitsient(kk, d);
+  };
   const k = nalichni.find((x) => x.klyuch === izbran) ?? nalichni[0]!;
 
   const parcheta = kraj >= nachalo ? razbiyNaStapki(nachalo, kraj, stapka) : [];
   const redica = parcheta.map((ch) => ({
     etiket: ch.etiket,
-    smetnat: smetniKoefitsient(k, danniZaPerioda(o, ch.ot, ch.do)),
+    smetnat: smetniTuk(k, danniZaPerioda(o, ch.ot, ch.do)),
   }));
 
   // Целият период накуп · за формулата и параметрите под диаграмата.
-  const zaTseliya = smetniKoefitsient(k, danniZaPerioda(o, nachalo, kraj));
+  const zaTseliya = smetniTuk(k, danniZaPerioda(o, nachalo, kraj));
 
   return `
     ${sastoyanieto(o, dnes)}
     ${formaNaSvoya()}
-    ${lentata(nalichni, k, nachalo, kraj, dnes)}
+    ${lentata(nalichni, svoiTuk, k, nachalo, kraj, dnes)}
     ${diagramata(redica, k)}
     ${podDiagramata(k, zaTseliya, o, nachalo, kraj)}
-    ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes)}`;
+    ${vsichkite(o, nachalo, kraj, nalichni, parcheta, dnes, smetniTuk)}`;
 }
 
 /**
@@ -324,6 +345,7 @@ function sastoyanieto(o: Ogledalo, dnes: string): string {
 
 function lentata(
   nalichni: readonly Koefitsient[],
+  svoiTuk: readonly SvoyKoefitsient[],
   k: Koefitsient,
   nachalo: string,
   kraj: string,
@@ -399,10 +421,14 @@ function lentata(
           .join(' ')}
       </p>
       ${
-        stapka === 'mesets'
-          ? '<p class="drebno">Стъпка МЕСЕЦ · показани са и месечните коефициенти (събираемост, ДДС) — начисленото и ДДС-то са месечни понятия, не наш избор.</p>'
-          : `<p class="drebno">При стъпка „${ekraniraj(IMENA_NA_TAKTOVETE[stapka])}" месечните коефициенти ги НЯМА — те нямат смисъл извън месец.</p>`
+        /* НИЩО НЕ СЕ КРИЕ ПО СТЪПКА (И135 · ADR-162): месечните по природа стоят
+           при всяка стъпка, а природата им се КАЗВА до числото. Дотук при друга
+           стъпка те изчезваха — „Махаш мои коефициенти, махни го глупаво е." */ ''
       }
+      <p class="drebno" data-mesechnite="${nalichni.filter((x) => x.samoMesechen).length}">Месечните по природа
+        (${nalichni.filter((x) => x.samoMesechen).map((x) => ekraniraj(x.ime)).join(' · ')}) се показват при
+        всяка стъпка${stapka === 'mesets' ? '' : ` — при „${ekraniraj(IMENA_NA_TAKTOVETE[stapka])}" до тях стои бележка, че са сметнати за цялото парче`}.
+        Своите коефициенти стоят в менюто и в таблицата до вградените (${svoiTuk.length} на брой).</p>
       <p class="drebno" id="kakvo-pokazva">${ekraniraj(IMENA_NA_REZULTATA[vidR])} · ${ekraniraj(KAKVO_POKAZVA[vidR])}</p>
       ${lazhe ? `<p class="drebno trevozhno" id="kade-lazhe">⚠ ${ekraniraj(lazhe)}</p>` : ''}
       <label class="vazm">
@@ -571,6 +597,7 @@ function vsichkite(
    */
   parcheta: readonly { readonly ot: string; readonly do: string; readonly etiket: string }[],
   dnes: string,
+  smetniTuk: (k: Koefitsient, d: DanniZaPerioda) => SmetnatKoefitsient,
 ): string {
   const d = danniZaPerioda(o, nachalo, kraj);
   // ДАННИТЕ ЗА ВСЯКО ПАРЧЕ · веднъж за всички коефициенти, не веднъж на ред.
@@ -588,11 +615,15 @@ function vsichkite(
         <div class="glava koef-red"><span>Коефициент</span><span>Формула</span><span>Посока</span><span class="suma">Стойност</span><span>Спрямо обичайното</span><span>На годишна база</span></div>
         ${nalichni
           .map((k) => {
-            const s = smetniKoefitsient(k, d);
+            const s = smetniTuk(k, d);
             const kak = PRIRAVNYAVANETO[k.vid];
-            const redica = poParcheta.map((dd) => smetniKoefitsient(k, dd).stoynost);
+            const redica = poParcheta.map((dd) => smetniTuk(k, dd).stoynost);
+            const belezhka = belezhkaZaStapkata(k, stapka);
+            const eSvoy = k.klyuch.startsWith(PREDSTAVKA_SVOY);
             return `<div class="red koef-red" data-koef="${ekraniraj(k.klyuch)}" translate="no">
-            <span class="kletka"><b>${ekraniraj(k.ime)}</b><span>${ekraniraj(k.kakvo)}</span></span>
+            <span class="kletka"><b>${ekraniraj(k.ime)}${eSvoy ? ' <span class="znachka tiha" data-svoy-v-tablitsata>свой</span>' : ''}</b><span>${ekraniraj(k.kakvo)}</span>${
+              belezhka === '' ? '' : `<span class="drebno" data-mesechen-po-priroda>${ekraniraj(belezhka)}</span>`
+            }</span>
             <span class="koef-formula">${ekraniraj(k.formula)}</span>
             <span>${sparklaynat(redica, k)}</span>
             <span class="suma">${ekraniraj(sDumiStoynost(s, pishi))}</span>

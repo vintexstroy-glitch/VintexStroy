@@ -776,6 +776,59 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
    натроши на тесен екран. */
 .poleta { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-sm); }
 .pole { display: flex; flex-direction: column; gap: 6px; }
+/* СКРИТО ПОЛЕ · авторският `display` бие `[hidden]` на браузъра, значи трябва
+   изрично правило (резен 99). Полето за името на НОВИЯ имот се крие, щом човек
+   избере вече вкаран — а не се маха: изборът се сменя без прерисуване. */
+.pole[hidden] { display: none; }
+
+/* ── ПОДТАБОВЕТЕ НА НАСТРОЙКИ (резен 112 · ADR-158) ────────────────────────
+   Негово: „да са разделени и да са самостоятелни активни подтабове." Затова
+   лентата е РЕД ОТ БУТОНИ, а не списък с връзки: тя сменя кое се рисува.
+   Активният носи същия белег като пункта в лентата (`tuk`), за да се чете с
+   едно око — и не лепне: скролиращата кутия е `.telo` (ADR-148). */
+.podtabove {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  margin: 0 0 var(--space-md); padding-bottom: 8px;
+  border-bottom: 1px solid var(--liniya);
+}
+.podtab {
+  font: inherit; font-size: var(--text-sm); font-weight: 600; letter-spacing: 0.02em;
+  padding: 7px 12px; border: 1px solid var(--liniya); border-radius: 5px;
+  background: var(--panel); color: var(--mastilo2); cursor: pointer;
+}
+.podtab:hover { color: var(--mastilo); border-color: var(--mastilo2); }
+.podtab.tuk { background: var(--aktsent); border-color: var(--aktsent); color: var(--hartiya); }
+
+/* ── КАРТАТА НА СЛУЖИТЕЛЯ (резен 113 · ADR-159) ────────────────────────────
+   Негово: „картата на всеки служител за седмица или за месец". Мрежата е
+   СЕДЕМ колони и при двата такта — седмицата е един ред, месецът са пет:
+   така окото чете еднакво и двете, вместо да се учи на два изгледа. */
+.karta-mrezha {
+  display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px;
+  margin: var(--space-sm) 0;
+}
+.karta-den {
+  min-height: 64px; padding: 5px 6px;
+  border: 1px solid var(--liniya); border-radius: 5px; background: var(--panel);
+}
+.karta-den.dnes { border-color: var(--aktsent); }
+.karta-den > b { display: block; font-size: 0.786rem; color: var(--mastilo2); margin-bottom: 3px; }
+.karta-zadacha {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 4px 5px; margin-bottom: 4px; border-radius: 4px;
+  border-left: 3px solid var(--mastilo2); background: var(--hartiya);
+  font-size: 0.786rem;
+}
+/* Двете състояния се четат по РЪБА, не по цвят сам: чакащата е топла, приетата
+   е зелена — същите два цвята, с които говори целият екран. */
+.karta-zadacha.chaka { border-left-color: var(--toplo); }
+.karta-zadacha.prieta { border-left-color: var(--zeleno); }
+.karta-zadacha .premesti { font: inherit; font-size: 0.786rem; max-width: 100%; }
+/* ДВАТА БЛОКА НА ФОРМАТА · имотът и обектът се вкарват заедно (И132), но окото
+   трябва да види къде свършва единият. `fieldset` носи решетката на `.poleta`,
+   затова рамката му пада, а `legend` е само надпис. */
+fieldset.poleta { border: 0; margin: 0 0 var(--space-sm); padding: 0; }
+fieldset.poleta > legend { padding: 0 0 4px; font-weight: 600; color: var(--mastilo2); }
 /* Двете форми на едно поле изглеждат ЕДНАКВО: „<div class=pole><label>" и
    „<label class=pole><span>". Втората е в личните форми; без този ред нейният
    надпис остава с ръста на текста и полето до него изглежда от друг екран. */
@@ -824,6 +877,14 @@ a.kato-buton { display: inline-flex; align-items: center; text-decoration: none;
   font-family: inherit; font-size: 0.964rem; text-align: left;
   min-height: 40px; width: 100%;
 }
+/* РАЗДЕЛИТЕЛЯТ НА ДВЕТЕ ГРУПИ (резен 118 · ADR-163) · съсед на пунктовете, не
+   обвивка (виж бележката над `.nav`). Линия отгоре и дребен надпис; в свитата
+   лента надписът пада с останалите `.navime`, линията остава като знак. */
+.navrazdel { border-top: 1px solid var(--liniya); margin: 6px 0 2px; padding: 6px 10px 0; }
+.navrazdel .navime { font-size: 0.75rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--mastilo2); }
+.strana.svita .navrazdel { margin: 6px 8px 2px; padding: 0; }
+.red.razdel { background: var(--panel); }
+.red.razdel .drebno { letter-spacing: 0.06em; text-transform: uppercase; }
 .navred:hover { background: #EAE2D6; }
 .navred.tuk { background: var(--mastilo); color: var(--hartiya); }
 .navred svg, .ikona.navikona { width: 17px; height: 17px; stroke: var(--mastilo2, var(--mastilo)); fill: none; stroke-width: 1.6; flex-shrink: 0; }
@@ -893,6 +954,10 @@ button.sIkona { display: inline-flex; align-items: center; gap: 6px; }
   display: flex; flex-direction: column; gap: 1px;
   margin: 2px 0 6px 8px; padding-left: 8px;
   border-left: 2px solid var(--liniya);
+  /* ДЪЛГИЯТ РЕД СЕ ПРЕВЪРТА, не изтласква лентата (резен 115): Сметки изрежда
+     секциите на петте си подтаба и редът порасна над екрана — пункт под ръба
+     не се натиска, а човек не разбира, че има още. */
+  max-height: 60vh; overflow-y: auto;
 }
 /* ПРИБРАНОТО СЕ ПРИБИРА НАИСТИНА.
    `[hidden] { display: none }` идва от таблицата на БРАУЗЪРА, а авторското
@@ -1684,29 +1749,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
 .pravo.pravo-skrito > span:first-of-type { text-decoration: line-through; }
 .pravo.pravo-vizhda { border-left: 3px solid var(--toplo); }
 
-/* ── ГРУПАТА ХЕДЪРИ · подредени по табовете на менюто (И103) ────────────────
-   Негови думи: „подредени както са по табовете в менюто И ОТДЕЛЕНИ ПРИ СКРОЛ."
-   „Отделени" е РАЗДЕЛЕНИ — своя рамка и свое заглавие на всяка група; ДОТУК
-   го четях като „залепени" и заглавието стоеше `sticky top: 0`.
-
-   ЗАЛЕПВАНЕТО ПАДА (И127 т.2 · ADR-148): „хедъра който се лепи от различните
-   таблици го има на места. Махни го навсякъде." Навсякъде значи и тук, и при
-   първата колона на всяка таблица — нула лепнати глави в целия лист, и
-   мярката го БРОИ, за да не се върне тихо.
-
-   ЗАГЛАВИЕТО Е НАДПИС, НЕ БУТОН (`role="presentation"`) — клавиатурата не бива
-   да спира на нещо, което не прави нищо. Лостът ДО него е бутонът. */
-.grupa-hedari { margin: 18px 0; }
-/* СВОЕ ИМЕ, не назаем: `.grupa-zaglavie` вече е заето от заглавията в падащия
-   ред на Настройки (резен 6). Името си остава свое и без залепването: два
-   стила под едно име се разминават при първата смяна на единия. */
-.hedari-zaglavie {
-  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
-  gap: 8px;
-  padding: 7px 10px; margin-bottom: 8px;
-  background: var(--panel); border: 1px solid var(--liniya); border-radius: 5px;
-  font-weight: 600; letter-spacing: 0.02em;
-}
+/* ── ГРУПИТЕ ХЕДЪРИ ПАДНАХА ОТ ЕКРАНА (резен 97 · ADR-156) · матрицата показва
+   ЕДИН хедър наведнъж, избран от падащо меню; табовете са групи В менюто. Лостът
+   „цял таб" стои под хедъра, само когато табът носи повече от една таблица. */
+.obhvat-tab { margin-top: 8px; }
 /* Лостът на обхвата · дума + падащо меню, същият вид и на групата, и на
    таблицата: двата обхвата се различават по МЯСТО, не по вид. */
 .obhvat { display: flex; align-items: center; gap: 6px; font-weight: 400; }
@@ -1948,9 +1994,32 @@ table.razbivka .drebno { font-size: 0.75rem; }
    (ADR-032 §1 · състояние никога само с цвят). Тук се различават по ПОСОКА —
    нагоре и надолу от нулевата линия — а цветът е само подсилване. */
 .diagrama-nula { stroke: var(--liniya); stroke-width: 1; }
+
+/* ТАБЛИЦАТА ОТЛЯВО, ДИАГРАМАТА ОТДЯСНО (И136 · резен 115) · „както в МС
+   Проджект". На тесен екран двете падат едно под друго: две колони на телефон
+   са два нечетими стълба. */
+.redom { display: grid; gap: var(--space-md); }
+.redom.dve { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); align-items: start; }
+.redom > div { min-width: 0; overflow-x: auto; }
+@media (max-width: 900px) { .redom.dve { grid-template-columns: minmax(0, 1fr); } }
+
+/* СЕДЕМТЕ РАЗБИВКИ · отметка · име · откъде · сума. */
+.glava.razbivka, .red.razbivka {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr) minmax(0, 2fr) 8rem;
+  gap: var(--space-md);
+  align-items: center;
+}
+.razbivka-kutiya { display: flex; justify-content: center; }
+.razbivka-kutiya input { width: 16px; height: 16px; accent-color: var(--aktsent); }
 .diagrama-pari.prihod { fill: var(--srok-normalno); }
 .diagrama-pari.razhod { fill: var(--aktsent); }
 .diagrama-parichna .diagrama-ime { fill: var(--mastilo2); }
+/* ЦИФРАТА В ДИАГРАМАТА (И136) · дребна, но четима: тя е точното число, докато
+   стълбчето е само пропорцията. Текстът на реда стои в таблицата ОТЛЯВО. */
+.diagrama-tsifra { font-size: 0.643rem; font-variant-numeric: tabular-nums; }
+.diagrama-tsifra.prihod { fill: var(--srok-normalno); }
+.diagrama-tsifra.razhod { fill: var(--aktsent); }
 
 /* ЛЕНТАТА · „ЦВЕТОВЕТЕ СПОРЕД СРОКА КАТО ПЛЪТНА ЛЕНТА" (р59·[41], главните са
    негови). Не се влачи — негова забрана (р83·[35]). */
@@ -2258,3 +2327,10 @@ table.razbivka .drebno { font-size: 0.75rem; }
   display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;
   font-variant-numeric: tabular-nums; margin-bottom: 6px;
 }
+
+/* ПРОФИЛЪТ · блокът „Лично" (ADR-154 · И131 т.1) · същите полета и бутони, свои имена */
+.profil-lichno { margin-top: 0.6rem; padding-top: 0.6rem; border-top: 1px solid var(--liniya); display: grid; gap: 0.45rem; min-width: 18rem; }
+.profil-lichno .dyalglava { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; }
+.profil-lichno .dyalglava h3 { margin: 0; font-size: var(--text-md); }
+.profil-lichno .pole { display: grid; gap: 0.2rem; }
+.profil-lichno .drebno { margin: 0; }

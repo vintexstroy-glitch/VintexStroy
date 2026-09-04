@@ -90,7 +90,7 @@ function kletkata(r: RedNaProdazhbite, kolona: string): string {
   switch (kolona) {
     case 'Обект':
       return r.obekt;
-    case 'Място':
+    case 'Имот':
       return r.myasto;
     case 'Купувач':
       return p.kupuvach;
@@ -353,11 +353,11 @@ export function narisuvayProdazhbi(o: Ogledalo, dnes: string): string {
 
       ${
         imoti.length === 0
-          ? `<p class="drebno">Няма нито един имот. Сделката се <b>вади от таблица
-             Наеми</b> и се мести тук ръчно — без имот няма какво да се продаде.</p>`
+          ? `<p class="drebno">Няма нито един обект. Сделката се <b>вади от таблица
+             Наеми</b> и се мести тук ръчно — без обект няма какво да се продаде.</p>`
           : `<form id="forma-prodazhba" class="redditsa">
         <label class="pole">
-          <span>Имот</span>
+          <span>Обект</span>
           <select name="imot" id="prodazhba-imot">
             ${imoti
               .map(

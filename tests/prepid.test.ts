@@ -8,7 +8,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { SHA } from './pomoshtni.js';
@@ -43,7 +43,7 @@ function razhod(chast: Partial<Parameters<Deystviya['zapishiRazhod']>[1]> = {}) 
     potok: 'fakturi',
     dostavchik: 'Материали ООД',
     opis: 'цимент',
-    suma_st: stotinki(600_00),
+    suma_st: tsentove(600_00),
     sektor: 'pokupki-materiali',
     nachin: 'банка' as const,
     data: '2026-02-14',
@@ -61,7 +61,7 @@ async function nasadiVzemane(d: Deystviya) {
     {
       imotId: 'I-1',
       naemetel: 'Стройпласт ЕООД',
-      naem_st: stotinki(1200_00),
+      naem_st: tsentove(1200_00),
       padezhDen: 5,
       ot: '2026-01-01',
       do: '',
@@ -110,7 +110,7 @@ describe('prepId при плащането', () => {
     await nasadiVzemane(d);
     await d.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V:2026-08:N-1', suma_st: stotinki(500_00), nachin: 'банка', data: '2026-08-10', prepId: 'PR-1' },
+      { vzemaneId: 'V:2026-08:N-1', suma_st: tsentove(500_00), nachin: 'банка', data: '2026-08-10', prepId: 'PR-1' },
       { opId: 'op-p1' },
     );
 
@@ -123,7 +123,7 @@ describe('prepId при плащането', () => {
     await expect(
       d.priemiPlashtane(
         'P-1',
-        { vzemaneId: 'V:2026-08:N-1', suma_st: stotinki(500_00), nachin: 'банка', data: '2026-08-10', prepId: 'PR-NYAMA' },
+        { vzemaneId: 'V:2026-08:N-1', suma_st: tsentove(500_00), nachin: 'банка', data: '2026-08-10', prepId: 'PR-NYAMA' },
         { opId: 'op-p1' },
       ),
     ).rejects.toThrow(/сочила в нищото/);

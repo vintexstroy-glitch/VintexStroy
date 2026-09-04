@@ -501,7 +501,7 @@ function pishiCyalo(st: number): string {
  * Отказът е ТИХ (връща `undefined`): полето още се пише и половин число не е
  * грешка на човека, а недовършено въвеждане.
  */
-function stotinkiOtPole(tekst: string): number | undefined {
+function tsentoveOtPole(tekst: string): number | undefined {
   const t = tekst.replace(/ | |\s/g, '').replace(',', '.');
   if (!/^\d+(\.\d{1,2})?$/.test(t)) return undefined;
   const [tsyalo, drobni = ''] = t.split('.');
@@ -551,7 +551,7 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
   for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-baza]')) {
     pole.addEventListener('change', async (e) => {
       const vid = pole.dataset['baza'] as VidObekt;
-      const st = stotinkiOtPole((e.target as HTMLInputElement).value);
+      const st = tsentoveOtPole((e.target as HTMLInputElement).value);
       if (st === undefined || st <= 0) return;
       nastroyki = sBaza(nastroyki, vid, st);
       zapomniEkranno(klyuchNaBazata(vid), st);
@@ -564,7 +564,7 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
     pole.addEventListener('change', async (e) => {
       const koe = pole.dataset['razhod'] as 'zemya' | 'stroitelna';
       const vid = pole.dataset['vid'] as VidObekt;
-      const st = stotinkiOtPole((e.target as HTMLInputElement).value);
+      const st = tsentoveOtPole((e.target as HTMLInputElement).value);
       // НУЛАТА Е ДОПУСТИМА · тогава подходът мълчи за този вид, а това е
       // отговор. Само неразчетеното се отхвърля.
       if (st === undefined || st < 0) return;
@@ -600,7 +600,7 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
   for (const pole of koren.querySelectorAll<HTMLInputElement>('[data-teglo]')) {
     pole.addEventListener('change', async (e) => {
       const koe = pole.dataset['teglo'] as keyof Tegla;
-      const bt = stotinkiOtPole((e.target as HTMLInputElement).value);
+      const bt = tsentoveOtPole((e.target as HTMLInputElement).value);
       if (bt === undefined || bt < 0 || bt > 10_000) return;
       // СБОРЪТ НЕ СЕ ПРЕНОРМИРА ТИХО · човек, който вдига едно тегло, минава
       // през 110 % и екранът го КАЗВА. Тихата поправка би сменила число, което
@@ -614,7 +614,7 @@ export function zakachiKalkulator(koren: HTMLElement, prerisuvay: () => Promise<
   koren.querySelector<HTMLInputElement>('#kalk-dohodnost')?.addEventListener('change', async (e) => {
     // Процентът се въвежда като „6,00" и живее като 600 базисни точки —
     // същите цели единици, в които се смята (правило 3).
-    const bt = stotinkiOtPole((e.target as HTMLInputElement).value);
+    const bt = tsentoveOtPole((e.target as HTMLInputElement).value);
     if (bt === undefined || bt <= 0) return;
     nastroyki = Object.freeze({ ...nastroyki, dohodnost_bt: bt });
     zapomniEkranno('kalk.dohodnost', bt);

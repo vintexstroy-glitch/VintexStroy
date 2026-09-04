@@ -24,6 +24,7 @@ import {
   sDumiStoynost,
   smetniKoefitsient,
   zaStapka,
+  belezhkaZaStapkata,
   STAPKI,
   razbiyNaStapki,
   type DanniZaPerioda,
@@ -139,11 +140,18 @@ describe('изборът · най-основните, без бройка', () 
     }
   });
 
-  it('месечните се появяват САМО при стъпка месец', () => {
+  it('месечните НЕ изчезват при друга стъпка · те се КАЗВАТ (И135 · ADR-162)', () => {
     const mesechni = KOEFITSIENTI.filter((k) => k.samoMesechen).map((k) => k.klyuch);
     expect(mesechni).toEqual(['sabiraemost', 'dds-kam-prihod']);
+    // Негово: „Махаш мои коефициенти, махни го глупаво е." Списъкът е един и
+    // същ при всяка стъпка; стъпката мени стойностите, не списъка.
     expect(zaStapka('mesets')).toHaveLength(KOEFITSIENTI.length);
-    for (const k of zaStapka('drug')) expect(k.samoMesechen, k.klyuch).toBe(false);
+    expect(zaStapka('drug')).toHaveLength(KOEFITSIENTI.length);
+    expect(zaStapka('drug').map((k) => k.klyuch)).toContain('sabiraemost');
+    // А месечната природа се казва до числото — само когато стъпката не е месец.
+    expect(belezhkaZaStapkata({ samoMesechen: true }, 'godina')).toContain('месечен по природа');
+    expect(belezhkaZaStapkata({ samoMesechen: true }, 'mesets')).toBe('');
+    expect(belezhkaZaStapkata({ samoMesechen: false }, 'godina')).toBe('');
   });
 
   it('измисленият ключ се отказва С ДУМИ', () => {

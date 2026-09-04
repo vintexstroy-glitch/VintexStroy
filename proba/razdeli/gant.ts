@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiVPoleto, sSabitie, zapishiDelo } from '../yadro/pomoshtni.ts';
+import { dobaviImotBezObekt, broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, zapishiDelo } from '../yadro/pomoshtni.ts';
 
 /** 24 · Гант */
 export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
@@ -27,7 +27,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       // мести заедно с кода. Отговорникът е новият: редът винаги го е показвал,
       // а старата глава го премълчаваше (резен 48).
       (await p.$eval('[data-prazno=dela]', (e) => e.textContent))
-        .includes('Място · Дело · Обект · Отговорник'), true);
+        .includes('Имот · Дело · Обект · Отговорник'), true);
     proveri('и се представя, вместо да мълчи',
       (await p.$eval('[data-prazno=dela]', (e) => (e.closest('section') as any).textContent)).includes('Времевия Ред'), true);
 
@@ -45,47 +45,64 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$$eval('.gant-delo .drebno', (e) => e.map((x) => x.textContent)))
         .some((t) => t.startsWith('—')), true);
 
-    // ══ 109 · МЕСТАТА · отговорник-ФИРМА и папка (резен 31 · ADR-091) ═════
+    // ══ 109 · ИМОТИТЕ · отговорник-ФИРМА и папка (резен 31 · ADR-091) ═════
     //
     // Едно негово изречение, два реда от описа: „На нивото на проекта дай линк
     // към папката с проекта" и „в таблицата за отговорник напиши фирмата която
     // управлява проекта" *(р48·[42])*. И границата: отговорникът на ДЕЛОТО е
     // ЧОВЕК *(р48·[44])*.
-    razdel = '109 · Местата · само ЗАРЕДЕНИТЕ (И124 т.7)';
-    // „Тук се появяват само заредените обекти" надживя показването на
-    // само-срещаните по делата (резен 31) — редове от делата НЕ се редят сами.
-    proveri('местата от делата НЕ се редят, докато не се запишат',
-      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 0);
-    proveri('и празното го КАЗВА с думи',
-      (await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).innerText))
-        .includes('не се реди само'), true);
+    //
+    // ОТ РЕЗЕН 99 ФОРМАТА Е НА ИМОТИ · „Имоти и обекти се вкарват едновременно"
+    // (И132). Тук остава ТАБЛИЦАТА; вписва се оттам, а тези проверки минават
+    // през нея.
+    razdel = '109 · Имотите · делата САМИ не вписват (И124 т.7)';
+    proveri('формата за имот тук вече я НЯМА · един дом (правило 17)',
+      Boolean(await p.$('#d-forma-myasto')), false);
+    // „Тук се появяват само заредените обекти" (И124 т.7 · ADR-134): име, което
+    // само се среща по ДЕЛА, не ражда ред. „Хисаря" е точно такова — дело има,
+    // имот няма.
+    proveri('имот само от дела НЕ се реди',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto="Хисаря"]', (e) => e.length), 0);
+    // А ВПИСАНИТЕ стоят · те влязоха заедно с обектите си от екрана Имоти.
+    // А КОИТО СТОЯТ, стоят заради ОБЕКТ или заради ЗАПИС — нито един заради
+    // дело. Имената се ПЕЧАТАТ: тук книгата е върнатият архив (§14) и съставът
+    // ѝ се мени с всеки внос, значи закован списък би паднал по друга причина,
+    // а инвариантът е един — „делата не вписват".
+    const imenataNaImotite = await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) =>
+      e.map((x) => x.getAttribute('data-myasto') ?? ''));
+    console.log(`
+  ИМОТИТЕ В УПРАВЛЕНИЕ: ${imenataNaImotite.join(' · ') || 'нито един'}
+`);
+    proveri('и всеки ред носи белега си · вписан или изведен от обект',
+      await p.$$eval('[data-tablitsa=mestata] [data-myasto][data-vpisan]', (e) => e.length),
+      imenataNaImotite.length);
+    proveri('и екранът казва КЪДЕ се вписва новият',
+      (await p.$eval('[data-sektsiya=gant-mesta]', (e) => (e as any).innerText)).includes('Имоти'), true);
     proveri('сверката се КАЗВА, дори когато е нула',
       (await p.$eval('[data-mesta-sverka]', (e) => (e as any).innerText)).includes('разлика 0'), true);
 
-    razdel = '109 · Местата · фирмата и записалият';
-    const prediMyasto = await broySabitiya(p);
-    await napishiVPoleto(p, '#d-m-ime', 'Малинова');
-    await napishiVPoleto(p, '#d-m-firma', 'Винтекс Строй ЕООД');
-    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
-    proveri('записването е ЕДНО събитие', await broySabitiya(p), prediMyasto + 1);
-    proveri('и записаното вече СЕ РЕДИ · само то',
-      await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), 1);
-    proveri('фирмата стои на реда на мястото',
+    razdel = '109 · Имотите · фирмата и записалият';
+    await naEkran(p, 'imoti', '#forma-imot');
+    // ИМОТ БЕЗ ОБЕКТ · „има Имот без Обект" (И131 т.2). „Малинова" вече го има
+    // (влезе с обекта си в §2), значи това е ЕДИН запис — само неговите полета.
+    await dobaviImotBezObekt(p, 'Малинова', { firma: 'Винтекс Строй ЕООД' });
+    await naEkran(p, 'gant', '#d-forma-delo');
+    proveri('фирмата стои на реда на имота',
       (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText))
         .includes('Винтекс Строй ЕООД'), true);
     proveri('„отговорник е този който извършва действието" · записалият е на реда',
       (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText))
         .includes('vintexstroy@gmail.com'), true);
-    proveri('броят на делата на мястото се КАЗВА',
+    proveri('броят на делата на имота се КАЗВА',
       (await p.$eval('[data-myasto="Малинова"]', (e) => (e as any).innerText)).includes('2'), true);
 
-    razdel = '109 · Местата · двата отговорника не се смесват';
+    razdel = '109 · Имотите · двата отговорника не се смесват';
     proveri('делото си пази ЧОВЕКА',
       (await p.$$eval('.gant-delo', (e) => e.map((x) => (x as any).innerText).join(' ')))
         .includes('Николай Петков'), true);
 
     razdel = '109б · Обектът и десният бутон (И124 т.3 · т.7 · ADR-134)';
-    // Мястото е без папка → менюто го КАЗВА, вместо редът да мълчи.
+    // Имотът е без папка → менюто го КАЗВА, вместо редът да мълчи.
     await p.click('[data-myasto="Малинова"] [data-mnogotochie]');
     await p.waitForSelector('.kontekstno-menyu');
     proveri('„⋯" вдига менюто на реда · втората дръжка за iOS',
@@ -97,11 +114,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.keyboard.press('Escape');
     await p.waitForFunction(() => document.querySelector('.kontekstno-menyu') === null);
 
-    // С папка → менюто носи ПЪТЯ (бутон, не линк в колоната).
-    await napishiVPoleto(p, '#d-m-ime', 'Малинова');
-    await napishiVPoleto(p, '#d-m-papka',
-      ['https:', '//', 'primer.example', '/malinova'].join(''));
-    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
+    // С папка → менюто носи ПЪТЯ (бутон, не линк в колоната). Пише се от Имоти.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await dobaviImotBezObekt(p, 'Малинова', {
+      papka: ['https:', '//', 'primer.example', '/malinova'].join(''),
+    });
+    await naEkran(p, 'gant', '#d-forma-delo');
     proveri('линк в колоните НЯМА · пътят е само през менюто',
       await p.$$eval('[data-tablitsa=mestata] a', (e) => e.length), 0);
     await p.click('[data-myasto="Малинова"] [data-mnogotochie]');
@@ -112,18 +130,104 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.keyboard.press('Escape');
     await p.waitForFunction(() => document.querySelector('.kontekstno-menyu') === null);
 
-    razdel = '109 · Местата · второто записване ПОПРАВЯ';
+    // ══ 100 · ЧЕТИРИТЕ ДРЪЖКИ ОТ МЕНЮТО НА ИМОТА (И124 т.8 · ADR-164) ═══════
+    //
+    // „Има място където се създават Имоти и отделно Дело или Среща или друго
+    // вкарано по избор от стопанина." Мястото е менюто на реда: дръжки към
+    // СЪЩИТЕ форми с предизбран Имот. Тук се играе от Управление (редът носи
+    // `data-myasto`), после от Имоти (`data-imot`) и от реда на Обекта.
+    razdel = '100 · дръжките на Имота · Управление';
+    const predDrazhkata = await broySabitiya(p);
+    await p.click('[data-tablitsa=mestata] [data-myasto="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    const punktoveUpravlenie = await p.$$eval('.kontekstno-menyu button', (e) =>
+      e.map((x) => (x.textContent ?? '').trim()));
+    proveri('менюто на Имота носи трите дръжки ПРЕДИ папката, поименно и в ред',
+      punktoveUpravlenie.slice(0, 3).join(' · '), 'Нов обект · Ново дело · Нова среща');
+    // Историята на реда е шестият (резен 104 · ADR-165): датата на всяка смяна
+    // на Състоянието се ЧЕТЕ от Журнала — нищо не се записва втори път.
+    proveri('и папката, копирането и Историята остават · шест бутона с линк',
+      punktoveUpravlenie.join(' · '),
+      'Нов обект · Ново дело · Нова среща · Папката в Драйва · Копирай реда · История');
+    // „Ново дело" · отваря СЪЩАТА форма в Управление с Имота вече вписан.
+    await p.click('.kontekstno-menyu button:has-text("Ново дело")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#d-forma-delo');
+    // СЪЩИЯТ екран се прерисува: старата форма стои, докато новата дойде.
+    // Чака се СВЪРШЕНОТО (обход Е), не първата намерена форма.
+    await p.waitForFunction(() => (document.querySelector('#d-myasto') as HTMLInputElement | null)?.value === 'Малинова');
+    proveri('„Ново дело" предизбира Имота във формата на Управление',
+      await p.$eval('#d-myasto', (e) => (e as HTMLInputElement).value), 'Малинова');
+    proveri('и полето Имот на делото ПРЕДЛАГА вписаните Имоти · „избор от наличното" (И124 т.8)',
+      await p.$$eval('#d-myasto-spisak option', (e) =>
+        e.some((x) => (x as HTMLOptionElement).value === 'Малинова')), true);
+    proveri('предизборът е движение на ръката · нула събития', await broySabitiya(p), predDrazhkata);
+
+    razdel = '100 · дръжките на Имота · Имоти и Контакти';
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.click('[data-tablitsa=imotite] [data-imot="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    proveri('същото меню и от Имоти · един код, два екрана',
+      (await p.$$eval('.kontekstno-menyu button', (e) => e.map((x) => (x.textContent ?? '').trim())))
+        .slice(0, 3).join(' · '), 'Нов обект · Ново дело · Нова среща');
+    // „Нова среща" · Контакти, формата на ангажимента с Имота избран.
+    await p.click('.kontekstno-menyu button:has-text("Нова среща")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#forma-sreshta');
+    proveri('„Нова среща" предизбира Имота в Контакти',
+      await p.$eval('#sr-imot', (e) => (e as HTMLSelectElement).value), 'Малинова');
+    proveri('и формата предлага всичките видове ангажимент · „Среща ИЛИ друго"',
+      await p.$$eval('#spisak-vidove-angazhiment option', (e) => e.length) >= 4, true);
+    // „Нов обект" · Имоти, формата с Имота избран и полето за ново име скрито.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await p.click('[data-tablitsa=imotite] [data-imot="Малинова"] [data-mnogotochie]');
+    await p.waitForSelector('.kontekstno-menyu');
+    await p.click('.kontekstno-menyu button:has-text("Нов обект")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForFunction(() => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.value === 'малинова');
+    proveri('„Нов обект" предизбира Имота във формата на Имоти',
+      await p.$eval('#imot-imot option:checked', (e) => (e as HTMLOptionElement).dataset['ime']), 'Малинова');
+    proveri('и полето за ново име е скрито · Имотът вече е избран',
+      await p.$eval('[data-pole-ime]', (e) => (e as HTMLElement).hidden), true);
+
+    razdel = '100 · дръжките на Обекта · само „Ново дело"';
+    // „Делата са за Имот и за Обект" (И131 т.2) · Обект под Обект той няма.
+    // РЕДЪТ СЕ ЧЕТЕ, не се гадае: по-ранни раздели поправят и сторнират
+    // обекти, и закован адрес би мерил чуждо състояние. Взима се първият жив
+    // Обект на екрана, с адреса и единицата от собствените му белези.
+    const obektat = await p.$eval('.red.imot', (e) => ({
+      adres: (e as HTMLElement).dataset['obektAdres'] ?? '',
+      edinitsa: (e as HTMLElement).dataset['obektEdinitsa'] ?? '',
+    }));
+    proveri('редът на Обекта носи адреса и единицата си', obektat.adres !== '' && obektat.edinitsa !== '', true);
+    await p.click('.red.imot .kletka', { button: 'right' });
+    await p.waitForSelector('.kontekstno-menyu');
+    const punktoveObekt = await p.$$eval('.kontekstno-menyu button', (e) =>
+      e.map((x) => (x.textContent ?? '').trim()));
+    proveri('редът на Обекта носи „Ново дело" и НЕ носи „Нов обект" и „Нова среща"',
+      `${punktoveObekt.includes('Ново дело')} · ${punktoveObekt.includes('Нов обект')} · ${punktoveObekt.includes('Нова среща')}`,
+      'true · false · false');
+    await p.click('.kontekstno-menyu button:has-text("Ново дело")');
+    await p.waitForSelector('.kontekstno-menyu', { state: 'detached' });
+    await p.waitForSelector('#d-forma-delo');
+    proveri('от Обекта делото носи и Имота, и Обекта',
+      `${await p.$eval('#d-myasto', (e) => (e as HTMLInputElement).value)} · ${await p.$eval('#d-obekt', (e) => (e as HTMLInputElement).value)}`,
+      `${obektat.adres} · ${obektat.edinitsa}`);
+
+    razdel = '109 · Имотите · второто записване ПОПРАВЯ';
     const prediPopravka = await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length);
-    await napishiVPoleto(p, '#d-m-ime', 'малинова');
-    await napishiVPoleto(p, '#d-m-firma', 'Друга Фирма ООД');
-    await sSabitie(p, () => p.click('#d-forma-myasto button[type=submit]'));
+    await naEkran(p, 'imoti', '#forma-imot');
+    // ДРУГИЯТ РЕГИСТЪР е СЪЩИЯТ имот: сведеното име е едно. Пише се като „нов",
+    // а Вратата го намира по свеждането и го ПОПРАВЯ.
+    await dobaviImotBezObekt(p, 'малинова', { firma: 'Друга Фирма ООД' });
+    await naEkran(p, 'gant', '#d-forma-delo');
     proveri('редовете НЕ стават повече · сведеното име е ЕДНО',
       await p.$$eval('[data-tablitsa=mestata] [data-myasto]', (e) => e.length), prediPopravka);
     proveri('и фирмата е новата',
       (await p.$eval('[data-myasto="малинова"]', (e) => (e as any).innerText))
         .includes('Друга Фирма ООД'), true);
     // ЗАПИСАНОТО ИМЕ БИЕ · последната дума е в сила (правило 1). Различният
-    // регистър не ражда второ място — той СМЕНЯ изписването на същото.
+    // регистър не ражда втори имот — той СМЕНЯ изписването на същия.
     proveri('и изписването е новото · старото го няма',
       await p.$$eval('[data-myasto="Малинова"]', (e) => e.length), 0);
 

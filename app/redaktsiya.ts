@@ -150,7 +150,7 @@ const REDAKTORI: Record<string, Redaktor> = {
     sDumi: (surovo) => (surovo > 0 ? `${kvSmVM2(surovo)} м²` : 'без площ'),
     async zapis(k, id, novo, prichina) {
       const imot = (await k.deystviya.ogledalo()).imoti.get(id);
-      if (!imot) throw new Error('Имотът вече не е в Огледалото — презареди екрана.');
+      if (!imot) throw new Error('Обектът вече не е в Огледалото — презареди екрана.');
       await k.deystviya.popraviImot(
         {
           imotId: id,

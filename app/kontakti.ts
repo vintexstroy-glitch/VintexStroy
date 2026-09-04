@@ -41,6 +41,8 @@ import {
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 import { ekraniraj } from './obshto.js';
+import { mestata, type RedNaMyasto, svedenotoMyasto } from '../src/domein/mesta.js';
+import { vzemiPredizbraniya } from './predizbor.js';
 import {
   filtriray,
   glaviTh,
@@ -84,7 +86,7 @@ function koloniNaPrepiskite(o: Ogledalo): readonly KolonaSFiltar<Prepiska>[] {
     { klyuch: 'zaVzimane', ime: 'За взимане', vid: 'data', vzemi: (p) => p.zaVzimane },
     { klyuch: 'otgovornik', ime: 'Отговорник', vid: 'tekst', vzemi: (p) => (p.otgovornik === '' ? '—' : p.otgovornik) },
     { klyuch: 'otsenka', ime: 'Оценка', vid: 'tekst', vzemi: (p) => imeNaOtsenkata(p.otsenka) },
-    { klyuch: 'zakachena', ime: 'Имот · дело', vid: 'tekst', vzemi: (p) => zakachanetoNa(p, o.imoti, o.dela).nadpis },
+    { klyuch: 'zakachena', ime: 'Обект · дело', vid: 'tekst', vzemi: (p) => zakachanetoNa(p, o.imoti, o.dela).nadpis },
     { klyuch: 'sastoyanie', ime: 'Състояние', vid: 'tekst', vzemi: (p) => p.sastoyanie },
   ];
 }
@@ -105,6 +107,9 @@ const KOLONI_SRESHTI: readonly KolonaSFiltar<Sreshta>[] = [
   { klyuch: 'adres', ime: 'Адрес', vid: 'tekst', vzemi: (x) => (x.adres === '' ? '—' : x.adres) },
   { klyuch: 'data', ime: 'Дата', vid: 'data', vzemi: (x) => x.data },
   { klyuch: 'chas', ime: 'Час', vid: 'tekst', vzemi: (x) => (x.chas === '' ? '—' : x.chas) },
+  // ИМОТЪТ Е ПО ИЗБОР (И129 т.3): „Среша може без Имот и без Обект. Те са
+  // опция." Затова колоната стои, а празното се пише с тире — не се крие.
+  { klyuch: 'imot', ime: 'Имот', vid: 'tekst', vzemi: (x) => (x.imot === '' ? '—' : x.imot) },
   { klyuch: 'sastoyanie', ime: 'Състояние', vid: 'tekst', vzemi: (x) => x.sastoyanie },
 ];
 
@@ -127,6 +132,8 @@ export function narisuvayKontaktite(o: Ogledalo, dnes: string): string {
   const chakat = zaVzimane(prepiski);
   const redove = kontaktite(kontakti, prepiski);
   const sv = sveriKontaktite(kontakti, prepiski, dnes);
+  // ИМОТИТЕ за падащото на срещата · вписаните и изведените (резен 99).
+  const imotite = mestata(o, zhivite([...o.dela.values()]));
   const imena = imenataNaKontaktite(kontakti);
 
   return `
@@ -158,7 +165,7 @@ export function narisuvayKontaktite(o: Ogledalo, dnes: string): string {
     </div>
 
     ${sektsiyaPrepiski(o, prepiski, imena, dnes)}
-    ${sektsiyaKontakti(redove, sv, sreshti, imena, dnes)}`;
+    ${sektsiyaKontakti(redove, sv, sreshti, imena, dnes, imotite)}`;
 }
 
 /** ПЪРВАТА секция · работата. */
@@ -218,10 +225,10 @@ function sektsiyaPrepiski(
             </select>
           </div>
           <div class="pole">
-            <label for="prep-zakachena">Имот, дело или поддело (по избор)</label>
+            <label for="prep-zakachena">Обект, дело или поддело (по избор)</label>
             <select translate="no" id="prep-zakachena" name="zakachena">
               <option value="">— към нищо —</option>
-              <optgroup label="Имоти">
+              <optgroup label="Обекти">
                 ${[...o.imoti.values()]
                   .map(
                     (i) =>
@@ -295,7 +302,7 @@ function sektsiyaPrepiski(
       в червено работа, за която никой не е бързал. Часът е ПО ИЗБОР — празен час
       значи „само дата", и дните до срока се броят по КАЛЕНДАР, не по часовник.</p>
 
-      <p class="drebno">Мястото и обектът НЕ се преписват в преписката: те идват от
+      <p class="drebno">Имотът и обектът НЕ се преписват в преписката: те идват от
       онова, за което е закачена. Преписан адрес остарява в мига, в който делото се
       премести, и после два реда казват различно за едно място.</p>
 
@@ -311,6 +318,8 @@ function sektsiyaKontakti(
   sreshti: readonly Sreshta[],
   imena: readonly string[],
   dnes: string,
+  /** ИМОТИТЕ · само пътуват към срещата, която ги предлага по избор (резен 99) */
+  imotite: readonly RedNaMyasto[],
 ): string {
   const filtriraniKontakti = filtriray('kontakti', redove, KOLONI_KONTAKTI, dnes);
   return `
@@ -376,7 +385,7 @@ function sektsiyaKontakti(
       <p class="drebno" data-kontakti-sverka>Сверка вход↔изход: ${sv.vhod} преписки →
       ${sv.izhod} преброени по контакти, разлика ${sv.razlika}.</p>
 
-      ${blokSreshti(sreshti, imena, dnes)}
+      ${blokSreshti(sreshti, imena, dnes, imotite, vzemiPredizbraniya('kontakti')?.imot ?? '')}
     </section>`;
 }
 
@@ -395,6 +404,10 @@ function blokSreshti(
   sreshti: readonly Sreshta[],
   imena: readonly string[],
   dnes: string,
+  /** ИМОТИТЕ за падащото · вписаните и изведените от обектите (резен 99) */
+  imotite: readonly RedNaMyasto[],
+  /** ПРЕДИЗБРАНИЯТ Имот от дръжката „Нова среща" (резен 100 · ADR-164) · празно иначе */
+  predizbranImot = '',
 ): string {
   const podredeni = [...sreshti].sort(
     (a, b) => a.data.localeCompare(b.data) || a.kontakt.localeCompare(b.kontakt, 'bg'),
@@ -440,6 +453,21 @@ function blokSreshti(
           <span class="drebno">Празен час значи „само дата" — дните се броят по календар.</span>
         </div>
         <div class="pole">
+          <label for="sr-imot">Имот (по избор)</label>
+          <select translate="no" id="sr-imot" name="imot">
+            <option value="">— без Имот —</option>
+            ${imotite
+              .map(
+                (r) =>
+                  '<option value="' + ekraniraj(r.ime) + '"' +
+                  (svedenotoMyasto(r.ime) === svedenotoMyasto(predizbranImot) ? ' selected' : '') +
+                  '>' + ekraniraj(r.ime) + (r.vpisan ? '' : ' · невписан') + '</option>',
+              )
+              .join('')}
+          </select>
+          <span class="drebno">Срещата може и без имот — „те са опция" (И129).</span>
+        </div>
+        <div class="pole">
           <label for="sr-sastoyanie">Състояние</label>
           <select translate="no" id="sr-sastoyanie" name="sastoyanie">
             ${SASTOYANIYA_NA_SRESHTA.map((x) => `<option value="${x}">${x}</option>`).join('')}
@@ -473,6 +501,7 @@ function blokSreshti(
             <td translate="no">${x.adres === '' ? '—' : ekraniraj(x.adres)}</td>
             <td translate="no">${ekraniraj(x.data)}</td>
             <td translate="no">${x.chas === '' ? '—' : ekraniraj(x.chas)}</td>
+            <td translate="no" data-imot-na-sreshtata>${x.imot === '' ? '—' : ekraniraj(x.imot)}</td>
             <td>${padashtoSastoyanie('sreshta', x.id, x.sastoyanie, SASTOYANIYA_NA_SRESHTA)}</td>
           </tr>`,
           )
@@ -578,7 +607,15 @@ export function zakachiKontaktite(
           if (!x) return;
           await k.deystviya.zapishiSreshta(
             id,
-            { kontakt: x.kontakt, vid: x.vid, adres: x.adres, data: x.data, chas: x.chas, sastoyanie: el.value },
+            {
+              kontakt: x.kontakt,
+              vid: x.vid,
+              adres: x.adres,
+              imot: x.imot,
+              data: x.data,
+              chas: x.chas,
+              sastoyanie: el.value,
+            },
             { opId: `sreshta:${crypto.randomUUID()}` },
           );
         }
@@ -603,6 +640,7 @@ export function zakachiKontaktite(
           kontakt: String(d.get('kontakt') ?? '').trim(),
           vid: String(d.get('vid') ?? 'среща').trim(),
           adres: String(d.get('adres') ?? '').trim(),
+          imot: String(d.get('imot') ?? '').trim(),
           data: String(d.get('data') ?? ''),
           chas: String(d.get('chas') ?? ''),
           sastoyanie: String(d.get('sastoyanie') ?? 'чака'),

@@ -14,7 +14,10 @@ import { describe, expect, it } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
-const PAPKI = ['src', 'app', 'tests', 'proba'];
+// И `stroezh` (резен 100): обходът на честността носеше име, слепено от
+// двете азбуки (латинско ch плюс кирилско ети), а никой не го четеше —
+// правило 11 имаше дупка точно в машината, която брои честността.
+const PAPKI = ['src', 'app', 'tests', 'proba', 'stroezh'];
 const NASTAVKI = ['.ts', '.mjs', '.js'];
 
 function faylove(papka: string): string[] {

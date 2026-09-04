@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
+import { naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, naEkran, natisni, plochka, tekstNa } from '../yadro/pomoshtni.ts';
 import { readFile } from 'node:fs/promises';
 import { ADRES } from '../yadro/server.ts';
 
@@ -63,7 +63,10 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
       (await p.$eval('[data-pole="stopanin"] .pod', (e) => e.textContent)).includes('това си ти'),
       true);
     await naEkran(p, 'imoti', '#forma-imot');
-    proveri('без имоти', (await tekstNa(p, '.prazno')).includes('Още няма нито един имот'), true);
+    proveri('без обекти',
+      (await tekstNa(p, '[data-sektsiya=imoti-spisak] .prazno')).includes('Още няма нито един обект'), true);
+    proveri('и без имоти · двете празноти са РАЗЛИЧНИ',
+      (await tekstNa(p, '[data-sektsiya=imotite] .prazno')).includes('Още няма нито един Имот'), true);
 
     await naEkran(p, 'pari', '#forma-nachisli');
     proveri('Пари при празно: дължимо', await plochka(p, 'Дължимо общо'), '0,00 €');
@@ -100,7 +103,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // ИЗМЕРЕНО, не обещано: номерът го няма в изнесения файл.
     razdel = '61 · Възстановяването · телефонът НЕ пътува';
-    await naEkran(p, 'nastroyki', '#zhurnal-iznesi');
+    await naPodtab(p, 'sigurnost', '#zhurnal-iznesi');
     const [svalenSZapasen] = await Promise.all([
       p.waitForEvent('download'),
       natisni(p, '#iznesi'),

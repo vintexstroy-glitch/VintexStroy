@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { fold } from '../src/ogledalo/ogledalo.js';
 import {
@@ -62,7 +62,7 @@ function stend() {
 
 const ogledaloto = async (dnevnik: DnevnikVPametta) => fold(await dnevnik.chetiVsichki(NAEMATEL));
 
-const razhod = (data: string, suma_st = stotinki(240_00)) => ({
+const razhod = (data: string, suma_st = tsentove(240_00)) => ({
   potok: 'fakturi',
   dostavchik: 'Баумит ЕООД',
   opis: 'вар и цимент',

@@ -17,7 +17,7 @@
  * (`sverki`), за да застане пред собственика, не да се преглътне.
  */
 
-import { GreshkaPari, stotinki, type Stotinki } from '../yadro/pari.js';
+import { GreshkaPari, tsentove, type Tsentove } from '../yadro/pari.js';
 import { kletka, type Tablitsa } from '../iztochnik/tablitsa.js';
 import { ploshtVKvSm } from './chetene.js';
 
@@ -34,8 +34,8 @@ interface RedOtTseniMD {
   readonly izlozhenie: string;
   readonly terasi_kvsm: number;
   readonly prodaden: boolean;
-  /** цената с ДДС в стотинки · null при ПРОДАДЕН (файлът не я носи) */
-  readonly tsena_st: Stotinki | null;
+  /** цената с ДДС в центове · null при ПРОДАДЕН (файлът не я носи) */
+  readonly tsena_st: Tsentove | null;
 }
 
 interface SverkaNaRed {
@@ -98,14 +98,14 @@ function chislo(surovo: string): number | null {
   return Number(chisto);
 }
 
-/** Цената с ДДС · цели евро от файла → стотинки. „ПРОДАДЕН" не е цена. */
-function tsenaVSt(surovo: string): Stotinki | null {
+/** Цената с ДДС · цели евро от файла → центове. „ПРОДАДЕН" не е цена. */
+function tsenaVSt(surovo: string): Tsentove | null {
   const n = chislo(surovo);
   if (n === null) return null;
   if (!Number.isInteger(n * 100)) {
-    throw new GreshkaPari(`Цената „${surovo}" не е цели стотинки.`);
+    throw new GreshkaPari(`Цената „${surovo}" не е цели центове.`);
   }
-  return stotinki(Math.round(n * 100));
+  return tsentove(Math.round(n * 100));
 }
 
 export function prochetiTseniMD(t: Tablitsa): ProchetenoTseniMD {

@@ -29,7 +29,17 @@ import {
   sPrevklyuchenPunkt,
   vidimiPunktove,
 } from '../app/lenta.js';
-import { GreshkaLenta, napraviRedNaLentata, redOtZhurnala } from '../src/domein/lenta.js';
+import {
+  GreshkaLenta,
+  IMENA_NA_GRUPITE,
+  PARVIYAT_VAV_VTORATA,
+  grupataNa,
+  mozheDaSeMesti,
+  naDveGrupi,
+  napraviRedNaLentata,
+  rabotnite,
+  redOtZhurnala,
+} from '../src/domein/lenta.js';
 import { DnevnikVPametta, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { GreshkaStopanin } from '../src/domein/stopanin.js';
@@ -245,5 +255,70 @@ describe('ширината на панела', () => {
 
   it('прагът за влачене е по-голям от нула · инак всяко докосване е влачене', () => {
     expect(MRADVA_ZA_VLACHENE).toBeGreaterThan(0);
+  });
+});
+
+describe('лентата на ДВЕ групи · двата му реда от 08.08 (резен 118 · ADR-163)', () => {
+  // Началният ред, както е закован в ekranite.ts — тук с ръка, за да пада на
+  // глас, ако някой измести границата заедно с реда.
+  const REDAT = [
+    'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
+    'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
+  ];
+
+  it('границата е ПИН С РЪКА · втората група почва с Контакти', () => {
+    // „втория да почва с Преписки, контакти…" (р52·[206] · 08.08) — преписките
+    // са секция в Контакти (М10), затова първият пункт на втората група е той.
+    expect(PARVIYAT_VAV_VTORATA).toBe('kontakti');
+    expect(rabotnite(REDAT)).toEqual(['tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya']);
+  });
+
+  it('думите на групите са НАШИ, не негови · и са две', () => {
+    expect(IMENA_NA_GRUPITE).toEqual({ rabotata: 'работата', vtorostepennite: 'второстепенните' });
+  });
+
+  it('групата е свойство на КЛЮЧА · непознатият е при системните (И121 т.6)', () => {
+    const r = rabotnite(REDAT);
+    expect(grupataNa('pari', r)).toBe('rabotata');
+    expect(grupataNa('nastroyki', r)).toBe('vtorostepennite');
+    expect(grupataNa('chetirinadeseti', r)).toBe('vtorostepennite');
+  });
+
+  it('подреденият ред се дели на две · редът ВЪТРЕ е редът отвън', () => {
+    const r = rabotnite(REDAT);
+    // Личен ред, който ПРЕСИЧА групите: Контакти отпред, Пари най-отзад.
+    const podredeni = ['kontakti', 'tablo', 'gant', 'nastroyki', 'imoti', 'pari'];
+    expect(naDveGrupi(podredeni, r)).toEqual({
+      rabotata: ['tablo', 'gant', 'imoti', 'pari'],
+      vtorostepennite: ['kontakti', 'nastroyki'],
+    });
+  });
+
+  it('сверка вход↔изход · нищо не се губи и не се удвоява при делението', () => {
+    const r = rabotnite(REDAT);
+    const podredeni = ['lichno', 'tablo', 'ii', 'smetki', 'nastroyki', 'imoti'];
+    const g = naDveGrupi(podredeni, r);
+    expect([...g.rabotata, ...g.vtorostepennite].sort()).toEqual([...podredeni].sort());
+    expect(g.rabotata.length + g.vtorostepennite.length - podredeni.length).toBe(0);
+  });
+
+  it('местенето спира на ГРАНИЦАТА · последният на работата няма надолу, първият на второстепенните няма нагоре', () => {
+    const r = rabotnite(REDAT);
+    expect(mozheDaSeMesti(REDAT, 'plashtaniya', 'dolu', r)).toBe(false);
+    expect(mozheDaSeMesti(REDAT, 'plashtaniya', 'gore', r)).toBe(true);
+    expect(mozheDaSeMesti(REDAT, 'kontakti', 'gore', r)).toBe(false);
+    expect(mozheDaSeMesti(REDAT, 'kontakti', 'dolu', r)).toBe(true);
+    expect(mozheDaSeMesti(REDAT, 'tablo', 'gore', r)).toBe(false);
+    expect(mozheDaSeMesti(REDAT, 'nastroyki', 'dolu', r)).toBe(false);
+    expect(mozheDaSeMesti(REDAT, 'nyama-go', 'dolu', r)).toBe(false);
+  });
+
+  it('съседът се търси ВЪТРЕ в групата · между двамата може да стои чужд ключ', () => {
+    const r = rabotnite(REDAT);
+    // Пресичащ ред: между Имоти и Пари стои Контакти.
+    const podredeni = ['imoti', 'kontakti', 'pari'];
+    expect(mozheDaSeMesti(podredeni, 'imoti', 'dolu', r)).toBe(true);
+    expect(mozheDaSeMesti(podredeni, 'kontakti', 'gore', r)).toBe(false);
+    expect(mozheDaSeMesti(podredeni, 'kontakti', 'dolu', r)).toBe(false);
   });
 });

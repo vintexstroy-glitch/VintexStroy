@@ -22,7 +22,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { GreshkaFormula, DEYSTVIYA_NA_FORMULA } from '../src/domein/formuli.js';
 import {
@@ -179,12 +179,12 @@ describe('проверката при създаване', () => {
 // ── 7 · СМЕТКАТА ──────────────────────────────────────────────────────────
 
 describe('сметката', () => {
-  it('разликата се смята с ЦЕЛИ стотинки · и се проверява на ръка', async () => {
+  it('разликата се смята с ЦЕЛИ центове · и се проверява на ръка', async () => {
     const { deystviya } = stend();
     await deystviya.dobaviImot('I-1', { adres: 'М', edinitsa: '1', ploshtad_kvsm: 0 }, { opId: 'op-i' });
     await deystviya.zapishiRazhod(
       'R-1',
-      { potok: 'zaplati', dostavchik: 'Т', opis: 'заплата', suma_st: stotinki(800_00),
+      { potok: 'zaplati', dostavchik: 'Т', opis: 'заплата', suma_st: tsentove(800_00),
         sektor: 'zaplati', nachin: 'банка', data: '2026-08-12', dokument: '', stavka: 0 },
       { opId: 'op-r' },
     );
@@ -204,7 +204,7 @@ describe('сметката', () => {
     expect(s.sDumi).toBe('разлика(Приход (събран) · Разход (всичко))');
   });
 
-  it('ПРОИЗВЕДЕНИЕТО дели на сто ВЕДНЪЖ · стотинки × стотни', () => {
+  it('ПРОИЗВЕДЕНИЕТО дели на сто ВЕДНЪЖ · центове × стотни', () => {
     // НАХОДКА (резен 42): само разликата беше смятана в тест, тъй че
     // произведението и процентът минаваха със сгрешена аритметика.
     // Изворите тук са ръчни, за да са числата кръгли и проверими с очи.
@@ -217,7 +217,7 @@ describe('сметката', () => {
       spisak,
     );
     // 1 000,00 € × 3,00 = 3 000,00 € · ВТОРИЯТ ПЪТ, на ръка:
-    // 100 000 стотинки × 300 стотни / 100 = 300 000 стотинки.
+    // 100 000 цента × 300 стотни / 100 = 300 000 цента.
     expect(s.stoynost).toBe(3_000_00);
     expect(s.vid).toBe('evro');
   });

@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, deystvieSPrerisuvane, naEkran, sSabitie } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, broySabitiya, deystvieSPrerisuvane, sSabitie } from '../yadro/pomoshtni.ts';
 
 /**
  * 99 · ЗАПЛАТИТЕ · седмицата, кешът и сборът (резен 20 · ADR-080).
@@ -17,7 +17,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=zaplati]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=zaplati]');
 
   proveri(
     'главата носи СЕДЕМ колони, с ПРОЕКТА най-отпред',
@@ -104,7 +104,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
 
-  await naEkran(p, 'smetki', '[data-sektsiya=zaplati]');
+  await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=zaplati]');
   proveri(
     'седмицата още НЕ е прехвърлена · и екранът го казва',
     await p.$eval('[data-prehvarlena]', (e) => (e as HTMLElement).dataset['prehvarlena']),

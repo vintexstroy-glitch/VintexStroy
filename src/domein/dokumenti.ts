@@ -61,7 +61,7 @@ export type KamKakvo = (typeof KAM_KAKVO)[number];
 export const IMENA_NA_KAM: Readonly<Record<KamKakvo, string>> = Object.freeze({
   razhod: 'разход',
   delo: 'дело',
-  imot: 'имот',
+  imot: 'обект',
   // ЧЕТВЪРТИЯТ · негово, 29.08: „информацията за плащанията по банка от ПД…
   // ще е в фолдър който ще се чете от ПДФ или друго, където ще пише какви са
   // вноските името и друга нужна информация."

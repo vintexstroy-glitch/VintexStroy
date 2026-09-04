@@ -10,11 +10,11 @@
 
 import { GreshkaSverka, sverka, type Sverka } from '../yadro/sverka.js';
 import { DnevnikNaSverki } from '../yadro/sverka.js';
-import { eStotinki } from '../yadro/pari.js';
+import { eTsentove } from '../yadro/pari.js';
 import { SEKTOR_PO_PODRAZBIRANE } from '../domein/dds.js';
 import type { Deystviya } from '../domein/deystviya.js';
 
-/** Един ред от регистъра, вече прочетен и приведен към стотинки. */
+/** Един ред от регистъра, вече прочетен и приведен към центове. */
 export interface RedOtRegistara {
   /** „АП. № 1", „ОФИС № 3", „ПМ БАР № 4" */
   readonly edinitsa: string;
@@ -31,7 +31,7 @@ export interface RedOtRegistara {
  */
 export interface ObyavenoOtLista {
   readonly broiRedove: number;
-  /** колона → обявен тотал в стотинки */
+  /** колона → обявен тотал в центове */
   readonly totali_st: Readonly<Record<string, number>>;
 }
 
@@ -104,9 +104,9 @@ export async function migrirajNaemiKesh(n: NastroykiMigratsiya): Promise<Rezulta
   const dnevnikNaSverki = new DnevnikNaSverki();
 
   for (const r of n.redove) {
-    if (!eStotinki(r.naem_st)) {
+    if (!eTsentove(r.naem_st)) {
       throw new GreshkaMigratsiya(
-        `„${r.edinitsa}" носи наем, който не е цели стотинки: ${String(r.naem_st)}`,
+        `„${r.edinitsa}" носи наем, който не е цели центове: ${String(r.naem_st)}`,
         [],
       );
     }

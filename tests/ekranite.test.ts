@@ -10,6 +10,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
+import { PARVIYAT_VAV_VTORATA, rabotnite } from '../src/domein/lenta.js';
 import { EKRANI, REDAT_NA_LENTATA } from '../app/ekranite.js';
 import { imaIkona } from '../app/ikoni.js';
 
@@ -49,6 +50,15 @@ describe('регистърът на екраните', () => {
     expect(EKRANI.lichno.iskaRolya).toBeUndefined();
   });
 
+  it('ЛИЧНО е САМО ЗА СЛУЖИТЕЛ · Стопанинът няма личен таб (ADR-154)', () => {
+    // И131 т.1, дословно: „Стопанина ням,а опция за личен. Служителя има опция да
+    // активира личен таб от таб Профил." Пинът е поименен: ако утре втори екран
+    // стане „само за служител", да падне на глас, не мимоходом.
+    expect(EKRANI.lichno.samoZaSluzhitel).toBe(true);
+    const samoZaSluzhitel = KLYUCHOVE.filter((k) => EKRANI[k].samoZaSluzhitel).sort();
+    expect(samoZaSluzhitel).toEqual(['lichno']);
+  });
+
   it('заключените по роля са ТОЧНО четирите, изброени поименно', () => {
     // Трите от И98 плюс ТАБОВЕ: негова дума от И101 — табове, таблици и
     // диаграми се създават и свързват само от Стопанина. Списъкът е поименен,
@@ -74,12 +84,33 @@ describe('регистърът на екраните', () => {
   });
 
   it('редът е НЕГОВОТО разпределение · закован поименно (И125 · резен 85)', () => {
+    // СЛУЖИТЕЛИ ИЗЛЕЗЕ ОТ ЛЕНТАТА (резен 112 · ADR-158): „Служители е таб от
+    // настройки с включени секцията за правомощи" (И133). Пунктът падна, а
+    // екранът живее като ПОДТАБ на Настройки — работата с хора е до правата им.
     // Таблото първо (файлът му почва с двете табла · р48·[37]); Плащания
     // Архив СЛЕД Продажби (р52·[288]); вторият ред — Контакти и Стойност
     // (Цени), с Настройки НАКРАЯ (р52·[206]). Пада на глас при разместване.
+    // ГОЛЯМО ДЕЛО влезе СЛЕД Управление (резен 110 · ADR-166): то работи върху
+    // делата на строежа и е техният вход. Пунктът стои в реда, но се ПОЯВЯВА
+    // само когато има живо голямо дело — „при посикване" е факт от Журнала,
+    // не място в списъка.
     expect(REDAT_NA_LENTATA).toEqual([
-      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'prodazhbi', 'plashtaniya',
-      'kontakti', 'stoynost', 'sluzhiteli', 'tabove', 'ii', 'lichno', 'nastroyki',
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'golyamodelo', 'prodazhbi', 'plashtaniya',
+      'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
     ]);
+  });
+
+  it('двете групи · осем в работата, шест второстепенни (резен 118 · ADR-163)', () => {
+    // Границата е ПИН С РЪКА в домейна; тук се брои, че редът и границата
+    // се покриват: работата е точно първите седем, второстепенните — от
+    // Контакти до Настройки. Табло е в първата (пътят обратно), Настройки —
+    // във втората, и двете не се скриват — значи разделителят никога не виси сам.
+    expect(rabotnite(REDAT_NA_LENTATA)).toEqual([
+      'tablo', 'imoti', 'pari', 'smetki', 'gant', 'golyamodelo', 'prodazhbi', 'plashtaniya',
+    ]);
+    expect(REDAT_NA_LENTATA.slice(rabotnite(REDAT_NA_LENTATA).length)).toEqual([
+      'kontakti', 'stoynost', 'tabove', 'ii', 'lichno', 'nastroyki',
+    ]);
+    expect(REDAT_NA_LENTATA[rabotnite(REDAT_NA_LENTATA).length]).toBe(PARVIYAT_VAV_VTORATA);
   });
 });

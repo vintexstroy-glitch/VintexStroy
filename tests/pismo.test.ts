@@ -15,7 +15,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { adresZaPoshta, dniSDuma, napishiPismo } from '../src/domein/pismo.js';
 import { SHA } from './pomoshtni.js';
@@ -47,7 +47,7 @@ async function sImot(d: Deystviya): Promise<void> {
 const NAEM = {
   imotId: 'I-1',
   naemetel: 'Домакинство',
-  naem_st: stotinki(500_00),
+  naem_st: tsentove(500_00),
   padezhDen: 5,
   ot: '2024-01-01',
   do: '',

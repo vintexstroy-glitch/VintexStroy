@@ -42,7 +42,7 @@ export function koloniNaVzemaniyata(o: Ogledalo): KolonaSFiltar<Vzemane>[] {
   return [
     {
       klyuch: 'koy',
-      ime: 'Наемател и имот',
+      ime: 'Наемател и обект',
       vid: 'tekst',
       vzemi: (v) => {
         const opis = opisiVzemane(o, v);

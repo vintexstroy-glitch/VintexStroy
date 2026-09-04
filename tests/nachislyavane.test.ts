@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DnevnikVPametta,
-  stotinki,
+  tsentove,
   Vrata,
   VsichkoRazresheno,
 } from '../src/yadro/index.js';
@@ -57,7 +57,7 @@ async function nasadi(d: Deystviya, naemi: readonly OpisNaem[]) {
       {
         imotId: 'I-1',
         naemetel: `наемател ${n.id}`,
-        naem_st: stotinki(n.naem_st),
+        naem_st: tsentove(n.naem_st),
         padezhDen: n.padezhDen ?? 5,
         ot: n.ot ?? '2024-01-01',
         do: n.do ?? '',
@@ -237,7 +237,7 @@ describe('изведените изгледи', () => {
 
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V:2026-08:N-1', suma_st: stotinki(1150_00), nachin: 'банка', data: '2026-08-22' },
+      { vzemaneId: 'V:2026-08:N-1', suma_st: tsentove(1150_00), nachin: 'банка', data: '2026-08-22' },
       { opId: 'op-plashtane' },
     );
 
@@ -251,7 +251,7 @@ describe('изведените изгледи', () => {
 
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V:2026-08:N-1', suma_st: stotinki(400_00), nachin: 'в брой', data: '2026-08-20' },
+      { vzemaneId: 'V:2026-08:N-1', suma_st: tsentove(400_00), nachin: 'в брой', data: '2026-08-20' },
       { opId: 'op-1' },
     );
 

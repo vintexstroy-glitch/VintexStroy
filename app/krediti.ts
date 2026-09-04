@@ -29,6 +29,14 @@
 import { ekraniraj } from './obshto.js';
 import { dumiZaGreshka } from '../src/yadro/dumi.js';
 import { otLeva, pishi } from '../src/yadro/pari.js';
+import { otPDF } from '../src/iztochnik/pdf.js';
+import {
+  fayltKazvaSbor,
+  opIdNaPlanaOtPDF,
+  prochetiPogasitelenPlan,
+  type ProchetenPlan,
+} from '../src/domein/pogasitelen-plan-ot-pdf.js';
+import { otLevaVEvro, vnoskaVEvro, ZNAK_NA_LEVA } from '../src/domein/zakonoviyat-lev.js';
 import {
   izvorNaPlana,
   KOLONI_KREDITI,
@@ -59,6 +67,7 @@ import {
   redZaSkritoto,
   type KolonaSFiltar,
 } from './filtri.js';
+import type { DenevnaSuma } from '../src/domein/gant.js';
 import type { Ogledalo } from '../src/ogledalo/ogledalo.js';
 import type { Konteks } from './ekranite.js';
 
@@ -91,6 +100,28 @@ function tablitsataEVklyuchena(): boolean {
   return chetiEkranno('krediti.tablitsa', 'da') === 'da';
 }
 
+/**
+ * КАЛКУЛАТОРЪТ Е ОПЦИЯ, И ПО ПОДРАЗБИРАНЕ ГО НЯМА (резен 117 · И134).
+ *
+ * Негово, 03.09: „За калкулатора за кредии да е по малък и да е като опция
+ * само в Сметки за експерименти **да се добавя**." Тоест не стои постоянно на
+ * екрана: добавя се, когато потрябва. Отметката е ЛИЧНА — памет на екрана,
+ * нула събития (ADR-066).
+ */
+function kalkulatoratEVklyuchen(): boolean {
+  return chetiEkranno<string>('krediti.kalkulator', 'ne') === 'da';
+}
+
+/**
+ * ПРОЧЕТЕНИЯТ ПЛАН ОТ ПДФ · памет на МОДУЛА, не на устройството.
+ *
+ * Това са ЧУЖДИ редове, показани преди решение — „данни не влизат никога" в
+ * паметта на екрана (ADR-022). Презареждане ги губи, и това е вярно: файлът е
+ * в ръцете на човека, а решението е бутонът (правило 18). Същата шарка като
+ * дървото в Имоти (ADR-165) и графика в Голямо дело (ADR-166).
+ */
+let planOtPDF: { readonly fayl: string; readonly chetene: ProchetenPlan } | null = null;
+
 /** Процент от базисни пунктове · един дом, за да не се пише на три места. */
 function protsent(bp: number): string {
   return `${(bp / 100).toFixed(2)} %`;
@@ -105,6 +136,136 @@ function protsent(bp: number): string {
  */
 let kalkulator: { ostatak_st: number; lihva_bp: number; vnoska_st: number; den: number } | null =
   null;
+
+/**
+ * ПРОЧЕТЕНИЯТ ПЛАН · шапката, трите сверки и първите редове.
+ *
+ * Показва и ДВЕТЕ числа (лев и евро), както той поиска: „по законовия курс
+ * 1,95583, с двете числа и сверка" (И135б). Сверката се прави в ЛЕВА — там
+ * числата на банката са точни; в евро влиза записът, защото книгата е в евро.
+ */
+function blokNaProchetteniyaPlan(imenaNaKreditite: readonly { id: string; ime: string }[]): string {
+  const p = planOtPDF;
+  if (p === null) {
+    return `
+      <p class="drebno" data-plan-vnoski="0">Още няма прочетен план. Файлът се
+      ЧЕТЕ тук и се записва с бутон — машината предлага, човекът записва
+      (правило 18).</p>`;
+  }
+  const c = p.chetene;
+  const lv = (st: number): string => `${(st / 100).toFixed(2).replace('.', ',')} лв.`;
+  const vsichkiRazliki =
+    c.razlika.glavnitsa_st +
+    c.razlika.lihva_st +
+    c.razlika.vnoska_st +
+    c.razlika.taksa_st +
+    c.razlika.zastrahovka_st +
+    c.razlika.obshto_st;
+  const naredno = vsichkiRazliki === 0 && c.nevarzaniChasti === 0 && c.nevarzanoObshto === 0;
+  return `
+    <p class="drebno" data-plan-vnoski="${c.vnoski.length}" data-plan-nomera="${c.nomera}"
+       data-plan-razlika="${vsichkiRazliki}" data-plan-nevarzani="${c.nevarzaniChasti + c.nevarzanoObshto}">
+      От „${ekraniraj(p.fayl)}" · договор
+      <b translate="no">${ekraniraj(c.shapka.dogovor === '' ? '—' : c.shapka.dogovor)}</b> ·
+      <b>${c.vnoski.length}</b> от ${c.nomera} вноски · пропуснати ${c.propusnati} ·
+      салдо <span translate="no">${lv(c.shapka.saldo_st)}</span>
+      (<span translate="no">${pishi(otLevaVEvro(c.shapka.saldo_st))}</span>) ·
+      ${
+        fayltKazvaSbor(c)
+          ? `сверка с реда „Общо:" на файла: разлика <b translate="no">${lv(c.razlika.obshto_st)}</b>`
+          : 'файлът не казва свой сбор — сверката е само по редовете'
+      } ·
+      невързани редове ${c.nevarzaniChasti + c.nevarzanoObshto}.</p>
+    ${
+      naredno
+        ? ''
+        : `<p class="greshka">Планът НЕ се връзва. Числата се показват както са
+           прочетени; вкарването остава възможно, но разликата е тук, на екрана,
+           а не скрита в Журнала.</p>`
+    }
+    <div class="tablitsa" data-tablitsa="plan-ot-pdf">
+      <div class="red glava" translate="no">
+        <span>№</span><span>Дата</span><span class="suma">Главница</span>
+        <span class="suma">Лихва</span><span class="suma">Вноска</span>
+        <span class="suma">Такса</span><span class="suma">Вноска в €</span>
+      </div>
+      ${c.vnoski
+        .slice(0, 12)
+        .map((v) => {
+          const e = vnoskaVEvro(v.glavnitsa_st, v.lihva_st);
+          return `<div class="red plan-pdf" data-plan-nomer="${ekraniraj(v.nomer)}">
+            <span translate="no">${ekraniraj(v.nomer)}</span>
+            <span translate="no">${ekraniraj(v.data)}</span>
+            <span class="suma" translate="no">${lv(v.glavnitsa_st)}</span>
+            <span class="suma" translate="no">${lv(v.lihva_st)}</span>
+            <span class="suma" translate="no">${lv(v.vnoska_st)}</span>
+            <span class="suma" translate="no">${lv(v.taksa_st)}</span>
+            <span class="suma" translate="no">${pishi(e.vnoska_st)}</span>
+          </div>`;
+        })
+        .join('')}
+    </div>
+    ${
+      c.vnoski.length > 12
+        ? `<p class="drebno">Показани са първите 12 от ${c.vnoski.length} — целият план влиза при вкарване.</p>`
+        : ''
+    }
+    <label class="pole">
+      <span>Към кой кредит</span>
+      <select translate="no" id="plan-kam-kredit">
+        <option value="">— НОВ кредит от шапката на плана —</option>
+        ${imenaNaKreditite
+          .map((r) => `<option value="${ekraniraj(r.id)}">${ekraniraj(r.ime)}</option>`)
+          .join('')}
+      </select>
+    </label>
+    <p>
+      <button type="button" class="glaven" id="plan-vkaray">Вкарай ${c.vnoski.length} вноски</button>
+      <button type="button" class="vtorichen" id="plan-otkazhi">Не сега</button>
+    </p>
+    <p class="drebno">По подразбиране планът ражда НОВ кредит — „Кредититер се
+    четат от пдф… Така се зареждат" (И134). Съществуващ кредит се избира
+    поименно: така вторият план на СЪЩИЯ договор го поправя, вместо да се
+    появи двойник.</p>
+    <p class="drebno"><b>Таксата и застраховката се ЧЕТАТ, но не се записват.</b>
+    Вноската по договора носи три числа — дата, главница и лихва;
+    таксата е плащане към банката, не част от дълга. Тя се вижда тук и чака своя
+    ред, вместо да се събере тихо във вноската и да размине остатъка.</p>
+    <p class="drebno">Планът е в <b translate="no">${ekraniraj(c.shapka.valuta === '' ? ZNAK_NA_LEVA : c.shapka.valuta)}</b>,
+    а книгата е в евро. Влиза се по ЗАКОНОВИЯ курс 1,95583 — той е закон, не
+    пазар (И135б). Частите се превалутират, а вноската се СЪБИРА от тях, за да
+    остане цяла: закръгленото не влиза в сбор (правило 3).</p>`;
+}
+
+/**
+ * СИМУЛАЦИЯТА В ДИАГРАМАТА НА СМЕТКИ (резен 117 · И134).
+ *
+ * Негово: „…калкулатора е само да симулира в Диаграмата на Сметки която е в
+ * моментното състояние от Управленмие, но можеш да коригиряаш триеш,
+ * редактираш и създаваш **без да влиаеш на останалите**."
+ *
+ * Затова смятаното от калкулатора влиза в СЪЩАТА диаграма като СВОЙ ред —
+ * „Симулация · калкулатор", — а не се смесва с истинските разходи. Нула
+ * събития: редовете се раждат при рисуване и умират с презареждането.
+ * „Коригираш, триеш, създаваш" е самата форма: пипаш числата, редът се
+ * преначертава, а Журналът не помръдва.
+ */
+export function simulatsiyataNaKalkulatora(dnes: string): readonly DenevnaSuma[] {
+  if (kalkulator === null || !kalkulatoratEVklyuchen()) return [];
+  return interpoliraiPlana(
+    kalkulator.ostatak_st,
+    kalkulator.lihva_bp,
+    kalkulator.vnoska_st,
+    kalkulator.den,
+    dnes,
+  ).map((v) => ({
+    data: v.data,
+    prihod_st: 0,
+    razhod_st: v.vnoska_st,
+    razrez: 'simulatsiya',
+    nadpis: 'Симулация · калкулатор',
+  }));
+}
 
 function blokNaKalkulatora(dnes: string): string {
   const glava = `
@@ -513,6 +674,18 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
       </form>
       <p class="greshka" id="greshka-kredit"></p>
 
+      <section data-sektsiya="krediti-plan-pdf">
+        <div class="dyalglava">
+          <h2>Погасителен план от ПДФ</h2>
+          <span>„Кредититер се четат от пдф за погасителния план" (И134)</span>
+        </div>
+        <p>
+          <button type="button" class="vtorichen" id="plan-cheti-pdf">Чети погасителен план</button>
+          <input translate="no" type="file" id="plan-fayl-pdf" accept=".pdf" hidden>
+        </p>
+        ${blokNaProchetteniyaPlan(redove.map((r) => ({ id: r.kredit.id, ime: r.kredit.ime })))}
+      </section>
+
       <p class="drebno"><b>Кредитът е единственият разход, който не се пише на
       ръка</b> — негово <i>(р65·[24])</i>: „Всичко освен Кредит, а именно:
       Заплати, Фактури Кеш и Фактури Карта". Тук се въвежда ДОГОВОРЪТ; вноските
@@ -547,9 +720,13 @@ export function blokNaKreditite(o: Ogledalo, dnes: string): string {
           : blokNaPlana(o, izbran, dnes)
       }
 
-      <section data-sektsiya="kredit-kalkulator">
-        ${blokNaKalkulatora(dnes)}
-      </section>
+      ${
+        kalkulatoratEVklyuchen()
+          ? `<section data-sektsiya="kredit-kalkulator">
+               ${blokNaKalkulatora(dnes)}
+             </section>`
+          : ''
+      }
     </section>`;
 }
 
@@ -572,6 +749,15 @@ export function blokNaKredititeVNastroyki(): string {
       <b>изключваш и последната таблица</b>." Изключването пипа ЕКРАНА и нищо
       друго: редът под Разходи, остатъкът в Ликвидността и двата коефициента
       остават — скритото ПАК се смята (правило 23).</p>
+      <label class="pole">
+        <input type="checkbox" id="krediti-kalkulator"${kalkulatoratEVklyuchen() ? ' checked' : ''}>
+        <span>Добавяй кредитния калкулатор в Сметки (експеримент)</span>
+      </label>
+      <p class="drebno">Негово <i>(И134)</i>: „За калкулатора за кредии да е <b>по
+      малък</b> и да е като <b>опция само в Сметки за експерименти да се
+      добавя</b>." Затова по подразбиране го НЯМА: добавя се, когато потрябва.
+      Той симулира върху интерполацията и не пише нищо — „без да влияеш на
+      останалите".</p>
       <p class="drebno">Отметката е ЛИЧНА и не влиза в Журнала. Последната дума
       по темата „кой какво скрива" е ADR-066: скриването е решение на всеки за
       СЕБЕ СИ и е нула събития. „Да вкарваш, да създаваш" от същото изречение
@@ -608,6 +794,128 @@ export function zakachiKreditite(
       zapomniEkranno('krediti.tablitsa', (e.target as HTMLInputElement).checked ? 'da' : 'ne');
       await prerisuvay();
     });
+
+  koren
+    .querySelector<HTMLInputElement>('#krediti-kalkulator')
+    ?.addEventListener('change', async (e) => {
+      zapomniEkranno('krediti.kalkulator', (e.target as HTMLInputElement).checked ? 'da' : 'ne');
+      await prerisuvay();
+    });
+
+  // ── ПОГАСИТЕЛНИЯТ ПЛАН ОТ ПДФ (резен 117 · ADR-167) ────────────────────
+  koren.querySelector<HTMLButtonElement>('#plan-cheti-pdf')?.addEventListener('click', () => {
+    koren.querySelector<HTMLInputElement>('#plan-fayl-pdf')?.click();
+  });
+  koren.querySelector<HTMLInputElement>('#plan-fayl-pdf')?.addEventListener('change', async (e) => {
+    const fayl = (e.target as HTMLInputElement).files?.[0];
+    if (!fayl) return;
+    try {
+      const prochetten = await otPDF(new Uint8Array(await fayl.arrayBuffer()));
+      const chetene = prochetiPogasitelenPlan(prochetten.stranitsi);
+      if (chetene.vnoski.length === 0) {
+        throw new Error(
+          `Във „${fayl.name}" не се намериха вноски с дата и шест числа. ` +
+            'Погасителният план се изнася от банката като ПДФ с текст, не като снимка.',
+        );
+      }
+      planOtPDF = { fayl: fayl.name, chetene };
+      k.vest(
+        'dobre',
+        `Прочетени ${chetene.vnoski.length} вноски от ${chetene.nomera} · записва се с бутона, не сега.`,
+      );
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+    }
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#plan-otkazhi')?.addEventListener('click', async () => {
+    planOtPDF = null;
+    await prerisuvay();
+  });
+
+  koren.querySelector<HTMLButtonElement>('#plan-vkaray')?.addEventListener('click', async () => {
+    const p = planOtPDF;
+    if (p === null) return;
+    const c = p.chetene;
+    try {
+      /**
+       * КРЕДИТЪТ СЕ ЗАРЕЖДА ОТ ПЛАНА, когато няма избран (И134: „Кредититер се
+       * четат от пдф за погасителния план. Така се зареждат").
+       *
+       * Всичко идва от шапката и от първата вноска: салдото е остатъкът,
+       * началото на издължаване е денят, от който тече, а денят на месеца — от
+       * датата на първата вноска. Лихвеният ПРОЦЕНТ го няма във файла и не се
+       * измисля: влиза нула и екранът го казва. Планът бие интерполацията, тъй
+       * че процентът не движи никакво число тук.
+       */
+      /**
+       * ПРЕВАЛУТИРА СЕ САМО ЛЕВ · всичко друго влиза както е.
+       *
+       * Първата версия делеше БЕЗУСЛОВНО на законовия курс: план в евро щеше
+       * да се смали два пъти, тихо. Валутата се ЧЕТЕ от шапката — празна значи
+       * лев (българските банки не я пишат в стария си износ), а всяка друга
+       * значи „числата са вече в нея". Курс между ДВЕ живи валути няма
+       * (правило 3), тъй че долар няма как да влезе оттук.
+       */
+      const eLev = c.shapka.valuta === '' || c.shapka.valuta === ZNAK_NA_LEVA;
+      const vEvro = (glavnitsa_st: number, lihva_st: number) =>
+        eLev ? vnoskaVEvro(glavnitsa_st, lihva_st) : { glavnitsa_st, lihva_st, vnoska_st: glavnitsa_st + lihva_st };
+      const summaVEvro = (st: number) => (eLev ? otLevaVEvro(st) : st);
+      let kreditId = koren.querySelector<HTMLSelectElement>('#plan-kam-kredit')?.value ?? '';
+      const parva = c.vnoski[0]!;
+      if (kreditId === '') {
+        kreditId = crypto.randomUUID();
+        const evroParva = vEvro(parva.glavnitsa_st, parva.lihva_st);
+        await k.deystviya.zapishiKredit(
+          {
+            kreditId,
+            // Името носи ДОГОВОРА, не думата „кредит": общата дума пасва на
+            // всеки ред от извлечението и ражда празни предложения (виж
+            // `DUMI_BEZ_ZNACHENIE` в `sverka-izvlechenie.ts`).
+            ime: `Договор ${c.shapka.dogovor === '' ? p.fayl : c.shapka.dogovor}`,
+            vid: 'ipoteka',
+            proektId: '',
+            ostatak_st: summaVEvro(c.shapka.saldo_st > 0 ? c.shapka.saldo_st : c.sbor.glavnitsa_st),
+            ot: c.shapka.nachaloIzdalzhavane === '' ? parva.data : c.shapka.nachaloIzdalzhavane,
+            lihva_bp: 0,
+            vnoska_st: evroParva.vnoska_st,
+            den: Number(parva.data.slice(8, 10)),
+            otgovornik: k.kojSam.imeyl,
+            obezpechenie_st: 0,
+          },
+          { opId: `kredit-ot-pdf:${c.shapka.dogovor || p.fayl}` },
+        );
+        zapomniEkranno('krediti.izbran', kreditId);
+      }
+      const vnoski = c.vnoski.map((v) => ({ data: v.data, ...vEvro(v.glavnitsa_st, v.lihva_st) }));
+      await k.deystviya.zapishiPogasitelenPlan(
+        { kreditId, vnoski },
+        { opId: opIdNaPlanaOtPDF(kreditId, c.shapka.dogovor || p.fayl) },
+      );
+      // СВЕРКА ВХОД↔ИЗХОД (правило 7) · и в лева, и в евро, и нулата се казва.
+      const sboratVEvro = vnoski.reduce((sbor, v) => sbor + v.vnoska_st, 0);
+      const razlikaOtKursa = summaVEvro(c.sbor.vnoska_st) - sboratVEvro;
+      k.vest(
+        'dobre',
+        `Планът е вкаран: ${vnoski.length} от ${c.vnoski.length} вноски · разлика ${
+          c.vnoski.length - vnoski.length
+        }.` +
+          (eLev
+            ? ` От ${(c.sbor.vnoska_st / 100).toFixed(2).replace('.', ',')} лв. станаха ${pishi(sboratVEvro)}` +
+              ` · закръглянето по частите дава ${pishi(Math.abs(razlikaOtKursa))} разлика спрямо превалутирания сбор.`
+            : ` Файлът е в ${c.shapka.valuta} — числата влизат както са, без курс.`) +
+          (c.shapka.saldo_st > 0
+            ? ` Салдото на шапката минус главниците: ${(c.razlikaSaldo_st / 100).toFixed(2).replace('.', ',')} лв.`
+            : '') +
+          ' Лихвеният ПРОЦЕНТ не е в плана и остава нула, докато не се впише на ръка — планът бие интерполацията.',
+      );
+      planOtPDF = null;
+    } catch (err) {
+      k.vest('zle', dumiZaGreshka(err));
+    }
+    await prerisuvay();
+  });
 
   const forma = koren.querySelector<HTMLFormElement>('#forma-kredit');
   forma?.addEventListener('submit', async (e) => {

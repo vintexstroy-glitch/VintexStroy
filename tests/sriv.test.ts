@@ -20,7 +20,7 @@ import {
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { otvoriDnevnik } from '../src/nositel/dnevnik-indexeddb.js';
-import { stotinki } from '../src/yadro/pari.js';
+import { tsentove } from '../src/yadro/pari.js';
 import { SHA } from './pomoshtni.js';
 
 const NAEMATEL = 'vintexstroy';
@@ -89,7 +89,7 @@ async function nasadiNaemi(d: Deystviya, kolko: number): Promise<void> {
     await d.dobaviNaem(
       `N-${i}`,
       {
-        imotId: 'I-1', naemetel: `наемател ${i}`, naem_st: stotinki(100_00 + i),
+        imotId: 'I-1', naemetel: `наемател ${i}`, naem_st: tsentove(100_00 + i),
         padezhDen: 5, ot: '2025-01-01', do: '', depozit_st: 0, sektor: 'naem-zhilishten',
       },
       { opId: `op-naem-${i}` },

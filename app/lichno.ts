@@ -213,7 +213,7 @@ function sektsiyaPrenos(lichno: Ogledalo, sluzhebno: Ogledalo): string {
           ? '<p class="drebno">Няма какво да се прехвърля в тази посока.</p>'
           : `<div class="tablitsa" data-tablitsa="prenos">
               <div class="glava prenos">
-                <span></span><span>Дело</span><span>Място · обект</span><span>Срок</span>
+                <span></span><span>Дело</span><span>Имот · обект</span><span>Срок</span>
               </div>
               ${dela
                 .map((d) => {

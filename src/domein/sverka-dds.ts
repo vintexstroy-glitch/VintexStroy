@@ -28,13 +28,13 @@
  * е различна от нулата, за която никой не е питал.
  */
 
-import type { Stotinki } from '../yadro/pari.js';
+import type { Tsentove } from '../yadro/pari.js';
 
 /** Едно движение, откъдето и да идва то. */
 export interface Dvizhenie {
   /** ISO дата */
   readonly data: string;
-  readonly suma_st: Stotinki;
+  readonly suma_st: Tsentove;
   /** номер на фактура или платежно — по него се сдвояват двата ъгъла */
   readonly dokument: string;
   readonly opisanie: string;
@@ -50,13 +50,13 @@ interface Nesvarshen {
 }
 
 export interface RezultatSverka {
-  readonly dds_ot_fakturi_st: Stotinki;
-  readonly dds_ot_izvlecheniya_st: Stotinki;
-  readonly dds_vneseno_st: Stotinki;
+  readonly dds_ot_fakturi_st: Tsentove;
+  readonly dds_ot_izvlecheniya_st: Tsentove;
+  readonly dds_vneseno_st: Tsentove;
   /** фактури ↔ извлечения · нулата тук значи „всичко се покрива" */
-  readonly razlika_st: Stotinki;
+  readonly razlika_st: Tsentove;
   /** изчислено ↔ внесено · това дължа още, или съм надвнесъл */
-  readonly ostava_st: Stotinki;
+  readonly ostava_st: Tsentove;
   /** КЪДЕ е разликата — поименно, не като число */
   readonly nesvarsheni: readonly Nesvarshen[];
   readonly svereno: boolean;
@@ -80,9 +80,9 @@ function klyuch(d: Dvizhenie): string {
 export function sveriDDS(n: {
   fakturi: readonly Dvizhenie[];
   izvlecheniya: readonly Dvizhenie[];
-  dds_ot_fakturi_st: Stotinki;
-  dds_ot_izvlecheniya_st: Stotinki;
-  dds_vneseno_st: Stotinki;
+  dds_ot_fakturi_st: Tsentove;
+  dds_ot_izvlecheniya_st: Tsentove;
+  dds_vneseno_st: Tsentove;
 }): RezultatSverka {
   const poDokument = new Map<string, Dvizhenie>();
   for (const f of n.fakturi) {
@@ -111,8 +111,8 @@ export function sveriDDS(n: {
     }
   }
 
-  const razlika = (n.dds_ot_fakturi_st - n.dds_ot_izvlecheniya_st) as Stotinki;
-  const ostava = (n.dds_ot_fakturi_st - n.dds_vneseno_st) as Stotinki;
+  const razlika = (n.dds_ot_fakturi_st - n.dds_ot_izvlecheniya_st) as Tsentove;
+  const ostava = (n.dds_ot_fakturi_st - n.dds_vneseno_st) as Tsentove;
 
   return {
     dds_ot_fakturi_st: n.dds_ot_fakturi_st,

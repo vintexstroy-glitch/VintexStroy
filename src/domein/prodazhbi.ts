@@ -82,7 +82,7 @@ export class GreshkaProdazhba extends Error {
  */
 export const KOLONI: readonly string[] = Object.freeze([
   'Обект',
-  'Място',
+  'Имот',
   'Купувач',
   'Телефон',
   'Цена €',

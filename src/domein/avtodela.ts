@@ -134,7 +134,9 @@ export function avtoDelata(o: Ogledalo, dnes: string): readonly AvtoDelo[] {
   const sreshti: readonly Sreshta[] = [...o.sreshti.values()];
   for (const s of predstoyashtiSreshti(sreshti)) {
     if (dniDoSroka(s.data, dnes) > NAPRED_DNI) continue;
-    const kade = s.adres === '' ? '' : ` · ${s.adres}`;
+    // КЪДЕ · Имотът и адресът, всеки ако го има (резен 99): срещата може да е
+    // за Имот, на адрес, и на двете, и на нито едно — „те са опция" (И129 т.3).
+    const kade = [s.imot, s.adres].filter((x) => x !== '').map((x) => ` · ${x}`).join('');
     redove.push(red('среща', s.id, `Среща с ${s.kontakt}${kade}`, s.kontakt, s.data, dnes));
   }
 

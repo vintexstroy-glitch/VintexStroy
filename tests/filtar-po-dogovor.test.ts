@@ -18,7 +18,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { stotinki } from '../src/yadro/index.js';
+import { tsentove } from '../src/yadro/index.js';
 import {
   BEZ_DOGOVOR,
   dogovoriteVSverkata,
@@ -56,17 +56,17 @@ function bankov(n: Partial<RedOtKarta> & { klyuch: string; suma_st: number }): R
 /** Три записа: два по договор „N1", един по „N2", и един разход БЕЗ договор. */
 function stend() {
   const zapisi = [
-    zapis({ klyuch: 'plashtane:a', suma_st: stotinki(500_00), dogovor: 'N1', koy: 'Иван' }),
-    zapis({ klyuch: 'plashtane:b', suma_st: stotinki(300_00), dogovor: 'N1', koy: 'Иван' }),
-    zapis({ klyuch: 'plashtane:c', suma_st: stotinki(200_00), dogovor: 'N2', koy: 'Мария' }),
-    zapis({ klyuch: 'razhod:d', suma_st: stotinki(100_00), posoka: 'razhod', koy: 'Баумит' }),
+    zapis({ klyuch: 'plashtane:a', suma_st: tsentove(500_00), dogovor: 'N1', koy: 'Иван' }),
+    zapis({ klyuch: 'plashtane:b', suma_st: tsentove(300_00), dogovor: 'N1', koy: 'Иван' }),
+    zapis({ klyuch: 'plashtane:c', suma_st: tsentove(200_00), dogovor: 'N2', koy: 'Мария' }),
+    zapis({ klyuch: 'razhod:d', suma_st: tsentove(100_00), posoka: 'razhod', koy: 'Баумит' }),
   ];
   // Банката вижда ДВА от четирите, плюс един свой ред без насрещен запис.
   // Имената носят платците — името е ТРЕТИЯТ белег на срещата (резен 73).
   const izvlechenie = [
-    bankov({ klyuch: 'b1', suma_st: stotinki(500_00), koy: 'ПРЕВОД ОТ ИВАН' }),
-    bankov({ klyuch: 'b2', suma_st: stotinki(200_00), koy: 'ПРЕВОД ОТ МАРИЯ' }),
-    bankov({ klyuch: 'b3', suma_st: stotinki(777_00), koy: 'Непознат' }),
+    bankov({ klyuch: 'b1', suma_st: tsentove(500_00), koy: 'ПРЕВОД ОТ ИВАН' }),
+    bankov({ klyuch: 'b2', suma_st: tsentove(200_00), koy: 'ПРЕВОД ОТ МАРИЯ' }),
+    bankov({ klyuch: 'b3', suma_st: tsentove(777_00), koy: 'Непознат' }),
   ];
   return sverkaSIzvlechenie({
     period: PERIOD,
@@ -108,7 +108,7 @@ describe('стеснението', () => {
   it('показва САМО редовете на избрания договор', () => {
     const s = stesniPoDogovor(stend(), 'N1');
     expect(s.redove.map((x) => x.zapis.klyuch)).toEqual(['plashtane:a', 'plashtane:b']);
-    expect(s.vhod_st).toBe(stotinki(800_00));
+    expect(s.vhod_st).toBe(tsentove(800_00));
   });
 
   it('и РАЗХОДЪТ не се появява под никой договор · той няма наем', () => {
@@ -138,8 +138,8 @@ describe('стеснението', () => {
   it('а изходът брои само ОБЯСНЕНОТО · сверено плюс в брой', () => {
     // От двата реда на „N1" банката вижда само единия (500,00).
     const s = stesniPoDogovor(stend(), 'N1');
-    expect(s.izhod_st).toBe(stotinki(500_00));
-    expect(s.vhod_st - s.izhod_st).toBe(stotinki(300_00));
+    expect(s.izhod_st).toBe(tsentove(500_00));
+    expect(s.vhod_st - s.izhod_st).toBe(tsentove(300_00));
   });
 
   it('избор на договор, който го НЯМА, дава празно · не чужди редове', () => {
@@ -165,7 +165,7 @@ describe('сверката на филтъра', () => {
     const r = stend();
     const bezEdin = dogovoriteVSverkata(r, imeNa).filter((d) => d.id !== 'N2');
     const s = sveriStesnyavaneto(r, bezEdin, KOGATO);
-    expect(s.razlika).toBe(-stotinki(200_00));
+    expect(s.razlika).toBe(-tsentove(200_00));
     expect(s.nared).toBe(false);
   });
 
@@ -173,7 +173,7 @@ describe('сверката на филтъра', () => {
     const r = stend();
     const dvazh = [...dogovoriteVSverkata(r, imeNa), { id: 'N1', ime: 'Иван Петров', broy: 2 }];
     const s = sveriStesnyavaneto(r, dvazh, KOGATO);
-    expect(s.razlika).toBe(stotinki(800_00));
+    expect(s.razlika).toBe(tsentove(800_00));
     expect(s.nared).toBe(false);
   });
 });

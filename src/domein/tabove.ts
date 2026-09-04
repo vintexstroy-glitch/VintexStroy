@@ -88,7 +88,7 @@ export const VRAZKI = ['imot', 'obekt', 'myasto'] as const;
 export type PoKakvo = (typeof VRAZKI)[number];
 
 export const IMENA_NA_VRAZKITE: Readonly<Record<PoKakvo, string>> = Object.freeze({
-  imot: 'по имот',
+  imot: 'по обект',
   obekt: 'по обект',
   myasto: 'по място',
 });

@@ -119,6 +119,8 @@ import type {
   PayloadTablitsaOtFaylSazdadena,
   PayloadGodinaZatvorena,
   PayloadMyastoZapisano,
+  PayloadSastoyanieNaImotZapisano,
+  PayloadSastoyanieOtbelyazanoKatoZemya,
   PayloadKategoriyaZadadena,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
@@ -364,6 +366,22 @@ export interface Ogledalo {
   readonly etapiNaProdazhbite: ReadonlyMap<string, PayloadEtapNaProdazhbaZapisan>;
 
   /**
+   * СЪСТОЯНИЯТА НА ИМОТА · само ДОБАВЕНИТЕ (резен 99 · ADR-157).
+   *
+   * Шестте работни живеят в кода (`BAZOVI_SASTOYANIYA_NA_IMOT`) — те са негови
+   * от начало и не се пишат в Журнала. Тук е растежът, по същата сметка като
+   * при етапите на продажбата.
+   */
+  readonly sastoyaniyaNaImotite: ReadonlyMap<string, PayloadSastoyanieNaImotZapisano>;
+  /**
+   * КОИ СЪСТОЯНИЯ ЗНАЧАТ ЗЕМЯ (резен 111 · ADR-170).
+   *
+   * „земя е Имот с различен Статут" — отметка върху номенклатурата, не нов вид
+   * обект. Върху нея СМЯТА Калкулаторът: земя се оценява само по земята.
+   */
+  readonly zemniSastoyaniya: ReadonlySet<string>;
+
+  /**
    * КРЕДИТИТЕ · договорните данни (резен 19 · ADR-079).
    *
    * Остатъкът НЕ е тук — той се СМЯТА от платените главници (`krediti.ts`).
@@ -537,6 +555,16 @@ export interface Ogledalo {
    */
   readonly rachniyatRedNaDelata: readonly string[];
   readonly lichnoVklyucheno: boolean;
+  /**
+   * ПИПАНО ли е някога · има ли поне едно `ЛичноПревключено` (резен 98).
+   *
+   * НЕ е „Журналът съществува": откриващото събитие (Стопанинът е първото,
+   * ADR-043) ляга в личния Журнал ПРЕДИ Вратата да провери мястото, и
+   * неуспешен първи опит без място иначе правеше „не е пускано" на
+   * „прибрано" — а прибраното се връща без поле за място: задънена улица,
+   * която проходът намери, щом служителят мина през Профила (ADR-154).
+   */
+  readonly lichnoPipnato: boolean;
   /**
    * МЯСТОТО в личния драйв, с което личното е активирано (И99).
    * Празно значи „активирано преди това поле" — старият запис си е валиден.
@@ -839,6 +867,9 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const prodazhbi = new Map<string, Prodazhba>();
   const dvizheniyaNaProdazhbi: DvizhenieNaProdazhba[] = [];
   const etapiNaProdazhbite = new Map<string, PayloadEtapNaProdazhbaZapisan>();
+  const sastoyaniyaNaImotite = new Map<string, PayloadSastoyanieNaImotZapisano>();
+  /** кои състояния значат ЗЕМЯ · отметка от Настройки (резен 111 · ADR-170) */
+  const zemniSastoyaniya = new Set<string>();
   const krediti = new Map<string, Kredit>();
   const plashtaniyaPoKrediti: PlashtanePoKredit[] = [];
   const pogasitelniPlanove = new Map<string, readonly VnoskaOtDogovora[]>();
@@ -866,6 +897,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
   const nachalniIzgledi = new Map<string, NachalenIzgled>();
   let rachniyatRedNaDelata: readonly string[] = [];
   let lichnoVklyucheno = false;
+  let lichnoPipnato = false;
   let lichnoMyasto = '';
   const lichniDostapi = new Map<string, LichenDostap>();
   const lichniTemi = new Map<string, LichnaTema>();
@@ -1205,6 +1237,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'ЛичноПревключено': {
         const p = s.payload as unknown as PayloadLichnoPrevklyucheno;
         lichnoVklyucheno = p.vklyucheno; // последната дума бие
+        lichnoPipnato = true;
         // Мястото се пази и след прибиране: прибраното не е изтрито, а при
         // повторно пускане човекът не бива да го посочва наново.
         if (p.myasto) lichnoMyasto = p.myasto;
@@ -1552,15 +1585,41 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
       case 'МястоЗаписано': {
         // ПОСЛЕДНИЯТ ЗАПИС БИЕ · поправката на фирмата или папката е ново
         // събитие върху същата същност, не второ място.
+        //
+        // НО ТРИТЕ ПОЛЕТА СЕ СЛИВАТ (резен 99): липсващо поле значи „не го
+        // пипам" и старото остава; подадената нула (или празно състояние) е
+        // решение на човек и чисти. Същата сметка като при папката на Обекта
+        // („ИмотПоправен"): слети, поправката на фирмата щеше да изтрие
+        // стойността мълчаливо.
         const p = s.payload as unknown as PayloadMyastoZapisano;
+        const staro = mesta.get(svedenotoMyasto(p.ime));
         mesta.set(svedenotoMyasto(p.ime), {
           ime: p.ime,
           firma: p.firma,
           papka: p.papka,
-          seq: mesta.get(svedenotoMyasto(p.ime))?.seq ?? s.seq,
+          stoynost_st: p.stoynost_st ?? staro?.stoynost_st ?? 0,
+          kvadratura_kvsm: p.kvadratura_kvsm ?? staro?.kvadratura_kvsm ?? 0,
+          sastoyanie: p.sastoyanie ?? staro?.sastoyanie ?? '',
+          seq: staro?.seq ?? s.seq,
           kogato: String(s.ts),
           koy: s.actor,
         });
+        break;
+      }
+
+      case 'СъстояниеНаИмотЗаписано': {
+        // ПОСЛЕДНИЯТ ЗАПИС ЗА КЛЮЧА БИЕ · базовите шест не идват насам.
+        const p = s.payload as unknown as PayloadSastoyanieNaImotZapisano;
+        sastoyaniyaNaImotite.set(p.klyuch, p);
+        break;
+      }
+
+      case 'СъстояниеОтбелязаноКатоЗемя': {
+        // ПОСЛЕДНАТА ДУМА БИЕ · отметката ляга и върху базово състояние,
+        // затова живее в СВОЯ карта, а не в записа на номенклатурата.
+        const p = s.payload as unknown as PayloadSastoyanieOtbelyazanoKatoZemya;
+        if (p.zemya) zemniSastoyaniya.add(p.klyuch);
+        else zemniSastoyaniya.delete(p.klyuch);
         break;
       }
 
@@ -1615,6 +1674,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
           // празното е точният му смисъл, старото не се пренаписва (правило 1).
           vid: p.vid ?? 'среща',
           adres: p.adres,
+          // ИМОТЪТ по избор (резен 99) · запис отпреди него го няма и е празен.
+          imot: p.imot ?? '',
           data: p.data,
           chas: p.chas ?? '',
           sastoyanie: p.sastoyanie as SastoyanieNaSreshta,
@@ -1902,6 +1963,8 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     prodazhbi,
     dvizheniyaNaProdazhbi,
     etapiNaProdazhbite,
+    sastoyaniyaNaImotite,
+    zemniSastoyaniya,
     krediti,
     plashtaniyaPoKrediti,
     pogasitelniPlanove,
@@ -1931,6 +1994,7 @@ export function fold(sabitiya: readonly Sabitie[]): Ogledalo {
     nachalniIzgledi,
     rachniyatRedNaDelata,
     lichnoVklyucheno,
+    lichnoPipnato,
     lichnoMyasto,
     lichniDostapi,
     lichniTemi,
@@ -1994,7 +2058,7 @@ export function prosrocheni(o: Ogledalo, dnes: string): ProsrocheneVzemane[] {
     .sort((a, b) => b.dniZakasnenie - a.dniZakasnenie || a.id.localeCompare(b.id));
 }
 
-/** Остатъкът по наеми — карта naemId → дължимо в стотинки. */
+/** Остатъкът по наеми — карта naemId → дължимо в центове. */
 export function duljimoPoNaem(o: Ogledalo): Map<string, number> {
   const karta = new Map<string, number>();
   for (const v of o.vzemaniya.values()) {

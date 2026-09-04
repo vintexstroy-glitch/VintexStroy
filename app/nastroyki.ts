@@ -16,6 +16,7 @@
  */
 
 import { blokNaKredititeVNastroyki, zakachiKreditite } from './krediti.js';
+import { sektsiyaNaPravata, zakachiPravata } from './pravata.js';
 import { pishi } from '../src/yadro/pari.js';
 import {
   OPISI,
@@ -33,6 +34,22 @@ import {
   type Kontragent,
 } from '../src/domein/kontragenti.js';
 import { etapite } from '../src/domein/prodazhbi.js';
+import { sastoyaniyataNaImota } from '../src/domein/sastoyaniya-na-imot.js';
+import { narisuvaySluzhiteli, zakachiSluzhitelite } from './sluzhiteli.js';
+
+/**
+ * КОЙ ПОДТАБ Е ОТВОРЕН · поглед, не запис (резен 112 · ADR-158).
+ *
+ * Живее в ПАМЕТТА на устройството, като всеки друг изглед (ADR-022): Журналът
+ * не помни на кой таб е стоял човекът, а следващият вход го заварва там, където
+ * го е оставил.
+ *
+ * ЧЕТЕ СЕ ПРИ ВСЯКО РИСУВАНЕ, не веднъж при зареждане. Падащият ред сменя
+ * подтаба, като пише В ПАМЕТТА (`zavediDoSektsiyata`) — променлива, прочетена
+ * веднъж, щеше да остане на старото и кликът върху тема щеше да изглежда като
+ * нищо. Един дом на факта, две дръжки към него (ADR-134 §3).
+ */
+
 import { sektsiyaZhurnalat, zakachiZhurnalat } from './zhurnalat.js';
 import { sektsiyaGodinite, zakachiGodinite } from './godinite.js';
 import { branshovete, broyPostroeni, sveriBranshovete } from '../src/domein/modeli-po-bransh.js';
@@ -92,8 +109,9 @@ import type { Rolya as RolyaNaChovek } from '../src/yadro/samolichnost.js';
 import type { Ogledalo, ZapisanaSverka } from '../src/ogledalo/ogledalo.js';
 import { izboratZaSemeystvo, sravniGlavi } from '../src/domein/obshta-glava.js';
 import type { Konteks } from './ekranite.js';
-import { EKRANI, type KoyEkran } from './ekranite.js';
+import { EKRANI, type KoyEkran, REDAT_NA_LENTATA } from './ekranite.js';
 import { moyatRed, podredeniPunktove, zabraviMoyaRed, premestiVMoyaRed } from './lenta.js';
+import { IMENA_NA_GRUPITE, naDveGrupi, rabotnite } from '../src/domein/lenta.js';
 import {
   broySganati,
   ekraniSPodredba,
@@ -106,7 +124,14 @@ import {
 import { ZASHTO_I_NULATA } from '../src/yadro/sverka.js';
 import { izborPoPodrazbirane, mozhe, type Izbor } from '../src/domein/planove.js';
 import { rolyataNa } from '../src/domein/stopanin.js';
-import { vizhdaSektsiyata, type KoyGleda } from '../src/domein/temi-nastroyki.js';
+import {
+  podtabatNa,
+  podtabovete,
+  vizhdaSektsiyata,
+  type KoyGleda,
+} from '../src/domein/temi-nastroyki.js';
+import type { Samolichnost } from '../src/yadro/samolichnost.js';
+import { aktivniyatPodtab, lentataNaPodtabovete, zakachiPodtabovete } from './podtabove.js';
 import {
   eVgradenKlyuch,
   prazenModelZaVgradena,
@@ -198,6 +223,8 @@ export function narisuvayNastroyki(
    * екраните" щеше да предлага пункт, който човекът няма.
    */
   dostapni: readonly string[] = [],
+  /** КОЙ Е ВЛЯЗЪЛ · Служители живее тук от резен 112 и иска самоличността */
+  kojSam?: Samolichnost,
 ): string {
   punktoveNaLentata = punktove;
   const butoni = [...o.butoni.values()];
@@ -205,6 +232,17 @@ export function narisuvayNastroyki(
   // Присъдата на всяка секция е в домейна (`vizhdaSektsiyata`) — тук само се
   // пита. Секция, скрита оттук с гол `if`, би се разминала с падащия ред.
   const vizhda = (s: string): boolean => vizhdaSektsiyata(koy, s);
+  /**
+   * ЕДИН ПОДТАБ НАВЕДНЪЖ (резен 112 · ADR-158) · „да са самостоятелни активни
+   * подтабове". Секцията се рисува само когато е СВОЯ на активния — иначе
+   * екранът пак е един дълъг скрол, само че с лента отгоре.
+   *
+   * Запомненият подтаб може да е чужд (служител на устройството на Стопанина)
+   * или изчезнал — тогава се пада на ПЪРВИЯ видим, а не на празно.
+   */
+  const podtabove = podtabovete(koy);
+  const aktiven = aktivniyatPodtab('nastroyki', podtabove, 'moeto');
+  const tuk = (s: string): boolean => vizhda(s) && podtabatNa(s) === aktiven;
 
   return `
     ${
@@ -215,9 +253,11 @@ export function narisuvayNastroyki(
         : `<p class="drebno" data-samo-tvoite>Тук са ТВОИТЕ настройки. Стопанските —
       хедърите, бутоните, номенклатурите — ги вижда и мени само Стопанинът.</p>`
     }
+    ${lentataNaPodtabovete('nastroyki', podtabove, aktiven, 'Подтабовете на Настройки')}
+
     <div class="plochki">
       ${
-        vizhda('butoni')
+        tuk('butoni')
           ? `<div class="plochka">
         <span class="etiket">Бутони</span>
         <span class="chislo" translate="no">${butoni.length}</span>
@@ -226,7 +266,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('modeli')
+        tuk('modeli')
           ? `<div class="plochka">
         <span class="etiket">Модели на таблици</span>
         <span class="chislo" translate="no">${modeli.length}</span>
@@ -235,7 +275,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('sverki')
+        tuk('sverki')
           ? `<div class="plochka">
         <span class="etiket">Записани сверки</span>
         <span class="chislo" translate="no">${o.sverki.length}</span>
@@ -244,7 +284,7 @@ export function narisuvayNastroyki(
           : ''
       }
       ${
-        vizhda('patishta')
+        tuk('patishta')
           ? `<div class="plochka">
         <span class="etiket">Построени действия</span>
         <span class="chislo" translate="no">${
@@ -272,7 +312,7 @@ export function narisuvayNastroyki(
        * Сега изискването живее на ТЕМАТА (`temi-nastroyki.ts`), а тук отпадат
        * само двете ѝ секции. Правило 15: изключеното се КАЗВА, не се преглъща.
        */
-      !vizhda('butoni')
+      !tuk('butoni')
         ? ''
         : mozhe(izbor, 'iztochnitsi')
           ? blokNaButonite(butoni)
@@ -283,9 +323,9 @@ export function narisuvayNastroyki(
       план: пътища без облак водят наникъде. Всичко останало в Настройки работи.</p>
     </section>`
     }
-    ${dobavyam && vizhda('butoni') ? formaNaButon(modeli) : ''}
+    ${dobavyam && tuk('butoni') ? formaNaButon(modeli) : ''}
     ${
-      !vizhda('modeli')
+      !tuk('modeli')
         ? ''
         : mozhe(izbor, 'iztochnitsi')
           ? blokNaModelite(modeli)
@@ -296,19 +336,29 @@ export function narisuvayNastroyki(
       Хедърите и колоните им се редактират нормално.</p>
     </section>`
     }
-    ${vizhda('hedari') ? blokNaRedaktora(modeli, o) : ''}
-    ${vizhda('parametri') ? blokNaParametrite(o) : ''}
-    ${vizhda('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
+    ${tuk('hedari') ? blokNaRedaktora(modeli, o) : ''}
+    ${
+      /* КОЙ КАКВО ВИЖДА · върна се тук от Служители (И129 т.2 · резен 97 ·
+         ADR-156): служител · хедър · трите думи над всяка колона. */
+      tuk('sluzhiteli-horata') && kojSam ? narisuvaySluzhiteli(o, kojSam, dnes, izbor) : ''
+    }
+    ${
+      /* ПРАВАТА стоят ДО хората · един подтаб, две решения (резен 112). */
+      tuk('pravata') ? sektsiyaNaPravata(o, izbor, koy === 'stopanin', punktove) : ''
+    }
+    ${tuk('parametri') ? blokNaParametrite(o) : ''}
+    ${tuk('etapi-prodazhbi') ? blokNaEtapite(o) : ''}
+    ${tuk('sastoyaniya-imot') ? blokNaSastoyaniyataNaImota(o) : ''}
 
-    ${vizhda('krediti') ? blokNaKredititeVNastroyki() : ''}
-    ${vizhda('kontragenti') ? blokNaKontragentite(o) : ''}
-    ${vizhda('sverki') ? blokNaSverkite(o) : ''}
-    ${vizhda('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
-    ${vizhda('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
-    ${vizhda('branshove') ? blokNaBranshovete(dnes) : ''}
-    ${vizhda('patishta') ? blokNaDeystviyata() : ''}
-    ${blokNaPodredbata(o, dostapni, koy === 'stopanin')}
-    ${vizhda('karta') ? blokNaKartata() : ''}`;
+    ${tuk('krediti') ? blokNaKredititeVNastroyki() : ''}
+    ${tuk('kontragenti') ? blokNaKontragentite(o) : ''}
+    ${tuk('sverki') ? blokNaSverkite(o) : ''}
+    ${tuk('zhurnalat') ? sektsiyaZhurnalat(o, sabitiya, dnes) : ''}
+    ${tuk('godinite') ? sektsiyaGodinite(o, dnes, koy === 'stopanin') : ''}
+    ${tuk('branshove') ? blokNaBranshovete(dnes) : ''}
+    ${tuk('patishta') ? blokNaDeystviyata() : ''}
+    ${tuk('podredbata') ? blokNaPodredbata(o, dostapni, koy === 'stopanin') : ''}
+    ${tuk('karta') ? blokNaKartata() : ''}`;
 }
 
 // ── НАП · активирането със съгласие (резен 17 · И108 · И112) ────────────────
@@ -1209,6 +1259,83 @@ function blokNaEtapite(o: Ogledalo): string {
     </section>`;
 }
 
+/**
+ * СЪСТОЯНИЯТА НА ИМОТА · номенклатура като етапите (резен 99 · ADR-157).
+ *
+ * Негово, 03.09: списъкът да е „номенклатура от Настройки, като етапите".
+ * Шестте начални са работните от ADR-153 §3; новото се ДОБАВЯ, а базово не се
+ * презаписва — същата граница като при етапите на продажбата.
+ *
+ * Защо ТУК, а не в полето на Имоти: върху състоянието СМЯТА резен 104
+ * (ADR-165: „Строителство" ражда голямото дело и площообразуването), а „меню,
+ * върху което системата смята, расте само от Настройки" (И97).
+ */
+function blokNaSastoyaniyataNaImota(o: Ogledalo): string {
+  const spisak = sastoyaniyataNaImota(o);
+  const dobaveni = spisak.filter((s) => !s.bazov);
+  return `
+    <section data-sektsiya="sastoyaniya-imot">
+      <div class="dyalglava">
+        <h2>Състоянията на Имота</h2>
+        <span>шест начални + твоите · менюто в Имоти расте само оттук</span>
+      </div>
+
+      <p class="drebno">Негово, 02.09: „Оценката е Спешно и Важно, а <b>Състояние и
+      Статут е едно и стщо ползвай Състояние</b>." Състоянието е ИЗБОР на имота,
+      не събитие — а изборът се пълни оттук.</p>
+
+      <form id="forma-sastoyanie-imot" class="redditsa">
+        <label class="pole">
+          <span>Име на състоянието</span>
+          <input translate="no" name="sastoyanie" id="sastoyanie-imot-ime" placeholder="както ще стои в менюто">
+        </label>
+        <button type="submit">Добави състояние</button>
+      </form>
+      <p class="greshka" id="greshka-sastoyanie-imot"></p>
+
+      <p class="drebno" data-sastoyaniya-imot="${spisak.length}" data-dobaveni-sastoyaniya="${dobaveni.length}">
+      ${spisak.length} състояния общо · ${dobaveni.length} добавени.
+      ${
+        dobaveni.length === 0
+          ? 'Нито едно още — менюто стои с шестте начални.'
+          : 'Добавеното застава СЛЕД началните и веднага се избира в Имоти.'
+      }</p>
+
+      <div class="tablitsa" data-tablitsa="sastoyaniya-imot">
+        <div class="red glava etapred" translate="no">
+          <span class="kletka">Състояние</span>
+          <span class="kletka">Откъде</span>
+          <span class="kletka">Земя</span>
+        </div>
+        ${spisak
+          .map(
+            (s) => `
+        <div class="red etapred" translate="no" data-sastoyanie-imot="${ekraniraj(s.klyuch)}" data-zemya="${s.zemya ? 'da' : 'ne'}">
+          <span class="kletka">${ekraniraj(s.klyuch)}</span>
+          <span class="kletka">${s.bazov ? 'от начало' : 'добавено'}</span>
+          <span class="kletka"><label class="pole">
+            <input type="checkbox" data-zemya-za="${ekraniraj(s.klyuch)}"${s.zemya ? ' checked' : ''}>
+            <span class="drebno">земя</span>
+          </label></span>
+        </div>`,
+          )
+          .join('')}
+      </div>
+
+      <p class="drebno"><b>Отметката „земя" мени СМЕТКАТА, не надписа.</b>
+      Негово, 04.09: „<b>земя е Имот с различен Статут. Ще се добавят и трият
+      статутите</b>" — и на въпроса как се смята такъв Имот: „<b>Само земята,
+      без сграда и без наем</b>." Отметнатото състояние прави Имота земя за
+      Калкулатора: разходният подход дава само земята (без строителна стойност
+      и без овехтяване), а доходният отпада, защото празната земя няма очакван
+      наем — записан наем от Журнала обаче се ЗАЧИТА. Имената на състоянията са
+      твои и се добавят горе; кодът не ги гадае.</p>
+
+      <p class="drebno"><b>Началните шест не се презаписват.</b> „Изпълнен" не е
+      седмо състояние — то е краят на Строителство или на Ремонт, тоест ДЕЛО.</p>
+    </section>`;
+}
+
 function blokNaKontragentite(o: Ogledalo): string {
   const spisak = [...o.kontragenti.values()].sort(
     (a, b) => a.vid.localeCompare(b.vid) || a.ime.localeCompare(b.ime, 'bg'),
@@ -1407,7 +1534,15 @@ function blokNaDeystviyata(): string {
 function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: boolean): string {
   const punktove = podredeniPunktove(dostapni, o.redNaLentata, moyatRed());
   const ekrani = ekraniSPodredba().filter((e: string) => videniteSektsii(e).length > 1);
-  const posleden = punktove.length - 1;
+  /**
+   * ДВЕТЕ ГРУПИ И ТУК (резен 118 · ADR-163): редовете стоят по групи, с
+   * разделител, и стрелките спират на ГРАНИЦАТА на групата — „личният ред
+   * продължава да мести вътре в групата". Ръбът на целия списък вече не е
+   * ръбът: последният на работата няма „надолу", първият на второстепенните
+   * няма „нагоре".
+   */
+  const rabotni = rabotnite(REDAT_NA_LENTATA);
+  const grupite = naDveGrupi(punktove, rabotni);
 
   const strelki = (kade: string, klyuch: string, i: number, kray: number): string =>
     `<span class="premestvane">
@@ -1416,6 +1551,15 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: b
       <button type="button" class="premestvach" data-podredi="${kade}" data-klyuch="${ekraniraj(klyuch)}"
         data-posoka="dolu"${i === kray ? ' disabled' : ''} aria-label="надолу">▼</button>
     </span>`;
+  const redoveNaGrupata = (klyuchove: readonly string[]): string =>
+    klyuchove
+      .map(
+        (k, i) => `<div class="red opis" data-lentapunkt="${ekraniraj(k)}">
+          <span translate="no">${ekraniraj(EKRANI[k as KoyEkran]?.ime ?? k)}</span>
+          ${strelki('lenta', k, i, klyuchove.length - 1)}
+        </div>`,
+      )
+      .join('');
 
   return `
     <section data-sektsiya="podredbata">
@@ -1429,14 +1573,15 @@ function blokNaPodredbata(o: Ogledalo, dostapni: readonly string[], stopanski: b
 
       <div class="tablitsa" data-tablitsa="red-na-lentata">
         <div class="red glava"><span>пункт на лентата</span><span></span></div>
-        ${punktove
-          .map(
-            (k, i) => `<div class="red opis" data-lentapunkt="${ekraniraj(k)}">
-          <span translate="no">${ekraniraj(EKRANI[k as KoyEkran]?.ime ?? k)}</span>
-          ${strelki('lenta', k, i, posleden)}
-        </div>`,
-          )
-          .join('')}
+        ${redoveNaGrupata(grupite.rabotata)}
+        ${
+          grupite.vtorostepennite.length === 0
+            ? ''
+            : `<div class="red razdel" data-lenta-razdel="vtorostepennite" translate="no">
+          <span class="drebno">${IMENA_NA_GRUPITE.vtorostepennite}</span><span></span>
+        </div>`
+        }
+        ${redoveNaGrupata(grupite.vtorostepennite)}
       </div>
       <div class="deystviya">
         <button type="button" class="vtorichen malak" id="zabravi-reda-lenta">Върни реда на лентата</button>
@@ -1505,7 +1650,7 @@ function blokNaKartata(): string {
       </div>
       <div class="tablitsa">
         <div class="glava deystvie">
-          <span>Откъде</span><span>Накъде</span><span>Място</span><span>Състояние</span>
+          <span>Откъде</span><span>Накъде</span><span>Къде</span><span>Състояние</span>
         </div>
         ${VRAZKI.map(
           (v) => `<div class="red deystvie" translate="no">
@@ -1532,6 +1677,14 @@ export function zakachiNastroyki(
 ): void {
   // ОТМЕТКАТА ЗА ТАБЛИЦАТА КРЕДИТИ · същата дръжка, втори екран (резен 19).
   zakachiKreditite(koren, k, prerisuvay);
+  // Колонното право · двете падащи и клетките (резен 97 · ADR-156).
+  zakachiPravata(koren, k, prerisuvay);
+  // ХОРАТА · екранът Служители живее в подтаб оттук (резен 112 · ADR-158).
+  // Вика се винаги: закачането само търси възли и мълчи, когато подтабът е друг.
+  zakachiSluzhitelite(koren, k, prerisuvay);
+
+  // ЛЕНТАТА НА ПОДТАБОВЕТЕ · общият механизъм (резен 115 · ADR-161).
+  zakachiPodtabovete(koren, 'moeto', prerisuvay);
 
   /**
    * КОЯ Е РОЛЯТА · СМЯТА се от Журнала, не се твърди с литерал.
@@ -1611,6 +1764,59 @@ export function zakachiNastroyki(
       izhod.textContent = dumiZaGreshka(err);
     }
   });
+
+  /**
+   * НОВО СЪСТОЯНИЕ НА ИМОТА · същият ход като етапа (резен 99 · ADR-157).
+   *
+   * Отказът остава НА ЕКРАНА, не като вест: човекът още гледа полето си.
+   */
+  const formaSastoyanie = koren.querySelector<HTMLFormElement>('#forma-sastoyanie-imot');
+  formaSastoyanie?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const izhod = koren.querySelector<HTMLElement>('#greshka-sastoyanie-imot')!;
+    izhod.textContent = '';
+    const danni = new FormData(formaSastoyanie);
+    try {
+      await k.deystviya.zapishiSastoyanieNaImot(
+        { klyuch: String(danni.get('sastoyanie') ?? '') },
+        { opId: `sastoyanie-imot:${crypto.randomUUID()}` },
+      );
+      k.vest('dobre', 'Състоянието е добавено · вече стои в менюто на Имоти.');
+      await prerisuvay();
+    } catch (err) {
+      izhod.textContent = dumiZaGreshka(err);
+    }
+  });
+
+  /**
+   * ОТМЕТКАТА „ЗЕМЯ" · един слушател за всички редове (резен 111 · ADR-170).
+   *
+   * Пише в Журнала, защото върху нея СМЯТА Калкулаторът: това е решение на
+   * Стопанина, не поглед. Махането е същото събитие с `zemya: false` —
+   * последната дума бие, Журналът не се пипа (правило 1).
+   */
+  for (const kutiya of koren.querySelectorAll<HTMLInputElement>('[data-zemya-za]')) {
+    kutiya.addEventListener('change', async () => {
+      const izhod = koren.querySelector<HTMLElement>('#greshka-sastoyanie-imot');
+      if (izhod) izhod.textContent = '';
+      const klyuch = kutiya.dataset['zemyaZa'] ?? '';
+      try {
+        await k.deystviya.otbelezhiSastoyanieKatoZemya(
+          { klyuch, zemya: kutiya.checked },
+          { opId: `sastoyanie-zemya:${crypto.randomUUID()}` },
+        );
+        k.vest(
+          'dobre',
+          kutiya.checked
+            ? `„${klyuch}" вече значи ЗЕМЯ · Калкулаторът смята такъв Имот само по земята.`
+            : `„${klyuch}" вече не е земя · Имотът се смята като застроен.`,
+        );
+      } catch (err) {
+        if (izhod) izhod.textContent = dumiZaGreshka(err);
+      }
+      await prerisuvay();
+    });
+  }
 
   const formaKontragent = koren.querySelector<HTMLFormElement>('#forma-kontragent');
   formaKontragent?.addEventListener('submit', async (e) => {
@@ -1722,7 +1928,7 @@ export function zakachiNastroyki(
         const og = await k.deystviya.ogledalo();
         const vsichki = [...koren.querySelectorAll<HTMLElement>('[data-lentapunkt]')]
           .map((e) => e.dataset['lentapunkt'] ?? '');
-        premestiVMoyaRed(vsichki, og.redNaLentata, klyuch, posoka);
+        premestiVMoyaRed(vsichki, og.redNaLentata, klyuch, posoka, rabotnite(REDAT_NA_LENTATA));
       } else if (kade.startsWith('ekran:')) {
         premestiSektsiya(kade.slice('ekran:'.length), klyuch, posoka);
       }

@@ -171,10 +171,82 @@ export async function sSabitie(p: Page, deystvie: () => Promise<unknown>): Promi
   }, predi);
 }
 
+/**
+ * ВКАРВА ОБЕКТ · и Имота му, ако още го няма (резен 99 · ADR-157).
+ *
+ * Негово, 03.09: „Имоти и обекти се вкарват едновременно, просто обекта е
+ * опция." Значи един и същ ход ражда ЕДНО или ДВЕ събития — и помощникът
+ * трябва да знае кое от двете чака, иначе `sSabitie` виси трийсет секунди с
+ * „нещо не стана" вместо с число.
+ *
+ * Затова първо се пита МЕНЮТО: там ли е вече този Имот, и вписан ли е. Вписан
+ * → само обектът (едно събитие); нов или само изведен от обектите си → и двете.
+ */
 export async function dobaviImot(p: Page, adres: string, edinitsa: string, ploshtad?: string): Promise<void> {
-  await p.fill('#imot-adres', adres);
+  const veche = await p.$$eval(
+    '#imot-imot option',
+    (optsii, ime) =>
+      optsii
+        .map((x) => ({ stoynost: (x as HTMLOptionElement).value, ime: (x as HTMLElement).dataset['ime'], vpisan: (x as HTMLElement).dataset['vpisan'] }))
+        .find((x) => x.ime === ime),
+    adres,
+  );
+  if (veche) {
+    await p.selectOption('#imot-imot', veche.stoynost);
+    // Изборът пълни полетата на имота без прерисуване — чака се СВЪРШЕНОТО,
+    // не времето (обход Е на честността).
+    await p.waitForFunction(
+      (ime) => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === ime,
+      adres,
+    );
+  } else {
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', adres);
+  }
   await p.fill('#imot-edinitsa', edinitsa);
   if (ploshtad) await p.fill('#imot-ploshtad', ploshtad);
+  await sSabitiya(p, veche?.vpisan === 'da' ? 1 : 2, () => p.click('#forma-imot button[type=submit]'));
+}
+
+/** Полетата на Имота · всичките по избор, както са и на екрана. */
+export interface ImotVhod {
+  readonly firma?: string;
+  readonly stoynost?: string;
+  readonly kvadratura?: string;
+  readonly sastoyanie?: string;
+  readonly papka?: string;
+}
+
+/**
+ * ВКАРВА САМО ИМОТ · без обект (резен 99).
+ *
+ * „има Имот без Обект" (И131 т.2) — това е ходът, който го прави. Едно събитие:
+ * обект не се ражда.
+ */
+export async function dobaviImotBezObekt(p: Page, ime: string, n: ImotVhod = {}): Promise<void> {
+  const veche = await p.$$eval(
+    '#imot-imot option',
+    (optsii, tarseno) =>
+      optsii
+        .map((x) => ({ stoynost: (x as HTMLOptionElement).value, ime: (x as HTMLElement).dataset['ime'] }))
+        .find((x) => x.ime === tarseno),
+    ime,
+  );
+  if (veche) {
+    await p.selectOption('#imot-imot', veche.stoynost);
+    await p.waitForFunction(
+      (tarseno) => (document.querySelector('#imot-imot') as HTMLSelectElement | null)?.selectedOptions[0]?.dataset['ime'] === tarseno,
+      ime,
+    );
+  } else {
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', ime);
+  }
+  if (n.firma !== undefined) await p.fill('#imot-firma', n.firma);
+  if (n.stoynost !== undefined) await p.fill('#imot-stoynost', n.stoynost);
+  if (n.kvadratura !== undefined) await p.fill('#imot-kvadratura', n.kvadratura);
+  if (n.sastoyanie !== undefined) await p.selectOption('#imot-sastoyanie', n.sastoyanie);
+  if (n.papka !== undefined) await p.fill('#imot-papka-imota', n.papka);
   await sSabitie(p, () => p.click('#forma-imot button[type=submit]'));
 }
 
@@ -287,6 +359,11 @@ export async function zapishiRazhod(
   p: Page,
   { potok, sektor, dostavchik, opis, suma, nachin, data, dokument, stavka, prepiska }: RazhodVhod,
 ): Promise<void> {
+  // ФОРМАТА ЖИВЕЕ В ПОДТАБ „РАЗХОД" (резен 115 · ADR-161). Помощникът я намира
+  // сам: инак всеки от трийсетината му викащи щеше да носи по един ред за това.
+  if ((await p.$('#forma-razhod')) === null) {
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
+  }
   await p.selectOption('#razhod-potok', potok);
   // Сектор се избира САМО при „Фактури". Заплатите и кредитите взимат
   // акумулатора си ОТ ПОТОКА (`app/smetki.ts` · `dds.ts`): те не носят ДДС и
@@ -364,7 +441,7 @@ export async function chisloNaPoleto2(p: Page, klyuch: string): Promise<number> 
   return Number(tekst.replace(/[^\d-]/g, ''));
 }
 
-/** Числото на едно поле от Отчети, в цели стотинки — за да се СМЯТА, не да се сравнява текст. */
+/** Числото на едно поле от Отчети, в цели центове — за да се СМЯТА, не да се сравнява текст. */
 export async function chisloNaPoleto(p: Page, klyuch: string): Promise<number> {
   const tekst = await tekstNaPoleto(p, klyuch);
   // „−12 500,00 €" → −1250000; неразделимите интервали и знакът за евро падат
@@ -409,6 +486,9 @@ export async function zapishiDelo(
 export async function smetni(p: Page, opis: string, suma: string, stavka: string): Promise<void> {
   // Екранът се прерисува целият след всяко действие — чака се РЕДЪТ да се появи,
   // не просто таблицата, иначе следващото писане пада върху сменен DOM.
+  if ((await p.$('#forma-smyatane')) === null) {
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-smyatane');
+  }
   const predi = await p.$$eval('.red.smyatane', (r) => r.length);
   await p.fill('#smyatane-opis', opis);
   await p.fill('#smyatane-suma', suma);
@@ -536,4 +616,113 @@ export async function napishiSigurno(p: Page, znak: string, stoynost: string): P
     [znak, stoynost],
     { timeout: 5_000 },
   );
+}
+
+/**
+ * СЛУЖИТЕЛЯТ, който проходът играе · Бамстера от §20 (редактор).
+ *
+ * ЕДИН дом за влизането: §53–§56 (Личното е на служителя · ADR-154) и §141
+ * (Настройките на служителя) влизат по един и същ път. Дотук рецептата
+ * живееше в §141 с двусъбитийна стопанска верига, написана на ръка; на второ
+ * място същата рецепта щеше да се размине — и книгата на служителя с книгата
+ * на Стопанина.
+ */
+export const SLUZHITELYAT = { email: 'Ivaylo85Petkov@gmail.com', name: 'Бамстера', sub: '5556667778' } as const;
+const STOPANINAT = 'vintexstroy@gmail.com';
+
+/**
+ * ИЗЛИЗА и ВЛИЗА като служителя. Презарежда страницата: никой блок след това
+ * не бива да разчита на състоянието отпреди.
+ *
+ * КНИГАТА НА СЛУЖИТЕЛЯ иска стопанската верига ВЪТРЕ (ADR-055): на своето
+ * устройство той отваря книга под СВОЯ ключ, а чуждите вериги пристигат по
+ * Драйва. Проходът играе Драйва по похвата на §67 — пренася ЦЯЛАТА верига на
+ * Стопанина, каквато е в този миг, в книгата на служителя под ключа на писача,
+ * ПРЕДИ входа; при второ влизане досипва само новото (ключът на носителя е
+ * наемател + seq, повторен запис би гръмнал). Без нея служителят е стопанин
+ * на празна книга и вижда всичко — вярно по устройство, но не е сценарият на
+ * нито един резен.
+ */
+export async function vlezKatoSluzhitelya(p: Page): Promise<void> {
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  // Подложката се слага СЛЕД презареждането — то чисти всичко от `evaluate`.
+  await p.evaluate((koy) => {
+    (globalThis as unknown as { __kojVliza: unknown }).__kojVliza = koy;
+  }, SLUZHITELYAT);
+  await p.evaluate(async ([kniga, stopanin]) => {
+    const db = await new Promise<IDBDatabase>((da, ne) => {
+      const z = indexedDB.open('masterbook');
+      z.onsuccess = () => da(z.result);
+      z.onerror = () => ne(z.error);
+    });
+    const vsichki = await new Promise<{ naematel: string; seq: number }[]>((da, ne) => {
+      const z = db.transaction('sabitiya', 'readonly').objectStore('sabitiya').getAll();
+      z.onsuccess = () => da(z.result);
+      z.onerror = () => ne(z.error);
+    });
+    const veriga = `${kniga}#pero:${stopanin}`;
+    const doseq = Math.max(0, ...vsichki.filter((s) => s.naematel === veriga).map((s) => s.seq));
+    const novi = vsichki
+      .filter((s) => s.naematel === stopanin && s.seq > doseq)
+      .map((s) => ({ ...s, naematel: veriga }));
+    for (const s of novi) {
+      await new Promise<void>((da, ne) => {
+        const z = db.transaction('sabitiya', 'readwrite').objectStore('sabitiya').add(s);
+        z.onsuccess = () => da();
+        z.onerror = () => ne(z.error);
+      });
+    }
+  }, [SLUZHITELYAT.email.toLowerCase(), STOPANINAT]);
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+}
+
+/** ОБРАТНО Стопанинът · проходът оставя книгата на онзи, който я е почнал. */
+export async function varniSeKatoStopanina(p: Page): Promise<void> {
+  await naEkran(p, 'tablo', '#izlez');
+  await p.click('#izlez');
+  await p.waitForSelector('#podstaven-google');
+  await p.click('#podstaven-google');
+  await p.waitForSelector('#nastroyki-vhod');
+}
+
+/** ОТВАРЯ панела на Профила, ако е затворен · прерисуването го затваря само. */
+export async function otvoriProfila(p: Page): Promise<void> {
+  if (await p.$eval('#profil-panel', (e) => (e as HTMLElement).hidden)) await p.click('#profil-avatar');
+  await p.waitForSelector('#profil-panel:not([hidden])');
+}
+
+/**
+ * ОТВАРЯ ПОДТАБ НА НАСТРОЙКИ · и чака секцията му (резен 112 · ADR-158).
+ *
+ * Негово, 03.09: „когато цъкнеш на подтаб от менюто да отваря само секцията
+ * вътре, а не да те препраща в скрола". Затова тук се натиска БУТОН на лентата,
+ * а после се чака ЗНАКЪТ на онова, което подтабът носи — свършеното, не времето.
+ */
+export async function naPodtab(p: Page, podtab: string, znak: string): Promise<void> {
+  await naPodtabNa(p, 'nastroyki', podtab, znak);
+}
+
+/**
+ * СЪЩОТО, НО ЗА ВСЕКИ ЕКРАН С ПОДТАБОВЕ (резен 115 · ADR-161).
+ *
+ * Сметки получи лентата втори; механизмът е един (`app/podtabove.ts`), затова
+ * и помощникът е един. Ключовете на двата екрана не се застъпват, но селекторът
+ * пак минава през `[data-podtabove-na]`: гол `[data-podtab]` върху екран, който
+ * утре ще е трети, е точно дефектът, който обход Б брои.
+ */
+export async function naPodtabNa(
+  p: Page,
+  ekran: string,
+  podtab: string,
+  znak: string,
+): Promise<void> {
+  const znakNaButona = `[data-podtabove-na="${ekran}"] [data-podtab="${podtab}"]`;
+  if ((await p.$(`${znakNaButona}.tuk`)) === null) {
+    await naEkran(p, ekran, znakNaButona);
+    await deystvieSPrerisuvane(p, () => p.click(znakNaButona));
+  }
+  await p.waitForSelector(znak);
 }

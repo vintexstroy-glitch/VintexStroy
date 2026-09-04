@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, broySabitiya, denOtDnes, deystvieSPrerisuvane, naEkran, napishiSigurno, natisni, plochka, tekstNa, zapishiDelo, zapishiRazhod } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 
 /** 57 · Менютата · речникът е от Журнала | 57 · Менютата · четирите състояния | 57 · Менютата · следата СЛЕД записа | 58 · Още огледала · по обект | 58 · Още огледала · по контрагент */
@@ -9,11 +9,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
   const proveri = (kakvo: string, vidyano: unknown, ochakvano: unknown): boolean =>
     broyach.proveri(razdel, kakvo, vidyano, ochakvano);
     razdel = '57 · Менютата · речникът е от Журнала';
-    proveri('полето „Място" носи СПИСЪК, а не само текст',
+    proveri('полето „Имот" носи СПИСЪК, а не само текст',
       await p.$eval('#d-myasto', (e) => e.getAttribute('list')), 'd-myasto-spisak');
     const mestaVSpisaka = await p.$$eval('#d-myasto-spisak option', (o) => o.map((x) => (x as any).value));
+    // ОТ РЕЗЕН 100 (И124 т.8 „избор от наличното за дело"): след живите места
+    // стоят и ВПИСАНИТЕ Имоти без дело — първите две остават живите.
     proveri('и в списъка стоят ЖИВИТЕ места, най-писаното горе',
-      mestaVSpisaka, ['Малинова', 'Хисаря']);
+      mestaVSpisaka.slice(0, 2), ['Малинова', 'Хисаря']);
     proveri('отговорниците също · речникът е на всяко поле',
       (await p.$$eval('#d-otgovornik-spisak option', (o) => o.map((x) => (x as any).value))).length, 3);
     proveri('и НИЩО ново не е записано за речниците',
@@ -261,7 +263,7 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
       kazvaSektor.includes('ЗДДС') && !kazvaSektor.includes('Настройки'), true);
 
     razdel = '59 · Менютата · Сметки';
-    await naEkran(p, 'smetki', '#razhod-dostavchik');
+    await naPodtabNa(p, 'smetki', 'razhod', '#razhod-dostavchik');
     proveri('„Доставчик" носи списък от записаните разходи',
       (await p.$$eval('#razhod-dostavchik-spisak option', (o) => o.length)) > 0, true);
     proveri('и „За какво" също · двете полета, не едното',
@@ -379,7 +381,7 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     // пункт; секция с ТРИ (Кредити) дава три подпункта с имената им.
     // Кредитите са СЕКЦИЯ на Баланс, не свой екран (ADR-143 · редът на
     // лентата) — редът, който ги изрежда, е неговият.
-    await naEkran(p, 'smetki', '[data-sektsiya=krediti]');
+    await naPodtabNa(p, 'smetki', 'razhod', '[data-sektsiya=krediti]');
     // КЛИКЪТ Е УСЛОВЕН: `naEkran` натиска СЪЩИЯ пункт, за да смени екрана — а
     // пунктът е един бутон с две задачи (ADR-057в), тоест редът вече е
     // отворен. Втори клик щеше да го ЗАТВОРИ, и чакането да виси върху
@@ -404,23 +406,58 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
       .then(() => true)
       .catch(() => false);
     proveri('натиснатият подпункт завежда до СВОЯТА таблица', zavelo, true);
+    // ЗАВЕЖДАНЕТО Е АСИНХРОНО · чака се екранът да се УТАЛОЖИ, преди да се
+    // тръгне другаде. Без това при бавна машина недовършеното „заведи" връщаше
+    // екрана на Сметки СЛЕД като проходът вече е поискал Имоти — и следващият
+    // раздел четеше реда на ТЕКУЩИЯ екран (той изрежда само видимия подтаб),
+    // тоест находката беше измислена от състезание, не от кода.
+    const naEkranaE = async (ime: string): Promise<void> => {
+      await p.waitForFunction(
+        (t) => document.querySelector('.shapka h1')?.textContent?.trim() === t,
+        ime,
+        { timeout: 10_000 },
+      );
+    };
+    await naEkranaE('Сметки');
     await naEkran(p, 'imoti', '#forma-imot');
+    await naEkranaE('Имоти');
 
     razdel = '71 · Падащият ред на екрана · какво изрежда';
     const vhodSmetki = '.padasht-menyu > [data-ekran=smetki]';
     proveri('пунктът КАЗВА, че носи ред', await p.$eval(vhodSmetki, (e) => e.getAttribute('aria-expanded')), 'false');
     await p.click(vhodSmetki);
     await p.waitForSelector('#ekran-red-smetki:not([hidden])');
+    // ПУНКТЪТ И ЗАВЕЖДА („един бутон с две задачи"): натискането отваря реда
+    // И сменя екрана на Сметки, асинхронно. Редът се появява в СТАРИЯ DOM
+    // веднага, а прерисуването идва след миг — и всичко, прочетено или
+    // натиснато между двете, стъпва върху възел, който след малко го няма
+    // („element was detached, retrying" до изтичане на времето). Тринайсет
+    // пускания и една сонда, за да се види: превъртането НЕ прерисува (нула
+    // мутации), навигацията прерисува. Затова се чака екранът, чак после се чете.
+    await naEkranaE('Сметки');
     proveri('и се отваря', await p.$eval(vhodSmetki, (e) => e.getAttribute('aria-expanded')), 'true');
-    const redove = await p.$$eval('#ekran-red-smetki [data-kam-sektsiya]', (e) => e.length);
-    proveri('изрежда секциите на Сметки · повече от десет', redove > 10, true);
-    proveri('и всяка носи ИМЕТО си, не ключа',
-      await p.$eval('#ekran-red-smetki [data-kam-sektsiya="smetki-dds"] b', (e) => e.textContent!.trim()),
-      'ДДС');
+    // ЕДНА СНИМКА, не три четения (честност · обход Е): редът се строи наново
+    // при всяко рисуване, а между две четения екранът може да е прерисувал —
+    // тогава двете четения описват РАЗЛИЧНИ редове и находката е измислена.
+    const snimka = await p.$$eval('#ekran-red-smetki [data-kam-sektsiya]', (e) => ({
+      klyuchove: [...new Set(e.map((x) => x.getAttribute('data-kam-sektsiya') ?? ''))],
+      dds: e
+        .filter((x) => x.getAttribute('data-kam-sektsiya') === 'smetki-dds' && !x.hasAttribute('data-kam-tablitsa'))
+        .map((x) => x.textContent!.trim())
+        .join(' | '),
+    }));
+    proveri('изрежда секциите на Сметки · повече от десет', snimka.klyuchove.length > 10, true);
+    // ОТ РЕЗЕН 115: редът изрежда секциите на ВСИЧКИТЕ пет подтаба, не само на
+    // видимия — иначе би зависел от историята на устройството. На провал се
+    // изписва целият списък, за да се вижда КОЕ липсва, не само че липсва.
+    proveri('и носи секция от подтаб Баланс',
+      snimka.klyuchove.includes('smetki-dds') ? 'да' : `няма · ${snimka.klyuchove.join(' · ')}`, 'да');
+    proveri('и всяка носи ИМЕТО си, не ключа', snimka.dds, 'ДДС');
 
     razdel = '71 · Падащият ред на екрана · води до секцията';
     // Подчертаването живее 1,6 секунди и си отива само — чака се да се появи,
-    // вместо да се чете след прерисуването.
+    // вместо да се чете след прерисуването. Показалецът е истински: екранът
+    // вече е уталожен (виж по-горе), значи няма кой да откачи бутона.
     await p.click('#ekran-red-smetki [data-kam-sektsiya="smetki-dds"]');
     // ПЪРВО се чака СМЯНАТА на екрана, чак после белегът. Сметки е най-тежкият
     // екран и рисуването му изяжда кадрите; чакането направо за белега тръгва

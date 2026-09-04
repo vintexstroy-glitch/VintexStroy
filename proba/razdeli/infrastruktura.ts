@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
+import { naPodtabNa, naPodtab, OTKRIVASHTOTO, broySabitiya, deystvieSPrerisuvane, dobaviImot, dobaviNaem, naEkran, natisni, plochka, redove, sSabitie, sSabitiya, tekstNa, vlezOtnovo } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -17,12 +17,12 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // проходът се прибира там изрично, както би направил и човек.
     await p.waitForSelector('.nav');
     await naEkran(p, 'imoti', '#forma-imot');
-    proveri('събитията оцеляха', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('събитията оцеляха', await broySabitiya(p), 15 + OTKRIVASHTOTO);
     proveri('месечният наем оцеля', await plochka(p, 'Месечен наем'), '2 000,00 €');
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-02');
     await p.click('#forma-period button[type=submit]');
-    await p.waitForFunction(() => document.body.innerText.includes('наем · търговски'));
+    await p.waitForFunction(() => (document.body.textContent ?? '').includes('Приход за 2026-02'));
     proveri('ДДС оцеля', await plochka(p, 'ДДС за внасяне'), '200,00 €');
 
     // ══ 9 · веригата ═════════════════════════════════════════════════════
@@ -33,7 +33,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     // „съгласни ли са веригите помежду си". Тук книгата е с един писач, тъй
     // че вторият е нулевата сверка — и нулата ПАК се казва (правило 7).
     proveri('веригата е цяла, 13 звена', await tekstNa(p, '.vest'),
-      `Веригата е цяла · ${12 + OTKRIVASHTOTO} от ${12 + OTKRIVASHTOTO} звена. ` +
+      `Веригата е цяла · ${15 + OTKRIVASHTOTO} от ${15 + OTKRIVASHTOTO} звена. ` +
       'Сверката на единствената верига: нула сблъсъка.');
     await naEkran(p, 'imoti', '#forma-imot');
 
@@ -42,7 +42,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     const [svaleno] = await Promise.all([p.waitForEvent('download'), natisni(p, '#iznesi')]);
     const patyat = await svaleno.path();
     const izneseni = JSON.parse(await readFile(patyat, 'utf8'));
-    proveri('изнесени 12 събития + откриващото', izneseni.length, 12 + OTKRIVASHTOTO);
+    proveri('изнесени 15 събития + откриващото', izneseni.length, 15 + OTKRIVASHTOTO);
     // ПЪРВОТО В ИЗНОСА Е СТОПАНИНЪТ · законът пътува с файла, не само с базата.
     proveri('и първото в износа е Стопанинът', izneseni[0].type, 'СтопанинЗаписан');
     proveri('всяко носи hash и prevHash', izneseni.every((x: any) => x.hash && x.prevHash !== undefined), true);
@@ -53,7 +53,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     razdel = '10б · внасяне';
     await p.setInputFiles('#fayl', patyat);
     await p.waitForFunction(() => document.body.innerText.includes('Файлът вече е тук'));
-    proveri('същият файл не добавя нищо', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('същият файл не добавя нищо', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // подправен файл — отказва се изцяло
     const podpraven = `${patyat}.podpraven.json`;
@@ -66,14 +66,14 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     const otkaz = await tekstNa(p, '.vest');
     proveri('казва къде се къса', otkaz.includes('се къса на seq 4'), true);
     proveri('казва, че нищо не е внесено', otkaz.includes('Нищо не е внесено'), true);
-    proveri('Журналът не е пипнат', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('Журналът не е пипнат', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // файл, който изобщо не е Журнал
     const bokluk = `${patyat}.boklu.json`;
     await writeFile(bokluk, '{"каквото и да е": 1}');
     await p.setInputFiles('#fayl', bokluk);
     await p.waitForFunction(() => document.body.innerText.includes('не е редица от събития'));
-    proveri('и след боклук Журналът е цял', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('и след боклук Журналът е цял', await broySabitiya(p), 15 + OTKRIVASHTOTO);
 
     // ══ 11 · тесен екран ═════════════════════════════════════════════════
     razdel = '11 · тесен екран';
@@ -143,8 +143,9 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
 
     // +2 записа И +1 СверкаЗаписана: сверката вече живее в Журнала, не в паметта.
     await sSabitiya(p, 3, () => p.click('#prilozhi'));
-    proveri('двайсет и две събития', await broySabitiya(p), 22 + OTKRIVASHTOTO);
+    proveri('двайсет и пет събития', await broySabitiya(p), 25 + OTKRIVASHTOTO);
     proveri('вестта казва, че сверката е ЗАПИСАНА', (await tekstNa(p, '.vest')).includes('ЗАПИСАНА в Журнала'), true);
+    await naPodtabNa(p, 'smetki', 'balans', '.red.smetka');
     proveri('Фактури пораснаха', (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3], '1 200,00 €');
 
     // поправен файл за същия месец: една сума сменена, един ред махнат
@@ -164,7 +165,8 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('филтърът „всичко" пак дава два', (await redove(p, '.red.razlika')).length, 2);
 
     await sSabitiya(p, 4, () => p.click('#prilozhi'));
-    proveri('двайсет и шест събития', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('двайсет и девет събития', await broySabitiya(p), 29 + OTKRIVASHTOTO);
+    await naPodtabNa(p, 'smetki', 'balans', '.red.smetka');
     proveri(
       'Фактури казват това, което казва новият файл',
       (await redove(p, '.red.smetka')).find((x) => (x[0] as any).startsWith('Фактури'))?.[3],
@@ -204,15 +206,16 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     const vest = await tekstNa(p, '.vest');
     proveri('посочва точния seq', vest.includes(`seq ${podmenen}`), true);
     proveri('казва, че Вратата е спряна', vest.includes('Вратата е спряна'), true);
-    proveri('Журналът не е пипан', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('Журналът не е пипан', await broySabitiya(p), 29 + OTKRIVASHTOTO);
 
     await naEkran(p, 'imoti', '#forma-imot');
-    await p.fill('#imot-adres', 'След инцидента');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'След инцидента');
     await p.fill('#imot-edinitsa', 'не влиза');
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('спирателният кран държи записа', (await tekstNa(p, '#greshka-imot')).length > 0, true);
-    proveri('нищо ново не влезе', await broySabitiya(p), 26 + OTKRIVASHTOTO);
+    proveri('нищо ново не влезе', await broySabitiya(p), 29 + OTKRIVASHTOTO);
 
     // ══ 13 · хранилището и котвата ═══════════════════════════════════════
     razdel = '13 · хранилище и котва';
@@ -248,7 +251,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
         t.onerror = () => ne(t.error);
       });
       (db as any).close();
-    }, { akaunt: akauntNaEkrana, posledniyat: 26 + OTKRIVASHTOTO });
+    }, { akaunt: akauntNaEkrana, posledniyat: 29 + OTKRIVASHTOTO });
 
     await p.reload();
     await p.waitForSelector('.vest.zle');
@@ -258,12 +261,13 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     proveri('и че кранът е дръпнат', trevoga.includes('Вратата е спряна'), true);
 
     await p.waitForSelector('#forma-imot');
-    await p.fill('#imot-adres', 'След котвата');
+    await p.selectOption('#imot-imot', '');
+    await p.fill('#imot-ime', 'След котвата');
     await p.fill('#imot-edinitsa', 'не влиза');
     await p.click('#forma-imot button[type=submit]');
     await p.waitForFunction(() => document.querySelector('#greshka-imot')?.textContent !== '');
     proveri('записът е отказан с думи', (await tekstNa(p, '#greshka-imot')).includes('котвата'), true);
-    proveri('Журналът остава на 24', await broySabitiya(p), 24 + OTKRIVASHTOTO);
+    proveri('Журналът остава на 27', await broySabitiya(p), 27 + OTKRIVASHTOTO);
     // ══ 14 · справката заключва, архивът излиза, филтрите режат ══════════
     razdel = '14 · справка, архив, филтри';
     // Котвата спря Вратата в раздел 13 — за тези проверки се тръгва начисто.
@@ -303,13 +307,16 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await naEkran(p, 'smetki', '#forma-period');
     await p.fill('#smetki-period', '2026-03');
     await deystvieSPrerisuvane(p, () => p.click('#forma-period button[type=submit]'));
+    // Справката и ДДС живеят в подтаб „Баланс" (резен 115 · ADR-161).
+    await naPodtabNa(p, 'smetki', 'balans', '#forma-spravka');
     proveri('изчисленото стои в блока', await plochka(p, 'Изчислено в Баланс'), '200,00 €');
 
     await p.fill('#spravka-data', '2026-04-10');
     await sSabitie(p, () => p.click('#forma-spravka button[type=submit]'));
     proveri('казва, че месецът е заключен', (await tekstNa(p, '.vest')).includes('заключен'), true);
 
-    // заключеният месец отказва разход през формата
+    // заключеният месец отказва разход през формата (тя е в подтаб „Разход")
+    await naPodtabNa(p, 'smetki', 'razhod', '#forma-razhod');
     await p.selectOption('#razhod-potok', 'fakturi');
     await p.fill('#razhod-dostavchik', 'Опит ООД');
     await p.fill('#razhod-opis', 'опит');
@@ -326,6 +333,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
       /[A-Za-z]{4,}/.test(await tekstNa(p, '#greshka-razhod')), false);
 
     // внесеното на ръка — на части, разликата свети и после гасне
+    await naPodtabNa(p, 'smetki', 'balans', '#forma-dds-plateno');
     await p.fill('#dds-suma', '150,00');
     await p.fill('#dds-data', '2026-04-14');
     await sSabitie(p, () => p.click('#forma-dds-plateno button[type=submit]'));
@@ -429,7 +437,8 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     // Работи ли се офлайн, или само се гледа: нов имот трябва да влезе.
     await naEkran(p, 'imoti', '#forma-imot');
     await dobaviImot(p, 'Офлайн', 'без мрежа', '');
-    proveri('и се ПИШЕ офлайн', await broySabitiya(p), predi + 1);
+    // ДВЕ събития: „Офлайн" е нов имот и влиза заедно с обекта си (резен 99).
+    proveri('и се ПИШЕ офлайн', await broySabitiya(p), predi + 2);
 
     await p.context().setOffline(false);
     tishina.ochakvana = false;
@@ -496,13 +505,17 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от тях
+      // (резен 115), а „#razhod-dostavchik" живее само в РАЗХОД.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      // НАСТРОЙКИ се познава по ЛЕНТАТА на подтабовете · тя стои на всеки от
+      // тях (резен 112), а „#nov-buton" живее само в БИЗНЕСЪТ.
+      ['nastroyki', '[data-podtabove]'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       proveri(`екран „${ekran}" · полетата са защитени`,
@@ -512,6 +525,33 @@ export async function blok4(ctx: KonteksNaProhoda): Promise<void> {
           return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || (e as any).name).join(' · ')}`) : 'няма полета';
         }),
         'всички');
+    }
+
+    // И ВСЕКИ ПОДТАБ НА ДВАТА ЕКРАНА С ЛЕНТА (резен 112 · ADR-158 · резен 115 ·
+    // ADR-161): екранът рисува ЕДИН наведнъж, значи обход само по видимия би
+    // пазил една пета от полетата.
+    //
+    // СПИСЪКЪТ СЕ ЧЕТЕ НА СВОЯ ЕКРАН. Дотук се четеше там, където проходът е
+    // спрял (Табло) — а Таблото няма подтабове, тоест списъкът излизаше ПРАЗЕН
+    // и целият обход не проверяваше нищо. Обход, който мълчи вярно, е по-скъп
+    // от липсващ (ADR-051): затова тук първо се отива на екрана, и чак после
+    // се брои.
+    const golaPoveretka = async (): Promise<string> =>
+      p.evaluate(() => {
+        const poleta = [...document.querySelectorAll('input:not([type=checkbox]), select')];
+        const goli = poleta.filter((e) => e.getAttribute('translate') !== 'no');
+        return poleta.length > 0 ? (goli.length === 0 ? 'всички' : `голи: ${goli.map((e) => e.id || (e as any).name).join(' · ')}`) : 'няма полета';
+      });
+    for (const ekran of ['nastroyki', 'smetki'] as const) {
+      await naEkran(p, ekran, `[data-podtabove-na=${ekran}]`);
+      const podtabove = await p.$$eval(`[data-podtabove-na=${ekran}] [data-podtab]`, (e) =>
+        e.map((x) => x.getAttribute('data-podtab') ?? ''));
+      proveri(`екран „${ekran}" · лентата носи подтабове`, podtabove.length > 0, true);
+      for (const podtab of podtabove) {
+        await naPodtabNa(p, ekran, podtab, `[data-podtabove-na=${ekran}] [data-podtab="${podtab}"].tuk`);
+        proveri(`подтаб „${ekran} · ${podtab}" · полетата са защитени`,
+          await golaPoveretka(), 'всички');
+      }
     }
 
     // ══ 67 · МНОГОТО ВЕРИГИ · вторият писач в ЕДНА книга (ADR-055) ══════════
@@ -563,13 +603,15 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ и НАСТРОЙКИ се познават по ЛЕНТАТА на подтабовете · тя стои на
+      // всеки от тях (резен 112 · резен 115), а формите живеят по един подтаб.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      ['nastroyki', '[data-podtabove-na=nastroyki]'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на
@@ -673,7 +715,8 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
 
     // ── СГЪВАНЕТО НА ДЯЛА · „да е СКРИТО с дребни бутончета" (И101) ────────
     razdel = '134б · дялът се сгъва';
-    await naEkran(p, 'smetki', '#forma-period');
+    // Салдата са в ГЛАВНИЯ подтаб на Сметки (резен 115 · ADR-161).
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-salda]');
     const vidimiPoleta = async (): Promise<number> =>
       p.$$eval('[data-sektsiya=smetki-salda] input, [data-sektsiya=smetki-salda] button:not([data-sgavane])', (e) =>
         e.filter((x) => {
@@ -705,11 +748,11 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     // ЧАКА СЕ СЕКЦИЯТА, не поле в нея: сгънатият дял НЯМА видимо поле, и
     // чакането щеше да виси трийсет секунди върху собствения си успех.
     await naEkran(p, 'imoti', '#forma-imot');
-    await naEkran(p, 'smetki', '[data-sektsiya=smetki-salda]');
+    await naPodtabNa(p, 'smetki', 'smetki', '[data-sektsiya=smetki-salda]');
     proveri('и остава сгънат след връщане', await vidimiPoleta(), 0);
 
     // ВСИЧКИ НАВЕДНЪЖ · от Настройки, където той решава кое как работи.
-    await naEkran(p, 'nastroyki', '[data-sektsiya=podredbata]');
+    await naPodtab(p, 'moeto', '[data-sektsiya=podredbata]');
     // ПРЕЗ ГРУПАТА · трите действия на картата станаха група (ADR-057) и
     // видимо стои само последно избраното. Точно за това е `natisni`.
     await deystvieSPrerisuvane(p, () => natisni(p, '[data-razgani-vsichki="smetki"]'));
@@ -727,14 +770,16 @@ export async function blok6(ctx: KonteksNaProhoda): Promise<void> {
     for (const [ekran, znak] of [
       ['imoti', '#forma-imot'],
       ['pari', '#forma-nachisli'],
-      ['smetki', '#razhod-dostavchik'],
+      // СМЕТКИ и НАСТРОЙКИ се познават по ЛЕНТАТА на подтабовете (резен 112 ·
+      // резен 115): формите им живеят по един подтаб, лентата — на всеки.
+      ['smetki', '[data-podtabove-na=smetki]'],
       ['gant', '#d-forma-delo'],
       ['kontakti', '#forma-kontakt'],
       ['stoynost', '#cheti-ploshti'],
       ['tabove', '#izbor-tab'],
-      ['nastroyki', '#nov-buton'],
+      ['nastroyki', '[data-podtabove-na=nastroyki]'],
       ['ii', '#nov-agent'],
-      ['tablo', '#tablo-lichno'],
+      ['tablo', '#izlez'],
     ] as const) {
       await naEkran(p, ekran, znak);
       // ИМЕНАТА НА ТАБЛИЦИТЕ · преди плътността, за да се броят и двете на

@@ -11,7 +11,7 @@ import { readFile } from 'node:fs/promises';
 import { otCSV, pogadniRazdelitel, tekstOtBaytove } from '../src/iztochnik/csv.js';
 import { GreshkaXLSX, kolonaOtAdres, otXLSX } from '../src/iztochnik/xlsx.js';
 import { bezPrazni, nameriGlavata, nameriKolona } from '../src/iztochnik/tablitsa.js';
-import { GreshkaPDF, otPDF, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
+import { GreshkaPDF, otPDF, redoveOtBlokove, tablitsaOtPDF } from '../src/iztochnik/pdf.js';
 
 describe('CSV', () => {
   it('познава „;" когато запетаята е десетичен знак', () => {
@@ -98,6 +98,36 @@ describe('PDF · чете текста, казва когато не може', 
 
   it('отказва това, което не е PDF', async () => {
     await expect(otPDF(new TextEncoder().encode('нищо'))).rejects.toThrow(GreshkaPDF);
+  });
+
+  it('чете ШЕСТНАЙСЕТИЧЕН текст през `/ToUnicode` на шрифта (резен 110)', async () => {
+    // Мострата е направена като истинските му файлове: буквите са номера на
+    // знаци в подмножен шрифт, а преводът им живее в самия шрифт. Дотук
+    // четецът четеше само низове в скоби и връщаше празно оттук.
+    const danni = new Uint8Array(await readFile('tests/mostri/lineen-grafik.pdf'));
+    const prochetten = await otPDF(danni);
+    expect(prochetten.imaTekst).toBe(true);
+    expect(prochetten.redove).toContain('Изкопни работи');
+  });
+
+  it('непреведеният знак става ИНТЕРВАЛ, не изчезва', async () => {
+    // MS Project пропуска интервала в превода си. Изхвърлен, той слепва
+    // думите („ИзгражданеПроект"); върнат като дупка — не измисля буква.
+    const danni = new Uint8Array(await readFile('tests/mostri/lineen-grafik.pdf'));
+    const prochetten = await otPDF(danni);
+    expect(prochetten.redove).toContain('Кофраж и армировка');
+  });
+
+  it('парчетата носят мястото си · оттам са колоните и отстъпът', async () => {
+    const danni = new Uint8Array(await readFile('tests/mostri/lineen-grafik.pdf'));
+    const prochetten = await otPDF(danni);
+    const redove = redoveOtBlokove(prochetten.stranitsi[0] ?? []);
+    expect(redove[0]?.map((b) => b.tekst)).toEqual([
+      'ID', 'Task Name', 'Duration', 'Start', 'Finish', 'Predecessors',
+    ]);
+    // Името на подделото стои по-навътре от името на делото — това е дървото.
+    const imeNaRed = (n: number): number => redove[n]?.[1]?.x ?? 0;
+    expect(imeNaRed(2)).toBeGreaterThan(imeNaRed(1));
   });
 
   it('отказва шифрован PDF с думи какво да се направи', async () => {

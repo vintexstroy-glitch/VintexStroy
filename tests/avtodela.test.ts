@@ -68,6 +68,7 @@ function stend() {
 const sreshta = (p: Partial<Sreshta> & { id: string; kontakt: string; data: string }): Sreshta => ({
   vid: 'среща',
   adres: '',
+  imot: '',
   chas: '',
   sastoyanie: 'чака',
   seq: 1,

@@ -49,6 +49,8 @@ import { butonSIkona } from './ikoni.js';
 import { kolkoMyasto } from '../src/nositel/hranilishte.js';
 import { presmetni, sDumi, type KvotaNaDrayva } from '../src/domein/spiratchka.js';
 import { NESKRIVAEMI, prevklyuchiPunkt, zabraviMoyaRed } from './lenta.js';
+import { IMENA_NA_GRUPITE, grupataNa, rabotnite } from '../src/domein/lenta.js';
+import { REDAT_NA_LENTATA } from './ekranite.js';
 import { dumiteNaProbvaneto, probvanetoEIzteklo, type Probvane } from '../src/domein/probvane.js';
 
 const KLYUCH = 'masterbook:izbor';
@@ -254,8 +256,10 @@ function kartaOtmetki(izbor: Izbor): string {
  *
  * ═══ ЗАЩО ТЯ Е ЕДНА, А ДЕЙСТВИЯТА СА ТРИ ═══
  *
- * Редът се подрежда В ЛЕНТАТА — там са стрелките и там го гледа човекът.
- * Тук стоят ДРУГИТЕ три неща, които в лентата нямат място:
+ * Редът се подрежда от Настройки · „Подредбата на екраните" (ADR-117: „Махни
+ * това смешно разместване. То ще се прави от всеки стопанин от настройки") —
+ * дотук тук пишеше „в лентата, там са стрелките", а стрелките паднаха от нея.
+ * Тук стоят ДРУГИТЕ три неща, които там нямат място:
  *
  *   · ВИДИМОСТТА · отметка на всеки пункт, ЛИЧНА. Скритият пункт го няма в
  *     лентата — значи няма и къде да се върне от нея. Затова картата изрежда
@@ -268,7 +272,7 @@ function kartaOtmetki(izbor: Izbor): string {
  *     бутон — не при всяко местене: инак Журналът щеше да се пълни с междинни
  *     подредби, а те не са решения, а движение на ръката.
  *
- * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (лентата) и се
+ * ЕДНА ВРАТА, ДВЕ ДРЪЖКИ. Редът се мени на едно място (Настройки) и се
  * ПУБЛИКУВА на друго. Дотук същият похват е в `kontekstno-menyu.ts`: „менюто е
  * втора дръжка на същата врата, не втора врата."
  */
@@ -278,6 +282,7 @@ function kartaLenta(
   moyatRedEPipnat: boolean,
 ): string {
   const skriti = punktove.filter((p) => p.skrit).length;
+  const rabotni = rabotnite(REDAT_NA_LENTATA);
   return `
     <section data-sektsiya="tablo-lenta" class="karta">
       <div class="dyalglava">
@@ -291,7 +296,13 @@ function kartaLenta(
       <div class="vazmozhnosti" data-sektsiya="lenta-punktove">
         ${punktove
           .map(
-            (p) => `
+            (p, i) => `${
+              // РАЗДЕЛИТЕЛЯТ И ТУК (резен 118 · ADR-163) · пред първия от втората
+              // група; без белег на пункт, за да не се брои като пункт.
+              i > 0 && grupataNa(p.klyuch, rabotni) === 'vtorostepennite' && grupataNa(punktove[i - 1]!.klyuch, rabotni) === 'rabotata'
+                ? `<p class="drebno navrazdel" data-lenta-razdel="vtorostepennite">${IMENA_NA_GRUPITE.vtorostepennite}</p>`
+                : ''
+            }
           <label class="vazm${p.skrit ? ' izklyuchena' : ''}">
             <input type="checkbox" data-punkt="${ekraniraj(p.klyuch)}"${p.skrit ? '' : ' checked'}${
               NESKRIVAEMI.includes(p.klyuch) ? ' disabled' : ''
@@ -323,8 +334,8 @@ function kartaLenta(
         }
       </div>
       <p class="drebno">
-        Редът се мести със стрелките В ЛЕНТАТА и е <b>твой</b> — нула записа в
-        Журнала. ${
+        Редът се мести от Настройки · „Подредбата на екраните" и е <b>твой</b> —
+        нула записа в Журнала; местенето е вътре в групата (резен 118). ${
           negov
             ? 'Бутонът горе взима реда, който виждаш СЕГА, и го записва като НАЧАЛНИЯ за всички; всеки после може да го пренарежда за себе си.'
             : 'Началният ред идва от Стопанина; твоите размествания стоят върху него и не го менят.'
@@ -692,7 +703,8 @@ export function narisuvayTablo(
     kartaProbvane(probvane) +
     kartaZapasen(negov, zapasen) +
     kartaVrashtane() +
-    kartaLichno(lichnoVklyucheno, lichnoPipnato) +
+    // СТОПАНИНЪТ НЯМА ЛИЧЕН ТАБ (ADR-154) — и карта за него няма.
+    (negov ? '' : kartaLichno(lichnoVklyucheno, lichnoPipnato)) +
     kartaLenta(lenta.punktove, negov, lenta.moyatRedEPipnat) +
     kartaOtmetki(izbor) +
     kartaSpiratchka(izbor, koj, nuzhnoZaZhurnala) +
@@ -715,8 +727,9 @@ export function narisuvayTablo(
  */
 function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
   // ТРИ състояния, не две: „не е пипано" ≠ „прибрано" ≠ „включено".
-  // Първото пускане иска МЯСТО в личния драйв и става на самия екран „Лично"
-  // (И99); тук се връща само вече записаното.
+  // Първото пускане иска МЯСТО в личния драйв и става от Профила (ADR-154)
+  // или на самия екран „Лично" (И99); тук се връща само вече записаното.
+  // „Пипано" е превключване, не съществуване на Журнала (резен 98).
   const sastoyanie = vklyucheno ? 'включено' : pipnato ? 'прибрано' : 'не е пускано';
   return `
     <section class="karta" data-sektsiya="tablo-lichno">
@@ -731,7 +744,7 @@ function kartaLichno(vklyucheno: boolean, pipnato: boolean): string {
             ? `<button type="button" class="vtorichen" id="tablo-lichno">${
                 vklyucheno ? 'Прибери личното' : 'Върни личното'
               }</button>`
-            : '<span class="drebno">пуска се от пункта <b>Лично</b> — там се посочва мястото в твоя драйв</span>'
+            : '<span class="drebno">пуска се от <b>Профила</b> (аватарът горе вдясно) — там се посочва мястото в твоя драйв</span>'
         }
       </div>
       <p class="drebno">Личният таб е <b>същата таблица</b> от Управление за собствени нужди, с
@@ -862,7 +875,12 @@ function kartaSpiratchka(izbor: Izbor, koj: Samolichnost, nuzhno: number): strin
       </div>
 
       <p class="drebno">
-        <span class="znachka ${znachka}" data-otsenka="${ekraniraj(p.otsenka)}">${ekraniraj(
+        <!-- СВОЙ БЕЛЕГ, не „оценка": същата дума в Контакти носи Айзенхауер
+             (спешно-важно…), а тук — мястото на устройството (stiga · tyasno).
+             Един белег с две значения е двусмислен за всеки обход и смесва
+             латиница с кирилица в едно поле (правило 11). Намерено при
+             сверката на резен 105 (ADR-168). -->
+        <span class="znachka ${znachka}" data-mestoto="${ekraniraj(p.otsenka)}">${ekraniraj(
           p.otsenka === 'ne e pitano'
             ? 'не е питано'
             : p.otsenka === 'stiga'

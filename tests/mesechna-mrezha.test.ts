@@ -23,7 +23,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { sumiZaDen } from '../src/domein/otcheti.js';
@@ -63,7 +63,7 @@ async function nasadi(d: Deystviya): Promise<string> {
     {
       imotId: 'I-1',
       naemetel: 'Домакинство',
-      naem_st: stotinki(500_00),
+      naem_st: tsentove(500_00),
       padezhDen: 5,
       ot: '2024-01-01',
       do: '',
@@ -141,7 +141,7 @@ describe('мрежата с парите', () => {
     const vzemaneId = await nasadi(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(300_00), nachin: 'банка', data: '2026-08-10' },
+      { vzemaneId, suma_st: tsentove(300_00), nachin: 'банка', data: '2026-08-10' },
       { opId: 'op-p' },
     );
     await deystviya.zapishiRazhod(
@@ -150,7 +150,7 @@ describe('мрежата с парите', () => {
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'заплата',
-        suma_st: stotinki(800_00),
+        suma_st: tsentove(800_00),
         sektor: 'zaplati',
         nachin: 'в брой',
         data: '2026-08-12',
@@ -178,7 +178,7 @@ describe('мрежата с парите', () => {
     const vzemaneId = await nasadi(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(500_00), nachin: 'банка', data: '2026-08-14' },
+      { vzemaneId, suma_st: tsentove(500_00), nachin: 'банка', data: '2026-08-14' },
       { opId: 'op-p' },
     );
     await deystviya.zapishiRazhod(
@@ -187,7 +187,7 @@ describe('мрежата с парите', () => {
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'заплата',
-        suma_st: stotinki(500_00),
+        suma_st: tsentove(500_00),
         sektor: 'zaplati',
         nachin: 'банка',
         data: '2026-08-14',
@@ -213,7 +213,7 @@ describe('мрежата с парите', () => {
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'юлска заплата',
-        suma_st: stotinki(900_00),
+        suma_st: tsentove(900_00),
         sektor: 'zaplati',
         nachin: 'банка',
         // 31 юли 2026 е ПЕТЪК и стои в първата седмица на августовската мрежа.
@@ -258,7 +258,7 @@ describe('сверката на мрежата', () => {
     const vzemaneId = await nasadi(deystviya);
     await deystviya.priemiPlashtane(
       'P-1',
-      { vzemaneId, suma_st: stotinki(300_00), nachin: 'банка', data: '2026-08-10' },
+      { vzemaneId, suma_st: tsentove(300_00), nachin: 'банка', data: '2026-08-10' },
       { opId: 'op-p' },
     );
     // РАЗХОДЪТ Е ЗАДЪЛЖИТЕЛЕН ТУК (находка, резен 40): без него приходът и
@@ -270,7 +270,7 @@ describe('сверката на мрежата', () => {
         potok: 'zaplati',
         dostavchik: 'Тихомир Иванов',
         opis: 'заплата',
-        suma_st: stotinki(800_00),
+        suma_st: tsentove(800_00),
         sektor: 'zaplati',
         nachin: 'в брой',
         data: '2026-08-12',

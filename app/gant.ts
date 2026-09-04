@@ -1,4 +1,5 @@
 import { imaRachenRed, nomeratNa, sledPremestvane } from '../src/domein/porednost.js';
+import { vzemiPredizbraniya } from './predizbor.js';
 /**
  * УПРАВЛЕНИЕ НА ВРЕМЕВИЯ РЕД В ДЕЛАТА · седмият екран.
  *
@@ -32,7 +33,6 @@ import { ekraniraj } from './obshto.js';
 import {
   filtriray,
   glaviNaTablitsata,
-  glaviTh,
   izchistiFiltrite,
   poleZaTarsene,
   redZaSkritoto,
@@ -68,14 +68,21 @@ import {
   zavarshenite,
   zhivite,
 } from '../src/domein/dela.js';
-import { mestata, sveriMestata } from '../src/domein/mesta.js';
+import { mestata, svedenotoMyasto, sveriMestata } from '../src/domein/mesta.js';
+import { KOLONI_MESTATA, tablitsaNaImotite } from './imotite.js';
+import { podtabatNa } from '../src/domein/temi-nastroyki.js';
+import { DUMITE } from '../src/domein/dumite.js';
 import {
   dumataNaButona,
+  IMENA_NA_TEMITE,
   mozheDaSeSkrie,
   obobshteniRedove,
+  podrazbranaTema,
   prevkluchi,
   reshetka,
+  TEMI_NA_DIAGRAMATA,
   type RedNaRazrez,
+  type TemaNaDiagramata,
 } from '../src/domein/gant.js';
 import {
   IMENA_NA_RAZREZITE,
@@ -121,6 +128,8 @@ interface PogledNaGanta {
   diagrama: boolean;
   /** негово, 31.08: „Да може да се крие" · таблицата, като диаграмата */
   tablitsa: boolean;
+  /** КОЯ ТЕМА рисува диаграмата · Текст или Пари (резен 114 · ADR-160) */
+  tema: TemaNaDiagramata;
   /**
    * ЕДИНСТВЕНИЯТ останал свой филтър: Оценката НЕ Е колона на таблицата,
    * затова падащото ѝ меню не дублира колонен филтър и остава (резен 75в).
@@ -150,10 +159,25 @@ function menyutoNaDelata(o: Ogledalo, klyuch: KlyuchNaMenyu, ime: string): Menyu
 }
 
 /** Четирите менюта наведнъж · за закачането след рисуване. */
-function menyutataNaFormata(o: Ogledalo, nadpisi: NadpisiNaGanta): ReadonlyMap<string, Menyu> {
-  const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място';
+function menyutataNaFormata(
+  o: Ogledalo,
+  nadpisi: NadpisiNaGanta,
+  /** вписаните Имоти · влизат в речника на полето (И124 т.8) · празно в личния */
+  imotite: readonly string[] = [],
+): ReadonlyMap<string, Menyu> {
+  const parvata = nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot;
+  // „ИЗБОР ОТ НАЛИЧНОТО ЗА ДЕЛО" (И124 т.8 · резен 100): полето Имот предлага
+  // и ВПИСАНИТЕ Имоти, не само местата от живите дела — иначе Имот без нито
+  // едно дело не се предлагаше, а дръжката от менюто му го предизбираше в
+  // поле, което не го познава. Двата списъка се сливат по броя: най-честото
+  // от делата напред, вписаните след него.
+  const zhivi = zhivite([...o.dela.values()]);
+  // Без дубъл по СВЕДЕНО име: „малинова" от Имоти и „Малинова" от делата са
+  // един Имот — правописът на делата води, вписаният влиза само ако липсва.
+  const znae = new Set(zhivi.map((d) => svedenotoMyasto(d.myasto)));
+  const samoNovite = imotite.filter((i) => !znae.has(svedenotoMyasto(i)));
   return new Map<string, Menyu>([
-    ['myasto', menyutoNaDelata(o, 'myasto', parvata)],
+    ['myasto', menyuOtZhivi('myasto', parvata, [...zhivi.map((d) => d.myasto), ...samoNovite])],
     ['obekt', menyutoNaDelata(o, 'obekt', 'Обект')],
     ['ime', menyutoNaDelata(o, 'ime', 'Дело')],
     ['otgovornik', menyutoNaDelata(o, 'otgovornik', 'Отговорник')],
@@ -196,6 +220,9 @@ function pogled(klyuch = 'gant'): PogledNaGanta {
     diagrama: chetiEkranno(`${klyuch}.diagrama`, true),
     tablitsa: chetiEkranno(`${klyuch}.tablitsa`, true),
     filtarOtsenka: chetiEkranno(`${klyuch}.otsenka`, ''),
+    // „едната ще кореспондира с Управление, а другата в сметки" (И133): всеки
+    // екран се отваря със СВОЯТА, а изборът после е негов.
+    tema: chetiEkranno<TemaNaDiagramata>(`${klyuch}.tema`, podrazbranaTema(klyuch)),
   };
   POGLEDI.set(klyuch, nov);
   return nov;
@@ -212,6 +239,7 @@ function zapomniPogleda(p: PogledNaGanta): void {
   zapomniEkranno(`${p.klyuch}.diagrama`, p.diagrama);
   zapomniEkranno(`${p.klyuch}.tablitsa`, p.tablitsa);
   zapomniEkranno(`${p.klyuch}.otsenka`, p.filtarOtsenka);
+  zapomniEkranno(`${p.klyuch}.tema`, p.tema);
 }
 
 /**
@@ -232,8 +260,8 @@ interface NadpisiNaGanta {
 // той е ЕДИНСТВЕНИЯТ ѝ дом и матрицата чете същото (правило 17 · резен 48).
 export const NADPISI_SLUZHEBNI: NadpisiNaGanta = Object.freeze({
   zaglavie: 'Управление на Времевия Ред в Делата',
-  glavaNaImenata: glavataNaDelata('Място'),
-  podnaslovNaFormata: `${glavataNaDelata('Място')} — колоните на делото`,
+  glavaNaImenata: glavataNaDelata(DUMITE.imot),
+  podnaslovNaFormata: `${glavataNaDelata(DUMITE.imot)} — колоните на делото`,
   imeNaFormata: 'Ново дело',
 });
 
@@ -263,7 +291,7 @@ export const NADPISI_LICHNI: NadpisiNaGanta = Object.freeze({
  * „обект · отговорник". Отговорникът се виждаше на екрана и го нямаше в главата
  * му — точно разминаването, което един дом премахва.
  */
-export function koloniNaDelata(parvata = 'Място'): KolonaSFiltar<Delo>[] {
+export function koloniNaDelata(parvata: string = DUMITE.imot): KolonaSFiltar<Delo>[] {
   return [
     { klyuch: 'myasto', ime: parvata, vid: 'tekst', vzemi: (d) => d.myasto },
     { klyuch: 'ime', ime: 'Дело', vid: 'tekst', vzemi: (d) => d.ime },
@@ -273,7 +301,7 @@ export function koloniNaDelata(parvata = 'Място'): KolonaSFiltar<Delo>[] {
 }
 
 /** Главата на имената · СМЯТА се от описателя, вече не се пише като низ. */
-export function glavataNaDelata(parvata = 'Място'): string {
+export function glavataNaDelata(parvata: string = DUMITE.imot): string {
   return koloniNaDelata(parvata)
     .map((k) => k.ime)
     .join(' · ');
@@ -307,7 +335,7 @@ export function narisuvayGant(
   // Двигателят реже по колоните (Място · Дело · Обект · Отговорник) и по
   // търсенето; Оценката остава свой филтър, защото не е колона. Дървовидната
   // наредба се пази: филтърът маха редове, не разбърква останалите.
-  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място');
+  const koloniDela = koloniNaDelata(nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot);
   const fDvigatel = filtriray(klyuch, podredeni, koloniDela, dnes);
   const filtrirani = fDvigatel.redove.filter(
     (d) => !filtarOtsenka || d.otsenka === filtarOtsenka,
@@ -429,6 +457,13 @@ export function narisuvayGant(
           <select translate="no" id="f-otsenka">${opciiOtsenki(filtarOtsenka)}</select>
         </div>
         <div class="pole">
+          <label for="tema-diagrama">Тема на диаграмата</label>
+          <select translate="no" id="tema-diagrama">${TEMI_NA_DIAGRAMATA.map(
+            (x) =>
+              `<option value="${x}"${x === p.tema ? ' selected' : ''}>${IMENA_NA_TEMITE[x]}</option>`,
+          ).join('')}</select>
+        </div>
+        <div class="pole">
           <label for="f-razrez">Разбий по</label>
           <select translate="no" id="f-razrez">${RAZREZI.map(
             (x) =>
@@ -473,7 +508,7 @@ export function narisuvayGant(
             ${tablitsa ? `<div class="gant-tablitsata">${tablitsataSOcveteniPoleta(zaRisuvane, r, sumi, dnes, true, true, sgunati, nadpisi, sgavaemi, (id) =>
               broyDokumenti(o, 'delo', id), rachen,
             )}</div>` : ''}
-            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi)}</div>` : ''}
+            ${diagrama ? `<div class="gant-diagramata">${narisuvayDiagrama(zaRisuvane, r, dnes, sumi, p.tema)}</div>` : ''}
           </div>`
     }
 
@@ -487,107 +522,58 @@ export function narisuvayGant(
 }
 
 /**
- * МЕСТАТА (проектите) · отговорник-ФИРМА и папка (резен 31 · ADR-091).
+ * ИМОТИТЕ до делата · таблица без форма (резен 99 · ADR-157).
  *
  * „На нивото на проекта дай ЛИНК КЪМ ПАПКАТА с проекта" и „в таблицата за
- * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])*.
+ * отговорник напиши ФИРМАТА която управлява проекта" *(р48·[42])* — двете стоят.
  *
  * ═══ ДВА ОТГОВОРНИКА, КОИТО НЕ СЕ СМЕСВАТ ═══
  *
- * Мястото (проектът) го управлява ФИРМА; делото (задачата) го върши ЧОВЕК
- * *(р48·[44])*. Колоната тук КАЗВА кой е кой, за да не се четат двете като едно.
+ * Имотът го управлява ФИРМА; делото го върши ЧОВЕК *(р48·[44])*. Колоната тук
+ * КАЗВА кой е кой, за да не се четат двете като едно.
  *
- * ═══ НЕЗАПИСАНИТЕ СЕ ПОКАЗВАТ СЪЩО ═══
+ * ═══ ФОРМАТА СИ ОТИДЕ · ЕДИН ДОМ ═══
  *
- * Място, което само се среща по делата, стои в списъка с празни полета и белег
- * „още не е записано". Списък само от записаните щеше да КРИЕ точно работата —
- * човек вижда къде има какво да допълни, вместо да се сеща сам.
+ * Дотук имотът се записваше ОТ ТУК: „всипки се създават от Упрсвление. Само от
+ * там" *(р83·[18])*. На 03.09 той каза друго: „**Имоти и обекти се вкарват
+ * едновременно**, просто обекта е опция" — тоест единият вход е на екрана Имоти
+ * и носи и двете. Последната дума бие (правило 28), а две форми за един запис
+ * се разминават при първото ново поле (правило 17). Тук остава ТАБЛИЦАТА: до
+ * делата стои онова, което им трябва — кой имот, чия фирма, кой е записал,
+ * колко дела.
+ *
+ * ═══ САМО В СЛУЖЕБНОТО ═══
+ *
+ * Личният таб реди делата по ТЕМА, не по имот (`NADPISI_LICHNI`): таблица на
+ * имотите там би показала чужд списък под лично заглавие.
  */
-/** Колоните на местата за двигателя на филтрите (резен 75б · И124 т.2). */
-const KOLONI_MESTATA: readonly KolonaSFiltar<{ ime: string; firma: string; dela: number; koy: string }>[] = [
-  { klyuch: 'ime', ime: 'Място', vid: 'tekst', vzemi: (r) => r.ime },
-  { klyuch: 'firma', ime: 'Фирма · управлява проекта', vid: 'tekst', vzemi: (r) => (r.firma === '' ? '—' : r.firma) },
-  { klyuch: 'koy', ime: 'Записал', vid: 'tekst', vzemi: (r) => r.koy },
-  { klyuch: 'dela', ime: 'Дела', vid: 'chislo', vzemi: (r) => r.dela },
-];
-
 function blokNaMestata(o: Ogledalo, dnes: string, predstavka: string): string {
-  // САМО ЗАРЕДЕНИТЕ (И124 т.7 · ADR-134): „Тук се появяват само заредените
-  // обекти и отговорник е този който извършва действието." Само-срещаните по
-  // делата вече не се редят тук; „Записал" е извършващият (правило 14).
-  const redove = mestata(o, zhivite([...o.dela.values()]));
-  const sv = sveriMestata(o, zhivite([...o.dela.values()]), dnes);
-  const filtriraniMesta = filtriray('mestata', redove, KOLONI_MESTATA, dnes);
+  if (predstavka !== 'd-') return '';
+  const zhivi = zhivite([...o.dela.values()]);
+  const redove = mestata(o, zhivi);
+  const sv = sveriMestata(o, zhivi, dnes);
 
   return `
     <section data-sektsiya="gant-mesta" data-broy="${redove.length}">
       <div class="dyalglava">
-        <h2>Местата · проектите</h2>
-        <span>само заредените · отговорникът на ДЕЙСТВИЕТО е записалият</span>
+        <h2>Имотите</h2>
+        <span>вписаните и онези, под които виси обект · записалият е извършителят</span>
       </div>
 
       ${
         redove.length === 0
-          ? '<p class="drebno">Още няма нито едно записано място — записва се от формата тук. Място, което само се среща по делата, не се реди само (И124 т.7).</p>'
-          : `${poleZaTarsene('mestata')}<div class="skrolkutiya">
-        <table class="tablitsa" data-tablitsa="mestata">
-          <thead>
-            <tr>${glaviTh('mestata', KOLONI_MESTATA, redove, dnes)}<th></th></tr>
-          </thead>
-          <tbody>${filtriraniMesta.redove
-            .map(
-              (r) => `
-            <tr data-myasto="${ekraniraj(r.ime)}" data-papka-adres="${ekraniraj(r.papka)}">
-              <td translate="no">${ekraniraj(r.ime)}</td>
-              <td translate="no">${ekraniraj(r.firma) || '<span class="drebno">—</span>'}</td>
-              <td translate="no">${ekraniraj(r.koy)}</td>
-              <td class="chislo" translate="no">${r.dela}</td>
-              <td><button type="button" class="vtorichen malak" data-mnogotochie
-                aria-label="Менюто на реда" title="Менюто на реда">⋯</button></td>
-            </tr>`,
-            )
-            .join('')}</tbody>
-        </table>
-      </div>${redZaSkritoto(filtriraniMesta, 'mestata')}
-      <p class="drebno">Папката на мястото се отваря с ДЕСЕН БУТОН върху реда
+          ? '<p class="drebno">Още няма нито един имот — вписва се от екрана <b>Имоти</b>, заедно с обекта си. Имот, който само се среща по делата, не се реди сам (И124 т.7).</p>'
+          : `${tablitsaNaImotite(redove, dnes, {
+              tablitsa: 'mestata',
+              beleg: 'data-myasto',
+              koloni: KOLONI_MESTATA,
+            })}<p class="drebno">Папката на имота се отваря с ДЕСЕН БУТОН върху реда
       (или „⋯") — „да има пътища за неща само от там" (И124 т.3). Видим линк в
-      колона вече няма.</p>`
+      колона вече няма. Новият имот се вписва от <b>Имоти</b>, заедно с обекта си.</p>`
       }
 
-      <form class="forma" id="${predstavka}forma-myasto">
-        <div class="poleta">
-          <div class="pole">
-            <label for="${predstavka}m-ime">Място</label>
-            <input translate="no" type="text" id="${predstavka}m-ime" name="ime" required
-                   list="${predstavka}m-imena" placeholder="Малинова Долина">
-            <datalist id="${predstavka}m-imena">
-              ${redove.map((r) => `<option value="${ekraniraj(r.ime)}"></option>`).join('')}
-            </datalist>
-          </div>
-          <div class="pole">
-            <label for="${predstavka}m-firma">Фирма · управлява проекта</label>
-            <input translate="no" type="text" id="${predstavka}m-firma" name="firma"
-                   placeholder="Винтекс Строй ЕООД">
-          </div>
-          <div class="pole">
-            <label for="${predstavka}m-papka">Линк към папката</label>
-            <!-- ПЛЕЙСХОЛДЪР БЕЗ АДРЕС · стената срещу кода брои всеки адрес в
-                 него, и е права да не различава плейсхолдър от истинско
-                 посягане: адрес в кода е адрес в кода. Думите вършат същата
-                 работа. -->
-            <input translate="no" type="url" id="${predstavka}m-papka" name="papka"
-                   placeholder="адресът на папката в Драйва">
-          </div>
-        </div>
-        <div class="deystviya">
-          <button type="submit" class="glaven">Запиши мястото</button>
-          <span class="drebno">Фирмата и папката са <b>по избор</b> — мястото има смисъл
-          и само с име. Второто записване ПОПРАВЯ същото място, не ражда второ.</span>
-        </div>
-      </form>
-
       <p class="drebno" data-mesta-sverka>Сверка вход↔изход: ${sv.vhod} → ${sv.izhod},
-      разлика ${sv.razlika}. Показват се само заредените.</p>
+      разлика ${sv.razlika}.</p>
     </section>`;
 }
 
@@ -672,7 +658,7 @@ function blokNaZavarshenite(o: Ogledalo, predstavka: string, ot: string, doD: st
           ? ''
           : arhivnaTablitsa(
               'zavarsheni-dela',
-              ['Място', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
+              ['Имот', 'Обект', 'Дело', 'Отговорник', 'Срок', 'Завършено на', 'От кого'],
               vPerioda.map((d) =>
                 redVArhiva(d, `data-zavarsheno="${ekraniraj(d.id)}"`, [ekraniraj(d.do)]),
               ),
@@ -706,7 +692,7 @@ function blokNaOtpadnalite(o: Ogledalo, predstavka: string): string {
           ? ''
           : arhivnaTablitsa(
               'otpadnali-dela',
-              ['Място', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
+              ['Имот', 'Обект', 'Дело', 'Отговорник', 'Отпаднало на', 'От кого'],
               redove.map((d) =>
                 redVArhiva(d, `data-otpadnalo="${ekraniraj(d.id)}" class="otpadnalo"`, []),
               ),
@@ -811,7 +797,7 @@ export function tablitsataSOcveteniPoleta(
           ${[...poMyasto.entries()]
             .map(
               ([myasto, spisak]) => `
-            <div class="gant-myasto" title="Мястото е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
+            <div class="gant-myasto" title="Имотът е колона — не се сгъва (И88)">${ekraniraj(myasto)}</div>
             ${spisak.map((d) => imeNaDeloto(d, dela, dnes, sasSgavachi, sgunati, nomera.get(d.id) ?? '', sgavaemi, dokumentiNa, nomeratNa(rachen, d.id))).join('')}`,
             )
             .join('')}
@@ -981,8 +967,17 @@ export function formaDelo(
   nadpisi: NadpisiNaGanta = NADPISI_SLUZHEBNI,
 ): string {
   const id = (kratko: string) => `${predstavka}${kratko}`;
-  const menyutata = menyutataNaFormata(o, nadpisi);
+  // Служебната форма познава вписаните Имоти; личната е по Тема (ADR-154).
+  const sluzhebna = predstavka === 'd-';
+  const menyutata = menyutataNaFormata(
+    o,
+    nadpisi,
+    sluzhebna ? mestata(o, zhivite([...o.dela.values()])).map((r) => r.ime) : [],
+  );
   zapomniRechnitsite(predstavka, menyutata);
+  // ПРЕДИЗБРАНИЯТ ИМОТ (и Обект) от дръжката „Ново дело" на менюто на реда
+  // (резен 100 · ADR-164). Чете се веднъж; формата е СЪЩАТА.
+  const predizbran = sluzhebna ? vzemiPredizbraniya('gant') : null;
   return `
     <section data-sektsiya="gant-forma" class="karta">
       <div class="dyalglava"><h2>${ekraniraj(nadpisi.imeNaFormata)}</h2><span>${ekraniraj(nadpisi.podnaslovNaFormata)}</span></div>
@@ -996,14 +991,14 @@ export function formaDelo(
              * делата. Всичките четири ОПИСВАТ (системата не смята върху тях),
              * значи растат свободно от полето: „нищо не спира човека".
              *
-             * Първата колона носи надписа на погледа: „Място" в служебния,
-             * „Тема" в личния — същото поле, същият речник, друга дума.
+             * Първата колона носи надписа на погледа: Имот (`DUMITE.imot`) в
+             * служебния, „Тема" в личния — същото поле, същият речник, друга дума.
              */
             [
-              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? 'Място', z: true, m: 'Малинова' },
-              { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно' },
-              { k: 'ime', e: 'Дело', z: true, m: 'Акт 15' },
-              { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков' },
+              { k: 'myasto', e: nadpisi.glavaNaImenata.split(' · ')[0] ?? DUMITE.imot, z: true, m: 'Малинова', s: predizbran?.imot ?? '' },
+              { k: 'obekt', e: 'Обект', z: false, m: 'може да е празно', s: predizbran?.obekt ?? '' },
+              { k: 'ime', e: 'Дело', z: true, m: 'Акт 15', s: '' },
+              { k: 'otgovornik', e: 'Отговорник', z: true, m: 'Николай Петков', s: '' },
             ]
               .map((p) =>
                 poleSMenyu({
@@ -1013,6 +1008,7 @@ export function formaDelo(
                   menyu: menyutata.get(p.k)!,
                   zadalzhitelno: p.z,
                   mestodarzhatel: p.m,
+                  stoynost: p.s,
                 }),
               )
               .join('')
@@ -1056,7 +1052,7 @@ export function formaDelo(
           <button type="submit">Запиши делото</button>
           <p class="greshka" id="${id('greshka-delo')}">${ekraniraj(greshkaDelo)}</p>
         </div>
-        <p class="drebno">Мястото и Обектът са КОЛОНИ, не нива: дело без обект е нормално.
+        <p class="drebno">Имотът и Обектът са КОЛОНИ на реда: дело без обект е нормално, а Обект без Имот няма (И131).
         Сгъва се само дело с поддела — „Имотите не се сгъват, сгъват се само делата и поддела."</p>
       </form>
     </section>`;
@@ -1107,27 +1103,7 @@ export function zakachiGant(
   const menyutata = rechnitsite(predstavka);
   zakachiMenyuta(koren, menyutata);
 
-  // МЯСТОТО (проектът) · записва се от УПРАВЛЕНИЕ, „само от там" (р83·[18]).
-  koren
-    .querySelector<HTMLFormElement>(`#${predstavka}forma-myasto`)
-    ?.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const d = new FormData(e.target as HTMLFormElement);
-      try {
-        await k.deystviya.zapishiMyasto(
-          {
-            ime: String(d.get('ime') ?? ''),
-            firma: String(d.get('firma') ?? ''),
-            papka: String(d.get('papka') ?? ''),
-          },
-          { opId: `myasto:${crypto.randomUUID()}` },
-        );
-        k.vest('dobre', `Мястото „${String(d.get('ime') ?? '')}" е записано.`);
-      } catch (err) {
-        k.vest('zle', err instanceof Error ? err.message : String(err));
-      }
-      await prerisuvay();
-    });
+  // ИМОТЪТ СЕ ВПИСВА ОТ ИМОТИ (резен 99 · ADR-157) · тук няма форма, а таблица.
 
   // ═══ РЪЧНИЯТ РЕД · „★ Ръчният ред побеждава" *(ред 1496)* (резен 34) ═══
   //
@@ -1255,6 +1231,18 @@ export function zakachiGant(
   });
 
   /**
+   * ТЕМАТА НА ДИАГРАМАТА · Текст или Пари (резен 114 · ADR-160).
+   *
+   * Същият вид дръжка като разреза: поглед, не запис. Осата и решетката са
+   * общи — сменя се само какво стои върху тях.
+   */
+  koren.querySelector<HTMLSelectElement>('#tema-diagrama')?.addEventListener('change', async (e) => {
+    p.tema = (e.target as HTMLSelectElement).value as TemaNaDiagramata;
+    zapomniPogleda(p);
+    await prerisuvay();
+  });
+
+  /**
    * СВОЯТ ПЕРИОД · двете дати (И104 · „такъв който сам да избереш").
    *
    * Пише се при СМЯНА, не при всеки натиснат клавиш: полето за дата ражда
@@ -1277,11 +1265,19 @@ export function zakachiGant(
    * която минава и човек — пунктът в лентата. Втора форма за едно нещо се
    * разминава с първата при първата поправка (дословният урок на ADR-057:
    * „втора дръжка на същата врата, не втора врата").
+   *
+   * ОТ РЕЗЕН 112 вратата е ДРУГА: Служители е ПОДТАБ на Настройки (ADR-158),
+   * значи пунктът в лентата вече не съществува. Запомня се и подтабът — това е
+   * единственият дом на въпроса „къде живее тази секция" (`podtabatNa`), — и
+   * се натиска пунктът на Настройки. Пътят пак е човешкият, само че по-къс с
+   * едно натискане.
    */
   for (const b of koren.querySelectorAll<HTMLButtonElement>('[data-prati]')) {
     b.addEventListener('click', () => {
       zapomniEkranno('sluzhiteli.delo', b.dataset.prati ?? '');
-      document.querySelector<HTMLElement>('[data-ekran=sluzhiteli]')?.click();
+      const podtab = podtabatNa('sluzhiteli-prashtane');
+      if (podtab) zapomniEkranno('nastroyki.podtab', podtab);
+      document.querySelector<HTMLElement>('[data-ekran=nastroyki]')?.click();
     });
   }
 

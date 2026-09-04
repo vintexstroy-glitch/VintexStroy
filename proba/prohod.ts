@@ -16,7 +16,7 @@ import { chromium, nameriHroma } from '../stroezh/hrom.mjs';
 import { Broyach } from './yadro/proverka.ts';
 import type { KonteksNaProhoda } from './yadro/kontekst.ts';
 import { postaviGoogle } from './yadro/mok-google.ts';
-import { pusniServer, pochakaySurvara } from './yadro/server.ts';
+import { pusniServer, pochakaySurvara, spriServer } from './yadro/server.ts';
 import { tishina } from './yadro/tishina.ts';
 
 import * as vhodISamolichnost from './razdeli/vhod-i-samolichnost.ts';
@@ -105,11 +105,8 @@ async function main(): Promise<void> {
     await smetki.blok7(ctx);
     await stoynost.blok3(ctx);
     await nastroyki.blok4(ctx);
-    const lichniyat = await lichno.blok1(ctx);
     await udobstvoto.blok3(ctx);
     await udobstvoto.blok4(ctx);
-    await menyuta.blok2(ctx);
-    await lichno.blok2(ctx, lichniyat);
     await menyuta.blok3(ctx);
     await smetki.blok8(ctx);
     await nastroyki.blok5(ctx);
@@ -166,6 +163,8 @@ async function main(): Promise<void> {
     // §142 стои СЛЕД мярката на плътността (§134): той оставя начален изглед
     // „всичко сгънато" на Стойност, а сгънат екран мери друго празно.
     await nastroyki.blok12(ctx);
+    // §148 · номенклатурата на състоянията · пише в Настройки и в Имоти
+    await nastroyki.blok13(ctx);
     // §71 стои НАКРАЯ нарочно: обхожда лентата, отваря редове и мени екрана,
     // а дотогава всеки друг блок вече си е взел своето. Блок, който мести
     // състояние под следващия, е по-скъп от липсващ.
@@ -177,6 +176,14 @@ async function main(): Promise<void> {
     // §145 също върви късно: таблиците и редовете им идват от §128–132, а
     // закачките искат екрана Табове — проходът тече по реда на екраните.
     await tablitsaOtFayl.blok2(ctx);
+    // §53–§56 и §59 ги играе СЛУЖИТЕЛЯТ (ADR-154) и затова стоят ТУК, при
+    // §141: влизането като друг човек презарежда страницата и чисти модулното
+    // състояние — сметнатата Стойност живее в паметта на модула, и §96 падна,
+    // когато смяната беше по средата (пет пуска, ADR-154 §6). Между влизането
+    // на служителя и връщането на Стопанина не стои нищо негово.
+    const lichniyat = await lichno.blok1(ctx);
+    await menyuta.blok2(ctx);
+    await lichno.blok2(ctx, lichniyat);
     // §141 е ПОСЛЕДЕН нарочно: излиза и влиза като ДРУГ човек (служителя),
     // а презареждането при изхода чисти всяко модулно състояние — блок след
     // него би тръгнал от нула, без да го казва.
@@ -197,7 +204,10 @@ async function main(): Promise<void> {
     // Какво е имало на екрана в мига на спъването — „timeout" сам по себе си
     // не казва нищо, а снимката се гледа чак после.
     const naEkrana = await p
-      .evaluate(() => document.getElementById('ekran')?.innerText?.slice(0, 300) ?? 'няма екран')
+      // 1 500 знака, не 300: при 300 дъмпът свършваше в лентата и тялото на
+      // екрана — точно онова, което казва дали екранът изобщо се е нарисувал —
+      // не се виждаше (резен 98, три пуска на сляпо).
+      .evaluate(() => document.getElementById('ekran')?.innerText?.slice(0, 1500) ?? 'няма екран')
       .catch(() => 'екранът не се чете');
     console.log(`\n  НА ЕКРАНА В МИГА НА СПЪВАНЕТО:\n  ${naEkrana.replace(/\n/g, '\n  ')}\n`);
 
@@ -220,6 +230,10 @@ async function main(): Promise<void> {
       )
       .catch(() => 'наслоеното не се чете');
     console.log(`\n  НАСЛОЕНО ВЪРХУ BODY:\n  ${nasloeno.replace(/\n/g, '\n  ')}\n`);
+    // КОНЗОЛАТА ДОТУК · екран, който е гръмнал при рисуване, оставя празно
+    // тяло и грешка в конзолата; без нея „секцията не се вижда" изглежда
+    // като скрита секция, а не като нерисуван екран.
+    console.log(`\n  КОНЗОЛАТА ДОТУК:\n  ${greshkiVKonzolata.join('\n  ') || 'чиста'}\n`);
     await p.screenshot({ path: 'proba/spanal.png', fullPage: true }).catch(() => {});
   }
 
@@ -227,7 +241,7 @@ async function main(): Promise<void> {
 
   await brauzar.close();
   try {
-    if (server.pid) process.kill(-server.pid);
+    spriServer(server);
   } catch {
     /* вече е спрян */
   }

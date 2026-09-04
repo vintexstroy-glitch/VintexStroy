@@ -1,5 +1,5 @@
 import type { KonteksNaProhoda } from '../yadro/kontekst.ts';
-import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, dokatoStane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
+import { broySabitiya, chisloNaPoleto, deystvieSPrerisuvane, dobaviImotBezObekt, dokatoStane, naEkran, napishiVPoleto, plochka, plochkaPod, redove, smeniKoefitsient, sSabitiya, tekstNa, tekstNaChisloto } from '../yadro/pomoshtni.ts';
 import { join } from 'node:path';
 import type { Page } from 'playwright-core';
 import { writeFile } from 'node:fs/promises';
@@ -140,7 +140,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     proveri('казва СВЕРКАТА вход↔изход',
       (await tekstNa(p, '.vest.dobre')).includes('разлика 0'), true);
     proveri('и колко нови имота са родени',
-      (await tekstNa(p, '.vest.dobre')).includes('5 нови имота'), true);
+      (await tekstNa(p, '.vest.dobre')).includes('5 нови обекта'), true);
     proveri('обявява, че дела НЕ се раждат',
       (await tekstNa(p, '.vest.dobre')).includes('Дела не се раждат'), true);
 
@@ -195,7 +195,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
     await p.click('#vpishi-obekti');
     await p.waitForFunction(() => document.body.textContent.includes('Вписано:'));
     const vestVpis = await tekstNa(p, '.vest');
-    proveri('вписани са 45 имота', vestVpis.includes('45 имота'), true);
+    proveri('вписани са 45 обекта', vestVpis.includes('45 обекта'), true);
     proveri('и 79 дела (4 на сградата + 3 на всеки непродаден)',
       vestVpis.includes('79 дела'), true);
     proveri('всяко е събитие в Журнала', await broySabitiya(p), predMD + 45 + 79);
@@ -501,6 +501,88 @@ export async function blok3(ctx: KonteksNaProhoda): Promise<void> {
     const glava89 = (await tekstNa(p, '[data-sektsiya=stoynost-obektite] .glava')).toLowerCase();
     proveri('таблицата носи и В, и Съгласувана',
       glava89.includes('по разход') && glava89.includes('съгласувана'), true);
+
+    // ══ 105 · ОЦЕНКАТА СРЕЩУ КНИГАТА · смята се, не се редактира (ADR-168) ══
+    //
+    // Негово, 09.08 (р57·[199]): „казва се Стойност на Състояние и НЯМА
+    // РЕДАКЦИЯ ОТ ТАМ, а само изчисляане на стойност на имотите като оценка на
+    // всички наши активи." Затова тук няма бутон, който пише: има сметка и
+    // разлика.
+    // ══ 107 · АКТИВИТЕ ОТ ЖУРНАЛА · третият път (ADR-169) ═══════════════════
+    //
+    // „Имот без ОБект и ОБект с Имот могат да се изберат в Клакулатора и това
+    // са основните наши активи." (И129 т.4) Дотук Калкулаторът смяташе само
+    // прочетеното от файл; тук входът е самата книга.
+    razdel = '107 · активите се четат от Журнала · нула събития';
+    const prediAktivi = await broySabitiya(p);
+    proveri('третият път стои до другите два',
+      await p.$$eval('#cheti-aktivi', (e) => e.length), 1);
+    await deystvieSPrerisuvane(p, () => p.click('#cheti-aktivi'));
+    const vestAktivi = await tekstNa(p, '.vest');
+    proveri('вестта казва КОЛКО актива са прочетени и от кой вид',
+      vestAktivi.includes('От Журнала') && vestAktivi.includes('обекта с Имот'), true);
+    proveri('и носи сверка вход↔изход · разлика 0',
+      vestAktivi.includes('разлика 0'), true);
+    proveri('четенето от Журнала НЕ пише нищо', await broySabitiya(p), prediAktivi);
+    proveri('и таблицата вече показва редове от книгата',
+      await p.$$eval('.red.stoynost:not(.sbor)', (e) => e.length) > 0, true);
+
+    razdel = '107 · разбивката по Имот се ОТКЛЮЧВА от Журнала';
+    // ИМОТ СЪС СТОЙНОСТ · разбивката сравнява вписаното срещу сметнатото, тъй
+    // че иска и двете. Вписва се ТУК, за да не зависи от реда на блоковете.
+    await naEkran(p, 'imoti', '#forma-imot');
+    await dobaviImotBezObekt(p, 'Гара Яна', { stoynost: '300 000,00', kvadratura: '2 000,00' });
+    await naEkran(p, 'stoynost', '#cheti-ploshti');
+    await deystvieSPrerisuvane(p, () => p.click('#cheti-aktivi'));
+    await p.waitForSelector('[data-tablitsa=stoynost-po-imot]');
+    proveri('сравнението вече има ред на Имот',
+      await p.$eval('[data-tablitsa=stoynost-po-imot]', (e) =>
+        Number((e as HTMLElement).dataset['poImot'])) > 0, true);
+    proveri('и всеки ред носи СВОЯ разлика, не общата',
+      await p.$$eval('[data-imot-razlika]', (e) =>
+        e.every((x) => Number.isInteger(Number((x as HTMLElement).dataset['imotRazlika'])))), true);
+    proveri('Имотът без Обект се оценява по квадратурата си',
+      await p.$$eval('[data-imot-sravnenie]', (e) =>
+        e.some((x) => (x as HTMLElement).dataset['imotSravnenie'] === 'Гара Яна')), true);
+    // СВЕРКАТА НА САМАТА РАЗБИВКА · сборът на редовете е сметнатото общо, тъй
+    // че нищо не потъва: нито Имот без стойност в книгата, нито обект, чийто
+    // Имот не е вписан (той има свой ред „без вписан Имот").
+    proveri('разбивката се сверява със сметнатото · разлика 0',
+      await p.$eval('[data-razbivka-sverka]', (e) =>
+        Number((e as HTMLElement).dataset['razbivkaSverka'])), 0);
+
+    razdel = '107 · падащото меню добавя ЕДИН Имот, без да дублира';
+    const prediEdin = await p.$$eval('.red.stoynost:not(.sbor)', (e) => e.length);
+    await deystvieSPrerisuvane(p, () => p.selectOption('#aktiv-edin', 'Гара Яна'));
+    proveri('вече добавеният не влиза втори път',
+      await p.$$eval('.red.stoynost:not(.sbor)', (e) => e.length), prediEdin);
+    proveri('и екранът го КАЗВА, вместо да мълчи',
+      (await tekstNa(p, '.vest')).includes('вече бяха тук'), true);
+
+    razdel = '105 · оценката срещу вписаното · нула събития';
+    const prediSravnenie = await broySabitiya(p);
+    proveri('секцията „Оценката срещу книгата" стои на екрана',
+      await p.$$eval('[data-sektsiya=stoynost-sravnenie]', (e) => e.length), 1);
+    proveri('и носи сметнатата съгласувана стойност',
+      await p.$eval('[data-smetnata-stoynost]', (e) =>
+        Number((e as HTMLElement).dataset['smetnataStoynost'])) > 0, true);
+    // ТРИ реда, ТОЧНО: вписано · сметнато · разлика. Броят е пин с ръка —
+    // „по-голямо или равно на нула" е проверка, която не може да падне.
+    proveri('редовете са ТРИ · вписано, сметнато, разлика',
+      await p.$$eval('[data-sektsiya=stoynost-sravnenie] [data-sravnenie]', (e) => e.length), 3);
+    // РАЗЛИКАТА се СМЯТА тук наново: сметнато минус вписано, в цели центове.
+    const trite = await p.$$eval('[data-sektsiya=stoynost-sravnenie] [data-sravnenie]', (e) =>
+      e.map((x) => (x as HTMLElement).dataset['sravnenie']));
+    proveri('и стоят в този ред · числото се чете отгоре надолу',
+      trite.join(' · '), 'vpisano · smetnato · razlika');
+    proveri('разликата носи СВОЕ число, не надпис',
+      Number.isInteger(
+        await p.$eval('[data-sektsiya=stoynost-sravnenie] [data-razlika]', (e) =>
+          Number((e as HTMLElement).dataset['razlika'])),
+      ), true);
+    proveri('гледането не пише НИЩО в Журнала', await broySabitiya(p), prediSravnenie);
+    proveri('и бутон за вписване НЯМА · „няма редакция от там"',
+      await p.$$eval('#stoynost-vpishi', (e) => e.length), 0);
 
     // ══ 52 · Журналът от таблица (И96 т.8) ═══════════════════════════════════
     //

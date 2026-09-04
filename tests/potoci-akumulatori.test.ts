@@ -16,7 +16,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { nachisliZaPeriod } from '../src/domein/nachislyavane.js';
 import { POTOTSI, smetki, potototsiNaRazhod } from '../src/domein/smetki.js';
@@ -75,7 +75,7 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
       {
         imotId: 'I-1',
         naemetel: n.naemetel,
-        naem_st: stotinki(n.naem_st),
+        naem_st: tsentove(n.naem_st),
         padezhDen: 5,
         ot: '2024-01-01',
         do: '',
@@ -96,12 +96,12 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
 
   await d.priemiPlashtane(
     'P-kesh',
-    { vzemaneId: vzemaniya[0]!.id, suma_st: stotinki(500_00), nachin: 'в брой', data: '2026-08-06' },
+    { vzemaneId: vzemaniya[0]!.id, suma_st: tsentove(500_00), nachin: 'в брой', data: '2026-08-06' },
     { opId: 'op-p-kesh' },
   );
   await d.priemiPlashtane(
     'P-banka',
-    { vzemaneId: vzemaniya[1]!.id, suma_st: stotinki(1200_00), nachin: 'банка', data: '2026-08-07' },
+    { vzemaneId: vzemaniya[1]!.id, suma_st: tsentove(1200_00), nachin: 'банка', data: '2026-08-07' },
     { opId: 'op-p-banka' },
   );
 
@@ -112,10 +112,10 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
       imotId: 'I-1',
       kupuvach: 'Петър Иванов',
       telefon: '0888 000 000',
-      tsena_st: stotinki(200_000_00),
-      prodazhba_st: stotinki(190_000_00),
-      smr_st: stotinki(10_000_00),
-      pd_st: stotinki(180_000_00),
+      tsena_st: tsentove(200_000_00),
+      prodazhba_st: tsentove(190_000_00),
+      smr_st: tsentove(10_000_00),
+      pd_st: tsentove(180_000_00),
       sastoyanie: 'tekushta',
     },
     { opId: 'op-prodazhba' },
@@ -125,7 +125,7 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
       dvizhenieId: 'PRD-1',
       prodazhbaId: 'PR-1',
       vid: 'Капаро',
-      suma_st: stotinki(20_000_00),
+      suma_st: tsentove(20_000_00),
       data: '2026-08-14',
       belezhka: 'капаро по предварителен договор',
       nachin: 'банка',
@@ -141,7 +141,7 @@ async function vsichkiPotoci(d: Deystviya): Promise<void> {
         potok: r.potok,
         dostavchik: `Доставчик ${i + 1}`,
         opis: r.opis,
-        suma_st: stotinki(r.suma_st),
+        suma_st: tsentove(r.suma_st),
         sektor: r.sektor,
         nachin: 'банка',
         data: '2026-08-12',
@@ -312,7 +312,7 @@ describe('сверките затварят, когато в периода им
         potok: 'fakturi',
         dostavchik: 'Още един',
         opis: 'арматура',
-        suma_st: stotinki(600_00),
+        suma_st: tsentove(600_00),
         sektor: 'pokupki-materiali',
         nachin: 'банка',
         data: '2026-08-20',

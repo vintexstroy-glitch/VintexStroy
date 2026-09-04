@@ -16,8 +16,24 @@
 import type { Konteks } from './ekranite.js';
 import { prilozhiSkritite, skriyKolona } from './skriti-koloni.js';
 import { KLIPBORDAT_OTKAZA, kopirayKletkite } from './klaviatura.js';
+import { zavediDoSektsiyata } from './menyu-ekran.js';
+import { predizberi } from './predizbor.js';
+import { drazhkiteNa, type RolyaZaDrazhkite } from '../src/domein/drazhki-na-imota.js';
 
 let otvorenoMenyu: HTMLElement | null = null;
+
+/**
+ * КАКВОТО МЕНЮТО ТРЯБВА ДА ЗНАЕ ЗА ДРЪЖКИТЕ (резен 100 · ADR-164) · ролята
+ * на гледащия и пътят към друг екран. Слушателят се закача ВЕДНЪЖ, а човекът
+ * може да е друг след следващото влизане — затова стойностите се ОБНОВЯВАТ
+ * при всяко рисуване, а не се затварят в closure при закачането.
+ */
+interface ZaDrazhkite {
+  readonly rolya: RolyaZaDrazhkite;
+  readonly otvoriEkran: (ekran: string) => Promise<void>;
+  readonly prerisuvay: () => Promise<void>;
+}
+let zaDrazhkite: ZaDrazhkite | null = null;
 
 /** Слушателят на скрола се закача при отваряне и се маха при затваряне —
  *  виж дългата бележка при отварянето защо не може да стои постоянно. */
@@ -34,7 +50,8 @@ function zatvori(): void {
  *  закачане би трупало по един слушател на всяко прерисуване. */
 let zakacheno = false;
 
-export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
+export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks, drazhki: ZaDrazhkite): void {
+  zaDrazhkite = drazhki;
   if (zakacheno) return;
   zakacheno = true;
   // „⋯" · ВТОРАТА ДРЪЖКА за iOS (И124 т.3 · резен 77 · ADR-134): там
@@ -50,8 +67,9 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
     );
   });
   koren.addEventListener('contextmenu', (e) => {
-    // Освен `.red` менюто се вдига и на ОБЕКТЕН ред от истинска `<table>`
-    // (местата) — той се познава по адреса на папката си (резен 77).
+    // Освен `.red` менюто се вдига и на реда на ИМОТА от истинска `<table>`
+    // (`tr[data-imot]` в Имоти · `tr[data-myasto]` в Управление, резен 99) —
+    // той се познава по адреса на папката си (резен 77).
     const red = (e.target as HTMLElement).closest<HTMLElement>('.red, [data-papka-adres]');
     if (!red) return; // извън ред браузърното меню си е на мястото
     e.preventDefault();
@@ -72,6 +90,33 @@ export function zakachiKontekstnoMenyu(koren: HTMLElement, k: Konteks): void {
       });
       menyu.append(b);
     };
+
+    // ── ЧЕТИРИТЕ ДРЪЖКИ НА ИМОТА (И124 т.8 · резен 100 · ADR-164) ────────────
+    //
+    // „Има място където се създават Имоти и отделно Дело или Среща или друго
+    // вкарано по избор от стопанина." Мястото е ТОВА меню: дръжки към СЪЩИТЕ
+    // форми — Нов обект (Имоти), Ново дело (Управление), Нова среща (Контакти)
+    // — с предварително избран Имот. Нищо не се пише оттук; формата пише.
+    // На реда на ОБЕКТА е само „Ново дело" (И131 т.2: „Делата са за Имот и за
+    // Обект"), с Обекта предизбран. Наблюдателят не ги вижда (правило 23).
+    const imotNaReda = red.dataset['imot'] ?? red.dataset['myasto'];
+    const obektNaReda = red.dataset['obektAdres'];
+    const vidNaReda = imotNaReda !== undefined ? 'imot' : obektNaReda !== undefined ? 'obekt' : null;
+    if (vidNaReda !== null && zaDrazhkite !== null) {
+      const { rolya, otvoriEkran, prerisuvay } = zaDrazhkite;
+      const izbor = {
+        imot: (vidNaReda === 'imot' ? imotNaReda : obektNaReda) ?? '',
+        obekt: vidNaReda === 'obekt' ? (red.dataset['obektEdinitsa'] ?? '') : '',
+      };
+      const drazhki = drazhkiteNa(rolya, vidNaReda);
+      for (const d of drazhki) {
+        dobavi(d.ime, () => {
+          predizberi(d.ekran, izbor);
+          void zavediDoSektsiyata(d.ekran, d.sektsiya, otvoriEkran, prerisuvay);
+        });
+      }
+      if (drazhki.length > 0) menyu.append(document.createElement('hr'));
+    }
 
     // ── ПЪТЯТ НА ОБЕКТА (И124 т.3 · т.7 · резен 77 · ADR-134) ──────────────
     //

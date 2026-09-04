@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { mozheLiDaSeStornira } from '../src/domein/storno.js';
@@ -38,7 +38,7 @@ const IMOT = { adres: 'Малинова', edinitsa: 'АП. № 1', ploshtad_kvsm
 const NAEM = {
   imotId: 'I-1',
   naemetel: 'Стройпласт ЕООД',
-  naem_st: stotinki(1200_00),
+  naem_st: tsentove(1200_00),
   padezhDen: 5,
   ot: '2026-01-01',
   do: '',
@@ -158,7 +158,7 @@ describe('вратарят на сторното', () => {
     await nachisliZaPeriod({ deystviya: d, period: '2026-02', kogato: KOGATO });
     await d.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V:2026-02:N-1', suma_st: stotinki(600_00), nachin: 'в брой', data: '2026-02-10' },
+      { vzemaneId: 'V:2026-02:N-1', suma_st: tsentove(600_00), nachin: 'в брой', data: '2026-02-10' },
       { opId: 'op-pl' },
     );
 
@@ -208,7 +208,7 @@ describe('вратарят на сторното', () => {
     await nachisliZaPeriod({ deystviya: d, period: '2026-02', kogato: KOGATO });
     await d.priemiPlashtane(
       'P-1',
-      { vzemaneId: 'V:2026-02:N-1', suma_st: stotinki(600_00), nachin: 'в брой', data: '2026-02-10' },
+      { vzemaneId: 'V:2026-02:N-1', suma_st: tsentove(600_00), nachin: 'в брой', data: '2026-02-10' },
       { opId: 'op-pl' },
     );
     const plashtaneSeq = (await d.ogledalo()).plashtaniya.get('P-1')!.seq;

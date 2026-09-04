@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { PLANOVE } from '../src/domein/planove.js';
 import {
@@ -52,7 +52,7 @@ const razhod = (data: string) => ({
   potok: 'fakturi',
   dostavchik: 'Баумит ЕООД',
   opis: 'вар',
-  suma_st: stotinki(120_00),
+  suma_st: tsentove(120_00),
   sektor: 'pokupki-materiali',
   nachin: 'банка' as const,
   data,

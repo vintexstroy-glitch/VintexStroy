@@ -7,7 +7,7 @@
  */
 
 import { describe, expect, it } from 'vitest';
-import { DnevnikVPametta, stotinki, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
+import { DnevnikVPametta, tsentove, Vrata, VsichkoRazresheno } from '../src/yadro/index.js';
 import { Deystviya } from '../src/domein/deystviya.js';
 import { VID } from '../src/domein/sabitiya.js';
 import { GreshkaZamrazen, eZamrazen } from '../src/domein/zamrazyavane.js';
@@ -41,7 +41,7 @@ async function nasadi(d: Deystviya) {
   await d.dobaviImot('I-1', { adres: 'Дианабад', edinitsa: 'ОФИС № 3', ploshtad_kvsm: 0 },
     { opId: 'op-imot' });
   await d.dobaviNaem('N-1', {
-    imotId: 'I-1', naemetel: 'Стройпласт ЕООД', naem_st: stotinki(1200_00),
+    imotId: 'I-1', naemetel: 'Стройпласт ЕООД', naem_st: tsentove(1200_00),
     padezhDen: 5, ot: '2026-01-01', do: '', depozit_st: 0, sektor: 'naem-targovski',
   }, { opId: 'op-naem' });
   await nachisliZaPeriod({ deystviya: d, period: PERIOD, kogato: KOGATO });
@@ -49,7 +49,7 @@ async function nasadi(d: Deystviya) {
 
 async function poday(d: Deystviya) {
   return d.podaySpravka(
-    { period: PERIOD, dds_deklarirano_st: stotinki(200_00), data: '2026-03-10', belezhka: '' },
+    { period: PERIOD, dds_deklarirano_st: tsentove(200_00), data: '2026-03-10', belezhka: '' },
     { opId: 'op-spravka' },
   );
 }
@@ -66,20 +66,20 @@ describe('справката заключва', () => {
     await expect(
       d.nachisliVzemane('V-x', {
         naemId: 'N-1', period: PERIOD, osnovanie: 'наем',
-        suma_st: stotinki(100_00), padezh: '2026-02-28',
+        suma_st: tsentove(100_00), padezh: '2026-02-28',
       }, { opId: 'op-x1' }),
     ).rejects.toThrow(GreshkaZamrazen);
 
     await expect(
       d.priemiPlashtane('P-x', {
-        vzemaneId: `V:${PERIOD}:N-1`, suma_st: stotinki(100_00),
+        vzemaneId: `V:${PERIOD}:N-1`, suma_st: tsentove(100_00),
         nachin: 'в брой', data: '2026-02-20',
       }, { opId: 'op-x2' }),
     ).rejects.toThrow(GreshkaZamrazen);
 
     await expect(
       d.zapishiRazhod('R-x', {
-        potok: 'fakturi', dostavchik: 'Х', opis: 'х', suma_st: stotinki(100_00),
+        potok: 'fakturi', dostavchik: 'Х', opis: 'х', suma_st: tsentove(100_00),
         sektor: 'pokupki-materiali', nachin: 'банка', data: '2026-02-14', dokument: '',
       }, { opId: 'op-x3' }),
     ).rejects.toThrow(GreshkaZamrazen);
@@ -98,7 +98,7 @@ describe('справката заключва', () => {
     // Пари, дошли ДНЕС за февруарско вземане: данъчното събитие на плащането
     // е неговата дата, а тя е в свободен месец.
     await d.priemiPlashtane('P-dnes', {
-      vzemaneId: `V:${PERIOD}:N-1`, suma_st: stotinki(600_00),
+      vzemaneId: `V:${PERIOD}:N-1`, suma_st: tsentove(600_00),
       nachin: 'банка', data: '2026-03-15',
     }, { opId: 'op-dnes' });
 
@@ -126,7 +126,7 @@ describe('справката заключва', () => {
 
     async function podayPak(dd: Deystviya) {
       return dd.podaySpravka(
-        { period: PERIOD, dds_deklarirano_st: stotinki(300_00), data: '2026-03-11', belezhka: '' },
+        { period: PERIOD, dds_deklarirano_st: tsentove(300_00), data: '2026-03-11', belezhka: '' },
         { opId: 'op-spravka-2' },
       );
     }
@@ -146,7 +146,7 @@ describe('справката заключва', () => {
 
     // Периодът пак приема; следата — справка + сторно — стои в Журнала.
     await d.zapishiRazhod('R-sled', {
-      potok: 'fakturi', dostavchik: 'Х', opis: 'късен', suma_st: stotinki(120_00),
+      potok: 'fakturi', dostavchik: 'Х', opis: 'късен', suma_st: tsentove(120_00),
       sektor: 'pokupki-materiali', nachin: 'банка', data: '2026-02-25', dokument: '',
     }, { opId: 'op-sled' });
 
@@ -193,9 +193,9 @@ describe('трите числа на ДДС', () => {
     await nasadi(d);
     await poday(d); // декларирано 200,00 — колкото е изчисленото
 
-    await d.platiDDS('DP-1', { period: PERIOD, suma_st: stotinki(150_00), data: '2026-03-14', nachin: 'банка' },
+    await d.platiDDS('DP-1', { period: PERIOD, suma_st: tsentove(150_00), data: '2026-03-14', nachin: 'банка' },
       { opId: 'op-dp1' });
-    await d.platiDDS('DP-2', { period: PERIOD, suma_st: stotinki(50_00), data: '2026-03-20', nachin: 'банка' },
+    await d.platiDDS('DP-2', { period: PERIOD, suma_st: tsentove(50_00), data: '2026-03-20', nachin: 'банка' },
       { opId: 'op-dp2' });
 
     const o = await d.ogledalo();

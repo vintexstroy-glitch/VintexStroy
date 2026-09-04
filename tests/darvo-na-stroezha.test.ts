@@ -8,15 +8,19 @@ import { describe, expect, it } from 'vitest';
 import {
   broyatNaShablona,
   delataOtShablona,
+  imaZhivKoren,
   KORENAT_NA_STROEZHA,
+  opIdNaDeloOtShablona,
+  predlagaLiDarvo,
   SHABLON_NA_STROEZHA,
 } from '../src/domein/darvo-na-stroezha.ts';
+import { BAZOVI_SASTOYANIYA_NA_IMOT } from '../src/domein/sastoyaniya-na-imot.ts';
 
 const DNES = '2026-09-01';
 
 function redovete() {
   let n = 0;
-  return delataOtShablona('Върба', 'вила 1', 'vintexstroy@gmail.com', DNES, () => `D-${(n += 1)}`);
+  return delataOtShablona('Върба', 'vintexstroy@gmail.com', DNES, () => `D-${(n += 1)}`);
 }
 
 describe('шаблонът на строежа · формата на дървото', () => {
@@ -68,10 +72,10 @@ describe('делата от шаблона · готови за Вратата',
     }
   });
 
-  it('мястото, обектът и извършващият пътуват до всяко дело (И124 т.7)', () => {
+  it('Имотът и извършващият пътуват до всяко дело · Обект НЯМА, дървото е на Имота (И131 т.2)', () => {
     for (const r of redovete()) {
       expect(r.danni.myasto).toBe('Върба');
-      expect(r.danni.obekt).toBe('вила 1');
+      expect(r.danni.obekt).toBe('');
       expect(r.danni.otgovornik).toBe('vintexstroy@gmail.com');
       expect(r.danni.sastoyanie).toBe('чака');
       expect(r.danni.ot).toBe(DNES);
@@ -81,5 +85,41 @@ describe('делата от шаблона · готови за Вратата',
   it('идентификаторите са уникални · две дела на един ключ се презаписват тихо', () => {
     const redove = redovete();
     expect(new Set(redove.map((r) => r.id)).size).toBe(redove.length);
+  });
+});
+
+describe('спусъкът е СЪСТОЯНИЕТО „Строителство" (резен 104 · ADR-165)', () => {
+  const zhivi = [
+    { myasto: 'Върба', ime: 'Покрив', nadDelo: 'D-1' },
+    { myasto: 'Хисаря', ime: KORENAT_NA_STROEZHA, nadDelo: '' },
+  ];
+
+  it('коренът на дървото и първото базово състояние са ЕДНА дума · кръстосан пин', () => {
+    expect(BAZOVI_SASTOYANIYA_NA_IMOT).toContain('Строителство');
+    expect(KORENAT_NA_STROEZHA).toBe(BAZOVI_SASTOYANIYA_NA_IMOT[0]);
+    expect(KORENAT_NA_STROEZHA).toBe('Строителство');
+  });
+
+  it('предлага се при „Строителство" без жив корен · иначе не', () => {
+    expect(predlagaLiDarvo('Строителство', zhivi, 'Върба')).toBe(true);
+    expect(predlagaLiDarvo('Наем', zhivi, 'Върба')).toBe(false);
+    expect(predlagaLiDarvo('', zhivi, 'Върба')).toBe(false);
+    // Хисаря вече има жив корен · второ дърво е дубъл.
+    expect(predlagaLiDarvo('Строителство', zhivi, 'Хисаря')).toBe(false);
+    expect(predlagaLiDarvo('Строителство', zhivi, ' хисаря ')).toBe(false);
+  });
+
+  it('живият корен се познава по името, по празния родител и по СВЕДЕНИЯ Имот', () => {
+    expect(imaZhivKoren(zhivi, 'Хисаря')).toBe(true);
+    expect(imaZhivKoren(zhivi, 'Върба')).toBe(false);
+    expect(imaZhivKoren([{ myasto: 'Върба', ime: KORENAT_NA_STROEZHA, nadDelo: 'D-9' }], 'Върба')).toBe(false);
+  });
+
+  it('opId носи ДЕЙСТВИЕТО · Имот + път в шаблона, без случайно число (правило 5 · 20)', () => {
+    const redove = redovete();
+    expect(redove.map((r) => r.pat).slice(0, 5)).toEqual(['0', '1', '1.1', '1.2', '1.3']);
+    expect(new Set(redove.map((r) => r.pat)).size).toBe(redove.length);
+    expect(opIdNaDeloOtShablona('Върба', '1.2')).toBe('darvo:върба:1.2');
+    expect(opIdNaDeloOtShablona(' ВЪРБА ', '1.2')).toBe(opIdNaDeloOtShablona('върба', '1.2'));
   });
 });

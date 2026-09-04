@@ -431,6 +431,11 @@ export interface Sreshta {
   readonly kontakt: string;
   /** „**Адрес на срещата**" *(р57·[34])* · по избор — среща по телефона няма адрес */
   readonly adres: string;
+  /**
+   * ИМОТЪТ · по избор (резен 99 · И129 т.3: „Среша може без Имот и без Обект.
+   * Те са опция."). По ИМЕ, както делото сочи своя; празно значи „без имот".
+   */
+  readonly imot: string;
   /** КОГА · датата; часът е ОТДЕЛЕН и по избор */
   readonly data: string;
   /**
@@ -540,7 +545,7 @@ export function zakachanetoNa(
           nadpis: i.edinitsa === '' ? i.adres : `${i.adres} · ${i.edinitsa}`,
           nameren: true,
         })
-      : Object.freeze({ kam: 'имот' as const, nadpis: 'имотът вече го няма', nameren: false });
+      : Object.freeze({ kam: 'имот' as const, nadpis: 'обектът вече го няма', nameren: false });
   }
   const d = dela.get(p.zakachenaId);
   if (!d) return Object.freeze({ kam: 'дело' as const, nadpis: 'делото вече го няма', nameren: false });

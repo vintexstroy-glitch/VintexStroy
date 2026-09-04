@@ -163,7 +163,7 @@ export function koefitsient(
  * законът от ADR-012: закръгленото никога не влиза в сбор.
  *
  * Редът на делението е нарочен: първо се умножават ЦЕЛИТЕ числа (площ в кв.см
- * × база в стотинки × два коефициента в б.т.), после се дели веднъж. Обратният
+ * × база в центове × два коефициента в б.т.), после се дели веднъж. Обратният
  * ред би закръглил по средата и разликата щеше да расте с всеки обект.
  */
 export function tsenaTochno(n: {
@@ -267,7 +267,7 @@ export function tsenaPoSastoyanie(n: {
 }): number {
   const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   if (!Number.isSafeInteger(n.naem_mesechen_st) || n.naem_mesechen_st < 0) {
-    throw new GreshkaMatritsa(`Наемът се дава в цели стотинки; получено: ${n.naem_mesechen_st}`);
+    throw new GreshkaMatritsa(`Наемът се дава в цели центове; получено: ${n.naem_mesechen_st}`);
   }
   if (m.dohodnost_bt <= 0) {
     throw new GreshkaMatritsa('Доходност нула или под нула не капитализира — сметката е невъзможна.');
@@ -313,6 +313,17 @@ export function tsenaPoRazhod(n: {
   readonly obshta_kvsm: number;
   readonly vid: VidObekt;
   readonly matritsa?: Matritsa;
+  /**
+   * САМО ЗЕМЯ · Имот със статут „земя" (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „земя е Имот с различен Статут", и на въпроса как се смята:
+   * **„Само земята, без сграда и без наем."** Тогава строителната стойност и
+   * овехтяването отпадат — няма сграда, която да остарява, — и подходът връща
+   * земята за квадрат по площта. Липсваща земя пак е сентинел за „не е
+   * дадено" и връща нула, за да отпадне подходът, вместо да излъже с половин
+   * сметка.
+   */
+  readonly samoZemya?: boolean;
 }): number {
   const m = n.matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   const zemya_st_kvm = m.zemya_st_kvm[n.vid];
@@ -346,6 +357,13 @@ export function tsenaPoRazhod(n: {
    * нула" на друго. Оттук нататък значи първото навсякъде, а `saglasuvana`
    * изхвърля подхода и го НАЗОВАВА в „отпаднали" (правило 15).
    */
+  if (n.samoZemya === true) {
+    if (zemya_st_kvm === 0) return 0;
+    // площ(кв.см) × земя(цент/м²) ÷ 10 000 кв.см/м² · закръгляне към най-близкото
+    return Number(
+      (BigInt(n.obshta_kvsm) * BigInt(zemya_st_kvm) * 2n + 10_000n) / (10_000n * 2n),
+    );
+  }
   if (zemya_st_kvm === 0 || stroitelna_st_kvm === 0) return 0;
 
   // ОСТАНАЛОТО от сградата, в б.т. Възраст над живота дава нула, не отрицателно:
@@ -389,7 +407,7 @@ export function ostavashti_bt(matritsa?: Matritsa): number {
  *
  * ОСТАТЪКЪТ ОТ ПРЕНОРМИРАНЕТО отива на НАЙ-ГОЛЯМОТО от оцелелите тегла и това
  * е назовано (`matematika` §4): остатък, който изчезва, се появява по-късно
- * като „сметката не затваря с една стотинка".
+ * като „сметката не затваря с един цент".
  *
  * Всичко в `BigInt`, делене ВЕДНЪЖ накрая.
  */
@@ -485,7 +503,7 @@ export function ochakvanNaem_st(
   const m = matritsa ?? MATRITSA_ZA_RAZRABOTKA;
   const naem_st_kvm = m.naem_st_kvm[vid];
   if (naem_st_kvm === undefined) return 0;
-  // площ (кв.см) × наем (ст./м²) ÷ 10 000 → стотинки на месец
+  // площ (кв.см) × наем (ст./м²) ÷ 10 000 → центове на месец
   return Math.round((obshta_kvsm * naem_st_kvm) / 10_000);
 }
 

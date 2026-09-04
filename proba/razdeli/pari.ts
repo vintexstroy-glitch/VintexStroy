@@ -12,7 +12,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.fill('#period', '2026-02');
     await p.click('#forma-nachisli button[type=submit]');
     await p.waitForFunction(() => document.body.innerText.includes('Сверката затваря'));
-    proveri('осем събития след начисляване', await broySabitiya(p), 8 + OTKRIVASHTOTO);
+    proveri('осем събития след начисляване', await broySabitiya(p), 11 + OTKRIVASHTOTO);
     proveri('дължимо общо', await plochka(p, 'Дължимо общо'), '2 000,00 €');
 
     const vzemaniya = await redove(p, '.red.vzemane');
@@ -23,13 +23,13 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.fill('#period', '2026-02');
     await p.click('#forma-nachisli button[type=submit]');
     await p.waitForFunction(() => document.body.innerText.includes('вече е начислен'));
-    proveri('второто натискане не добави събитие', await broySabitiya(p), 8 + OTKRIVASHTOTO);
+    proveri('второто натискане не добави събитие', await broySabitiya(p), 11 + OTKRIVASHTOTO);
 
     // ══ 5 · плащания, надплащане, сторно ═════════════════════════════════
     razdel = '5 · плащания';
     await plati(p, 'Стройпласт', '600,00', 'в брой', '2026-02-10');
     proveri('частично · остатък', await ostatak(p, 'Стройпласт'), '600,00 €');
-    proveri('девет събития', await broySabitiya(p), 9 + OTKRIVASHTOTO);
+    proveri('девет събития', await broySabitiya(p), 12 + OTKRIVASHTOTO);
 
     await plati(p, 'Стройпласт', '700,00', 'банка', '2026-02-15');
     proveri('надплатеното излиза от просрочените', await ostatak(p, 'Стройпласт'), 'НЯМА РЕД');
@@ -38,11 +38,11 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     const zaStorno = (await redove(p, '.red.plashtane')).find((r) => r[3] === '700,00 €');
     proveri('плащането от 700,00 се вижда', Boolean(zaStorno), true);
     await sSabitie(p, () => p.click(`.red.plashtane:has-text("700,00") [data-storno]`));
-    proveri('единайсет събития след сторно', await broySabitiya(p), 11 + OTKRIVASHTOTO);
+    proveri('единайсет събития след сторно', await broySabitiya(p), 14 + OTKRIVASHTOTO);
     proveri('сторното върна остатъка', await ostatak(p, 'Стройпласт'), '600,00 €');
 
     await plati(p, 'Стройпласт', '600,00', 'банка', '2026-02-15');
-    proveri('дванайсет събития', await broySabitiya(p), 12 + OTKRIVASHTOTO);
+    proveri('дванайсет събития', await broySabitiya(p), 15 + OTKRIVASHTOTO);
     proveri('дължимо общо накрая', await plochka(p, 'Дължимо общо'), '800,00 €');
 
     // ══ 6 · сметки и ДДС ═════════════════════════════════════════════════

@@ -64,7 +64,7 @@ export interface ChislovaKolona {
   readonly kolona: number;
   /** заглавието от хедъра, както го е написал източникът */
   readonly ime: string;
-  /** сборът на цялата колона, цели стотинки */
+  /** сборът на цялата колона, цели центове */
   readonly sbor_st: number;
   /** колко реда в нея са се разчели като число */
   readonly broy: number;

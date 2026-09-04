@@ -1,6 +1,6 @@
 ---
 name: masterbook-data
-description: "MasterBook (VintexStroy) data analysis context — property, rentals, sales, loans, accounting, payments, projects/Gantt. Provides entity definitions, metric formulas, standard filters and gotchas for querying MasterBook data. Use when analyzing MasterBook data for: (1) rent & receivables, (2) property portfolio & occupancy, (3) accounting/VAT & payments, (4) projects/Gantt & resource load, or any question needing MasterBook-specific context. Money is always whole стотинки; truth lives in the append-only Журнал; читаемите изгледи са Огледало (производни)."
+description: "MasterBook (VintexStroy) data analysis context — property, rentals, sales, loans, accounting, payments, projects/Gantt. Provides entity definitions, metric formulas, standard filters and gotchas for querying MasterBook data. Use when analyzing MasterBook data for: (1) rent & receivables, (2) property portfolio & occupancy, (3) accounting/VAT & payments, (4) projects/Gantt & resource load, or any question needing MasterBook-specific context. Money is always whole центове; truth lives in the append-only Журнал; читаемите изгледи са Огледало (производни)."
 ---
 
 # MasterBook · Data Analysis Context
@@ -83,7 +83,7 @@ MasterBook е **event-sourcing** (дневник от събития) с **ра�
 
 | Термин | Определение | Капан |
 |---|---|---|
-| Стотинки | Парите се пазят като **цяло число стотинки** | НИКОГА float; форматирай към ЕВРО чрез /100 — лев няма (правило 3) |
+| Центове | Парите се пазят като **цяло число центове** | НИКОГА float; форматирай към ЕВРО чрез /100 — лев няма (правило 3) |
 | Журнал | Дневникът от събития (истината) | само добавяне; „текущо" = агрегат, не последен ред |
 | Огледало | Производният изглед | не се съхранява; преизгражда се |
 | Сторно | Поправка чрез ново обратно събитие | стар ред не се пипа никога |
@@ -114,7 +114,7 @@ WHERE начало <= :край_период AND (край IS NULL OR край >
 
 ```ts
 const o = await deystviya.ogledalo();          // fold(събития) — производно
-const dlg = duljimo(o);                        // всичко в стотинки, цели числа
+const dlg = duljimo(o);                        // всичко в центове, цели числа
 poImot(o) · poKontragent(o)                    // готовите изгледи
 ```
 
@@ -129,7 +129,7 @@ poImot(o) · poKontragent(o)                    // готовите изглед
    състояние е агрегат. (Точно това счупи пресяването — виж постмортема за загуба.)
 2. **Общ курсор при синхрон** вместо **курсор на наемател** → прескочени събития през Моста
    (тих инцидент). Винаги синхронизирай по наемател.
-3. **Float за пари.** Води до 1-стотинкови разминавания в ДДС. Само цели стотинки.
+3. **Float за пари.** Води до 1-центови разминавания в ДДС. Само цели центове.
 4. **„Последен ред = истина".** Не. Сторно-моделът значи агрегат на всички събития.
 5. **Смесване на дати с/без часова зона.** Пази дати ISO (YYYY-MM-DD); ако има час — една зона.
 6. **Наемател (tenant) ↔ наемател (по договор)** объркване → изтичане на чужди данни (С1).

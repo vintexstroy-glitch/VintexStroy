@@ -12,7 +12,7 @@
  * Един двигател за всички таблици: колоните се описват, не се програмират.
  */
 
-import { eStotinki, pishi } from '../src/yadro/pari.js';
+import { eTsentove, pishi } from '../src/yadro/pari.js';
 import { ekraniraj } from './obshto.js';
 import { eChislo, type VidStoynost } from '../src/domein/vid-stoynost.js';
 import { chetiEkranno, zapomniEkranno } from './pamet-ekran.js';
@@ -375,7 +375,7 @@ export function grupiraj<T>(
 }
 
 /**
- * Сборовете на една група · САМО колоните с вид `evro`, в цели стотинки.
+ * Сборовете на една група · САМО колоните с вид `evro`, в цели центове.
  * Airtable е упрекван точно за „групите не сумират" — тук групата сумира,
  * а сборът никъде не се записва: той е поглед, не събитие.
  */
@@ -392,7 +392,7 @@ export function sboroveNaGrupata<T>(
         // празното (напр. продаден обект) не е нула по право — то просто липсва
         if (surovo === '') return sbor;
         const st = Number(surovo);
-        return sbor + (eStotinki(st) ? st : 0);
+        return sbor + (eTsentove(st) ? st : 0);
       }, 0),
     }));
 }

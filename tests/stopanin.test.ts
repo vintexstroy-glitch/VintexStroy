@@ -275,3 +275,44 @@ describe('пинът · името на събитието се твърди с 
     expect(OTKRIVASHTO_SABITIE).toBe('СтопанинЗаписан');
   });
 });
+
+describe('веригата на ПИСАЧ · открита е книгата, не веригата (ADR-055 · резен 98)', () => {
+  // НАМЕРЕНО ОТ ПРОХОДА (ADR-154 §6): служителят на своето устройство има
+  // ПРАЗНА верига, а правилото „празен Журнал приема само откриващото" я
+  // заключваше — първото му събитие не е и не може да е Стопанинът. Тестовете
+  // на веригите строяха Вратата БЕЗ `parvoto` и дупката беше невидима.
+  const PISACH = 'bamstera@example.bg';
+  const VERIGA = `vintexstroy#pero:${PISACH}`;
+  function vrataSPisachi() {
+    const dnevnik = new DnevnikVPametta();
+    return new Vrata({
+      dnevnik,
+      pravata: new VsichkoRazresheno(),
+      sha: SHA,
+      parvoto: OTKRIVASHTO_SABITIE,
+      bezOtkrivane: (naematel) => naematel.includes('#pero:'),
+    });
+  }
+
+  it('празната верига на писач приема ОБИКНОВЕНО събитие първо', async () => {
+    const vrata = vrataSPisachi();
+    await expect(
+      vrata.dobavi(operatsiya({ opId: 'p-1', naematel: VERIGA, actor: PISACH })),
+    ).resolves.toMatchObject({ seq: 1, povtoreno: false });
+  });
+
+  it('а откриващото в нея е ОТКАЗАНО · втори стопанин в чужд подпис не се записва', async () => {
+    const vrata = vrataSPisachi();
+    await expect(
+      vrata.dobavi(operatsiya({ ...stopaninat('p-s', PISACH), naematel: VERIGA })),
+    ).rejects.toMatchObject({ kod: 'NEVALIDNO' });
+    await expect(
+      vrata.dobavi(operatsiya({ ...stopaninat('p-s', PISACH), naematel: VERIGA })),
+    ).rejects.toThrow(/верига на писач/);
+  });
+
+  it('и веригата-нула си остава под правилото · без Стопанин нищо не влиза', async () => {
+    const vrata = vrataSPisachi();
+    await expect(vrata.dobavi(operatsiya({ opId: 'n-1' }))).rejects.toMatchObject({ kod: 'NEVALIDNO' });
+  });
+});

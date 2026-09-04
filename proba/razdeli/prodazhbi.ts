@@ -58,7 +58,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
         e.map((x) => (x as HTMLElement).dataset['kolona']),
       )
     ).join(' · '),
-    'Обект · Място · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
+    'Обект · Имот · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
       'Капаро · НС · НС кеш · Акт 15 · Акт 16 · проверка · Състояние',
   );
   proveri(
@@ -71,7 +71,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     await p.$$eval('[data-tablitsa=prodazhbi] .glava .glavicha.zatvorena', (e) =>
       e.map((x) => (x as HTMLElement).dataset['kolona']).join(' · '),
     ),
-    'Обект · Място · проверка',
+    'Обект · Имот · проверка',
   );
   // НУЛАТА ЧАКАЩИ СЕ КАЗВА · трите въпроса получиха негов отговор на 29.08.
   proveri(
@@ -119,7 +119,7 @@ export async function blok1(ctx: KonteksNaProhoda): Promise<void> {
     true,
   );
   proveri(
-    'Обект и Място се ЧЕТАТ от имота · не са празни',
+    'Обект и Имот се ЧЕТАТ от обекта · не са празни',
     (await p.$eval('.red.prodazhbared.izbran .kletka', (e) => e.textContent ?? '')).trim().length > 0,
     true,
   );
@@ -421,7 +421,7 @@ export async function blok2(ctx: KonteksNaProhoda): Promise<void> {
   proveri(
     'а неговите петнайсет пазят реда си помежду си',
     glavi.filter((k) => k !== 'Акт 17').join(' · '),
-    'Обект · Място · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
+    'Обект · Имот · Купувач · Телефон · Цена € · Продажба € · СМР € · ПД · ' +
       'Капаро · НС · НС кеш · Акт 15 · Акт 16 · проверка · Състояние',
   );
 

@@ -14,7 +14,14 @@ import { fold, type Ogledalo } from '../ogledalo/ogledalo.js';
 import { prochetiKnigata } from './knigata.js';
 import { praviTsikal, proveriOtsenkata, SASTOYANIYA as SASTOYANIYA_NA_DELO, ZAVARSHENO } from './dela.js';
 import { proveriChasa } from './kontakti.js';
-import { proveriMyastoto, sashtnostNaMyastoto } from './mesta.js';
+import { proveriImota, proveriObekta, sashtnostNaMyastoto } from './mesta.js';
+import {
+  BAZOVI_SASTOYANIYA_NA_IMOT,
+  GreshkaSastoyanieNaImot,
+  proveriSastoyanieNaImot,
+  sashtnostNaSastoyanie,
+  sastoyaniyataNaImota,
+} from './sastoyaniya-na-imot.js';
 import {
   GreshkaZadacha,
   napraviIzprashtane,
@@ -178,6 +185,8 @@ import type {
   PayloadKategoriyaZadadena,
   PayloadGodinaZatvorena,
   PayloadMyastoZapisano,
+  PayloadSastoyanieNaImotZapisano,
+  PayloadSastoyanieOtbelyazanoKatoZemya,
   PayloadZaplataZapisana,
   PayloadProdazhbaZapisana,
   PayloadPravoZapisano,
@@ -254,7 +263,10 @@ export class Deystviya {
       'ИмотДобавен',
       VID.imot,
       id,
-      { ...danni, papka: proveriPapkata(danni.papka ?? '') },
+      // АДРЕСЪТ Е ИМЕТО НА ИМОТА и единицата е самият обект (резен 99): празни,
+      // те раждат ред без дом и ред без име. Пазачът е тук, не на екрана —
+      // екран без бутон се заобикаля с конзолата.
+      { ...danni, ...proveriObekta(danni.adres, danni.edinitsa), papka: proveriPapkata(danni.papka ?? '') },
       z,
     );
   }
@@ -277,7 +289,13 @@ export class Deystviya {
       // ЛИПСВАЩОТО поле се подава ЛИПСВАЩО, не празно: празното значи „махни
       // папката", а липсващото — „не пипам папката". Слети, поправка на площта
       // щеше да трие линка мълчаливо.
-      danni.papka === undefined ? danni : { ...danni, papka: proveriPapkata(danni.papka) },
+      danni.papka === undefined
+        ? { ...danni, ...proveriObekta(danni.adres, danni.edinitsa) }
+        : {
+            ...danni,
+            ...proveriObekta(danni.adres, danni.edinitsa),
+            papka: proveriPapkata(danni.papka),
+          },
       z,
     );
   }
@@ -443,12 +461,86 @@ export class Deystviya {
    * предишна стойност и поправката би изчезнала мълчаливо (правило 20).
    */
   async zapishiMyasto(danni: PayloadMyastoZapisano, z: Zayavka): Promise<Rezultat> {
-    const ime = proveriMyastoto(danni.ime);
+    // ТРИТЕ ПОЛЕТА се проверяват тук (резен 99): числата са цели центове и цели
+    // кв. сантиметри, а състоянието е от номенклатурата. Списъкът се ЧЕТЕ от
+    // Огледалото — ядрото на мястото не сгъва Огледала, а Вратата вече го има.
+    const chisto = proveriImota(danni, sastoyaniyataNaImota(await this.ogledalo()));
     return this.#pusni(
       'МястоЗаписано',
       VID.myasto,
-      sashtnostNaMyastoto(ime),
-      { ...danni, ime },
+      sashtnostNaMyastoto(chisto.ime),
+      // ЛИПСВАЩИТЕ ключове НЕ влизат в товара: `stoynost_st: undefined` е поле
+      // със стойност `undefined` при проверката на Вратата за цели центове, а
+      // и в Журнала — а липсващото трябва да значи „не съм го пипал".
+      {
+        ime: chisto.ime,
+        firma: chisto.firma,
+        papka: chisto.papka,
+        ...(chisto.stoynost_st === undefined ? {} : { stoynost_st: chisto.stoynost_st }),
+        ...(chisto.kvadratura_kvsm === undefined ? {} : { kvadratura_kvsm: chisto.kvadratura_kvsm }),
+        ...(chisto.sastoyanie === undefined ? {} : { sastoyanie: chisto.sastoyanie }),
+      },
+      z,
+    );
+  }
+
+  /**
+   * ЗАПИСВА НОВО СЪСТОЯНИЕ НА ИМОТА · номенклатурата расте (резен 99 · ADR-157).
+   *
+   * Негово, 03.09: състоянията са „номенклатура от Настройки, като етапите".
+   * Двете проверки са същите като при етапа: празно име не се записва, а
+   * негово от начало не се презаписва — второто вписване не мени нищо и би
+   * дало два еднакви реда в менюто.
+   *
+   * КОЙ може, решава МЯСТОТО: секцията живее в Настройки и се вижда само от
+   * Стопанина — „меню, върху което системата СМЯТА, расте само от Настройки"
+   * (И97). Втора проверка тук би била втора врата към достъпа (правило 23).
+   */
+  async zapishiSastoyanieNaImot(
+    danni: PayloadSastoyanieNaImotZapisano,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const klyuch = proveriSastoyanieNaImot(danni.klyuch);
+    return this.#pusni(
+      'СъстояниеНаИмотЗаписано',
+      VID.sastoyanieNaImot,
+      sashtnostNaSastoyanie(klyuch),
+      { klyuch },
+      z,
+    );
+  }
+
+  /**
+   * ОТБЕЛЯЗВА СЪСТОЯНИЕ КАТО ЗЕМЯ · и го маха със същото действие
+   * (резен 111 · ADR-170).
+   *
+   * Негово, 04.09: „земя е Имот с различен Статут. Ще се добавят и трият
+   * статутите." Имената им са НЕГОВИ и идват от Настройки; кодът пази само
+   * отметката — кое състояние значи земя.
+   *
+   * ЕДНА проверка тук: състоянието трябва да СЪЩЕСТВУВА. Отметка върху дума,
+   * която я няма в менюто, е тиха настройка за нищо — а върху нея смята
+   * Калкулаторът.
+   */
+  async otbelezhiSastoyanieKatoZemya(
+    danni: PayloadSastoyanieOtbelyazanoKatoZemya,
+    z: Zayavka,
+  ): Promise<Rezultat> {
+    const klyuch = danni.klyuch.trim();
+    const o = await this.ogledalo();
+    const ima =
+      (BAZOVI_SASTOYANIYA_NA_IMOT as readonly string[]).includes(klyuch) ||
+      o.sastoyaniyaNaImotite.has(klyuch);
+    if (!ima) {
+      throw new GreshkaSastoyanieNaImot(
+        `Няма състояние „${klyuch}". Отметка върху дума извън менюто не мени нищо.`,
+      );
+    }
+    return this.#pusni(
+      'СъстояниеОтбелязаноКатоЗемя',
+      VID.sastoyanieNaImot,
+      sashtnostNaSastoyanie(klyuch),
+      { klyuch, zemya: danni.zemya },
       z,
     );
   }
@@ -1121,7 +1213,7 @@ export class Deystviya {
     proveriKletkaNaDobavka(o.modeli.get(danni.tablitsa), danni);
     if (danni.tablitsa === VGRADEN_IMOTI && !o.imoti.has(danni.redId)) {
       throw new GreshkaTablitsa(
-        `Ред „${danni.redId}" го няма сред имотите — клетка без ред няма къде да се покаже.`,
+        `Ред „${danni.redId}" го няма сред обектите — клетка без ред няма къде да се покаже.`,
       );
     }
     // Сесията се СМЯТА от потока и Огледалото не я държи (резен 82) — затова
@@ -1277,7 +1369,7 @@ export class Deystviya {
     const o = await this.ogledalo();
     if (!o.imoti.has(danni.imotId)) {
       throw new GreshkaProdazhba(
-        'Няма такъв имот. Сделката чете „Обект" и „Място" от имота — без него ' +
+        'Няма такъв обект. Сделката чете „Обект" и „Имот" от обекта — без него ' +
           'двете колони остават празни и никой не разбира защо.',
       );
     }
@@ -2252,7 +2344,7 @@ function proveriPadezhDen(den: number): void {
  *
  * ═══ ЗАЩО ПОИМЕННО, А НЕ ВЪРХУ ВСЯКО `_st` ═══
  *
- * Вратата пази, че всяко поле на `_st` е ЦЕЛИ стотинки (правило 3) — но нулата
+ * Вратата пази, че всяко поле на `_st` е ЦЕЛИ центове (правило 3) — но нулата
  * е цяло число и минава, а отрицателното също. За повечето суми това е ВЯРНО и
  * общ пазач щеше да отхвърли точно верните случаи:
  *
